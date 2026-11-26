@@ -1,13 +1,14 @@
 # Threat model
 
-Status: normative. As of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06); Hermes adapter external jobs (FIX-hermes-external-jobs, 2026-11-07); Hermes adapter session mirror (FEAT-hermes-mirror-sessions, 2026-11-07); Hermes adapter stage files (FEAT-hermes-adapter-stages, 2026-11-20); client IP from one forwarding header (AUD-srv-platform-01, 2026-11-11); failed credentials on the gateway (AUD-srv-gateway-01, 2026-11-11); backup service, off-site target and audit checkpoint sink drawn as built in M7 (audit finding docs-accuracy-15, 2026-11-23). Living document; maintenance rule in section 9.
+Status: normative. As of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06); Hermes adapter external jobs (FIX-hermes-external-jobs, 2026-11-07); Hermes adapter session mirror (FEAT-hermes-mirror-sessions, 2026-11-07); Hermes adapter stage files (FEAT-hermes-adapter-stages, 2026-11-20); client IP from one forwarding header (AUD-srv-platform-01, 2026-11-11); failed credentials on the gateway (AUD-srv-gateway-01, 2026-11-11); backup service, off-site target and audit checkpoint sink drawn as built in M7 (audit finding docs-accuracy-15, 2026-11-23); as of stage CU (computer use, specification CU-01, 2026-11-26). Living document; maintenance rule in section 9.
 Controls with IDs `SEC-...`: [../spec/19-security.md](../spec/19-security.md). Permissions and
-guard rules `SR1` to `SR12`: [../spec/07-permissions.md](../spec/07-permissions.md). Identity:
+guard rules `SR1` to `SR13`: [../spec/07-permissions.md](../spec/07-permissions.md). Identity:
 [../spec/08-identity.md](../spec/08-identity.md). Privacy:
 [../spec/20-privacy.md](../spec/20-privacy.md). Dev isolation:
 [../spec/21-dev-isolation.md](../spec/21-dev-isolation.md). Terminal:
 [../spec/24-terminal.md](../spec/24-terminal.md). Built-in agents:
-[../spec/26-builtin-agents.md](../spec/26-builtin-agents.md).
+[../spec/26-builtin-agents.md](../spec/26-builtin-agents.md). Computer use:
+[../spec/27-computer-use.md](../spec/27-computer-use.md).
 
 Method: system boundaries and data flows, assets, attackers, STRIDE per component, then a register
 of the most important threats with rating, mitigation, test and residual risk. AI-specific
@@ -18,7 +19,9 @@ threats follow the classification of the OWASP Top 10 for LLM Applications 2025
 
 In the model: server (all roles), data storage, native apps, admin console, agent protocol and
 reference adapters, apps and webhooks, push, telemetry, backups, supply chain, multi-user dev
-environment, terminal (pairing, relay, host service, terminal view of the clients).
+environment, terminal (pairing, relay, host service, terminal view of the clients), computer use
+(the runner's MCP server, the relay, the host service's computer sessions and the computer helper
+in the owner's desktop session).
 
 Not in the model, with reason:
 
@@ -49,6 +52,7 @@ Source: [diagrams/trust-boundaries.mmd](diagrams/trust-boundaries.mmd). Re-rende
 | TB8 | Operations and supply chain and instance | Root of trust, code integrity | Server command only on the host, signed releases, pinned actions |
 | TB9 | Dev environment of a person and host of the runner | Host, secrets of the owner, other people | VM boundary, egress rules, readiness check (21) |
 | TB10 | Device, server relay and host service of a connected host | Terminal content, shell on the host, LLM login of the host | Noise `NK` end-to-end, one-time token, fresh step-up, SR10, I6, host service without admin (24) |
+| TB11 | Runner's MCP server `bothy-computer-mcp`, server relay, host service and computer helper in the owner's desktop session | Screen content, the owner's desktop with every app and setting, typed text | SR13 (only the owner's own `host` run), local enablement with generation, single-use attach token, Noise `NK` end-to-end with per-runner pinning, peer rule of the helper channel, indicator, Esc and stop from every client (27) |
 
 ## 3. Assets
 
@@ -301,11 +305,30 @@ Pairing, relay, host service and terminal view ([24-terminal.md](../spec/24-term
 | Host service | R | Who worked on which host and when? | audit per opening, attach and end, with device and reason | T-AZ-04 |
 | Permissions | E | Person with a grant opens a foreign host or the server host | SR10, server host owners only, checked twice | T-TM-03 |
 | Permissions | E | A second person uses the personal subscription on a host | a separate session user per person, never shared (SR12, T12), without shared locations (T13, HD11); I6 transactional and on every opening; `doctor` HD6 as an additional check | T-TM-08 |
-| Permissions | E | Agent opens a terminal after prompt injection | terminal only for people in a session with a fresh step-up | T-TM-09 |
+| Permissions | E | Agent opens a terminal after prompt injection | terminal only for people in a session with a fresh step-up; computer use is a different session kind (5.18) | T-TM-09 |
 | Device | S | Stolen session or stolen device opens a terminal | step-up `fresh` with biometrics or passkey per opening | T-TM-03 |
 | Device | T | Escape sequences write to the clipboard or open links | SEC-TERM-6 | T-TM-10 |
 | Console | I | Browser extension reads an open session | passkey required, CSP, recommendation of a separate browser profile | T-TM-07 |
 | Console | S | A foreign page opens the stream path with the console cookie (cross-site WebSocket hijacking) | origin check on upgrade (08, section 7.5), `SameSite=Strict`; without the server's terminal session token and the tab's Noise key no PTY is created | T-TM-07 |
+
+### 5.18 Computer use
+
+The runner's MCP server, relay, host service, computer helper and client views
+([27-computer-use.md](../spec/27-computer-use.md), stage CU). New data flows: screenshots from the
+helper through the host service and the relay to the runner and from there to the LLM provider;
+actions the other way; the enablement state from the helper to the server; the order from any
+client of the owner to the agent.
+
+| Part | STRIDE | Threat | Mitigation | Register |
+|---|---|---|---|---|
+| Agent | E | Prompt injection in screen content, a web page, a mail or a file makes the agent act with the owner's rights on the desktop | only the owner's own run (SR13); data line on every image; system prompt block; indicator, Esc, stop from every client; audit with app identities; no barrier by design (OR-1) | T-CU-01, T-CU-02 |
+| Agent | E | The agent operates the owner's Bothy client on the desktop (confirms cards, grants, settings) | not locked (OR-1); actions with step-up need the owner's passkey or biometrics, which synthetic input probably cannot give (unverified) | T-CU-03 |
+| Runner | I | Screenshots and typed text stay in the Claude Code transcript on the runner host | the Claude Code session of a computer run ends with the run and its files are deleted (27 10.5) | T-CU-04 |
+| Relay | S | A stolen attach token attaches a foreign process to a session | single use, `cek` binding, Noise pinning per runner, run and SR13 checked at attach | T-CU-05 |
+| Helper | T | A fake or swapped helper, or another local process, drives or reads the desktop through the host service | peer rule: console user, installed path owned by a trusted owner, code signing requirement (27 9.4) | T-CU-06 |
+| Helper | D | A key or button stays pressed after a crash, a pause or a lost connection | release on every end path and at the helper's start (27 8.4) | T-CU-07 |
+| Client | S | A stolen owner session starts computer work from afar | device and session revocation, the indicator at the machine, the status chip on all devices, audit; no step-up per session (OR-1) | T-CU-08 |
+| Relay | I | Relay, proxy, logs or a database dump read screenshots | Noise `NK` end-to-end; only lengths and times visible; sentinel test (27 CU-T18) | T-CU-04 |
 
 ### 5.17 Built-in agents
 
@@ -426,7 +449,7 @@ provider into a per-turn file; templates from the repository and a private folde
 | T-TM-06 | **Pairing of a foreign host** with an intercepted code. | low | high | code single-use, short-lived, format with checksum and secret scanner rule; the owner types in the fingerprint; failed attempts limited | TM-T19, TM-T20 (`TestTMT19_FingerprintMaxAttempts`, `TestTMT20_PairingCodeRejections`, `TestTMT20_WrongChecksumNoDatabase`, `TestHostPairingCode_MatchesGitleaksRule`, `test_pairing_code_with_valid_checksum_is_detected`, M2-41) | low |
 | T-TM-07 | **Browser extension or XSS in the console** reads or controls an open session. | medium | high | passkey required per opening, CSP with Trusted Types, no HTML from output, origin check on upgrade of the stream path (SEC-TERM-7, ADR 0070) | SEC-T05, ID-T28, origin test (PLAN M6-18) | medium: a malicious extension with access to the origin remains; recommendation of a separate browser profile |
 | T-TM-08 | **Misuse of someone else's LLM login** through the terminal, also through a subscription login that someone creates during a session, or by reading the API key from the environment of the profile `claude`. | medium | high | Load-bearing: one session user per person and host, never shared, not even after the end of the assignment; no terminal without an assignment (SR12); the host service binds every session user to the first person (Ruling T12, 24 section 2.2); no location connects the accounts again: working directories and `CLAUDE_CONFIG_DIR` per session user, HD11 for every configured path (Ruling T13, T-TM-13). In addition I6 with an individual grant, checked on every opening; as an additional check `doctor` HD6, which refuses the start on a contradiction to the declaration and runs before every PTY and periodically (a hit ends all sessions), only through `host_service.claude_bin` with a fixed search list, which HD10 checks like the helper, including folder chain and interpreter; key per host with a spending limit and a new key after access removal; profile `claude` with a controlled environment (24, 7) | TM-T09, TM-T13, TM-T27, TM-T28, TM-T29, AZ-M56, AZ-M57, AZ-M61 | low for other people's subscription logins: a login in a session user reaches only its person, even if HD6 does not see it (macOS without `host_service.claude_bin`, warning `auth_status_unchecked`) or its result is forged from the same account, as long as no location connects the accounts again (T13). Remains: a shared folder outside the configured paths in which a person starts the coding agent themselves (T-TM-13); a local privilege escalation on the host lifts the separation of the session users (T-TM-04); after retiring and re-pairing the host, or after loss of the state folder, only the instance operator keeps a previously assigned session user away from another person (24 section 2.2, 16 section 4.4); the declaration of the owner cannot be verified, `doctor` shows a false declaration `organization` with a hidden subscription only at known locations; with `organization` the API key is readable by every session |
-| T-TM-09 | **Prompt injection opens a terminal.** | high | high | terminal actions only for people in a session with step-up; agent and app tokens rejected | TM-T17, AZ-M59, `TestOpen_DeniedOpensNothing`, `TestClose_RightsAndRepeats` and `TestStream_IdentifyDecisions` with the agent token (M2-44) | low |
+| T-TM-09 | **Prompt injection opens a terminal.** Reworded with ADR 0078 (2026-11-26): an agent never opens a terminal session; that it reaches a desktop of the owner through computer use is T-CU-02. | high | high | terminal actions only for people in a session with step-up; agent and app tokens rejected; computer use only in the owner's own run on a desktop enabled at the machine (SR13) | TM-T17, AZ-M59, `TestOpen_DeniedOpensNothing`, `TestClose_RightsAndRepeats` and `TestStream_IdentifyDecisions` with the agent token (M2-44) | low |
 | T-TM-10 | **Escape sequences** write the clipboard, open links or query data. | medium | medium | SEC-TERM-6 | TM-T14 | low |
 | T-TM-11 | **Session or processes remain after access removal.** The session stays open, or processes of the person keep running (`nohup`, `setsid`, child processes outside the ConPTY, long-running processes such as crontab, systemd services of the user, LaunchAgent, scheduled task). | medium | high | access removal ends sessions in the same transaction; the server additionally measures idle time; every session in its own process group, cgroup or Job Object, whose end ends the whole tree (24, 6.3, 6.5 and 8.3); a session user belongs to only one person and is never reassigned (SR12, T12) | TM-T10, TM-T11, TM-T28, `TestCrossNode_CloseReachesRelayAndControl`, `TestCrossNode_ListenerLossReconciles` (ends and reconciliation across nodes, M2-47) | low for other people: no session end ends long-running processes that were set up as the session user, but they run in the session user of the person whose access was removed, which nobody else gets; they do not reach the keys (HD8), no foreign home folders (HD9; for the home of another session user, HD11) and cannot replace the helper (HD10). Remains: they keep using computing time, network and local services of the host until the instance operator deletes the session user together with its long-running processes (locking alone does not end them; 16 section 4.4 item 1); the console points this out after the access removal of a person who is not an owner; after `bothy-host session-user remove` they can reopen the home of their user until then and bring the host to a standstill through HD9 (T-TM-14); non-owners work only on their own host (SR10). After retiring and re-pairing the host, or after loss of the state folder, only the instance operator prevents the session user, together with such long-running processes, from being assigned to another person (24 section 2.2, 16 section 4.4) |
 | T-TM-12 | **Replacing or tapping the PTY helper.** A shell or a long-running process of the session user ends the helper and puts its own in its place, attaches to the running helper or to shells of later sessions, forges HD6, HD8, HD9 and HD11 and reads the plaintext of later sessions of the same session user. | medium | high | helper as a system service under the session user; binary, definition and channel endpoint not writable for it; channel endpoint from the service manager; `bothy-host` checks user and process ID of the peer, and on a wrong peer the message of HD10 names the session user of this channel (24 section 2.2, rule for names); memory protection of the helper; on Linux `kernel.yama.ptrace_scope` at least `1`; HD8 additionally through the service user (HD10, 24 section 2.2); warning before the step-up for owners on the host of another person, and audit `foreign_assignee` (24, 8.4) | TM-T22, TM-T26, TM-T28 | medium: processes of the same user ID reach the PTY device of every session of this session user; since T12 these are only sessions of the same person, sessions of different people are separated by the user ID. Against an assignee who manipulates their own host or escalates privileges there, the only protection is that owners do not work there or take the warning seriously |
@@ -463,6 +486,23 @@ are BA-T01 to BA-T22 of section 12 there.
 | T-BA-05 | **Interview cost.** Repeated or crafted interviews spend money on the builder agent's account. (OWASP LLM10) | medium | low | owners only, `rl.trigger`, one model call without tools per request, `runner.agent_builder_timeout`, audit entry with the cost estimate and counts (26 6.1, 6.2) | BA-T15 | low |
 | T-BA-06 | **Private names in templates.** A template copied from a real installation names its agents, profiles, companies, hosts, people or internal scripts in the public repository. | medium | medium | templates written for the repository; template gate with the generic deny rules, example domains and example persons, without the private list; private deny list over the whole repository in `make denylist`, the pull request job and `denylist-main`; private list extended by the owner before the first template (26 7.3) | BA-T17 | low: a scan proves only what its list contains (ADR 0042) |
 
+### 6.10 Computer use
+
+Normative together with [27-computer-use.md](../spec/27-computer-use.md) (stage CU, owner ruling
+OR-1, ADR 0078); the tests are CU-T01 to CU-T24 of section 15 there. The red team of the stage
+attacks every row before the stage merges (D-CU-01-9).
+
+| ID | Threat | L | I | Mitigations | Tests | Residual risk |
+|---|---|---|---|---|---|---|
+| T-CU-01 | **Prompt injection from screen content.** Text on a web page, in a mail, a document or a dialog the agent sees asks it to do something the owner did not order. (OWASP LLM01) | high | high | only the owner's own `host` run opens a session (SR13), so injected text in any other run reaches no desktop; every image carries the data line; the system prompt tells the agent to report such requests instead of following them; indicator, Esc and stop from every client; audit with app identities (27 7, 10.3, 13) | CU-T02, CU-T05, CU-T19, CU-T21 | high: detection is not relied on, and Anthropic's classifiers probably do not see MCP images (unverified) |
+| T-CU-02 | **A hijacked agent acts with all the owner's rights on the desktop:** terminal commands, deleted files, mails and messages sent, actions in signed-in browser accounts, changed system settings, installed software. | medium | high | no barrier by design (OR-1, accepted by the owner); the session exists only inside the owner's run and ends with it; the owner sees it on every device and stops it from any of them or with Esc at the machine; the enablement can be switched off from anywhere | CU-T01, CU-T13 to CU-T16 | high: the mitigations make an attack visible and stoppable, they do not prevent it; replaces for computer use the "agents never reach a host" of T-TM-09 |
+| T-CU-03 | **The agent operates the owner's Bothy client** on the desktop: confirms cards of other agents, changes settings, grants or the enablement. | medium | high | not locked (OR-1); actions with step-up need the owner's passkey or biometrics; switching the enablement off only ends the session | CU-T16 | medium: actions without step-up in the client are reachable; whether synthetic input can satisfy a passkey or biometric prompt is unverified and assumed not |
+| T-CU-04 | **Screenshots leave through the runner or the server.** The Claude Code transcript and tool result files keep images on the runner host; a relay, log or dump reads them. | medium | high | Noise `NK` end-to-end; nothing in the server, logs, audit, telemetry, event log, search or push (sentinel test); the runner deletes the session's transcript and tool result files after the run (27 10.5); C1 writes no image | CU-T18, CU-T22 | medium: until the run ends the images are on the runner host and always at the LLM provider (20 6) |
+| T-CU-05 | **A stolen attach token** attaches a foreign process. | low | high | single use, short-lived, bound to `cek`, run, agent, owner, host and generation; the run and SR13 are checked at attach; no reattach; pinning of the host key per runner | CU-T07, CU-T17, CU-T20 | low |
+| T-CU-06 | **A fake or swapped helper** or another local process drives or reads the desktop through the host service. | low | high | peer rule of 27 9.4: console user, installed path whose chain belongs to a trusted owner, code signing requirement; keys only with the service user (R-TM-12) | CU-T23 | low with a signed build; medium for a development build without a signing requirement, which the doctor reports |
+| T-CU-07 | **A key or button stays pressed** after a crash, a pause or a lost connection and acts on later input. | medium | medium | release on every end, on a broken channel and at the helper's start; the pause drops pending input | CU-T13, CU-T16 | low |
+| T-CU-08 | **A stolen owner session or device starts computer work from afar** without a step-up. | low | high | revocation of the device or session ends nothing on the desktop by itself, but every open is audited and shows the indicator and the chip on all devices; the enablement can be switched off from any other device and at the machine | CU-T16 | medium: the owner accepted no step-up per session (OR-1) |
+
 ## 7. What remains open
 
 - Prompt injection is unsolved. The product does not rely on detection, but on
@@ -487,6 +527,9 @@ are BA-T01 to BA-T22 of section 12 there.
 - Built-in agents share their hosting runner's host user, slots and process: a `host` turn of one
   hosted agent reaches what the runner user reaches, and a crash of the runner takes all hosted
   agents offline at once (T-BA-01, T-BA-02).
+- Computer use gives a hijacked agent in an owner's run the owner's full rights on an enabled
+  desktop; the product makes it visible and stoppable, it does not prevent it (T-CU-01, T-CU-02,
+  owner ruling OR-1).
 - One host carries everything (T-DS-01). More availability means several roles on several hosts
   (Baseline B1), not part of M1.
 

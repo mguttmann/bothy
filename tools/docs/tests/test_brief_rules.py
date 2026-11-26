@@ -39,8 +39,9 @@ def test_canonical_block_has_five_rules() -> None:
     ]
 
 
-# Briefs of the milestones (M*) and of the stages after them (A1, PLAN section 21).
-BRIEF_FILES = sorted([*BRIEFS.glob("M*.md"), *BRIEFS.glob("A*.md")])
+# Briefs of the milestones (M*) and of the stages after them (A1, PLAN section 21; AR, section
+# 22; CU, section 23).
+BRIEF_FILES = sorted([*BRIEFS.glob("M*.md"), *BRIEFS.glob("A*.md"), *BRIEFS.glob("CU*.md")])
 
 
 @pytest.mark.parametrize("brief", BRIEF_FILES, ids=lambda p: p.name)

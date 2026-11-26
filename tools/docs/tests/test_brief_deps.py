@@ -315,6 +315,39 @@ def test_stage_ar_tickets_are_checked_like_the_others(tmp_path: Path) -> None:
     assert any("AR-03: depends on []" in p for p in brief_deps.check(root))
 
 
+def test_stage_cu_tickets_are_checked_like_the_others(tmp_path: Path) -> None:
+    """Tickets of stage CU (computer use, PLAN section 23): ID form `CU-<nn>`, graph block last."""
+    rows = dict(
+        INDEX_ROWS,
+        **{
+            "AR-02": (1, "none (specification merged)"),
+            "CU-02": (1, "none (specification merged)"),
+            "CU-03": (2, "CU-02"),
+        },
+    )
+    root = _repo(tmp_path, rows=rows, waves=WAVES, edges="  M1_01 --> M1_02\n")
+    assert brief_deps.main(["--root", str(root), "--write"]) == 0
+    text = (root / "docs/briefs/README.md").read_text(encoding="utf-8")
+    assert "| 1 | AR-02, CU-02, M1-01, M1-04 |" in text
+    assert "| 2 | CU-03, M1-02 |" in text
+    blocks = text.split("## Dependency graph")[1].split("```mermaid")[1:]
+    assert len(blocks) == 3
+    assert text.index("Tickets of AR:") < text.index("Tickets of CU:")
+    assert "CU_02 --> CU_03" in blocks[2]
+    assert brief_deps.check(root) == []
+    plan = (root / "docs/PLAN.md").read_text(encoding="utf-8")
+    (root / "docs/PLAN.md").write_text(
+        plan.replace("| CU-03 | Title | CU-02 |", "| CU-03 | Title | none |")
+    )
+    assert any("CU-03: depends on []" in p for p in brief_deps.check(root))
+
+
+def test_stage_cu_ticket_gets_the_milestone_base() -> None:
+    deps = {"M1-01": [], "CU-02": [], "CU-03": ["CU-02"]}
+    assert brief_deps.stage_base(deps, "CU-03") == {"M1-01"}
+    assert brief_deps._ID.findall("CU-03, D-CU-01-2 and CU-030") == ["CU-03"]
+
+
 def test_stage_ar_ticket_gets_the_milestone_base() -> None:
     deps = {"M1-01": [], "AR-02": [], "AR-03": ["AR-02"]}
     assert brief_deps.stage_base(deps, "AR-03") == {"M1-01"}

@@ -42,6 +42,8 @@ Code names are English and apply in API, database and code.
 | Close code | `close code` | Code with which the server ends a WebSocket connection, with a defined client reaction. |
 | Commit order | `commit order` | Order in which transactions become visible; the global sequence follows it exactly. |
 | Component | `component` | Interactive element on a message: button, select or form. |
+| Computer helper | `computer helper` | The only process that captures the screen and injects input for computer use; runs in the desktop session of the console user on macOS and Windows and talks only to the host service ([27-computer-use.md](27-computer-use.md) 9). |
+| Computer session | `computer_session` | One control of one desktop of the owner by one run: screenshots and mouse and keyboard actions end-to-end encrypted between the runner's MCP server and the host; ends with its run at the latest (27). |
 | Configuration value | `config key` | Named value for a limit, a window or an interval; its default is in exactly one table. |
 | Consumer | `consumer` | Named reader of the event log with a durable cursor: per agent in `agent_consumer_cursors`, in the worker (push, webhooks) in `event_consumer_cursors`. |
 | Control command | `control command` | Command such as stop or status that never goes to the model as a prompt and never becomes a follow-up. |
@@ -49,6 +51,7 @@ Code names are English and apply in API, database and code.
 | Counter row | `sequence_counters` | Table row whose lock in the writing transaction enforces the commit order of the numbers. |
 | Credential holder | `credential_holder_id` | Person on whose personal subscription an agent with `billing_mode = personal` runs. |
 | Cursor | `cursor` | Highest global sequence that the server has checked for a receiver; starting point for catch-up. |
+| Desktop enablement | `computer enablement` | The switch "Allow computer control" of the computer helper with its generation; switched on only at the machine, off from any client of the owner; a host is a desktop for computer use only while enabled (27 4). |
 | Delivery | `delivery` | Handover of an event to a connection, a push service or a webhook; checked by `authorize` every time. |
 | Delivery field | `delivery field` | Field in the envelope that is created per delivery and never stands in the log: `invocation_token`, `redelivered`, `sync_epoch` (only in webhook deliveries; 04 section 2.2). |
 | Dev environment | `dev_environment` | Isolated work environment of a person for a runner agent (milestone multi-user dev environment). |

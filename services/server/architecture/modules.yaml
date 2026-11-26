@@ -205,7 +205,7 @@ modules:
     # driver s3 into the off-site bucket (awssdk).
     adapter_vendors: [pgx, otel, awssdk]
   terminal:
-    tables: [hosts, host_session_users, terminal_sessions]
+    tables: [hosts, host_session_users, terminal_sessions, computer_sessions]
     actions: [host.read, host.manage, host.pair, host.connect, terminal.open, terminal.attach,
               terminal.stream, terminal.read_own, terminal.close, terminal.terminate]
     events: [host.updated, terminal_session.changed]

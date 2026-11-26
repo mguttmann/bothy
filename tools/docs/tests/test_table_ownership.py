@@ -41,6 +41,7 @@ MIGRATIONS = SERVER / "migrations"
 PLANNED = {
     "dev_environments": "multi-user dev environment, V2 (03, 21-dev-isolation.md)",
     "dm_participants": "direct messages between people, 'later' in the feature list of 01",
+    "computer_sessions": "computer use, stage CU; CU-04 creates the migration (27-computer-use.md)",
 }
 # (module, query file, foreign table): queries that read a table of another module today.
 KNOWN_FOREIGN = {

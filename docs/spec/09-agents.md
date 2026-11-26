@@ -3895,6 +3895,14 @@ CronList ScheduleWakeup RemoteTrigger` (18.19.8); with `runner.cli_bg_wait_ceili
 holds `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (18.19.12). Without these keys the argument list and
 the environment are exactly as above.
 
+Stage CU (addendum of 2026-11-26, [27-computer-use.md](27-computer-use.md) 10): with
+`runner.computer_use` every turn under `host` gains `--mcp-config <turn computer MCP file>` for the
+MCP server `bothy-computer-mcp`, directly after `--permission-prompts none` in print mode and
+directly after the flags of the class in background mode, without `--strict-mcp-config`; its
+system prompt file gains the section `## Computer use`; a run that opened a computer session ends
+its Claude Code session after the run (27 10.5). Without the key the argument list is exactly as
+above.
+
 Background mode (addendum of 2026-11-16, FEAT-RUNNER-BG-SESSIONS, `docs/decisions.d/FEAT-RUNNER-BG-SESSIONS.md`,
 changed by FIX-RUNNER-BG-INBOX-AUTH, `docs/decisions.d/FIX-RUNNER-BG-INBOX-AUTH.md`; the
 design with its evidence is [runner-background-sessions.md](../design/runner-background-sessions.md)).

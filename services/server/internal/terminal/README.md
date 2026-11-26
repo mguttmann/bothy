@@ -41,7 +41,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`hosts`, `host_session_users`, `terminal_sessions`.
+`hosts`, `host_session_users`, `terminal_sessions`, `computer_sessions`.
 
 Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 

@@ -312,6 +312,40 @@ these values (R-AZ-37).
 | `run.launch.check` | allow or refuse a launch by a runner that did not accept the run | run | agent-self of the run's agent | no | no | denials | no | `rl.agent_runtime` | read | AR-04 |
 | `channel.autonomous_runs.set` | switch `allow_autonomous_runs` of a channel | channel | `manage` | no | no | yes | no | `rl.write` | write | AR-04 |
 
+### 2.15 Computer use
+
+Normative together with [27-computer-use.md](27-computer-use.md) (stage CU, owner ruling OR-1 of
+2026-11-26, [ADR 0078](../adr/0078-agent-computer-use-on-a-paired-desktop.md)).
+
+1. Computer use has no grant and no capability: the target `host` keeps only `terminal` (R-TM-04),
+   and no grant to a person, group, agent or app opens a desktop. It is the owner's alone (SR13).
+2. An agent opens a computer session (`computer.open`) and lists desktops
+   (`computer.desktops.list`) only bound to an active run by SR9, under tool class `host` (SR2),
+   and only when SR13 holds. SR9's intersection does not apply: the agent has no right on a host of
+   its own, and SR13 is the check of the person. There is no step-up: the owner's message in the
+   thread is the consent (R-AZ-03 is untouched, because these actions are no step-up actions).
+3. `computer.attach` is allowed only to the holder of the session's single-use attach token while
+   the run is active and SR13 still holds.
+4. An active owner in a session stops any computer session of the instance (`computer.stop`) and
+   switches the enablement of any host off (`computer.device.disable`), from any device, without
+   step-up: both only end or prevent control. Switching on is no action of the API; it happens
+   only at the machine (27 4).
+5. The triggering owner reads the own computer sessions (`computer.session.read`); every reader of
+   the host sees its listed state through `host.read`.
+
+The actions below enter `docs/spec/actions.yaml` with CU-04, which builds them, with exactly these
+values (R-AZ-38).
+
+| Action | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | Rate-limit class | Effect | Ticket |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `computer.desktops.list` | list the desktops of the run's owner | run | agent-self, bound to an active run by SR9 whose run satisfies SR13 | no | no | denials | no | `rl.agent_runtime` | read | CU-04 |
+| `computer.open` | open a computer session on a desktop for the bound run | host | agent-self, bound to an active run by SR9; SR2; SR13 | no | no | yes | no | `rl.agent_runtime` | write | CU-04 |
+| `computer.attach` | attach the MCP server of the run to its session | computer_session | holder of the session's attach token; run active; SR13 | no | no | yes | no | `rl.agent_runtime` | write | CU-04 |
+| `computer.session.read` | list one's own computer sessions | computer_session | the triggering owner of the session | yes | no | no | no | `rl.read` | read | CU-04 |
+| `computer.stop` | stop a computer session | computer_session | an active owner in a session | yes | no | yes | no | `rl.write` | write | CU-04 |
+| `computer.device.disable` | switch the enablement of a host off | host | an active owner in a session | yes | no | yes | no | `rl.admin` | write | CU-04 |
+| `computer.terminate` | every end of a computer session by the server or the host | computer_session | `system` | no | no | yes | no | none | write | CU-04 |
+
 ## 3. Principal context
 
 `authorize` receives not just an ID, but the verified context of the request. The
@@ -941,6 +975,29 @@ Reason: this way the credentials of a session user belong to exactly one person;
 session user would make every subscription login in it usable for all terminal users of the host
 ([24-terminal.md](24-terminal.md), sections 2.2 and 7.4; ADR 0068).
 
+### SR13 Computer use only in the owner's own run
+
+`computer.desktops.list`, `computer.open` and `computer.attach` are allowed only when all of these
+hold at the moment of the check (owner ruling OR-1 of 2026-11-26, [27-computer-use.md](27-computer-use.md)):
+
+1. The run is active and bound by SR9, and its tool class is `host` (SR2).
+2. The run's `trigger_kind` is `message` or `command`, and its trigger is a message with
+   `origin = 'human'` written by the run's `triggered_by`. Wake runs, team runs, runs from an
+   interaction and runs of an app or another agent never qualify.
+3. `triggered_by` is an active owner, with the owner status from the current owner list (the check
+   without a request, R-AZ-29).
+4. For `computer.open` and `computer.attach`: the host is a desktop of that owner (27 4 item 3:
+   active, connected, enabled by the helper with a generation above
+   `hosts.computer_disabled_generation`, `assigned_user_id` NULL or the owner).
+
+Otherwise `403 forbidden` with `reason: computer_not_owner_run` (items 1 to 3; item 1's tool class
+as `reason: computer_tool_class`) or `reason: computer_not_enabled` (item 4). Checked at every
+request; a lost owner status ends the person's computer sessions in the transaction of the change
+(`access_revoked`), the end of the run ends its session in the transaction that ends the run
+(`run_ended`). Reason: the owner's order is the consent (OR-1); a prompt injection in any other
+run (another trigger, an automatic input, another agent, another person) must never reach a
+desktop (T-CU-01, T-TM-09).
+
 ## 6. Read horizon of agents
 
 The read horizon `H(A)` of an agent is the set of channels that A may read (grants plus
@@ -1469,6 +1526,12 @@ DM between Alex and Sam. The clock is controllable in tests.
 | AZ-M59 | Lotse | host R1 | `terminal.open` | agent token | `forbidden` `subject_kind_not_allowed` |
 | AZ-M60 | Alex | host R3 (without assignee) | `terminal.open` | grant on the instance with `trigger` and all capabilities, no grant on R3 | `not_found` (host not visible) |
 | AZ-M61 | Owner | host R1 | `terminal.open` | fresh step-up, no valid assignment of the owner to a session user on R1 | `forbidden` `terminal_no_session_user` (SR12) |
+| AZ-M62 | Runner agent in Alex's run (Alex an owner, `message` by Alex, `host`) | desktop R1 enabled | `computer.open` | | `allow`, no step-up, no confirmation on R1 |
+| AZ-M63 | Runner agent in a wake run of Alex | desktop R1 enabled | `computer.open` | `trigger_kind = 'wake'` | `forbidden` `computer_not_owner_run` |
+| AZ-M64 | Runner agent in Sam's run (Sam no owner) | desktop R1 enabled | `computer.open` | | `forbidden` `computer_not_owner_run` |
+| AZ-M65 | Runner agent in Alex's run | desktop R1 | `computer.open` | enablement disabled remotely, same generation reported | `forbidden` `computer_not_enabled` |
+| AZ-M66 | Runner agent in Alex's ended run | desktop R1 enabled | `computer.open` | run `succeeded` | `invocation_token_invalid` `run_inactive` |
+| AZ-M67 | Owner | computer session of another owner's run | `computer.stop` | | `allow`, session ends `stopped_by_user` |
 
 ### 11.2 Required tests
 
@@ -1505,6 +1568,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | R-RE-11 | Host as its own target with only `terminal`; SR10, SR11 and SR12 as guard rules. | A terminal is remote access to a host; neither inheritance nor delegation may open it, and no account on the host is shared between people (Ruling T1, T2, T12). |
 | R-RE-12 | Built-in agents get no permission of their own: owner actions with step-up to create, edit and re-host them, an owner-only interview, a hosted token only for the hosting runner, and SR2 for a definition with a `stdio` MCP server (2.13, addendum of 2026-11-06). | An agent with tools runs with the host user's rights, which is an owner decision today; a definition must not widen what its class allows ([26-builtin-agents.md](26-builtin-agents.md), ADR 0076). |
 | R-RE-13 | Wake-ups act with the rights of the person of their source run at each check; autonomous inputs need an owner or the channel switch, `command` needs `host` and `pr_checks` an owner, each checked again before every host execution (2.14, addendum of 2026-11-06). | A wake-up runs long after its person acted; rights checked only at creation would outlive a revocation. |
+| R-RE-14 | Computer use has no grant and no capability; SR13 allows it only in an active `host` run that an active owner started with an own message, on a desktop of that owner enabled at the machine; stop and disable are open to every owner without step-up (addendum of 2026-11-26). | OR-1 makes the owner's order the consent; a grant would give a desktop to someone the owner never asked; stopping is the safe direction. |
 
 ## 13. Alignment with the core contract
 

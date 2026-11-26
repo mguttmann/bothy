@@ -114,6 +114,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `hosts` (03, 24) | indirect | host name (often with names of persons), host assignee, holder of the LLM login, public keys, operating system, reported names of the session users with display names of their working folders, check results (with the name of every session user or former session user that the rule for names from 24, section 2.2 names; never names of other users of the host), last seen | `security` | after `retired` plus `retention.security_after_end` |
 | `host_session_users` (03, 24) | indirect | which person has or had which session user on which host, who assigned and ended it | `security` | after `retired` of the host plus `retention.security_after_end`; never deleted before that, so that no name becomes free again (24, section 2.2); on account deletion with a pseudonymous ID |
 | `terminal_sessions` (03, 24) | indirect | who worked when from which device on which host with which profile, duration, bytes per direction, reason for the end; never contents | `security` | after `closed_at` plus `retention.security_after_end`; on account deletion with a pseudonymous ID |
+| `computer_sessions` (03, 27) | indirect | which owner's run and agent controlled which desktop when, pauses, number of actions, the last frontmost app, reason for the end; never an image, a coordinate, typed text or a key | `security` | after `closed_at` plus `retention.security_after_end`; on account deletion with a pseudonymous ID |
 | `stats_minutes` (03, 25) | no | minute aggregates per channel, agent and code (count, sum, good events); no column for people, no contents. In channels with a single person indirectly relatable to that person (section 9) | `stats` | detaching the daily partitions after `retention.stats_minutes` |
 | `gateway_presence` (03) | indirect | which device of a person holds a live connection right now, the threads in focus there, idle; only the routing of notifications reads it (section 9) | `transient` | deleted when the connection ends; the rows of a node that stopped are ignored after `cluster.presence_ttl` and deleted |
 
@@ -422,6 +423,7 @@ How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-10):
 | Client caches | deletion on `message.deleted`, `access.changed` with `removed`, revocation (`4012`), after `client.cache_max_age` unused (04) |
 | Agent runtimes | no deletion reaches them (4.2); whoever runs the runtime is responsible for storage and periods in the runtime; list them as separate recipients in the record |
 | LLM providers | periods of the provider; example Anthropic API: inputs and outputs deleted "within 30 days", for policy violations up to 2 years (https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data, retrieved 2026-10-10 [verified]) |
+| Runner host (computer use) | screenshots and typed text in the transcript of the Claude Code session until the run ends; then the runner deletes the session's transcript and tool result files ([27-computer-use.md](27-computer-use.md) 10.5) |
 | Push services | no contents (ADR 0031) |
 | Telemetry backends | no contents; period in the backend |
 
@@ -531,6 +533,11 @@ The owner rectifies other data; a `rectification` request documents that.
   of the server. Example: for the Anthropic API the documentation names only `global` and
   `us` as `inference_geo` (https://platform.claude.com/docs/en/manage-claude/usage-cost-api, retrieved 2026-10-10
   [verified]); EU processing then needs a different path, which the instance operator chooses.
+- Computer use (stage CU, [27-computer-use.md](27-computer-use.md)): every screenshot of a
+  desktop the agent controls goes to the LLM provider of the run's agent; a screenshot can show any
+  data on that screen, also of third parties. Only the owner controls only the owner's own
+  machines (SR13); the instance operator names this flow in the information for data subjects and
+  in the record of processing activities like the other agent flows of this section.
 - Data minimization at invocation: the server supplies the thread, `history_backfill_limit` earlier
   messages (03, `channels`) and authors as handle and kind, no email addresses.
 - Personal mode (`billing_mode = personal`): the person uses their own subscription for their own
@@ -595,6 +602,7 @@ defaults:
 | Audit log | owners only, with step-up; every read access is itself in the audit log (05, `audit.read`) |
 | "View as person" | step-up, time limit, audit, DMs excluded (07, 9.2) |
 | Terminal sessions | metadata only for the person themselves and owners; no content recording; not in the statistics per person ([24-terminal.md](24-terminal.md), section 10) |
+| Computer use | only the owner controls the owner's own machines, so no employee is observed; metadata only, no screenshot stored; an extension to other persons (CU-12) needs a new assessment under section 9 and Art. 35 GDPR ([27-computer-use.md](27-computer-use.md)) |
 | Live statistics and visualizations | on (`stats.live_enabled`); only for owners and space managers, without values per person, without the trigger of a run, without counters about people; in channels with only one person, runs allow conclusions about that person, therefore it can be turned off ([25-visualization.md](25-visualization.md), section 4) |
 
 The switches `privacy.per_person_stats_enabled`, `privacy.stats_min_group_size` and

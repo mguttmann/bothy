@@ -2,7 +2,7 @@
 """Every test ID of the specification is named in a test, or stands in a ratchet list.
 
 The chapters under docs/spec and docs/security define test IDs in the first column of their test
-tables (AR-T, BA-T, DEV-T, DP-T, ID-T, SEC-T, TM-T, VZ-T, and AZ-M and AZ-P of the permission
+tables (AR-T, BA-T, CU-T, DEV-T, DP-T, ID-T, SEC-T, TM-T, VZ-T, and AZ-M and AZ-P of the permission
 matrix). Only the terminal catalogue had a gate that a test exists for an ID
 (tools/docs/terminal_catalogue.py); for the other families nothing tied an ID to a test, and some
 were tested under another name or not at all (audit finding testing-16).
@@ -25,9 +25,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 
-_FAMILIES = r"(?:AR|BA|DEV|DP|ID|SEC|TM|VZ)-T[0-9]{1,3}|AZ-[MP][0-9]{1,3}"
+_FAMILIES = r"(?:AR|BA|CU|DEV|DP|ID|SEC|TM|VZ)-T[0-9]{1,3}|AZ-[MP][0-9]{1,3}"
 _DEFINED = re.compile(rf"^\|\s*`?({_FAMILIES})`?\s*\|")
-_NAMED = r"(AR|BA|DEV|DP|ID|SEC|TM|VZ|AZ)[-_]?(T|M|P)([0-9]{1,3})"
+_NAMED = r"(AR|BA|CU|DEV|DP|ID|SEC|TM|VZ|AZ)[-_]?(T|M|P)([0-9]{1,3})"
 _TEST_PATHS = (
     "*_test.go",
     "*_test.dart",
@@ -43,6 +43,7 @@ _TEST_PATHS = (
 
 _V2 = "chapter 21 is planned for V2"
 _AR_OPEN = "stage AR ticket not built (AR-05 to AR-07, AR-09, AR-10; PLAN section 22)"
+_CU_OPEN = "stage CU ticket not built (CU-02 to CU-07; PLAN section 23)"
 _OTHER = "not named in a test file; tested under another name or not at all (unverified)"
 
 # ID -> why no test names it today (paths of Go tests under services/server/internal). Only
@@ -76,6 +77,36 @@ KNOWN_UNNAMED: dict[str, str] = {
     "SEC-T02": "lint rules, not a test (SEC-TLS-4, SEC-NET-1, SEC-IN-5)",
     "SEC-T18": "an umbrella over TM-T01 to TM-T29, held by the terminal catalogue",
     "VZ-T06": "tested as TestLive_Revocation in wire/serve_stats_live_test.go",
+    "CU-T01": _CU_OPEN,
+    "CU-T02": _CU_OPEN,
+    "CU-T03": _CU_OPEN,
+    "CU-T04": _CU_OPEN,
+    "CU-T05": _CU_OPEN,
+    "CU-T06": _CU_OPEN,
+    "CU-T07": _CU_OPEN,
+    "CU-T08": _CU_OPEN,
+    "CU-T09": _CU_OPEN,
+    "CU-T10": _CU_OPEN,
+    "CU-T11": _CU_OPEN,
+    "CU-T12": _CU_OPEN,
+    "CU-T13": _CU_OPEN,
+    "CU-T14": _CU_OPEN,
+    "CU-T15": _CU_OPEN,
+    "CU-T16": _CU_OPEN,
+    "CU-T17": _CU_OPEN,
+    "CU-T18": _CU_OPEN,
+    "CU-T19": _CU_OPEN,
+    "CU-T20": _CU_OPEN,
+    "CU-T21": _CU_OPEN,
+    "CU-T22": _CU_OPEN,
+    "CU-T23": _CU_OPEN,
+    "CU-T24": _CU_OPEN,
+    "AZ-M62": _CU_OPEN,
+    "AZ-M63": _CU_OPEN,
+    "AZ-M64": _CU_OPEN,
+    "AZ-M65": _CU_OPEN,
+    "AZ-M66": _CU_OPEN,
+    "AZ-M67": _CU_OPEN,
 }
 
 

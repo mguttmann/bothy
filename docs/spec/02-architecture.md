@@ -175,7 +175,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `importer` | import sources, batches with origin key (`import.apply`), ownership list and read-only state of mirrored channels; the dry run lives in the tool | `import_sources`, `import_items` | 22 |
 | `privacy` | privacy requests, export and deletion through the participants of all modules, deletion journal | `gdpr_requests`, `deletion_journal_state` | 20 |
 | `status` | status page, components, incidents, automatic checks, backup runs | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
-| `terminal` | hosts and pairing, declaration of the LLM login (I6), session users per person (T12), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams | `hosts`, `host_session_users`, `terminal_sessions` | 24 |
+| `terminal` | hosts and pairing, declaration of the LLM login (I6), session users per person (T12), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams; computer sessions with their attach tokens and the enablement mirror (stage CU) | `hosts`, `host_session_users`, `terminal_sessions`, `computer_sessions` | 24, 27 |
 
 Technical tables outside the modules ([03-data-model.md](03-data-model.md), section
 4.13): River creates its own tables with the prefix `river_` (among others `river_migration`, `river_job`,

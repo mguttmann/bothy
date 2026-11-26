@@ -55,7 +55,10 @@ Features that Bothy deliberately never offers. The complete list with a reason p
 - End-to-end encryption of chat content, because agents must read along.
 - Chat in the browser; the web target is only the console ([ADR 0028](adr/0028-web-target-only-for-the-admin-and-statistics-console.md), [ADR 0070](adr/0070-terminal-in-the-web-console.md)).
 - A marketplace for bots of third-party vendors.
-- Recording of terminal content, and a terminal for agents or apps.
+- Recording of terminal content, and a terminal session for agents or apps. An agent operates a
+  desktop only as computer use on a desktop the owner enabled, in a run the owner started
+  ([27](spec/27-computer-use.md), [ADR 0078](adr/0078-agent-computer-use-on-a-paired-desktop.md));
+  that exception exists for the owner only.
 
 ## 5. Anti-goals
 
@@ -69,7 +72,7 @@ them is a defect, even if it brings a feature.
 | A way to use the personal subscription of another person | I1 to I3, I6 |
 | Agent, plugin or app code in the server process | B6, [ADR 0022](adr/0022-agents-and-plugins-outside-the-server-process.md) |
 | A specific agent framework as the core; Hermes Agent is one adapter among several | [09](spec/09-agents.md) "Principles" |
-| Message content in telemetry; terminal content in the server, in telemetry, audit, search, push or in the context of an agent | B11, [17](spec/17-observability.md), [24](spec/24-terminal.md) |
+| Message content in telemetry; terminal content in the server, in telemetry, audit, search, push or in the context of an agent; screen content of a computer session in the server, in telemetry, audit, search, push or the thread | B11, [17](spec/17-observability.md), [24](spec/24-terminal.md), [27](spec/27-computer-use.md) |
 | In-app statistics that depend on the telemetry stack | [17](spec/17-observability.md) "In-app statistics", [25](spec/25-visualization.md) "Own measurement" |
 | Third-party web pages (iframes) in the native apps | [ADR 0069](adr/0069-visualization-on-two-levels-without-iframes-in-apps.md) |
 | Anything instance-specific in the product repo | White label (section 6.4) |
@@ -91,7 +94,7 @@ These rules apply in every milestone. The linked chapter names where each rule i
 - No view permission results in `404`, not `403`. Lists, counters and search filter in the query.
 - Fail closed: every error in `authz` results in "no". Permissions apply at the moment of delivery;
   a revocation takes effect immediately and aborts ongoing runs and terminal sessions (L23).
-- No grant overrides the guard rules SR1 to SR12, among them: only people trigger agents,
+- No grant overrides the guard rules SR1 to SR13, among them: only people trigger agents,
   administration only with step-up, direct messages only for participants, not even for owners
   ([07](spec/07-permissions.md) "Protection rules that no grant overrides").
 
@@ -183,7 +186,7 @@ the change that finds it.
 | [04 Sync protocol](spec/04-sync-protocol.md) | Events, global and thread sequence, gateway, catch-up, visibility on permission changes, offline and live box streaming. Part of the core contract. | Gateway, catch-up interface, clients, adapters |
 | [05 Actions](spec/05-actions.md) | The closed action catalogue with level, capability and rate-limit class per action. Plus agent invocation, event types and WebSocket ops. Part of the core contract. | every check by `authorize` |
 | [06 API](spec/06-api.md) | Conventions of the public API: authentication per principal, errors per RFC 9457, pagination, idempotency, versioning. List of the endpoints and contract tests. | Conventions of the API (shapes: section 9) |
-| [07 Permissions](spec/07-permissions.md) | Grant model with levels, capabilities and inheritance, the function `authorize` and the guard rules SR1 to SR12. Plus permission cache, delivery filter and requirements for the admin interface. | Module `authz` |
+| [07 Permissions](spec/07-permissions.md) | Grant model with levels, capabilities and inheritance, the function `authorize` and the guard rules SR1 to SR13. Plus permission cache, delivery filter and requirements for the admin interface. | Module `authz` |
 | [08 Identity](spec/08-identity.md) | Identity providers (OIDC, proxy header, local accounts), devices with key and DPoP, step-up, token model. Plus disabling and API tokens. | Module `identity`, login |
 | [09 Agents](spec/09-agents.md) | Agents as principals, operator, adapter contract, run and live box, follow-ups, slash commands, components. Plus the reference adapters for Hermes Agent and the Claude Code runner. | Modules `agents` and `runs`, every adapter |
 | [10 Backend policy](spec/10-backend-policy.md) | Billing mode `personal` or `organization` per agent with the invariants I1 to I6 and their enforcement points. Plus switching, costs and display. | Modules `agents`, `authz`, `billing` |
@@ -203,6 +206,7 @@ the change that finds it.
 | [24 Terminal](spec/24-terminal.md) | Terminal on connected hosts through the host service `bothy-host` with a Noise-encrypted stream. Plus pairing, sessions, permissions, invariant I6, multi-node operation and tests. | Module `terminal`, host service, terminal views |
 | [25 Visualization](spec/25-visualization.md) | Own measurement of the server, live stream `stats.live`, native views in the package `bothy_viz` and the Grafana panel plugin "Bothy Live". Plus the optional embedding in the web console. | Statistics views and plugin |
 | [26 Built-in agents](spec/26-builtin-agents.md) | Agents created inside Bothy and hosted by a Claude Code runner: hosting and tokens, the versioned definition as closed data, its materialization in the runner, the interview with a builder agent, templates and their gate. Stage A1. | Built-in agents, module `agents` (definitions), runner hosting |
+| [27 Computer use](spec/27-computer-use.md) | An agent in a run of the owner sees and operates a desktop of the owner (macOS, Windows) that the owner enabled on that machine: enablement, guard rule SR13, the attach token, Noise frames for screenshots and actions, the computer helper, the runner's MCP server, stop and pause paths, audit without screen content. Stage CU. | Computer sessions in the module `terminal`, the session kind `computer` of the host service, the computer helper, `bothy-computer-mcp` |
 
 ### 8.1 Status lines
 

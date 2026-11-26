@@ -268,6 +268,21 @@ Normative together with [25-visualization.md](25-visualization.md); threats T-VZ
 | SEC-VZ-4 | Every live frame through the delivery mode of `authorize` with `stats.read`, filtered to visible channels; costs only with `cost.read.aggregate`. | 25, section 4 |
 | SEC-VZ-5 | Grafana plugin unsigned only with its own ID in `allow_loading_unsigned_plugins`, never with a wildcard or other IDs. | 25, section 8.3 |
 
+## 11c. Controls for computer use
+
+Normative together with [27-computer-use.md](27-computer-use.md) (stage CU); threats T-CU-* in
+[../security/threat-model.md](../security/threat-model.md), section 6.10.
+
+| ID | Control | Location |
+|---|---|---|
+| SEC-CU-1 | Screenshots and actions only end-to-end encrypted (Noise `NK`, prologue `bothy-computer/1`); the relay forwards binary frames unchanged and records only length, time and session ID. No image, coordinate, typed text, key name, window title or URL in the server, log, audit, telemetry, event log, search, push or thread. | 27, sections 6 and 13 |
+| SEC-CU-2 | Attach token valid exactly once, bound to session, run, agent, owner, host, the initiator's ephemeral key (`cek`) and the enablement generation; no reattach. | 27, sections 5.2 to 5.4 |
+| SEC-CU-3 | Only the owner's own `host` run lists, opens and attaches (SR13), checked at every request; a lost owner status and the end of the run end the session in the same transaction. | 07, SR13; 27, section 8.4 |
+| SEC-CU-4 | The enablement switches on only at the machine and off from any client of the owner; a remote disable holds until a new local switch-on raises the generation. | 27, section 4 |
+| SEC-CU-5 | The helper channel admits only the console user's installed helper whose path chain belongs to a trusted owner and, with a signing requirement in the build, whose signature satisfies it; never a network listener; no token or key on the channel. | 27, section 9.4 |
+| SEC-CU-6 | Indicator with a stop button, excluded from the capture; Esc from the real keyboard and every client stop; every end releases all keys and buttons, also at the helper's start. | 27, sections 8 and 9 |
+| SEC-CU-7 | The runner keeps the agent token, the DPoP key and the invocation token out of the MCP server and the turn; the tool loads only under `host`; the Claude Code session of a computer run ends with the run and its transcript and tool result files are deleted; the host key is pinned per runner. | 27, section 10 |
+
 ## 12. Supply chain, backups and audit integrity
 
 Supply chain (details and tools in [23-quality.md](23-quality.md) and

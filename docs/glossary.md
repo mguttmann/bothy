@@ -176,7 +176,7 @@ Rules:
 | Schließ-Code | close code | `close code` | |
 | Schlüssel-Pinning | key pinning | `key pinning` | |
 | Schreibschutz, schreibgeschützt | read-only | `read_only` | |
-| Schutzregel | guard rule | `guard_blocked` | SR1 to SR12 |
+| Schutzregel | guard rule | `guard_blocked` | SR1 to SR13 |
 | Schwärzen | redaction | `redaction` | |
 | Seitenleiste, Seitenleisten-Zustand | sidebar, sidebar state | `user_space_state` | |
 | Sequenz, globale | global sequence | `seq` | |

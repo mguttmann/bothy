@@ -47,7 +47,7 @@ kind of permission (Baseline section 3).
 
 | Persona | Goal | Typical tasks | Devices | Grants (example) |
 |---|---|---|---|---|
-| **Owner** (Alex) | Work with agents and lead the instance in terms of content | Chats with agents in all spaces, give grants, configure agents and backend policy, keep an eye on costs, read the audit; on the go, open a terminal on their own host from the iPhone; live topology and executive page | Desktop (Mac or Windows), iPhone | Owner: everything except other people's direct messages; terminal on every host, unless I6 blocks it ([24-terminal.md](24-terminal.md), section 7) |
+| **Owner** (Alex) | Work with agents and lead the instance in terms of content | Chats with agents in all spaces, give grants, configure agents and backend policy, keep an eye on costs, read the audit; on the go, open a terminal on their own host from the iPhone, or tell an agent to do a task on their Mac or Windows computer (3.9); live topology and executive page | Desktop (Mac or Windows), iPhone | Owner: everything except other people's direct messages; terminal on every host, unless I6 blocks it ([24-terminal.md](24-terminal.md), section 7) |
 | **Deputy** (Sam) | Operate granted spaces day to day | Trigger agents in the Support space, answer questions, review drafts; approve actions only if the capability has been given | iPhone, Android, laptop | `trigger` on the Support space, plus `upload`; no `approve_actions`; no terminal |
 | **Developer** (Robin) | Work on code with a runner agent | Posts in dev forums, read tool output, stop runs, watch costs and context, resume sessions; in the terminal on her own host, use `claude` interactively | Desktop with keyboard | `trigger` on a dev forum with project binding; grant `terminal` only on the host assigned to her (SR10); for isolation see [21-dev-isolation.md](21-dev-isolation.md) |
 | **Instance operator** | Install the instance and keep it running | Compose installation, login providers, backup, updates, status page, monitoring; pair hosts and declare the LLM login; Grafana with the panel plugin; TV mode in the office | Web console, command line, Grafana | Owner or a separate person with the owner role; not to be confused with the operator agent (`operator`) |
@@ -215,7 +215,25 @@ web console M6.
 | Take over a runner's thread in the terminal | later | D | | only when runner and host service run as the same user in a dev environment ([24-terminal.md](24-terminal.md), section 11.3) |
 | File transfer and clipboard through the terminal channel | later | D, M, W | | blocked in this version (OSC 52, [24-terminal.md](24-terminal.md), section 11.2) |
 | Recording of terminal content | never | | | metadata only; whether evidence obligations require a recording is an owner question (default: no) |
-| Terminal for agents or apps | never | | | an agent that prompt injection controls must not reach a host (T-TM-09) |
+| Terminal for agents or apps | never | | | an agent never opens a terminal session; an agent that prompt injection controls must not reach a host through it (T-TM-09). Operating a desktop of the owner is computer use (3.9), not a terminal session |
+
+### 3.9 Computer use
+
+Normative: [27-computer-use.md](27-computer-use.md) (owner ruling OR-1 of 2026-11-26,
+[ADR 0078](../adr/0078-agent-computer-use-on-a-paired-desktop.md)). Stage CU: helpers and host
+service CU-02 and CU-03, server CU-04, MCP server CU-05, runner CU-06, clients CU-07.
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| An agent operates a desktop of the owner (macOS, Windows) completely: any app, the terminal, the browser, the system settings | core | | `computer.desktops.list`, `computer.open`, `computer.attach` | stage CU; only in a run the owner started with an own message, only on a desktop the owner enabled on that machine (SR13); no app tiers, no confirmation per session or action |
+| Order work on a named desktop from any client, the phone included | core | D, M | | the owner's message in the thread is the order; the agent opens the session |
+| Enable a desktop: operating system permissions and the helper's switch "Allow computer control" | core | | | only at the machine; off after installation |
+| Switch the enablement of a desktop off | core | D, M, W | `computer.device.disable` | from any client of the owner; switching on again only at the machine |
+| Status chip while an agent controls, with stop; tray entry on the desktop | core | D, M | `computer.session.read`, `computer.stop` | metadata only (desktop, frontmost app, action count, locked); never a screenshot |
+| Stop with Esc or the indicator at the machine; pause while the screen is locked | core | | | the helper; the agent reports a locked machine in the thread |
+| Screenshots in the thread | later | | | F3 of the design note; not in stage CU |
+| Live view of what the agent sees | later | D, M | | CU-10; owner only, unstored |
+| Computer use for persons other than the owner | later | | | CU-12; needs its own ADR and a codetermination assessment |
 
 ## 4. Information architecture
 
