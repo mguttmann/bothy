@@ -1346,22 +1346,28 @@ class TranscriptReader:
         if entry.waiting_for is not None:
             what = _WAITING.get(entry.waiting_for, "a person")
             text = f"The background session waited for {what} and was stopped."
-            return [self._failure(CAUSE_WAITING, text)]
+            # The CLI's fixed words for what the session waits for, never a text of the
+            # session; a value the runner does not know is logged as "other".
+            known = entry.waiting_for if entry.waiting_for in _WAITING else "other"
+            return [self._failure(CAUSE_WAITING, text, waiting_for=known)]
         if entry.pid is not None and entry.pid != self.pid:
             text = "The background session runs in another process than the runner started."
             return [self._failure(CAUSE_REPLACED, text)]
         return []
 
-    def _failure(self, cause: str, text: str) -> dict[str, Any]:
+    def _failure(self, cause: str, text: str, *, waiting_for: str | None = None) -> dict[str, Any]:
         self._failed = True
         self.mapper.turn_open = False
-        return {
+        failure: dict[str, Any] = {
             "type": "result",
             "subtype": "error_during_execution",
             "is_error": True,
             "errors": [text],
             "bg_cause": cause,
         }
+        if waiting_for is not None:
+            failure["bg_waiting_for"] = waiting_for
+        return failure
 
     def _tasks(self, working: bool) -> list[dict[str, Any]]:
         if working == self._working:

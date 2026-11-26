@@ -178,6 +178,8 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
             "TMPDIR": tmpdir,
             "SSH_AUTH_SOCK": "",
         },
+        # A run can never answer a permission prompt: the CLI refuses instead of waiting.
+        "permissions": {"denyInsteadOfPrompting": True},
         "hooks": {
             "PreToolUse": [
                 {
@@ -652,18 +654,29 @@ async def test_a_stop_during_background_work_names_it_without_a_count(bg_world: 
 # ---- what a run cannot go on with ---------------------------------------------------------------
 
 
-async def test_a_session_that_waits_for_a_person_is_stopped(bg_world: World) -> None:
+@pytest.mark.parametrize("waiting_for", ["input needed", "permission prompt"])
+async def test_a_session_that_waits_for_a_person_is_stopped(
+    bg_world: World, logs: LogLines, waiting_for: str
+) -> None:
+    # The settings file refuses a tool call that would wait for a person
+    # (FIX-RUNNER-BG-NO-PROMPT); any other wait the CLI shows still stops the session, and the
+    # runner's own log names the cause and what the session waited for.
     world = bg_world
-    world.scenario(fixture="plain", bg_waiting="input needed")
+    world.scenario(fixture="plain", bg_waiting=waiting_for)
     await start(world)
     run = await world.fake.trigger("Ask me", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "failed"
     assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
     [note] = [s for s in world.fake.run(run.run_id)["steps"].values() if s["kind"] == "status"]
+    what = {"input needed": "a question", "permission prompt": "a permission prompt"}
     assert note["detail"]["errors"] == [
-        "The background session waited for a question and was stopped."
+        f"The background session waited for {what[waiting_for]} and was stopped."
     ]
     assert world.fake.run(run.run_id)["summary"] == cause("background_session_waiting")
+    [stopped] = events(logs, "background_session_stopped")
+    assert stopped["cause"] == "background_session_waiting"
+    assert stopped["waiting_for"] == waiting_for
+    assert stopped["run_id"] == str(run.run_id)
     assert texts(world) == []
     await nothing_left(world)
 

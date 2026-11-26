@@ -61,6 +61,7 @@ __all__ = [
     "REFUSED",
     "RETRY",
     "TOOL_SECONDS",
+    "UNPARSED_REMOVAL",
     "WAIT",
     "Refuser",
     "Script",
@@ -88,6 +89,16 @@ JOB_SECONDS = 8
 
 DUMMY_TOKEN = "stand-in-token-not-a-login"
 """What a world with ``login_token`` gives the CLI as ``CLAUDE_CODE_OAUTH_TOKEN``."""
+
+UNPARSED_REMOVAL = (
+    (Path(__file__).parent / "unparsed_removal.txt").read_text(encoding="utf-8").rstrip("\n")
+)
+"""The command of ``RMSTEP`` (``{folder}`` is `Script.folder`), kept in ``unparsed_removal.txt``:
+an agent's edit of a Makefile through a quoted Python heredoc whose text holds a recipe with
+``rm -f "$$f"``. The removal is text and never runs, but the CLI's check of removals cannot
+parse the whole command with certainty and asks for a person's approval even in bypass mode; a
+background session then waits (FIX-RUNNER-BG-NO-PROMPT). The shape is that of a real agent's
+command, with the addresses and values replaced."""
 
 
 class Refuser:
@@ -137,6 +148,7 @@ class Script:
     * ``ASK``: one question of ``AskUserQuestion``.
     * ``ENVSTEP``: one foreground command that prints the environment of the session.
     * ``FINDTOOLS``: one search for the tools that reach other sessions (``ToolSearch``).
+    * ``RMSTEP``: one foreground command `UNPARSED_REMOVAL` in the folder ``folder``.
     * anything else: a text ``Answer <n>``.
 
     A request without tools is one of the CLI itself (a summary for its agent view), or a
@@ -145,12 +157,14 @@ class Script:
     Attributes:
         bodies: The request bodies of the conversation, in order (for what a request carried).
         untooled: The bodies of the requests without tools, in order.
+        folder: The folder of the ``RMSTEP`` command (the working folder of the session).
     """
 
     def __init__(self) -> None:
         """Start without a request."""
         self.bodies: list[Mapping[str, Any]] = []
         self.untooled: list[Mapping[str, Any]] = []
+        self.folder = "."
         self._calls = 0
 
     def __call__(self, body: Mapping[str, Any]) -> Answer:  # noqa: PLR0911 - one answer per word
@@ -176,6 +190,10 @@ class Script:
             return [{"type": "tool_use", "id": call, "name": "Bash", "input": command}]
         if "ENVSTEP" in joined:
             command = {"command": "env", "description": "Environment"}
+            return [{"type": "tool_use", "id": call, "name": "Bash", "input": command}]
+        if "RMSTEP" in joined:
+            removal = UNPARSED_REMOVAL.replace("{folder}", self.folder)
+            command = {"command": removal, "description": "Edit the Makefile"}
             return [{"type": "tool_use", "id": call, "name": "Bash", "input": command}]
         if "FINDTOOLS" in joined:
             query = {"query": "select:SendMessage,ListAgents", "max_results": 5}
@@ -416,6 +434,7 @@ class World:
         without: Sequence[str] = (),
         hosted: HostedArgs | None = None,
         plugin_dirs: Sequence[Path] = (),
+        drop_settings: Sequence[str] = (),
     ) -> LaunchOutput:
         """Launch one session with the runner's own argument list and settings file.
 
@@ -423,7 +442,8 @@ class World:
         launch does; ``run_env`` is the environment of the session's run, of which only the
         ``env`` block of the settings file carries anything to the session. ``without`` names
         arguments to leave out of the runner's list, for a session that shows what one of
-        them changes.
+        them changes; ``drop_settings`` names members of the runner's settings file to leave
+        out in the same way.
         """
         prompt_file = self.root / f"{name}.prompt.md"
         prompt_file.write_text(system, encoding="utf-8")
@@ -435,6 +455,8 @@ class World:
         # The runner's turn environment names the CLI's configuration folder: the folder of
         # the world, unless ``run_env`` names another.
         document = settings_document({"CLAUDE_CONFIG_DIR": str(self.config), **turn_env}, base)
+        for member in drop_settings:
+            del document[member]
         settings.write_text(json.dumps(document), encoding="utf-8")
         self.classes[name] = tool_class
         argv = background_argv(

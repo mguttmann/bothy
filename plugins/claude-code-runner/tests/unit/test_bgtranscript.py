@@ -1235,6 +1235,7 @@ async def test_a_session_that_waits_for_a_person_fails_the_turn_once(tmp_path: P
             "is_error": True,
             "errors": ["The background session waited for a permission prompt and was stopped."],
             "bg_cause": CAUSE_WAITING,
+            "bg_waiting_for": "permission prompt",
         }
     ]
 
@@ -1246,6 +1247,7 @@ async def test_a_text_of_the_cli_never_reaches_the_failure(tmp_path: Path) -> No
     messages, _ = await read_through(tmp_path, [piece(PROMPT, TOOL)], sessions)
     [failure] = [m for m in messages if m["type"] == "result"]
     assert failure["errors"] == ["The background session waited for a person and was stopped."]
+    assert failure["bg_waiting_for"] == "other"  # the runner's log never carries the CLI's text
 
 
 async def test_a_process_the_runner_did_not_launch_fails_the_turn(tmp_path: Path) -> None:
@@ -1255,6 +1257,7 @@ async def test_a_process_the_runner_did_not_launch_fails_the_turn(tmp_path: Path
     messages, _ = await read_through(tmp_path, [piece(PROMPT, TOOL)], sessions)
     [failure] = [m for m in messages if m["type"] == "result"]
     assert failure["bg_cause"] == CAUSE_REPLACED
+    assert "bg_waiting_for" not in failure
 
 
 # ---- the launch offset, the replay and the priced usage -----------------------------------------

@@ -3887,6 +3887,14 @@ class RunTurn:
             self.bg_priced.add(message)
         elif kind == "result" and isinstance(message.get("bg_cause"), str):
             self._bg_cause = str(message["bg_cause"])
+            # The runner stops the session next (18.9); the reason belongs in its own log, not
+            # only in the run's summary (FIX-RUNNER-BG-NO-PROMPT).
+            _warn(
+                "background_session_stopped",
+                cause=self._bg_cause,
+                waiting_for=message.get("bg_waiting_for") or "",
+                **self.ids,
+            )
         return None
 
     async def _owner_code_stolen(self, session: BgSession, origin: str) -> _Outcome:
