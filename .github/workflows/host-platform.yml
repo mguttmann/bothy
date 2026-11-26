@@ -193,15 +193,15 @@ jobs:
           base="/Library/Application Support/bothy-host"
           sudo installer -pkg "$pkg" -target /
           test -x "$base/bin/bothy-host"
-          if [ -e "$base/desktop" ] || [ -e "$base/config.yaml" ]; then echo "the helper arrived without its choice"; exit 1; fi
+          if [ -e "$base/bin/bothy-computer-helper.app" ] || [ -e "$base/config.yaml" ]; then echo "the helper arrived without its choice"; exit 1; fi
           printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
             '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
             '<plist version="1.0"><array><dict><key>attributeSetting</key><integer>1</integer>' \
             '<key>choiceAttribute</key><string>selected</string><key>choiceIdentifier</key>' \
             '<string>computer-helper</string></dict></array></plist>' > "$RUNNER_TEMP/choices.plist"
           sudo installer -pkg "$pkg" -target / -applyChoiceChangesXML "$RUNNER_TEMP/choices.plist"
-          test -x "$base/desktop/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper"
-          [ "$(stat -f '%Su:%Sg' "$base/desktop/bothy-computer-helper.app")" = root:wheel ]
+          test -x "$base/bin/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper"
+          [ "$(stat -f '%Su:%Sg' "$base/bin/bothy-computer-helper.app")" = root:wheel ]
           [ "$(stat -f '%Su:%Sg %Lp' /Library/LaunchAgents/com.example.bothy-computer-helper.plist)" = "root:wheel 644" ]
           grep -qx '  computer_use: true' "$base/config.yaml"
           sudo launchctl bootout "gui/$(id -u)/com.example.bothy-computer-helper" 2>/dev/null || true
@@ -327,13 +327,13 @@ jobs:
           $dir = Join-Path $env:ProgramFiles 'bothy-host'
           $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', $msi, '/qn', '/norestart')
           if ($p.ExitCode -ne 0) { throw "msiexec exited with $($p.ExitCode)" }
-          if (Test-Path (Join-Path $dir 'desktop')) { throw 'the helper arrived without its feature' }
+          if (Test-Path (Join-Path $dir 'bothy-computer-helper.exe')) { throw 'the helper arrived without its feature' }
           if (Test-Path (Join-Path $dir 'config.yaml')) { throw 'the configuration changed without the feature' }
           $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', $msi, '/qn', '/norestart', 'ADDLOCAL=ComputerHelper')
           if ($p.ExitCode -ne 0) { throw "msiexec ADDLOCAL exited with $($p.ExitCode)" }
-          $helper = Join-Path $dir 'desktop\bothy-computer-helper.exe'
+          $helper = Join-Path $dir 'bothy-computer-helper.exe'
           if (-not (Test-Path $helper)) { throw 'no helper in Program Files' }
-          $run = (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run').bothy-computer-helper
+          $run = (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run').'bothy-computer-helper'
           if ($run -ne ('"' + $helper + '"')) { throw "start entry $run" }
           if (-not ((Get-Content (Join-Path $dir 'config.yaml')) -contains '  computer_use: true')) { throw 'computer_use not set' }
           $h = Start-Process -FilePath $helper -PassThru

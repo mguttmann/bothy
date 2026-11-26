@@ -98,6 +98,6 @@ The helper is never published (D-CU-01-29). On the owner's Windows computer the 
 `tools/distribution/hostdist.py` (D-CU-02-10) create the self-signed code signing certificate once
 (`helper-cert-windows`), sign `bothy-computer-helper.exe` and check it with `signtool verify /pa`
 (`helper-sign-windows`), and build the host MSI with the optional feature `ComputerHelper`
-(`helper-package-windows`), which installs the helper under `%ProgramFiles%\bothy-host\desktop\`,
+(`helper-package-windows`), which installs the helper under `%ProgramFiles%\bothy-host\`,
 writes its start entry at login and sets `host_service.computer_use`. A build without a signature
 that verifies reports `signature: development` in `hello`.

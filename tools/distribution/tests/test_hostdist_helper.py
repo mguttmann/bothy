@@ -235,7 +235,7 @@ def test_helper_package_macos(tmp_path: Path) -> None:
     component = plistlib.loads(Path(helper[helper.index("--component-plist") + 1]).read_bytes())
     assert component == [
         {
-            "RootRelativeBundlePath": f"bothy-host/desktop/{hostdist.HELPER_APP}",
+            "RootRelativeBundlePath": f"bothy-host/bin/{hostdist.HELPER_APP}",
             "BundleIsRelocatable": False,
             "BundleIsVersionChecked": False,
             "BundleHasStrictIdentifier": True,
@@ -243,7 +243,7 @@ def test_helper_package_macos(tmp_path: Path) -> None:
         }
     ]
     root = Path(helper[helper.index("--root") + 1])
-    copied = root / "bothy-host" / "desktop" / hostdist.HELPER_APP
+    copied = root / "bothy-host" / "bin" / hostdist.HELPER_APP
     assert (copied / "Contents" / "MacOS" / hostdist.HELPER_EXE_MACOS).read_bytes() == b"helper"
     agent = root / "bothy-host" / "share" / hostdist.HELPER_LAUNCH_AGENT.name
     assert agent.read_bytes() == (hostdist.INFRA / "macos" / agent.name).read_bytes()
@@ -391,3 +391,69 @@ def test_the_make_targets_call_the_steps() -> None:
         assert f"$(HOSTDIST) {step}" in body
     body = make[make.index("helper-macos:") :].split("\n\n", 1)[0]
     assert "desktop/macos/bundle.sh" in body
+
+
+# ---- the requirement the host service checks (D-CU-03-7) -----------------------------------
+
+
+def _requirement_flag(run: FakeRun) -> str | None:
+    build = next(c for c in run.calls if c[:2] == ["go", "build"])
+    flags = build[build.index("-ldflags") + 1]
+    marker = f"-X '{hostdist.MODULE}/internal/buildinfo.ComputerHelperRequirement="
+    if marker not in flags:
+        return None
+    return flags.split(marker, 1)[1].rsplit("'", 1)[0]
+
+
+def test_the_macos_package_builds_the_host_with_the_recorded_requirement(tmp_path: Path) -> None:
+    req = tmp_path / "requirement.txt"
+    req.write_text(DR + "\n", encoding="utf-8")
+    run = _package_run()
+    hostdist.helper_package_macos(
+        run,
+        version=VERSION,
+        out=tmp_path / "out",
+        app=_fake_app(tmp_path),
+        arch="arm64",
+        workdir=tmp_path / "work",
+        requirement_file=req,
+    )
+    assert _requirement_flag(run) == DR.removeprefix("designated => ")
+
+
+def test_the_macos_package_without_a_requirement_is_a_development_build(tmp_path: Path) -> None:
+    run = _package_run()
+    hostdist.helper_package_macos(
+        run,
+        version=VERSION,
+        out=tmp_path / "out",
+        app=_fake_app(tmp_path),
+        arch="arm64",
+        workdir=tmp_path / "work",
+    )
+    assert _requirement_flag(run) is None
+
+
+def test_a_requirement_with_a_single_quote_is_refused() -> None:
+    with pytest.raises(common.StepError, match="quote"):
+        hostdist.ldflags("1.2.3", "pkg", requirement="identifier 'x'")
+
+
+@pytest.mark.parametrize(
+    ("thumbprint", "want"), [("CD" * 20, hostdist.HELPER_CERT_SUBJECT), (None, None)]
+)
+def test_the_windows_package_builds_the_host_with_the_publisher(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, thumbprint: str | None, want: str | None
+) -> None:
+    monkeypatch.setattr(windows, "sdk_tool", lambda name, sdk_bin=None: Path(name))
+    run = _package_run()
+    hostdist.helper_package_windows(
+        run,
+        version=VERSION,
+        out=tmp_path / "out",
+        helper=tmp_path / hostdist.HELPER_EXE_WINDOWS,
+        thumbprint=thumbprint,
+        wix=tmp_path / "wix.dll",
+        workdir=tmp_path / "work",
+    )
+    assert _requirement_flag(run) == want

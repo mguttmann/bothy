@@ -411,10 +411,14 @@ doctor` prints a section `computer` (no HD check: the doctor list of 24 3.5 stay
 server refuses another): helper installed and trusted (9.4), connected, enabled, the permissions of
 9.1 granted, signed or a development build; the same state goes to the server in the `report` object
 `computer` (12.3). Places (D-CU-02-3): macOS `bothy-computer-helper.app` in
-`/Library/Application Support/bothy-host/desktop/` with the LaunchAgent
+`/Library/Application Support/bothy-host/bin/` next to `bothy-host` with the LaunchAgent
 `/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
-`%ProgramFiles%\bothy-host\desktop\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
-machine's `Run` key; the enablement's state file in the user's account (D-CU-02-4). A build
+`%ProgramFiles%\bothy-host\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
+machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule); the enablement's state file
+in the user's account (D-CU-02-4). A package built from a signed helper sets the host service's
+`buildinfo.ComputerHelperRequirement` to the helper's designated requirement (macOS) or the
+publisher subject of the machine's certificate (Windows); a package without one is a development
+build. A build
 without a signature that verifies is for development only and says so in the doctor and in the
 report (D-CU-01-29).
 

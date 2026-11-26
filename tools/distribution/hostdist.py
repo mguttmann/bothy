@@ -141,7 +141,7 @@ HELPER_EXE_MACOS = "bothy-computer-helper"
 HELPER_EXE_WINDOWS = "bothy-computer-helper.exe"
 HELPER_BUNDLE_ID = "com.example.bothy-computer-helper"
 HELPER_PKG_IDENTIFIER = HELPER_BUNDLE_ID
-DARWIN_HELPER_DIR = Path("/Library/Application Support/bothy-host/desktop")
+DARWIN_HELPER_DIR = DARWIN_PROGRAM_DIR  # D-CU-03-7: next to bothy-host
 HELPER_LAUNCH_AGENT = Path(f"/Library/LaunchAgents/{HELPER_BUNDLE_ID}.plist")
 HELPER_CERT_SUBJECT = "CN=bothy-computer-helper (local)"
 _THUMBPRINT = re.compile(r"^[0-9A-Fa-f]{40}$")
@@ -180,15 +180,30 @@ def check_version(version: str) -> None:
         raise StepError(f"services/host/VERSION says {component_version()}, not {version}")
 
 
-def ldflags(version: str, kind: str) -> str:
-    """Return the linker flags of a release build: no symbol table, version and package kind."""
-    return (
+def ldflags(version: str, kind: str, requirement: str = "") -> str:
+    """Return the linker flags of a release build: no symbol table, version and package kind.
+
+    `requirement` is the code signing requirement of the computer helper the host service checks
+    (`buildinfo.ComputerHelperRequirement`, docs/decisions.d/CU-03.md D-CU-03-7); only the
+    packages with the helper set it, empty leaves a development build.
+
+    Raises:
+        StepError: the requirement holds a single quote, which the linker flags cannot carry.
+    """
+    flags = (
         f"-s -w -X {MODULE}/internal/buildinfo.Version={version} "
         f"-X {MODULE}/internal/buildinfo.PackageKind={kind}"
     )
+    if requirement:
+        if "'" in requirement:
+            raise StepError("the helper requirement holds a single quote")
+        flags += f" -X '{MODULE}/internal/buildinfo.ComputerHelperRequirement={requirement}'"
+    return flags
 
 
-def go_build(run: Runner, goos: str, goarch: str, version: str, kind: str, out: Path) -> Path:
+def go_build(
+    run: Runner, goos: str, goarch: str, version: str, kind: str, out: Path, requirement: str = ""
+) -> Path:
     """Build `cmd/bothy-host` for goos/goarch without cgo into `out`; return `out`.
 
     The build depends only on the source and `version` (`-trimpath -buildvcs=false`), so the
@@ -202,7 +217,7 @@ def go_build(run: Runner, goos: str, goarch: str, version: str, kind: str, out: 
             "-trimpath",
             "-buildvcs=false",
             "-ldflags",
-            ldflags(version, kind),
+            ldflags(version, kind, requirement),
             "-o",
             out,
             "./cmd/bothy-host",
@@ -949,7 +964,7 @@ def helper_sign_macos(
 # The component property list of the helper bundle (`pkgbuild --component-plist`).
 _COMPONENT = [
     {
-        "RootRelativeBundlePath": f"bothy-host/desktop/{HELPER_APP}",
+        "RootRelativeBundlePath": f"bothy-host/bin/{HELPER_APP}",
         "BundleIsRelocatable": False,
         "BundleIsVersionChecked": False,
         "BundleHasStrictIdentifier": True,
@@ -990,14 +1005,15 @@ def helper_component(run: Runner, version: str, app: Path, workdir: Path) -> Pat
     """Build the component package of the helper from `app`; return its path.
 
     Installed below `/Library/Application Support` like the host component: the bundle in
-    `bothy-host/desktop` and the LaunchAgent as a reference in `bothy-host/share`, which the
-    postinstall copies to `/Library/LaunchAgents` (so the payload touches no system folder). The
-    bundle is not relocatable: Installer must not move the update to another copy with the same
-    bundle ID, because the peer rule trusts only the installed path (27 9.4).
+    `bothy-host/bin` next to the host binary (D-CU-03-7) and the LaunchAgent as a reference in
+    `bothy-host/share`, which the postinstall copies to `/Library/LaunchAgents` (so the payload
+    touches no system folder). The bundle is not relocatable: Installer must not move the update
+    to another copy with the same bundle ID, because the peer rule trusts only the installed path
+    (27 9.4).
     """
     base = workdir / "pkg-helper"
     root = base / "root" / "bothy-host"
-    desktop = root / "desktop"
+    desktop = root / "bin"
     share = root / "share"
     desktop.mkdir(parents=True)
     share.mkdir(parents=True)
@@ -1038,19 +1054,39 @@ def helper_component(run: Runner, version: str, app: Path, workdir: Path) -> Pat
 
 
 def helper_package_macos(
-    run: Runner, *, version: str, out: Path, app: Path, arch: str, workdir: Path
+    run: Runner,
+    *,
+    version: str,
+    out: Path,
+    app: Path,
+    arch: str,
+    workdir: Path,
+    requirement_file: Path | None = None,
 ) -> Path:
     """Build the host `.pkg` of `arch` with the helper as an optional choice; return it.
 
     The host binary is built with the package kind `pkg` and left unsigned: `bothy-host install`
     signs it ad hoc, as it does for a release binary (16 4.4). The product stays unsigned too: it
     is built and installed on the same machine, so it carries no quarantine flag (D-CU-01-29).
+    With `requirement_file` (the one `helper-sign-macos` wrote) the host binary carries the
+    helper's designated requirement as `buildinfo.ComputerHelperRequirement`, so the host service
+    admits only that helper (27 9.4); without it the host is a development build.
 
     Raises:
         StepError: a build step fails.
     """
+    requirement = ""
+    if requirement_file is not None:
+        line = requirement_file.read_text(encoding="utf-8").strip()
+        requirement = line.removeprefix("designated =>").strip()
     binary = go_build(
-        run, "darwin", arch, version, KIND_PKG, workdir / f"bin-{arch}" / "bothy-host"
+        run,
+        "darwin",
+        arch,
+        version,
+        KIND_PKG,
+        workdir / f"bin-{arch}" / "bothy-host",
+        requirement,
     )
     host = host_component(run, version, arch, binary, workdir)
     helper = helper_component(run, version, app, workdir)
@@ -1152,14 +1188,22 @@ def helper_package_windows(
     """Build the host MSI with the feature ComputerHelper around `helper`; return the MSI.
 
     `helper` is signed already (`helper-sign-windows`) or a development build. With a thumbprint
-    the host binary and the MSI are signed with the same certificate; without one they stay
-    unsigned, as in the CI jobs.
+    the host binary and the MSI are signed with the same certificate, and the host binary carries
+    the publisher subject of `helper-cert-windows` as `buildinfo.ComputerHelperRequirement`;
+    without one everything stays unsigned and a development build, as in the CI jobs.
 
     Raises:
         StepError: a build or signing step fails.
     """
+    publisher = HELPER_CERT_SUBJECT if thumbprint else ""
     binary = go_build(
-        run, "windows", "amd64", version, KIND_MSI, workdir / "msi-bin" / "bothy-host.exe"
+        run,
+        "windows",
+        "amd64",
+        version,
+        KIND_MSI,
+        workdir / "msi-bin" / "bothy-host.exe",
+        publisher,
     )
     if thumbprint:
         sign_with_store(run, binary, thumbprint)
@@ -1201,6 +1245,7 @@ def _add_helper_parsers(sub: Any) -> None:
     hp.add_argument("--out", type=Path, required=True)
     hp.add_argument("--app", type=Path, required=True)
     hp.add_argument("--arch", default="arm64" if platform.machine() == "arm64" else "amd64")
+    hp.add_argument("--requirement-file", type=Path)
     hc = sub.add_parser("helper-cert-windows", help="create the machine's signing certificate")
     hc.add_argument("--subject", default=HELPER_CERT_SUBJECT)
     hw = sub.add_parser("helper-sign-windows", help="sign the computer helper (machine store)")
@@ -1235,6 +1280,7 @@ def _helper_command(runner: Runner, args: argparse.Namespace) -> None:
                 app=args.app.resolve(),
                 arch=args.arch,
                 workdir=Path(tmp),
+                requirement_file=args.requirement_file,
             )
         print(f"helper-package-macos: {pkg.name}")
     elif args.command == "helper-cert-windows":

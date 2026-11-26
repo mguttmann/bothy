@@ -8,7 +8,7 @@ built and signed on the owner's own Mac and never published (D-CU-01-29).
 
 Names: the app bundle is `bothy-computer-helper.app` (bundle ID `com.example.bothy-computer-helper`,
 executable `bothy-computer-helper`), installed to
-`/Library/Application Support/bothy-host/desktop/bothy-computer-helper.app`; its display name and
+`/Library/Application Support/bothy-host/bin/bothy-computer-helper.app`; its display name and
 menu bar title are "Computer Helper", because code and configuration carry the working name only
 in its prefix forms (docs/spec/02-architecture.md "6. Code layout").
 

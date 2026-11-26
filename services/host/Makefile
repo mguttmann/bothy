@@ -64,9 +64,9 @@ helper-sign-macos: ## Sign the helper with a Developer ID: make helper-sign-maco
 	@[ -n "$${APP:-}" ] && [ -n "$${SIGN_IDENTITY:-}" ] && [ -n "$${REQUIREMENT_FILE:-}" ] || { echo "usage: make helper-sign-macos APP=<.app> SIGN_IDENTITY=<name> REQUIREMENT_FILE=<file>"; exit 2; }
 	@$(HOSTDIST) helper-sign-macos --app "$$APP" --identity "$$SIGN_IDENTITY" --requirement-file "$$REQUIREMENT_FILE"
 
-helper-package-macos: ## Host .pkg with the helper as an optional choice: make helper-package-macos APP=<.app> OUT=<dir>
+helper-package-macos: ## Host .pkg with the helper as an optional choice: make helper-package-macos APP=<.app> OUT=<dir> [REQUIREMENT_FILE=<file>]
 	@[ -n "$${APP:-}" ] && [ -n "$${OUT:-}" ] || { echo "usage: make helper-package-macos APP=<.app> OUT=<dir>"; exit 2; }
-	@mkdir -p "$$OUT" && $(HOSTDIST) helper-package-macos --version "$$(tr -d '[:space:]' < VERSION)" --out "$$(cd "$$OUT" && pwd)" --app "$$APP"
+	@mkdir -p "$$OUT" && $(HOSTDIST) helper-package-macos --version "$$(tr -d '[:space:]' < VERSION)" --out "$$(cd "$$OUT" && pwd)" --app "$$APP" $${REQUIREMENT_FILE:+--requirement-file "$$REQUIREMENT_FILE"}
 
 helper-package-windows: ## Host MSI with the helper feature (Windows): make helper-package-windows HELPER=<exe> OUT=<dir> [THUMBPRINT=<sha1>]
 	@[ -n "$${HELPER:-}" ] && [ -n "$${OUT:-}" ] || { echo "usage: make helper-package-windows HELPER=<exe> OUT=<dir> [THUMBPRINT=<sha1>]"; exit 2; }

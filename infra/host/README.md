@@ -51,7 +51,7 @@ The release packages above carry no computer helper (D-CU-01-29). On the owner's
 package with the helper as an optional component: the `.pkg` with the choices `host` and
 `computer-helper` (off unless selected), the MSI with the feature `ComputerHelper`
 (`ADDLOCAL=ComputerHelper`). Selected, it installs the helper below the program folder
-(`/Library/Application Support/bothy-host/desktop`, `%ProgramFiles%\bothy-host\desktop`), its
+(`/Library/Application Support/bothy-host/bin`, `%ProgramFiles%\bothy-host`, next to `bothy-host`), its
 start entry (LaunchAgent in the GUI session, the machine's `Run` key) and sets
 `host_service.computer_use: true` in the configuration file, creating the file when it does not
 exist; a `host_service` written in flow style is left alone and the step fails. Removing the
