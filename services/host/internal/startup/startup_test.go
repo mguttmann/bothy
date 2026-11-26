@@ -603,3 +603,22 @@ func TestLateReadyLogsInAndReports(t *testing.T) {
 		t.Errorf("declaration %q", d)
 	}
 }
+
+// TestComputerOnlyHostStarts holds D-CU-03-13 at the start: computer use without session users
+// logs in and reports, the report naming session_users_empty as a warning.
+func TestComputerOnlyHostStarts(t *testing.T) {
+	x := newWorld(t)
+	x.cfg.SessionUsers = nil
+	x.cfg.ComputerUse = true
+	x.pair()
+	s, code := Start(context.Background(), x.deps())
+	if s == nil || code != 0 {
+		t.Fatalf("computer-only host refused: %d\n%s", code, x.logs)
+	}
+	if logins, reports, _ := x.ctl.count(); logins != 1 || reports < 1 {
+		t.Fatalf("logins %d reports %d", logins, reports)
+	}
+	if e := hd(x.ctl.last(), doctor.HD1); len(e) != 1 || !e[0].OK || e[0].Code != doctor.CodeSessionUsersEmpty {
+		t.Errorf("HD1 %+v", e)
+	}
+}
