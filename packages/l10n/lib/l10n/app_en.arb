@@ -17941,7 +17941,7 @@
   "@signInPasskeyCancelled": {
     "description": "Notice when the system's passkey prompt was cancelled or no authenticator answered."
   },
-  "signInPasskeyUnavailable": "This app cannot create a passkey on this device. Add one in the web console of this instance or in the Windows app.",
+  "signInPasskeyUnavailable": "This app cannot create a passkey on this device. Add one in the web console of this instance.",
   "@signInPasskeyUnavailable": {
     "description": "Hint of the sign-in area on a device without a passkey port (a Mac, a phone build without a public domain; D-M4-18-9)."
   },

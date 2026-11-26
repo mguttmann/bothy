@@ -628,6 +628,19 @@ void main() {
           throwsA(isA<StepUpCancelled>()),
         );
         expect(h.server.to(passkeyPath), isEmpty);
+        expect(h.prompt.askedPassword, isEmpty);
+      });
+
+      test('a passkey this device cannot give leaves the password for an ordinary step-up', () async {
+        h.passkeys.assertionError = StateError('no credential on this device');
+        h.prompt.passwordAnswers.add((
+          password: 'correct horse',
+          totpCode: '123456',
+        ));
+        await h.session.stepUp.confirm(purposeText: 'Assign the runner');
+        expect(h.server.to(passkeyPath), isEmpty);
+        expect(h.server.to(passwordPath), hasLength(1));
+        expect(h.prompt.askedPassword.single.purposeText, 'Assign the runner');
       });
 
       test('a declined prompt creates no second challenge', () async {

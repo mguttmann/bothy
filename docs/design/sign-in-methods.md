@@ -61,7 +61,8 @@ Done means:
    (D-M4-18-9 stays): it has the step-up key and needs none for the terminal.
 6. **Step-up without a step-up key.** On a device without a step-up key the step-up uses a
    passkey when the app has a passkey port and the challenge carries `passkey_options` (the person
-   has a passkey); otherwise password and TOTP as before (08 6.2). The terminal's fresh step-up
+   has a passkey); otherwise, and when the platform gives no assertion (a passkey stored on
+   another device), password and TOTP as before (08 6.2). The terminal's fresh step-up
    takes the passkey too, because the server counts a passkey as fresh outside the console (08
    6.3 item 2); without a passkey it ends before any request with `StepUpUnavailable`, and the
    terminal shows the hint to add a passkey under Settings, Sign-in.

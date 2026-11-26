@@ -3188,7 +3188,7 @@
   "signInPasskeyContinue": "Weiter",
   "signInPasskeyAdded": "Der Passkey {name} wurde hinzugefügt.",
   "signInPasskeyCancelled": "Es wurde kein Passkey erstellt.",
-  "signInPasskeyUnavailable": "Diese App kann auf diesem Gerät keinen Passkey erstellen. Füge einen in der Web-Konsole dieser Instanz oder in der Windows-App hinzu.",
+  "signInPasskeyUnavailable": "Diese App kann auf diesem Gerät keinen Passkey erstellen. Füge einen in der Web-Konsole dieser Instanz hinzu.",
   "signInLinkWith": "Mit {provider} verknüpfen",
   "signInLinked": "Dein Konto ist jetzt mit {provider} verknüpft.",
   "signInLinkCancelled": "Die Verknüpfung wurde beim Anmeldedienst abgebrochen.",

@@ -571,9 +571,10 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   of the build equals the instance's host, with `android:apk-key-hash:<hash>` in
   `auth.webauthn_origins` ([08](08-identity.md) 18). As built on Windows (V1-14): Windows Hello
   through the Win32 WebAuthn API that the runner serves on the method channel `bothy/webauthn`,
-  for any instance; the app writes the client data with the origin of the instance itself, so it
-  needs no domain of the build and no entry in `auth.webauthn_origins`. The Mac app has no
-  passkey port (docs/decisions.d/M4-18.md D-M4-18-9).
+  for any instance; the app writes the client data with the origin of the address the person
+  connected to, so it needs no domain of the build; that origin must be one of
+  `auth.webauthn_origins`, as for a browser. The Mac app has no passkey port
+  (docs/decisions.d/M4-18.md D-M4-18-9).
 - **Step-up:** native apps sign a server challenge with a second device key that
   requires user confirmation (biometrics or PIN); a device without that key (Windows, section 9)
   confirms with a passkey of the person when the app has a passkey port (V1-14), else sends
@@ -1041,11 +1042,13 @@ the thread is loaded locally or through REST, and then jumps to the message.
 Web console (M6-02, docs/DECISIONS.md D-M6-02-1): the server serves it under `/console/` on the
 origin of the API, and its paths are `/console/login`, `/console/login/callback` (OIDC login),
 `/console/step-up`, `/console/step-up/callback` (OIDC re-login of the step-up),
+`/console/sign-in/callback` (the link of a further identity from the page Sign-in, V1-14),
 `/console/logged-out` (E7), `/console/public-status` (the status page without login, only with
 `status.public_enabled`; M7-21) and one path per navigation entry of 01 5.5: `/console/live`,
 `/console/stats`, `/console/hosts`, `/console/people`, `/console/groups`, `/console/devices`,
 `/console/agents`, `/console/apps`, `/console/audit`, `/console/import`, `/console/instance`,
-`/console/status`. The table of these paths (`ConsolePage` in `apps/console/lib/routes.dart`) is
+`/console/status`, `/console/sign-in` (V1-14), and `/console/grafana` for owners when
+`console.grafana_embed_url` is set (M6-17). The table of these paths (`ConsolePage` in `apps/console/lib/routes.dart`) is
 the whole router configuration of the console; it has no path for spaces, channels, threads or
 messages (ADR 0028), which a test holds. A thread in the console shows its ID with a copy action
 and the note to open it in the app, because `getDiscovery` names no URL scheme of the apps.

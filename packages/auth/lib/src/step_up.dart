@@ -112,7 +112,9 @@ final class StepUpService {
   Future<void> _confirm(String purposeText) async {
     final key = _core.keys.stepUp;
     if (key != null) return _confirmWithKey(key, purposeText);
-    if (await _confirmWithPasskey(purposeText)) return;
+    // A passkey the platform cannot answer (one stored on another device, Windows Hello refused)
+    // leaves the password: only the person's own "No" to the prompt cancels (D-V1-14-4).
+    if (await _confirmWithPasskey(purposeText) == _PasskeyStepUp.done) return;
     await _confirmWithPassword(purposeText);
   }
 
@@ -126,32 +128,39 @@ final class StepUpService {
   Future<void> confirmFresh({required String purposeText}) async {
     final key = _core.keys.stepUp;
     if (key != null) return _confirmWithKey(key, purposeText);
-    if (!await _confirmWithPasskey(purposeText)) {
-      throw const StepUpUnavailable();
+    switch (await _confirmWithPasskey(purposeText)) {
+      case _PasskeyStepUp.done:
+        return;
+      case _PasskeyStepUp.none:
+        throw const StepUpUnavailable();
+      case _PasskeyStepUp.failed:
+        throw const StepUpCancelled();
     }
   }
 
-  /// The step-up with a passkey of a device without a step-up key; false, after at most one
-  /// `createStepUpChallenge`, when the app has no passkey port or the challenge carries no
-  /// `passkey_options` (the person has no passkey, or the instance has passkeys off).
+  /// The step-up with a passkey of a device without a step-up key: [_PasskeyStepUp.none], after
+  /// at most one `createStepUpChallenge`, when the app has no passkey port or the challenge
+  /// carries no `passkey_options` (the person has no passkey, or the instance has passkeys off);
+  /// [_PasskeyStepUp.failed] when the platform gave no assertion (the passkey is on another
+  /// device, the prompt was refused, or the options did not fit), logged with its error type.
   ///
   /// The first challenge only tells whether a passkey can answer; the one the passkey signs is
   /// created after the prompt, because a challenge lives only `auth.step_up_challenge_ttl`. A
-  /// refused or cancelled platform prompt is [StepUpCancelled]; a refused assertion is the
-  /// server's answer (`401 step_up_required`, counted).
-  Future<bool> _confirmWithPasskey(String purposeText) async {
+  /// "No" to the prompt is [StepUpCancelled]; a refused assertion is the server's answer
+  /// (`401 step_up_required`, counted).
+  Future<_PasskeyStepUp> _confirmWithPasskey(String purposeText) async {
     final passkeys = _passkeys;
-    if (passkeys == null) return false;
+    if (passkeys == null) return _PasskeyStepUp.none;
     if (_core.tokens.state?.session == null) throw const NotSignedIn();
     final auth = _core.api.getAuthApi();
     final probe = (await auth.createStepUpChallenge(extra: _internal)).data!;
-    if (probe.passkeyOptions == null) return false;
+    if (probe.passkeyOptions == null) return _PasskeyStepUp.none;
     if (!await _prompt.ask(purposeText)) throw const StepUpCancelled();
     final challenge = (await auth.createStepUpChallenge(extra: _internal))
         .data!;
     final options = challenge.passkeyOptions;
     // The passkey was revoked between the two challenges: nothing can answer any more.
-    if (options == null) throw const StepUpCancelled();
+    if (options == null) return _PasskeyStepUp.failed;
     final Map<String, Object?> credential;
     try {
       credential = await passkeys.getAssertion({
@@ -159,9 +168,11 @@ final class StepUpService {
       });
     } on AuthException {
       rethrow;
-    } on Object {
-      // The platform's prompt (Windows Hello) was refused or cancelled, or no passkey answered.
-      throw const StepUpCancelled();
+    } on Object catch (e) {
+      // The platform's prompt (Windows Hello) was refused or cancelled, no passkey on this device
+      // answered, or the options did not fit the platform.
+      _core.log('step-up passkey not given (${e.runtimeType})');
+      return _PasskeyStepUp.failed;
     }
     await auth.completeStepUpWithPasskey(
       stepUpPasskeyRequest: StepUpPasskeyRequest(
@@ -177,7 +188,7 @@ final class StepUpService {
       extra: _internal,
     );
     _core.log('step-up confirmed with a passkey');
-    return true;
+    return _PasskeyStepUp.done;
   }
 
   Future<void> _confirmWithKey(DeviceKeySigner key, String purposeText) async {
@@ -266,4 +277,16 @@ final class StepUpService {
       }
     }
   }
+}
+
+/// How the passkey step-up of a device without a step-up key ended.
+enum _PasskeyStepUp {
+  /// Confirmed.
+  done,
+
+  /// No passkey port, or the person has no passkey.
+  none,
+
+  /// The platform gave no assertion.
+  failed,
 }

@@ -252,8 +252,9 @@ further identity (section 3.3). The password part shows only for a person with a
 while `auth.local_password_enabled` is true. Revoking an own passkey and unlinking an identity have
 no view. A first passkey also comes into being when an enrollment code is redeemed in a phone app
 whose build names a public domain (section 3.2). The Windows app creates its passkeys through the
-Win32 WebAuthn API and writes the client data itself with the origin of `server.public_url`, so
-`auth.webauthn_origins` needs no entry for it.
+Win32 WebAuthn API and writes the client data itself with the origin of the address the person
+connected to; that origin must be one of `auth.webauthn_origins` (empty: the origin of
+`server.public_url`), as for a browser.
 
 ### 2.6 Configuration per driver
 

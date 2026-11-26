@@ -12068,7 +12068,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signInPasskeyUnavailable =>
-      'This app cannot create a passkey on this device. Add one in the web console of this instance or in the Windows app.';
+      'This app cannot create a passkey on this device. Add one in the web console of this instance.';
 
   @override
   String signInLinkWith(String provider) {

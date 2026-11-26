@@ -19253,7 +19253,7 @@ abstract class AppLocalizations {
   /// Hint of the sign-in area on a device without a passkey port (a Mac, a phone build without a public domain; D-M4-18-9).
   ///
   /// In en, this message translates to:
-  /// **'This app cannot create a passkey on this device. Add one in the web console of this instance or in the Windows app.'**
+  /// **'This app cannot create a passkey on this device. Add one in the web console of this instance.'**
   String get signInPasskeyUnavailable;
 
   /// Button of the sign-in area that links a further login service (08 section 3.3).
