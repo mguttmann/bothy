@@ -135,11 +135,11 @@ final class InputTests: XCTestCase {
         rig.host(["op": "do", "seq": 3, "action": "type", "text": "naïve café\n世界"])
         XCTAssertEqual(
             rig.injector.events,
-            [
-                .move(Point(x: 5, y: 6)), .move(Point(x: 10, y: 20)),
-                .scroll(Point(x: 10, y: 20), .down, 3), .text("naïve café"),
-                .keyDown(.named(.return)), .keyUp(.named(.return)), .text("世界"),
-            ])
+            [.move(Point(x: 5, y: 6)), .move(Point(x: 10, y: 20))]
+                // One line of scroll and one character of text per unit (27 9.6).
+                + Array(repeating: .scroll(Point(x: 10, y: 20), .down, 1), count: 3)
+                + "naïve café".map { .text(String($0)) }
+                + [.keyDown(.named(.return)), .keyUp(.named(.return)), .text("世"), .text("界")])
     }
 
     func testPositionCarriesTheCursor() {

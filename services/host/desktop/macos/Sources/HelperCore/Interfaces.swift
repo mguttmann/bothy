@@ -81,6 +81,16 @@ public protocol Injector: AnyObject {
     /// Releases every key and button that may be held, including ones a crashed earlier run of
     /// the helper left pressed. Never fails: it is the cleanup of every end.
     func releaseAll()
+
+    /// Called right before the controller checks the interrupt flag for unit `index` (from 0) of
+    /// an action (27 9.6 item 1). The platform needs nothing here; the default does nothing.
+    /// Test engines count units with it and raise interrupts at a chosen unit.
+    func willStartUnit(_ index: Int)
+}
+
+extension Injector {
+    /// Does nothing: a platform injector needs no unit boundary.
+    public func willStartUnit(_ index: Int) {}
 }
 
 /// The identity of the frontmost app (brief item 21).
