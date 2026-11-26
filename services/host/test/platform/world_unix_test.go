@@ -40,9 +40,11 @@ var (
 	listRe     = regexp.MustCompile(`LS=(\d+)`)
 	loginRe    = regexp.MustCompile(`Login (successful)`)
 	// backgroundCmds start a nohup child and a child that left the session with setsid (perl is on
-	// every hosted runner); each prints its process ID.
+	// every hosted runner); each prints its process ID. No "!" before a double quote: the
+	// interactive zsh of macOS reads `!"` as a history mark, drops the quote and waits at
+	// "dquote>" for the rest of the line, so `echo "BG=$!"` never printed on macOS.
 	backgroundCmds = []string{
-		`nohup sleep 3000 >/dev/null 2>&1 & echo "BG=$!"`,
+		`nohup sleep 3000 >/dev/null 2>&1 & echo BG=$!`,
 		`perl -e 'use POSIX; if (fork) { exit 0 } POSIX::setsid(); print "SID=$$\n"; exec "sleep", "3001"'; sleep 1`,
 	}
 	backgroundRes = []*regexp.Regexp{regexp.MustCompile(`BG=(\d+)`), regexp.MustCompile(`SID=(\d+)`)}

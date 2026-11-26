@@ -1533,6 +1533,20 @@ jobs:
         shell: bash
         run: uv run --project tools --locked --quiet python tools/distribution/hostdist.py windows-trial --out "$RUNNER_TEMP/trial-host-windows"
 
+  # The platform suite of the host service (plan row V1-13, docs/decisions.d/AUD-PKG-R2-06-host-platform-ci.md):
+  # the reusable workflow host-platform.yml installs the service as administrator, creates and
+  # deletes users, services and ACLs on disposable Linux, macOS and Windows runners and runs
+  # services/host/test/platform. Only for changes of the host service and of that workflow, and
+  # only in the public phase (components.HOST_PLATFORM_JOBS); main runs it once a week.
+  host-platform:
+    name: host platform
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' host-platform ')
+    # Same-commit reusable workflow, as the gates call of release.yml.
+    uses: ./.github/workflows/host-platform.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
   apps-android-26:
     name: apps (Android API 26)
     needs: plan
@@ -1674,7 +1688,7 @@ jobs:
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
     # pending check run that the plan job created, or in a later attempt creates its own
     # (docs/quality/push-discipline.md).
-    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows, host-platform]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

@@ -35,6 +35,7 @@ PLATFORM_JOBS = (
     "desktop-trial-windows",
     "host-trial-macos",
     "host-trial-windows",
+    "host-platform",
 )
 _MAKE = re.compile(r"(?:^|[;&|]\s*|\n\s*)make\s+([^\n]*)")
 CI = REPO / ".github" / "workflows" / "ci.yml"
@@ -60,7 +61,7 @@ def _shared_jobs() -> list[str]:
 def _make_lines(job: dict[str, Any]) -> list[str]:
     """Every line of the job's steps that calls make, with its arguments."""
     lines: list[str] = []
-    for step in job["steps"]:
+    for step in job.get("steps", []):
         lines += [
             ln.strip() for ln in str(step.get("run", "")).splitlines() if ln.strip()[:5] == "make "
         ]
@@ -146,11 +147,14 @@ def test_the_platform_jobs_of_ci_run_too(job: str) -> None:
     )
     mine = _jobs()[job]
     theirs = ci["jobs"][job]
-    assert mine["runs-on"] == theirs["runs-on"]
-    assert [s.get("uses") for s in mine["steps"]] == [s.get("uses") for s in theirs["steps"]]
-    assert [s.get("run") for s in mine["steps"]] == [s.get("run") for s in theirs["steps"]]
-    assert [s.get("with", {}).get("script") for s in mine["steps"]] == [
-        s.get("with", {}).get("script") for s in theirs["steps"]
+    # A job that calls a reusable workflow (host-platform) has no runner and no steps of its own.
+    assert mine.get("uses") == theirs.get("uses")
+    assert mine.get("runs-on") == theirs.get("runs-on")
+    ours, ci_steps = mine.get("steps", []), theirs.get("steps", [])
+    assert [s.get("uses") for s in ours] == [s.get("uses") for s in ci_steps]
+    assert [s.get("run") for s in ours] == [s.get("run") for s in ci_steps]
+    assert [s.get("with", {}).get("script") for s in ours] == [
+        s.get("with", {}).get("script") for s in ci_steps
     ]
 
 

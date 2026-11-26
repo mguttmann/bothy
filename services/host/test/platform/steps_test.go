@@ -304,9 +304,10 @@ func startImpostor(t *testing.T, user string) func() {
 	case "linux":
 		pid := strings.TrimSpace(sh(t, "/usr/bin/systemctl", "show", "--property=MainPID", "--value", "bothy-host-helper-"+user+".service"))
 		_, _ = asUser(user, "/bin/kill", pid)
-		return stageLinuxImpostor(t, user)
+		return stageImpostor(t, user)
 	case "darwin":
 		_, _ = try("/bin/launchctl", "kill", "SIGKILL", "system/bothy-host.helper."+user)
+		return stageImpostor(t, user)
 	case "windows":
 		_, _ = try("sc.exe", "stop", "bothy-host-helper-"+user)
 	}
@@ -329,7 +330,20 @@ func attachSucceeds(t *testing.T, user string) bool {
 		return c == 0 && !strings.Contains(out, "Permission denied")
 	case "darwin":
 		out, _ := try("/bin/launchctl", "print", "system/bothy-host.helper."+user)
-		_, c := asUser(user, "/usr/bin/lldb", "--batch", "-o", "process attach --pid "+pidFrom(out))
+		pid := pidFrom(out)
+		if pid == "0" {
+			t.Fatalf("no running helper of %s to attach to", user)
+		}
+		got, c := asUser(user, "/usr/bin/lldb", "--batch", "-o", "process attach --pid "+pid)
+		if c == 0 {
+			// The hardened runtime keeps a debugger of the same user out only while System
+			// Integrity Protection is on; the log names both (no content of the helper).
+			sip, _ := try("/usr/bin/csrutil", "status")
+			if len(got) > 400 {
+				got = got[:400]
+			}
+			t.Logf("lldb attached to the helper of %s (%s):\n%s", user, firstLine(sip), got)
+		}
 		return c == 0
 	}
 	return false

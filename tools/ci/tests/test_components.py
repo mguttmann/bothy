@@ -290,8 +290,10 @@ TRIALS = {"desktop-trial-macos", "desktop-trial-windows"}
 HOST_TRIALS = {"host-trial-macos", "host-trial-windows"}
 # The phone trials follow the release steps and the files of the phone builds (M7-13).
 MOBILE = {"mobile-trial-ios", "mobile-trial-android"}
+# The platform suite of the host service follows the host service and its workflow (V1-13).
+HOST_PLATFORM = {"host-platform"}
 # Every job a full run starts: the distribution trials only follow their own files (M7-12).
-EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
+EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE - HOST_PLATFORM
 
 
 @pytest.mark.parametrize(
@@ -322,7 +324,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER | SDK),
-        (["services/host/internal/noise/noise.go"], TESTS_SERVER | HOST_TRIALS),
+        (["services/host/internal/noise/noise.go"], TESTS_SERVER | HOST_TRIALS | HOST_PLATFORM),
         (["docs/spec/actions.yaml"], TESTS_SERVER | {"test-apps"}),
         # Members of the Dart workspace (with their native code) and its root files run the
         # platform jobs; inputs of generated Dart files that are committed under packages/ do not.
@@ -338,7 +340,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         (["tools/arch-check/rules.yaml"], {"test-apps"}),
         (
             ["services/host/testdata/noise/recordings/go.json"],
-            {"test-apps", "test-server"} | HOST_TRIALS,
+            {"test-apps", "test-server"} | HOST_TRIALS | HOST_PLATFORM,
         ),
         (["tools/observability/sli_bounds.py"], {"test-apps", "test-server"}),
         # SDKs and plugins.
@@ -394,6 +396,7 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
         "sdk/python/src/x.py",
         "tools/distribution/apple.py",
         "infra/host/linux/nfpm.yaml",
+        "services/host/internal/x.go",
     ):
         triggered |= set(components.ci_plan(files=[example], public=True).jobs)
     assert triggered == set(components.CONDITIONAL_JOBS)
@@ -421,7 +424,9 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
         (["tools/distribution/hostdist.py"], TESTS_SERVER | HOST_TRIALS),
         (["tools/distribution/tests/test_hostdist.py"], HOST_TRIALS),
         (["infra/host/windows/bothy-host.wxs"], TESTS_SERVER | HOST_TRIALS),
-        (["services/host/Makefile"], TESTS_SERVER | HOST_TRIALS),
+        (["services/host/Makefile"], TESTS_SERVER | HOST_TRIALS | HOST_PLATFORM),
+        # The workflow of the host platform suite is a shared input and runs the suite too.
+        ([".github/workflows/host-platform.yml"], EVERY_JOB | HOST_PLATFORM),
         # A full run for a shared input, and any other app change, leave the trials out.
         (["Makefile"], EVERY_JOB),
         (["apps/client/lib/main.dart"], {"test-apps"} | PLATFORM),
@@ -435,6 +440,16 @@ def test_ci_plan_leaves_android_out_while_the_repository_is_private() -> None:
     private = set(components.ci_plan(files=["apps/client/lib/main.dart"], public=False).jobs)
     assert private == {"test-apps"} | DESKTOP
     assert set(components.ci_plan(files=["Makefile"], public=False).jobs) == EVERY_JOB - ANDROID
+
+
+def test_the_host_platform_suite_runs_only_in_the_public_phase() -> None:
+    # Its hosted macOS and Windows runners cost nothing only in a public repository.
+    host = ["services/host/internal/x.go"]
+    for stage in ("full", "pr", "queue"):
+        public = set(components.ci_plan(files=host, public=True, stage=stage).jobs)
+        private = set(components.ci_plan(files=host, public=False, stage=stage).jobs)
+        assert public >= HOST_PLATFORM, stage
+        assert not HOST_PLATFORM & private, stage
 
 
 @pytest.mark.parametrize(
@@ -472,7 +487,7 @@ def test_cli_ci_plan(capsys: pytest.CaptureFixture[str]) -> None:
     assert components.main(["ci-plan", "--files", *files, "--public", "true"]) == 0
     assert (
         capsys.readouterr().out
-        == "components=server\njobs=host-trial-macos host-trial-windows test-server\n"
+        == "components=server\njobs=host-platform host-trial-macos host-trial-windows test-server\n"
     )
     assert components.main(["ci-plan", "--files", "docs/x.md", "--public", "false"]) == 0
     assert capsys.readouterr().out == "components=none\njobs=none\n"
@@ -657,7 +672,7 @@ def test_every_tool_folder_is_assigned_or_shared() -> None:
         # The feature pull request that adds a planned configuration key with server code.
         (
             ["tools/configdoc/planned.yaml", "services/host/internal/x.go"],
-            {"test-server"} | HOST_TRIALS,
+            {"test-server"} | HOST_TRIALS | HOST_PLATFORM,
         ),
         (["tools/configdoc/planned.yaml", "docs/decisions.d/M2-48.md"], set()),
         # The configuration reference is read by the tests of every component (D-CSMQ-7).
@@ -773,7 +788,7 @@ def test_the_pull_request_stage_picks_a_mobile_job_without_android() -> None:
         (["apps/client/windows/runner/x.cpp"], EVERY_JOB),
         # ... and the trials the change of a pull request needs, as the full plan does.
         (["apps/client/Makefile"], EVERY_JOB | TRIALS | MOBILE),
-        (["services/host/x.go"], EVERY_JOB | HOST_TRIALS),
+        (["services/host/x.go"], EVERY_JOB | HOST_TRIALS | HOST_PLATFORM),
     ],
 )
 def test_the_merge_queue_stage_runs_every_job(files: list[str], expected: set[str]) -> None:

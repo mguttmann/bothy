@@ -460,7 +460,7 @@ flowchart LR
 |---|---|---|
 | HD1 Users | `host_service.session_users` names at least one user; no user of the host service is `root`, `Administrator` or `SYSTEM`; all session users are different, and none is the service user | Start refused |
 | HD2 Groups | no user of the host service (service user and every session user) is in a forbidden group: fixed `admin`, `sudo`, `wheel`, `Administrators`, `docker`, `lxd`, `libvirt`, `disk`, plus `host_service.extra_forbidden_groups`; under Linux, in addition, the socket of the Docker daemon is writable for none of them | Start refused |
-| HD3 sudo | no passwordless `sudo` for any of them (`sudo -n true` fails) | Start refused |
+| HD3 sudo | no passwordless `sudo` for any of them (`sudo -n /usr/bin/true` fails) | Start refused |
 | HD4 State directory | `host_service.state_dir` belongs to the service user, mode `0700`; key file `0600` (Windows: DPAPI, section 4.2) | Start refused |
 | HD5 Server host | detects whether the same host runs the server (section 2.3) | Warning; sessions only for owners (SR10) |
 | HD6 LLM login | section 7.4, in the account of every session user; additional check, not the load-bearing boundary (T12) | with `none` or `organization` and a detected subscription login: start refused or sessions ended, respectively (7.4); the message names every affected session user with its own entry |

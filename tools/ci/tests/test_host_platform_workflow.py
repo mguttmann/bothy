@@ -75,10 +75,15 @@ def linux_places() -> dict[str, str]:
 
 
 def resets(run: str, folder: str) -> bool:
-    """Whether the shell text gives `folder` itself to root with mode 0755, as root."""
+    """Whether the shell text gives `folder` itself to root with mode 0755 and no ACL, as root.
+
+    The ACL counts too: the hosted image gives /opt a default ACL that opens every new folder
+    below it to every user (run 45770587799), whatever the mode of /opt itself.
+    """
+    acl = re.search(rf"\bsudo setfacl -b {re.escape(folder)}(?=\s|$)", run)
     owner = re.search(rf"\bsudo chown root:root {re.escape(folder)}(?=\s|$)", run)
     mode = re.search(rf"\bsudo chmod 0?755 {re.escape(folder)}(?=\s|$)", run)
-    return bool(owner and mode)
+    return bool(acl and owner and mode)
 
 
 def test_the_places_are_read_from_their_sources() -> None:
@@ -95,7 +100,7 @@ def test_linux_gives_the_folders_above_the_programs_back_to_root_before_the_suit
         folder = top_folder(place)
         assert any(resets(run, folder) for run in linux), (
             f"{source} uses {place}: no Linux step before the platform suite gives {folder} "
-            "to root with mode 0755; the hosted Ubuntu image opens it to every user and "
+            "to root with mode 0755 and no ACL; the hosted Ubuntu image opens it to every user and "
             "bothy-host then refuses to start (helper_untrusted, program_location_untrusted)"
         )
 
@@ -111,9 +116,11 @@ def test_the_reset_runs_only_on_linux_and_touches_the_folder_alone() -> None:
 
 
 def test_resets_matches_only_the_folder_itself() -> None:
-    assert resets("sudo chown root:root /opt && sudo chmod 0755 /opt", "/opt")
-    assert resets("sudo chown root:root /opt\nsudo chmod 755 /opt\n", "/opt")
-    assert not resets("sudo chown root:root /opt/x && sudo chmod 0755 /opt/x", "/opt")
-    assert not resets("sudo chmod 0755 /opt", "/opt")
-    assert not resets("chown root:root /opt && chmod 0755 /opt", "/opt")
-    assert not resets("sudo chown root:root /opt && sudo chmod 0777 /opt", "/opt")
+    ok = "sudo setfacl -b /opt && sudo chown root:root /opt && sudo chmod 0755 /opt"
+    assert resets(ok, "/opt")
+    assert resets("sudo setfacl -b /opt\nsudo chown root:root /opt\nsudo chmod 755 /opt\n", "/opt")
+    assert not resets(ok.replace("/opt", "/opt/x"), "/opt")
+    assert not resets("sudo chown root:root /opt && sudo chmod 0755 /opt", "/opt")
+    assert not resets("sudo setfacl -b /opt && sudo chmod 0755 /opt", "/opt")
+    assert not resets("setfacl -b /opt && chown root:root /opt && chmod 0755 /opt", "/opt")
+    assert not resets(ok.replace("0755", "0777"), "/opt")

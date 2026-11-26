@@ -32,14 +32,7 @@ func serviceExit() (int, bool) {
 		}
 	case "darwin":
 		out, _ := try("/bin/launchctl", "print", "system/bothy-host")
-		if strings.Contains(out, "state = not running") {
-			for _, l := range strings.Split(out, "\n") {
-				if v, ok := strings.CutPrefix(strings.TrimSpace(l), "last exit code = "); ok {
-					n, _ := strconv.Atoi(strings.Fields(v)[0])
-					return n, true
-				}
-			}
-		}
+		return launchdExit(out)
 	case "windows":
 		out, _ := try("sc.exe", "query", "bothy-host")
 		if strings.Contains(out, "STOPPED") {
@@ -64,12 +57,7 @@ func starts() int {
 		return n + 1
 	case "darwin":
 		out, _ := try("/bin/launchctl", "print", "system/bothy-host")
-		for _, l := range strings.Split(out, "\n") {
-			if v, ok := strings.CutPrefix(strings.TrimSpace(l), "runs = "); ok {
-				n, _ := strconv.Atoi(v)
-				return n
-			}
-		}
+		return launchdRuns(out)
 	}
 	return 1
 }
@@ -187,7 +175,13 @@ func uninstall(t *testing.T, users []string) {
 			_, _ = try("net", "user", u, "/delete")
 		}
 	}
+	// The log file of the service lies in the state directory on macOS and Windows; it goes with
+	// the directory, so a failed test prints its tail first (Linux: the journal, failureLog).
+	if t.Failed() {
+		for _, l := range logFileTail(filepath.Join(stateDir(), "bothy-host.log")) {
+			t.Log(l)
+		}
+	}
 	_ = os.RemoveAll(stateDir())
 	_ = os.Remove(configPath())
-	_ = t
 }

@@ -88,7 +88,7 @@ type Output struct {
 
 // Probe asks the platform questions of HD2, HD3 and HD10 that are no file rights.
 type Probe interface {
-	// SudoWithoutPassword reports whether "sudo -n true" succeeds for the calling account (HD3).
+	// SudoWithoutPassword reports whether "sudo -n /usr/bin/true" succeeds for the calling account (HD3).
 	SudoWithoutPassword(ctx context.Context) (bool, error)
 	// PtraceScope returns kernel.yama.ptrace_scope on Linux; other platforms return -1 and nil.
 	PtraceScope() (int, error)

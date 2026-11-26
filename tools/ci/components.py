@@ -329,6 +329,15 @@ HOST_DISTRIBUTION_FILES = (
     "tools/distribution/hostdist.py",
     "tools/distribution/tests/test_hostdist.py",
 )
+# The platform suite of the host service (services/host/test/platform, plan row V1-13): it
+# creates and deletes users, services and ACLs as administrator on the disposable Linux, macOS
+# and Windows runners of the reusable workflow host-platform.yml. It runs when the host service
+# or that workflow changes, never for a shared input alone, on main once a week (the schedule of
+# host-platform.yml), and only in the public phase, where the hosted runners cost nothing
+# (docs/decisions.d/AUD-PKG-R2-06-host-platform-ci.md).
+HOST_PLATFORM_JOBS = ("host-platform",)
+HOST_PLATFORM_PREFIXES = ("services/host/",)
+HOST_PLATFORM_FILES = (".github/workflows/host-platform.yml",)
 CONDITIONAL_JOBS: tuple[str, ...] = (
     *COMPONENT_TEST_JOBS,
     *DESKTOP_JOBS,
@@ -338,6 +347,7 @@ CONDITIONAL_JOBS: tuple[str, ...] = (
     *DISTRIBUTION_JOBS,
     *MOBILE_TRIAL_JOBS,
     *HOST_TRIAL_JOBS,
+    *HOST_PLATFORM_JOBS,
 )
 # What the platform tests (tools/ci/apps_platform.py) build and run: the members of the Dart
 # workspace with their native code, and its root manifest (Flutter pin) and lock file. The other
@@ -494,12 +504,15 @@ def ci_plan(
             the desktop distribution (DISTRIBUTION_JOBS), which run only when a file of
             DISTRIBUTION_PREFIXES (but HOST_DISTRIBUTION_FILES) or DISTRIBUTION_FILES changes,
             the phone trials (MOBILE_TRIAL_JOBS), which run for the same prefixes and
-            MOBILE_TRIAL_FILES, and the host trials (HOST_TRIAL_JOBS), which run only for
-            HOST_TRIAL_PREFIXES and HOST_TRIAL_FILES.
+            MOBILE_TRIAL_FILES, the host trials (HOST_TRIAL_JOBS), which run only for
+            HOST_TRIAL_PREFIXES and HOST_TRIAL_FILES, and the platform suite of the host
+            service (HOST_PLATFORM_JOBS), which runs only for HOST_PLATFORM_PREFIXES and
+            HOST_PLATFORM_FILES.
         selected: gate components without a diff (`all` for a push to main or a manual run,
             the gate components of a release tag); every job of these components runs, the
-            distribution, phone and host trials not.
-        public: whether the repository is public; the Android emulator jobs need it.
+            distribution, phone and host trials and the host platform suite not.
+        public: whether the repository is public; the Android emulator jobs and the host
+            platform suite need it.
         stage: `full` (the default) as described above; `pr`, the fast checks of a pull request
             in front of a merge queue (`_pr_plan`); `queue`, the merge queue: every job of a
             push to main plus the trials the changed `files` need. `pr` and `queue` need
@@ -513,7 +526,7 @@ def ci_plan(
             or the stage `pr` or `queue` without `files`.
 
     Example: `ci_plan(files=["services/host/x.go"], public=True).jobs` is
-    `["host-trial-macos", "host-trial-windows", "test-server"]`.
+    `["host-platform", "host-trial-macos", "host-trial-windows", "test-server"]`.
     """
     if (files is None) == (selected is None):
         raise ValueError("ci_plan needs exactly one of files or selected")
@@ -525,7 +538,10 @@ def ci_plan(
         return _pr_plan(files or [], public=public)
     if stage == "queue":
         every = ci_plan(selected=["all"], public=public).jobs
-        return CIPlan(components=["all"], jobs=sorted({*every, *_trial_jobs(files or [])}))
+        jobs = {*every, *_trial_jobs(files or [])}
+        if not public:
+            jobs.difference_update(HOST_PLATFORM_JOBS)
+        return CIPlan(components=["all"], jobs=sorted(jobs))
     if files is not None:
         names = changed(files) if files else ["all"]
         full = names == ["all"] or any(f.startswith(API_PREFIX) for f in files)
@@ -543,7 +559,7 @@ def ci_plan(
         platform = "apps" in names
         postgres = "server" in names
         console = bool({"apps", "server"} & set(names))
-    trials = {*DISTRIBUTION_JOBS, *MOBILE_TRIAL_JOBS, *HOST_TRIAL_JOBS}
+    trials = {*DISTRIBUTION_JOBS, *MOBILE_TRIAL_JOBS, *HOST_TRIAL_JOBS, *HOST_PLATFORM_JOBS}
     jobs: set[str] = set(CONDITIONAL_JOBS) - trials if full else set()
     if not full:
         jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
@@ -555,7 +571,7 @@ def ci_plan(
             jobs.update(CONSOLE_E2E_JOBS)
     jobs.update(_trial_jobs(files or []))
     if not public:
-        jobs.difference_update(ANDROID_JOBS)
+        jobs.difference_update((*ANDROID_JOBS, *HOST_PLATFORM_JOBS))
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))
 
 
@@ -570,6 +586,8 @@ def _trial_jobs(files: list[str]) -> set[str]:
             jobs.update(MOBILE_TRIAL_JOBS)
         if f.startswith(HOST_TRIAL_PREFIXES) or f in HOST_TRIAL_FILES:
             jobs.update(HOST_TRIAL_JOBS)
+        if f.startswith(HOST_PLATFORM_PREFIXES) or f in HOST_PLATFORM_FILES:
+            jobs.update(HOST_PLATFORM_JOBS)
     return jobs
 
 
@@ -602,7 +620,7 @@ def _pr_plan(files: list[str], *, public: bool) -> CIPlan:
     if any(f.startswith(CONSOLE_E2E_PREFIXES) for f in files):
         jobs.update(CONSOLE_E2E_JOBS)
     if not public:
-        jobs.difference_update(ANDROID_JOBS)
+        jobs.difference_update((*ANDROID_JOBS, *HOST_PLATFORM_JOBS))
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))
 
 

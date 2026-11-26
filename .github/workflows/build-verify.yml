@@ -1058,6 +1058,15 @@ jobs:
         shell: bash
         run: uv run --project tools --locked --quiet python tools/distribution/hostdist.py windows-trial --out "$RUNNER_TEMP/trial-host-windows"
 
+  # As in ci.yml: the platform suite of the host service (components.HOST_PLATFORM_JOBS).
+  host-platform:
+    name: host platform
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' host-platform ')
+    uses: ./.github/workflows/host-platform.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
   apps-android-26:
     name: apps (Android API 26)
     needs: plan
@@ -1179,7 +1188,7 @@ jobs:
   # missing plan fails it.
   build-verify-ok:
     name: build-verify-ok
-    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
+    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows, host-platform]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

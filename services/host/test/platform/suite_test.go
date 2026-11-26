@@ -102,7 +102,8 @@ func track(t *testing.T) {
 const maxServiceLog = 30
 
 // failureLog returns the last maxServiceLog lines of the log of the host service since start
-// (Linux: the journal of bothy-host.service; other platforms: none). The service logs codes, IDs
+// (Linux: the journal of bothy-host.service; macOS and Windows: logFileTail, which uninstall prints
+// before it removes the state directory). The service logs codes, IDs
 // and names only (24 10.1).
 func failureLog(start time.Time) []string {
 	if runtime.GOOS != "linux" {
@@ -111,6 +112,23 @@ func failureLog(start time.Time) []string {
 	out, _ := try("/usr/bin/journalctl", "--no-pager", "-o", "short-precise", "-u", "bothy-host.service",
 		"--since", fmt.Sprintf("@%.6f", float64(start.UnixMicro())/1e6))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) > maxServiceLog {
+		lines = lines[len(lines)-maxServiceLog:]
+	}
+	return slices.DeleteFunc(lines, func(l string) bool { return strings.TrimSpace(l) == "" })
+}
+
+// logFileTail returns the last maxServiceLog lines of the log file of the host service at p
+// (macOS and Windows, state.LogFile); none on Linux, where failureLog reads the journal.
+func logFileTail(p string) []string {
+	if runtime.GOOS == "linux" {
+		return nil
+	}
+	b, err := os.ReadFile(p) //nolint:gosec // G304: the log file in the state directory of the suite
+	if err != nil {
+		return []string{"no log file of the host service: " + err.Error()}
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
 	if len(lines) > maxServiceLog {
 		lines = lines[len(lines)-maxServiceLog:]
 	}

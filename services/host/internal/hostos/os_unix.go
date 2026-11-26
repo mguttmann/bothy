@@ -54,12 +54,26 @@ type UnixProbe struct {
 	Runner Runner
 }
 
-// SudoWithoutPassword implements Probe: "sudo -n true" by absolute path with an empty environment.
+// trueCandidates are the places of the program true; the first that exists is the command of the
+// sudo probe.
+var trueCandidates = []string{"/usr/bin/true", "/bin/true"}
+
+// SudoWithoutPassword implements Probe: "sudo -n /usr/bin/true" by absolute paths with an empty
+// environment. The command is absolute as well: without PATH sudo finds a bare "true" only
+// through a secure_path of the sudoers file, which macOS does not set, so "sudo -n true" failed
+// with "command not found" there and HD3 never saw a passwordless sudo.
 func (p UnixProbe) SudoWithoutPassword(ctx context.Context) (bool, error) {
 	if _, err := os.Stat("/usr/bin/sudo"); err != nil {
 		return false, nil
 	}
-	out, err := p.Runner.Run(ctx, Cmd{Path: "/usr/bin/sudo", Args: []string{"-n", "true"}, Timeout: probeTimeout})
+	cmd := trueCandidates[0]
+	for _, c := range trueCandidates {
+		if _, err := os.Stat(c); err == nil {
+			cmd = c
+			break
+		}
+	}
+	out, err := p.Runner.Run(ctx, Cmd{Path: "/usr/bin/sudo", Args: []string{"-n", cmd}, Timeout: probeTimeout})
 	if err != nil {
 		return false, err
 	}
