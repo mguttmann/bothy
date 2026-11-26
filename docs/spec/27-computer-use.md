@@ -444,7 +444,9 @@ the normal mode with a service user (D-CU-01-26).
   process that reuses the PID; the executable and the signature are checked only while the current
   PID version equals the token's, before and after. Windows: a handle of the pipe client process
   opened at the accept and held for the life of the connection (a process created after the accept
-  holds a reused PID and is refused; Windows has no exec); the image is read through that handle, and
+  holds a reused PID and is refused; a PID reused between the connect and the accept is not
+  detected, which needs the client to exit in that gap and the new process to be the signed helper
+  at the installed path; Windows has no exec); the image is read through that handle, and
   the signer is the leaf certificate of the signer chain that `WinVerifyTrust` built. Linux: the uid
   that `SO_PEERCRED` took at connect time. The host service runs the rule at the connection, after
   `hello` and before every session, and closes the channel when it fails. The helper checks its side
