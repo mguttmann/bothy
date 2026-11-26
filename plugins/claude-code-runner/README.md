@@ -683,7 +683,8 @@ How a background turn runs:
 - **Launch.** One command `claude [--resume <id>] --bg --name bothy-<run id> ...` in the project
   folder, with the prompt on its stdin, the runner's fixed environment (the allow list plus
   `DISABLE_AUTOUPDATER`, never a value of the run), and a settings file of the run
-  (`worktree.bgIsolation` and an `env` block with the run's `TMPDIR` and `SSH_AUTH_SOCK`; the
+  (`worktree.bgIsolation`, `permissions.denyInsteadOfPrompting` and an `env` block with the
+  run's `TMPDIR` and `SSH_AUTH_SOCK`; the
   launching command's environment does not reach the session). The files of the
   launch lie in `<runner.state_dir>/bg/` and go when the run ends. The CLI makes the id of a new
   session; the runner reads it from the session list and reports it as the thread's session.
@@ -751,8 +752,14 @@ so a prompt never runs twice. Further causes of a failed run in this mode:
 `background_session_copied` (the CLI started a copy at a resume, because another program
 started the session in between), `background_process_replaced` (the supervisor started the
 session again), `background_session_waiting` (the session waited for a person; the class
-flags and `--disallowedTools AskUserQuestion` prevent a question, and a message of another
-session that the CLI holds for an approval shows the same way). A message the runner did not
+flags and `--disallowedTools AskUserQuestion` prevent a question,
+`permissions.denyInsteadOfPrompting` in the settings file makes the CLI refuse a tool call that
+would wait for an approval, also one that bypass mode cannot skip, such as its check of a
+removal in a command it cannot parse with certainty, and a message of another
+session that the CLI holds for an approval shows the same way). For this cause and for
+`background_process_replaced` the runner's log has the warning `background_session_stopped` with
+`cause` and `waiting_for` (the CLI's word for what the session waited for, or `other`), so the
+reason is in the log and not only in the run's summary. A message the runner did not
 send ends no run (above). A run that ends `billing_mode_mismatch` in this mode failed the login check above.
 
 Switching the key off again needs no step: both modes continue the same sessions, and a turn

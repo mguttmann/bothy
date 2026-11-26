@@ -173,7 +173,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
-        trivy-image portability portability-trial load-capacity console-e2e console-web-test alert-e2e adapters-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability portability-trial load-capacity console-e2e console-web-test alert-e2e adapters-e2e runner-real-cli linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test templates-check commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
@@ -1090,6 +1090,14 @@ alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the ch
 adapters-e2e: ## End-to-end suites of the Hermes adapter and the Claude Code runner against the real server (tests/realserver)
 	cd plugins/hermes-adapter && $(UV) run --locked pytest -m e2e tests/realserver
 	cd plugins/claude-code-runner && $(UV) run --locked pytest -m e2e tests/realserver
+
+# The background part of the runner's real-CLI suite (FIX-RUNNER-BG-NO-PROMPT): background sessions
+# of the Claude Code CLI version the runner runs with (tests/real_cli/ci_cli.py) against the local stand-in for the API, free (no login, no model
+# call). It refuses to run outside CI: a background session shares the CLI's supervisor with the
+# host user's sessions, so it never runs beside an operator's runner. The CI job
+# test-adapters-e2e runs it.
+runner-real-cli: ## Background sessions of the Claude Code CLI the runner runs with against the stand-in API, CI only (plugins/claude-code-runner/tests/real_cli/ci_cli.py)
+	cd plugins/claude-code-runner && $(UV) run --locked python tests/real_cli/ci_cli.py
 
 # The desktop E2E suite and the performance level (M4-34; 15 19 and 20), each with its terminal
 # part (M4-38: the client stack of the terminal with a host container, Go and Docker). Not part
