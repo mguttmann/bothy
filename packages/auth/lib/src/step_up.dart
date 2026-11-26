@@ -74,8 +74,8 @@ typedef StepUpCredentials = ({String password, String totpCode});
 /// await session.stepUp.confirm(purposeText: l10n.stepUpOpenTerminal);
 /// ```
 final class StepUpService {
-  /// Internal: created by the session over its [SessionCore]; [passkeys] is the passkey port of
-  /// the app, null where the platform has none.
+  /// Internal: created by the session over its [SessionCore]; the third argument is the passkey
+  /// port of the app, null where the platform has none.
   StepUpService(this._core, this._prompt, [this._passkeys]);
 
   final SessionCore _core;

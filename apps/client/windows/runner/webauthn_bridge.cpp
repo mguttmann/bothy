@@ -145,8 +145,8 @@ bool Int(const EncodableValue* value, int64_t* out) {
   if (value == nullptr) {
     return false;
   }
-  if (const auto* small = std::get_if<int32_t>(value)) {
-    *out = *small;
+  if (const auto* narrow = std::get_if<int32_t>(value)) {
+    *out = *narrow;
     return true;
   }
   if (const auto* large = std::get_if<int64_t>(value)) {
