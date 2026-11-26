@@ -69,8 +69,14 @@ func copyFile(t *testing.T, src, dst string, mode os.FileMode) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		t.Fatal(err)
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := adminOwned(dst); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Remove(dst) })
@@ -129,6 +135,9 @@ func mkdirOwned(t *testing.T, p, user string) {
 	// The parents stay traversable (0755): a parent of mode 0700 owned by the administrator would
 	// hide the folder from the helper of its owner, and HD7 would drop it as unresolvable.
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil { //nolint:gosec // G301: every helper must traverse the parents
+		t.Fatal(err)
+	}
+	if err := adminOwned(filepath.Dir(p)); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(p, 0o700); err != nil {
@@ -204,6 +213,9 @@ func createPerson(t *testing.T, name string) {
 		_, _ = try("/usr/sbin/createhomedir", "-c", "-u", name)
 	case "windows":
 		sh(t, "net", "user", name, "EXAMPLE-pw-1!", "/add")
+		if err := createWindowsProfile(name); err != nil {
+			t.Fatalf("profile of %s: %v", name, err)
+		}
 	}
 	t.Cleanup(func() { deleteUser(t, name) })
 }
@@ -215,6 +227,7 @@ func deleteUser(t *testing.T, name string) {
 	case "darwin":
 		_, _ = try("/usr/sbin/sysadminctl", "-deleteUser", name)
 	case "windows":
+		deleteWindowsProfile(name)
 		_, _ = try("net", "user", name, "/delete")
 	}
 	_ = t

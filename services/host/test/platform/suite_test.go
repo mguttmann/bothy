@@ -77,6 +77,9 @@ func installPrebuiltFake(src string) error {
 	if err := os.WriteFile(filepath.Join(fakeDir(), exeName("claude")), b, 0o755); err != nil { //nolint:gosec // G306: every session user runs it
 		return err
 	}
+	if err := adminOwned(filepath.Join(fakeDir(), exeName("claude"))); err != nil {
+		return err
+	}
 	return openForAll(startLogPath())
 }
 
@@ -208,6 +211,9 @@ func writeConfig(t *testing.T, body string) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(configPath(), []byte("host_service:\n"+body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := adminOwned(configPath()); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -60,25 +60,53 @@ func (o *OSOps) Run(ctx context.Context, argv []string) error {
 	return nil
 }
 
-// Mkdir implements Ops; the DACL comes from a win.acl step.
-func (o *OSOps) Mkdir(path string, _ fs.FileMode, _ string) error { return os.MkdirAll(path, 0o700) }
+// Mkdir implements Ops; the DACL comes from a win.acl step, the owner is Administrators
+// (adminOwner).
+func (o *OSOps) Mkdir(path string, _ fs.FileMode, owner string) error {
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return err
+	}
+	return adminOwner(path, owner)
+}
 
-// Write implements Ops; the file inherits the DACL of its folder.
-func (o *OSOps) Write(path string, content []byte, _ fs.FileMode, _ string) error {
+// Write implements Ops; the file inherits the DACL of its folder, the owner is Administrators.
+func (o *OSOps) Write(path string, content []byte, _ fs.FileMode, owner string) error {
 	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, content) { //nolint:gosec // a path of the plan
+		return adminOwner(path, owner)
+	}
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		return err
+	}
+	return adminOwner(path, owner)
+}
+
+// adminOwner makes Administrators the owner of path when the step names an owner. Windows gives a
+// new file the default owner of the token that creates it: the group Administrators for an
+// administrator under UAC, but the account itself without UAC or under the policy "object
+// creator", and HD4, HD10 and HD11 trust only SYSTEM, Administrators and TrustedInstaller as
+// owner (hostos.TrustedOwner), so the service refused every start after such an install
+// (docs/decisions.d/AUD-PKG-R2-06-host-platform-ci.md). The virtual account of the host service
+// cannot be made owner without a restore privilege; HD4 accepts Administrators for the state
+// directory.
+func adminOwner(path, owner string) error {
+	if owner == "" {
 		return nil
 	}
-	return os.WriteFile(path, content, 0o600)
+	ba, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
+	if err != nil {
+		return err
+	}
+	return windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION, ba, nil, nil, nil)
 }
 
 // Copy implements Ops. A repeated install replaces the image that the host and helper services
 // run: Windows refuses to replace a running image but lets it be renamed, so the old file moves
 // aside first and is removed when no process runs it any more. Installing from the installed
 // binary itself copies nothing.
-func (o *OSOps) Copy(src, dst string, _ fs.FileMode, _ string) error {
+func (o *OSOps) Copy(src, dst string, _ fs.FileMode, owner string) error {
 	if a, err := os.Stat(src); err == nil {
 		if b, err := os.Stat(dst); err == nil && os.SameFile(a, b) {
-			return nil
+			return adminOwner(dst, owner)
 		}
 	}
 	in, err := os.Open(src) //nolint:gosec // the running binary
@@ -111,7 +139,7 @@ func (o *OSOps) Copy(src, dst string, _ fs.FileMode, _ string) error {
 	if aside != "" {
 		_ = os.Remove(aside) // fails while a service still runs the old image; the next install retries
 	}
-	return nil
+	return adminOwner(dst, owner)
 }
 
 // moveAside renames an existing dst to a free name next to it and returns that name ("" when dst
