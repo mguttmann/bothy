@@ -1,5 +1,5 @@
 {
-  "description": "Conformance vectors of the stop contract of the computer helpers (docs/spec/27-computer-use.md 9.6, docs/decisions.d/CU-02.md D-CU-02-16). Both helper controllers (Swift HelperCore, C++ helper_core) run every case against their fakes. A case starts with a fresh controller: enablement as given, a connected fake channel, nothing shown. Its events run in order. {\"host\": <frame>} hands one host frame to the controller and lets it finish. {\"interrupt\": <kind>, \"before_unit\": k} arms the fake injector: when the next do is about to perform its unit number k (0 is before the first unit), the interrupt is raised from outside the controller, as the Esc tap, the stop button, the lock monitor or the channel reader do on their own threads; kinds: escape (a real Esc), stop_button, lock, hide (the host's hide of the shown session), channel_broken. {\"esc\": \"down\"|\"up\", \"injected\": bool, \"swallow\": bool} is one Esc key event at the tap; swallow is the expected answer of the tap (swallowed or passed on). A unit is one step of an action: one press and release of the combination per repeat of key, one character of type (a line break included), one line of scroll, one click of a click action (two for double_click, three for triple_click), one move. expect.units is the number of units the fake injector performed in the case's last do; expect.released_after says every key and button was released after that do ended; expect.sent lists, in order, the stop and done frames the helper sent after the last show (other frames such as state are ignored), each compared on the members given. frame_max_bytes, when present, is host_service.computer_frame_max_bytes for the case. 50 is the default of computer.key_repeat_max and of computer.scroll_amount_max (27 section 18). {\"tap_teardown\": \"previous\"} runs the late teardown of the tap generation before the current one (as a callback of the old tap that fires after the next start); it must leave the current tap in place (27 9.6 item 5). {\"raise\": <kind>} sets the interrupt at once from outside, as another thread does, before the controller handles the next event (a race with the host's next frame). A person's stop (escape, stop_button) is never cleared by a new session: a show while one is pending shows nothing and answers with a stop for the new session, with the person's detail; weaker kinds (hide, disable, channel_broken, lock) are cleared by the show (27 9.6 item 6). expect.shown, when present, says whether the indicator shows at the end of the case.",
+  "description": "Conformance vectors of the stop contract of the computer helpers (docs/spec/27-computer-use.md 9.6, docs/decisions.d/CU-02.md D-CU-02-16). Both helper controllers (Swift HelperCore, C++ helper_core) run every case against their fakes. A case starts with a fresh controller: enablement as given, a connected fake channel, nothing shown. Its events run in order. {\"host\": <frame>} hands one host frame to the controller and lets it finish. {\"interrupt\": <kind>, \"before_unit\": k} arms the fake injector: when the next do is about to perform its unit number k (0 is before the first unit), the interrupt is raised from outside the controller, as the Esc tap, the stop button, the lock monitor or the channel reader do on their own threads; kinds: escape (a real Esc), stop_button, lock, hide (the host's hide of the shown session), channel_broken. {\"esc\": \"down\"|\"up\", \"injected\": bool, \"swallow\": bool} is one Esc key event at the tap; swallow is the expected answer of the tap (swallowed or passed on). A unit is one step of an action: one press and release of the combination per repeat of key, one character of type (a line break included), one line of scroll, one click of a click action (two for double_click, three for triple_click), one move. expect.units is the number of units the fake injector performed in the case's last do; expect.released_after says every key and button was released after that do ended; expect.sent lists, in order, the stop and done frames the helper sent after the last show (other frames such as state are ignored), each compared on the members given. frame_max_bytes, when present, is host_service.computer_frame_max_bytes for the case. 50 is the default of computer.key_repeat_max and of computer.scroll_amount_max (27 section 18). {\"tap_teardown\": \"previous\"} runs the late teardown of the tap generation before the current one (as a callback of the old tap that fires after the next start); it must leave the current tap in place (27 9.6 item 5). {\"raise\": <kind>} sets the interrupt at once from outside, as another thread does, before the controller handles the next event (a race with the host's next frame). A person's stop (escape, stop_button) is never cleared by a new session: a show while one is pending shows nothing and answers with a stop for the new session, with the person's detail; weaker kinds (hide, disable, channel_broken, lock) are cleared by the show (27 9.6 item 6). expect.shown, when present, says whether the indicator shows at the end of the case. An esc event the tap answers by swallowing and stopping first raises the interrupt (escape) from the tap's thread and then hands the stop to the controller, in that order, as the platform taps do; the stop button does the same. A person's stop counts only while it is pending: once the controller has acted on it (stop sent, session ended), it is consumed and refuses no later show. {\"stop_button\": true} is a click on the indicator's stop button, raised and handled like the platform indicator does.",
   "key_repeat_max": 50,
   "scroll_amount_max": 50,
   "cases": [
@@ -777,6 +777,86 @@
             "code": "ok"
           }
         ]
+      }
+    },
+    {
+      "name": "a handled Esc does not refuse the next show",
+      "enabled": true,
+      "events": [
+        {
+          "host": {
+            "op": "show",
+            "session_id": "s1",
+            "agent_name": "Alex"
+          }
+        },
+        {
+          "esc": "down",
+          "injected": false,
+          "swallow": true
+        },
+        {
+          "esc": "up",
+          "injected": false,
+          "swallow": true
+        },
+        {
+          "host": {
+            "op": "show",
+            "session_id": "s2",
+            "agent_name": "Alex"
+          }
+        },
+        {
+          "host": {
+            "op": "do",
+            "seq": 1,
+            "action": "key",
+            "keys": "a",
+            "repeat": 1
+          }
+        }
+      ],
+      "expect": {
+        "units": 1,
+        "released_after": true,
+        "shown": true,
+        "sent": [
+          {
+            "op": "done",
+            "seq": 1,
+            "code": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a handled stop button does not refuse the next show",
+      "enabled": true,
+      "events": [
+        {
+          "host": {
+            "op": "show",
+            "session_id": "s1",
+            "agent_name": "Alex"
+          }
+        },
+        {
+          "stop_button": true
+        },
+        {
+          "host": {
+            "op": "show",
+            "session_id": "s2",
+            "agent_name": "Alex"
+          }
+        }
+      ],
+      "expect": {
+        "units": 0,
+        "released_after": true,
+        "shown": true,
+        "sent": []
       }
     }
   ]

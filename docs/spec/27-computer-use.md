@@ -516,16 +516,19 @@ both run (D-CU-02-16):
 3. A `repeat` above the default of `computer.key_repeat_max`, an `amount` above the default of
    `computer.scroll_amount_max` and a `text` longer than one frame of
    `host_service.computer_frame_max_bytes` are `invalid_action` before any step.
+4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts; a stop
+   keeps only the rest of the Esc that is still held, so its auto-repeat and key up are swallowed
+   and stop nothing more; one held Esc stops once; an injected Esc passes and stops nothing.
+
+
 5. The Esc tap of a session belongs to that session: every start of the tap raises a generation,
    and a tap's callback or teardown acts only while its generation is the current one, checked and
    done under one lock, so the end of an older tap never removes a newer one.
 6. A person's stop (a real Esc, the stop button) is never cleared by a new session: a `show` while
    one is pending shows nothing and answers with `stop` for the new session and the person's detail.
    Only the weaker interrupts (`hide`, `disable`, a broken channel, a lock that has ended) are cleared
-   by a `show`.
-4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts; a stop
-   keeps only the rest of the Esc that is still held, so its auto-repeat and key up are swallowed
-   and stop nothing more; one held Esc stops once; an injected Esc passes and stops nothing.
+   by a `show`. A person's stop counts only while it is pending: once the helper has sent the
+   `stop` and ended the session, it is consumed and refuses no later `show`.
 
 ## 10. Runner integration
 

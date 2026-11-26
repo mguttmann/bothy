@@ -10,6 +10,8 @@ the helper jobs.
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -96,3 +98,35 @@ def test_the_package_steps_install_with_and_without_the_component() -> None:
     assert "ADDLOCAL=ComputerHelper" in win
     assert "-DHELPER_UIACCESS=OFF" in win
     assert "-DHELPER_UIACCESS=ON" in win
+
+
+def _pwsh_steps() -> list[tuple[str, str]]:
+    found = []
+    for name, job in _doc()["jobs"].items():
+        for step in job.get("steps", []):
+            if step.get("shell") == "pwsh":
+                found.append((f"{name}: {step.get('name')}", str(step["run"])))
+    return found
+
+
+def test_no_pwsh_step_reads_a_hyphenated_member_without_quotes() -> None:
+    # PowerShell reads `.a-b` as `.a` minus `b` and refuses the whole script (review of CU-02).
+    import re
+
+    for where, run in _pwsh_steps():
+        assert not re.search(r"\)\.[A-Za-z_]\w*-\w", run), where
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell is not installed here")
+def test_every_pwsh_step_parses(tmp_path: Path) -> None:
+    for i, (where, run) in enumerate(_pwsh_steps()):
+        script = tmp_path / f"step{i}.ps1"
+        script.write_text(run, encoding="utf-8")
+        check = (
+            "$e = $null; [System.Management.Automation.Language.Parser]::ParseFile("
+            f"'{script}', [ref]$null, [ref]$e) | Out-Null; $e.Count"
+        )
+        done = subprocess.run(
+            ["pwsh", "-NoProfile", "-Command", check], capture_output=True, text=True, check=True
+        )
+        assert done.stdout.strip() == "0", f"{where}: {done.stdout}"
