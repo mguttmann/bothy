@@ -55,6 +55,7 @@ from claude_code_runner.statedir import ensure_private_dir, write_private
 __all__ = [
     "COMPUTER_PROMPT",
     "ENV_NAMES",
+    "FAILED_ANSWER",
     "REFUSED_ANSWER",
     "SERVER_NAME",
     "ComputerPaths",
@@ -104,6 +105,16 @@ REFUSED_ANSWER: dict[str, Any] = {
     "reason": None,
 }
 """The answer to a wrong nonce or a malformed request (27 10.2 item 3)."""
+
+FAILED_ANSWER: dict[str, Any] = {
+    "v": 1,
+    "ok": False,
+    "status": 0,
+    "code": "request_failed",
+    "reason": None,
+}
+"""The answer when the runner could not get an answer of the server: the network or the server
+failed, or its answer lacks a member of 27 12.2 (D-CU-06-3). C1 maps it to ``host_offline``."""
 
 _DESKTOP_MEMBERS = ("host_id", "name", "platform", "online", "locked", "busy")
 """The members of a desktop of ``listComputerDesktops`` (27 12.2) that C1 decodes."""
@@ -533,12 +544,12 @@ class RequestFolder:
                 answer = await self.call(request)
             except (ValueError, TypeError):
                 _warn("computer_answer_malformed", op=request.op, **self.ids)
-                answer = answer_of_problem(502, "bad_gateway", None)
+                answer = dict(FAILED_ANSWER)
             except Exception as err:
                 _warn(
                     "computer_request_failed", op=request.op, error=type(err).__name__, **self.ids
                 )
-                answer = answer_of_problem(503, "service_unavailable", None)
+                answer = dict(FAILED_ANSWER)
             if request.op == "open" and answer.get("ok") is True:
                 write_private(folder / OPENED_MARK, b"", atomic=True)
             _log(

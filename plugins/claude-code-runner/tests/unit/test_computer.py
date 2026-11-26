@@ -475,3 +475,30 @@ async def test_server_call_binds_the_run_and_maps_answers() -> None:
         "code": "request_refused",
         "reason": None,
     }
+
+
+@pytest.mark.anyio
+async def test_a_failed_call_is_answered_request_failed(tmp_path: Path) -> None:
+    """The network or the server failed: C1 gets ``request_failed`` (D-CU-06-3)."""
+    paths = _paths(tmp_path)
+    write_turn_file(paths, mcp_document(MCP_BIN, paths, NONCE, 30.0, SERVER))
+
+    async def broken(request: ComputerRequest) -> dict[str, Any]:
+        raise OSError("connection refused")
+
+    folder = RequestFolder(paths, NONCE, broken, poll=0.01)
+    task = asyncio.ensure_future(folder.serve())
+    try:
+        request_id = str(uuid.uuid4())
+        _write_request(paths.request_dir, request_id, _request())
+        assert await _answer(paths.request_dir, request_id) == {
+            "v": 1,
+            "ok": False,
+            "status": 0,
+            "code": "request_failed",
+            "reason": None,
+        }
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task

@@ -370,3 +370,15 @@ async def test_background_session_gets_the_file_and_is_removed(
     leftovers = list((world.home / ".claude" / "projects").rglob("*.jsonl"))
     assert leftovers == [], leftovers
     assert "computer_transcript_removed" in logs.text
+
+
+async def test_leftovers_of_a_crashed_runner_are_swept_at_start(world: World) -> None:
+    """27 10.1: the per-turn file and the request folder of a run without a record go."""
+    left = ComputerPaths(world.state, uuid.uuid4())
+    world.state.mkdir(mode=0o700, exist_ok=True)
+    from claude_code_runner.computer import mcp_document, write_turn_file
+
+    write_turn_file(left, mcp_document(_binary(world), left, "n", 30.0, world.fake.origin))
+    await world.start(_config(world))
+    assert not left.turn_file.exists()
+    assert not left.request_dir.exists()

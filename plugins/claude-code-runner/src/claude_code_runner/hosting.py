@@ -111,6 +111,7 @@ from claude_code_runner.commandline import (
     choose_session,
     reported_model,
 )
+from claude_code_runner.computer import sweep_computer
 from claude_code_runner.config import RunnerConfig, own_credential_files
 from claude_code_runner.definition import Definition, Limits, intersect, parse
 from claude_code_runner.heartbeat import WAIT_SLOTS_FULL, WAIT_THREAD_BUSY, Probe, runtime_status
@@ -127,7 +128,7 @@ from claude_code_runner.materialize import (
 )
 from claude_code_runner.reply_upload import remove_run_files
 from claude_code_runner.runturn import RunState, RunTurn
-from claude_code_runner.statedir import hosted_dir, is_private_dir, sweep
+from claude_code_runner.statedir import hosted_dir, is_private_dir, recorded_runs, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.team import ACCEPTED_TRIGGER_KINDS, facts_of
 from claude_code_runner.toolclass import ORDER, lower
@@ -995,6 +996,7 @@ class HostedHandler(AgentHandler):
                 retention = runner.config.stream_log_retention if runner else 0.0
                 if runner is not None:
                     sweep(self._state_dir, retention, active=active)
+                sweep_computer(self._state_dir, active | recorded_runs(self._state_dir))
 
     async def on_followup(self, inv: Invocation, run: RunHandle) -> None:
         """A follow-up of a hosted run: held until its turn starts, or offered (09 18.5).
