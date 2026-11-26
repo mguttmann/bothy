@@ -73,3 +73,11 @@ def test_sigint_during_a_blocked_write_ends_the_turn_cleanly(tmp_path: Path) -> 
     ends = [c for c in helper.read_capture(capture) if c["kind"] == "turn_end"]
     assert [e.get("signal") for e in ends] == ["SIGINT"]
     assert b'"error_during_execution"' in out.splitlines()[-1]
+
+
+def test_read_capture_leaves_a_record_still_being_written(tmp_path: Path) -> None:
+    capture = tmp_path / "capture.jsonl"
+    capture.write_text('{"kind": "version"}\n{"kind": "turn_start", "argv": ["--pri')
+    assert helper.read_capture(capture) == [{"kind": "version"}]
+    capture.write_text('{"kind": "version"}\n{"kind": "turn_start"}\n')
+    assert [c["kind"] for c in helper.read_capture(capture)] == ["version", "turn_start"]
