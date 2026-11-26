@@ -34,6 +34,7 @@ import 'rest/stats_handlers.dart';
 import 'rest/status_handlers.dart';
 import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
+import 'rest/computer_handlers.dart';
 import 'rest/terminal_handlers.dart';
 import 'rest/thread_view_handlers.dart';
 import 'rest/wake_handlers.dart';
@@ -183,6 +184,7 @@ final class FakeServer {
     registerAuditHandlers(rest, actions, audit);
     registerHostHandlers(rest, actions, audit);
     registerTerminalHandlers(rest);
+    registerComputerHandlers(rest);
     registerThreadViewHandlers(rest);
     registerAgentHandlers(rest, actions, audit);
     registerBuiltinAgentHandlers(rest, actions, audit);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Appliers of the durable host events (04 2.1; brief M4-36 Scope): `host.updated` and
-/// `terminal_session.changed` write no table (the app reloads hosts and sessions through REST)
+/// Appliers of the durable host events (04 2.1; briefs M4-36 and CU-07 Scope): `host.updated`,
+/// `terminal_session.changed` and `computer_session.changed` write no table (the app reloads hosts and sessions through REST)
 /// and announce their change on the [HostEventsHub] after the commit of the page, so a page
 /// that rolls back announces nothing.
 library;
@@ -16,7 +16,29 @@ import '../wire.dart';
 final Map<String, Applier> hostAppliers = {
   'host.updated': _hostUpdated,
   'terminal_session.changed': _terminalSessionChanged,
+  'computer_session.changed': _computerSessionChanged,
 };
+
+/// `computer_session.changed` (27 12.4): no table either; the client keeps the sessions of the
+/// owner in memory (R-CL-18).
+Future<void> _computerSessionChanged(ApplyContext c) async {
+  final s = c.payload;
+  final event = ComputerSessionChanged(
+    sessionId: str(s, 'id'),
+    hostId: HostId.parse(str(s, 'host_id')).value,
+    runId: str(s, 'run_id'),
+    userId: str(s, 'user_id'),
+    desktop: str(s, 'desktop'),
+    state: str(s, 'state'),
+    version: c.resourceVersion!.value,
+    actionCount: integer(s, 'action_count'),
+    pauseReason: optStr(s, 'pause_reason'),
+    frontApp: optStr(s, 'front_app'),
+    closeReason: optStr(s, 'close_reason'),
+    closeDetail: optStr(s, 'close_detail'),
+  );
+  c.after.steps.add(() => c.sync.hosts.add(event));
+}
 
 Future<void> _hostUpdated(ApplyContext c) async {
   final host = obj(c.payload, 'host');
