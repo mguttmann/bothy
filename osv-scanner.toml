@@ -1702,3 +1702,10 @@ version = "2.0.2"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The app lock on the phones (M5-08, D-M5-08-3)."
+
+[[PackageOverrides]]
+name = "qr"
+version = "4.0.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. The QR code of the one-time code setup in the sign-in area (V1-14, docs/decisions.d/V1-14.md D-V1-14-2)."
