@@ -3,14 +3,17 @@
 package localchan
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"runtime"
 	"sync"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -23,14 +26,20 @@ const (
 
 // pipeListener creates instances of a named pipe; the first instance is created with
 // FILE_FLAG_FIRST_PIPE_INSTANCE, so a pipe created first by another process makes the listener
-// fail instead of sharing the name.
+// fail instead of sharing the name. The instances are overlapped handles, as in
+// internal/confirm/peer_windows.go: Close ends a pending Accept, and the runtime poller ends a
+// pending Read when the connection closes (D-M2-42-29). With synchronous handles the helper
+// service never stopped: its Accept waited in ConnectNamedPipe after Close, the service stayed
+// STOP_PENDING, and the profile of its account stayed in use (AUD-PKG-R2-06/8).
 type pipeListener struct {
-	path  string
-	sa    *windows.SecurityAttributes
-	mu    sync.Mutex
-	next  windows.Handle
-	close chan struct{}
-	once  sync.Once
+	path string
+	sa   *windows.SecurityAttributes
+	mu   sync.Mutex
+	next windows.Handle
+	// closed is a manual-reset event that Close sets; it lives as long as the process, because an
+	// Accept may still wait on it.
+	closed windows.Handle
+	once   sync.Once
 }
 
 // ListenPipe creates the named pipe path with the security descriptor sddl.
@@ -39,9 +48,15 @@ func ListenPipe(path, sddl string) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("localchan: pipe security: %w", err)
 	}
-	l := &pipeListener{path: path, sa: &windows.SecurityAttributes{Length: 0, SecurityDescriptor: sd}, close: make(chan struct{})}
+	ev, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		return nil, fmt.Errorf("localchan: pipe: %w", err)
+	}
+	l := &pipeListener{path: path, sa: &windows.SecurityAttributes{SecurityDescriptor: sd}, closed: ev}
+	l.sa.Length = uint32(unsafe.Sizeof(*l.sa))
 	h, err := l.instance(true)
 	if err != nil {
+		_ = windows.CloseHandle(ev)
 		return nil, err
 	}
 	l.next = h
@@ -53,7 +68,7 @@ func (l *pipeListener) instance(first bool) (windows.Handle, error) {
 	if err != nil {
 		return 0, err
 	}
-	flags := uint32(windows.PIPE_ACCESS_DUPLEX)
+	flags := uint32(windows.PIPE_ACCESS_DUPLEX | windows.FILE_FLAG_OVERLAPPED)
 	if first {
 		flags |= windows.FILE_FLAG_FIRST_PIPE_INSTANCE
 	}
@@ -65,6 +80,7 @@ func (l *pipeListener) instance(first bool) (windows.Handle, error) {
 	return h, nil
 }
 
+// Accept waits for the next client on a fresh instance; Close ends the wait with net.ErrClosed.
 func (l *pipeListener) Accept() (net.Conn, error) {
 	l.mu.Lock()
 	h := l.next
@@ -76,22 +92,64 @@ func (l *pipeListener) Accept() (net.Conn, error) {
 			return nil, err
 		}
 	}
-	err := windows.ConnectNamedPipe(h, nil)
-	if err != nil && !errors.Is(err, windows.ERROR_PIPE_CONNECTED) {
+	if err := l.connect(h); err != nil {
 		_ = windows.CloseHandle(h)
-		select {
-		case <-l.close:
-			return nil, net.ErrClosed
-		default:
-		}
-		return nil, fmt.Errorf("localchan: connect pipe: %w", err)
+		return nil, err
 	}
 	return &pipeConn{f: os.NewFile(uintptr(h), l.path), h: h, server: true}, nil
 }
 
+// connect waits until a client connects to h or the listener closes; a client that connected and
+// left before the wait is dropped and the instance waits again, so it never ends the listener.
+func (l *pipeListener) connect(h windows.Handle) error {
+	for {
+		err := l.connectOnce(h)
+		if !errors.Is(err, errClientGone) {
+			return err
+		}
+		if err := windows.DisconnectNamedPipe(h); err != nil {
+			return fmt.Errorf("localchan: connect pipe: %w", err)
+		}
+	}
+}
+
+// errClientGone marks a client that left before the connection was complete.
+var errClientGone = errors.New("localchan: pipe client gone")
+
+func (l *pipeListener) connectOnce(h windows.Handle) error {
+	ev, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		return fmt.Errorf("localchan: connect pipe: %w", err)
+	}
+	defer func() { _ = windows.CloseHandle(ev) }()
+	ov := windows.Overlapped{HEvent: ev}
+	err = windows.ConnectNamedPipe(h, &ov)
+	switch {
+	case err == nil, errors.Is(err, windows.ERROR_PIPE_CONNECTED):
+		return nil
+	case errors.Is(err, windows.ERROR_NO_DATA):
+		return errClientGone
+	case !errors.Is(err, windows.ERROR_IO_PENDING):
+		return fmt.Errorf("localchan: connect pipe: %w", err)
+	}
+	r, err := windows.WaitForMultipleObjects([]windows.Handle{ev, l.closed}, false, windows.INFINITE)
+	if err != nil || r != windows.WAIT_OBJECT_0 {
+		_ = windows.CancelIoEx(h, &ov)
+		var n uint32
+		_ = windows.GetOverlappedResult(h, &ov, &n, true)
+		return net.ErrClosed
+	}
+	var n uint32
+	if err := windows.GetOverlappedResult(h, &ov, &n, false); err != nil && !errors.Is(err, windows.ERROR_PIPE_CONNECTED) {
+		return errClientGone
+	}
+	return nil
+}
+
+// Close ends a pending Accept and frees the waiting instance; connected clients stay.
 func (l *pipeListener) Close() error {
 	l.once.Do(func() {
-		close(l.close)
+		_ = windows.SetEvent(l.closed)
 		l.mu.Lock()
 		if l.next != 0 {
 			_ = windows.CloseHandle(l.next)
@@ -116,14 +174,14 @@ type pipeConn struct {
 	server bool
 }
 
-func (c *pipeConn) Read(b []byte) (int, error)       { return c.f.Read(b) }
-func (c *pipeConn) Write(b []byte) (int, error)      { return c.f.Write(b) }
-func (c *pipeConn) Close() error                     { return c.f.Close() }
-func (c *pipeConn) LocalAddr() net.Addr              { return pipeAddr(c.f.Name()) }
-func (c *pipeConn) RemoteAddr() net.Addr             { return pipeAddr(c.f.Name()) }
-func (c *pipeConn) SetDeadline(time.Time) error      { return nil }
-func (c *pipeConn) SetReadDeadline(time.Time) error  { return nil }
-func (c *pipeConn) SetWriteDeadline(time.Time) error { return nil }
+func (c *pipeConn) Read(b []byte) (int, error)         { return c.f.Read(b) }
+func (c *pipeConn) Write(b []byte) (int, error)        { return c.f.Write(b) }
+func (c *pipeConn) Close() error                       { return c.f.Close() }
+func (c *pipeConn) LocalAddr() net.Addr                { return pipeAddr(c.f.Name()) }
+func (c *pipeConn) RemoteAddr() net.Addr               { return pipeAddr(c.f.Name()) }
+func (c *pipeConn) SetDeadline(t time.Time) error      { return c.f.SetDeadline(t) }
+func (c *pipeConn) SetReadDeadline(t time.Time) error  { return c.f.SetReadDeadline(t) }
+func (c *pipeConn) SetWriteDeadline(t time.Time) error { return c.f.SetWriteDeadline(t) }
 
 // pipeOwner returns the owner SID of the pipe behind client handle h: the account that created the
 // server end. The client reads it from the pipe itself, because the token of a helper process gives
@@ -178,7 +236,7 @@ func dialPipe(ctx context.Context, path string, waitMissing bool) (*pipeConn, er
 		// SECURITY_SQOS_PRESENT makes SECURITY_IDENTIFICATION count: the server can identify the
 		// client but never act as it.
 		h, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING,
-			windows.SECURITY_SQOS_PRESENT|windows.SECURITY_IDENTIFICATION, 0)
+			windows.FILE_FLAG_OVERLAPPED|windows.SECURITY_SQOS_PRESENT|windows.SECURITY_IDENTIFICATION, 0)
 		if err == nil {
 			return &pipeConn{f: os.NewFile(uintptr(h), path), h: h}, nil
 		}
@@ -253,15 +311,42 @@ func servePipeConns(ctx context.Context, l net.Listener, allow func(windows.Toke
 			}
 			return err
 		}
-		pc, _ := c.(*pipeConn)
-		var pid uint32
-		if pc == nil || windows.GetNamedPipeClientProcessId(pc.h, &pid) != nil || !clientToken(pc.h, allow) {
-			_ = c.Close()
-			continue
-		}
-		go serve(ctx, NewConn(c, Peer{PID: int(pid)}))
+		go admitPipe(ctx, c, allow, serve)
 	}
 }
+
+// admitPipe checks the client of c and serves it, or closes c without sending anything. Windows
+// lets a server impersonate a pipe client only after it read from the pipe (ERROR_CANNOT_IMPERSONATE,
+// "Unable to impersonate using a named pipe until data has been read from that pipe"), so the
+// first bytes of the client are read first and handed on in front of the connection. Every client
+// of these pipes speaks first: the service sends the first message to a helper, an administrator
+// the first request to the service. Before, the check ran right after the connection, failed, and
+// every helper closed every connection of the host service (helper_unreachable, AUD-PKG-R2-06/8).
+func admitPipe(ctx context.Context, c net.Conn, allow func(windows.Token) bool, serve func(context.Context, *Conn)) {
+	pc, _ := c.(*pipeConn)
+	first := make([]byte, 4096)
+	_ = c.SetReadDeadline(time.Now().Add(firstMessageWait))
+	n, err := c.Read(first)
+	_ = c.SetReadDeadline(time.Time{})
+	var pid uint32
+	if pc == nil || err != nil || n == 0 || windows.GetNamedPipeClientProcessId(pc.h, &pid) != nil || !clientToken(pc.h, allow) {
+		_ = c.Close()
+		return
+	}
+	serve(ctx, NewConn(&readAhead{Conn: c, r: io.MultiReader(bytes.NewReader(first[:n]), c)}, Peer{PID: int(pid)}))
+}
+
+// firstMessageWait bounds the wait for the first bytes of a client before its check; a protocol
+// constant of the admission like handoffWait on Linux and macOS, not a product window.
+const firstMessageWait = 10 * time.Second
+
+// readAhead is a connection whose first bytes were read already.
+type readAhead struct {
+	net.Conn
+	r io.Reader
+}
+
+func (c *readAhead) Read(b []byte) (int, error) { return c.r.Read(b) }
 
 // ownerCreatesInstances lets the creator (OWNER RIGHTS) create further instances of its pipe
 // (FILE_CREATE_PIPE_INSTANCE) and nothing else; it also removes the implicit READ_CONTROL and
