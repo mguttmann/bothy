@@ -64,3 +64,8 @@ sdk/typescript/build/
 .claude/worktrees/
 .claude/settings.local.json
 **/test/goldens/**/failures/
+
+# Computer helper builds (services/host/Makefile helper-macos, brief CU-02)
+services/host/.helper/
+services/host/desktop/macos/.build/
+services/host/desktop/windows/build/

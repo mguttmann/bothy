@@ -226,6 +226,12 @@ signatures), `make trial-apple OUT=<dir>` and the CI jobs `host trial (macOS)` a
 (Windows)` (only on disposable runners: they install the package). docs/operations/release.md
 2.5 is the runbook.
 
+The computer helpers (brief CU-02, [desktop/README.md](desktop/README.md)) are not published:
+the release packages carry none (D-CU-01-29). On the owner's machines `make helper-macos`,
+`helper-sign-macos` and `helper-package-macos` (macOS) and the `helper-*-windows` steps of
+`hostdist.py` sign them and build a host package with the helper as an optional component, which
+sets `host_service.computer_use` when selected.
+
 Version below the minimum: the server closes with `4114` (or `hello` names no protocol version
 of the host). The client ends all PTYs, does not reconnect, logs one line `update the host
 service or the server` with `code=4114` and `update_path=<route of the package kind>`
@@ -339,6 +345,8 @@ the server carries codes and, by the rule for names, the names of session users 
 | `internal/pty/` | PTY and process tree per platform (cgroup, process group and run file, Job Object) |
 | `internal/profiles/` | offered profiles, start specifications and allow-list environments |
 | `internal/confirm/` | confirmation endpoint, peer rule and the agent with its dialogs |
+| `desktop/` | the computer helpers for macOS (Swift) and Windows (C++), [README](desktop/README.md) (CU-02) |
+| `testdata/computer/` | the channel vectors of the helper channel (27 9.4) |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
 | `test/platform/` | the platform suite (build tag `platform`), its marker guard (`guard.go`, untagged) and the accounts it creates (`accounts.go`, untagged) |
 | `test/noisedevice/` | the Noise sidecar of the Go test device of the terminal suite in `services/server/test/terminal` (M2-48): JSON lines on stdin and stdout, `internal/noise` and `internal/frame` unchanged |

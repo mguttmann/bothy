@@ -1,0 +1,25 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
+# postinstall of the computer helper component of the macOS host package (docs/spec/27-computer-use.md
+# 9.3, docs/decisions.d/CU-02.md D-CU-02-10). The installer runs it as root only when the person
+# installing selected the component. It sets host_service.computer_use in the configuration file of
+# the host service, installs the LaunchAgent of the helper and starts the helper in the GUI session
+# of the user at the console, if one is logged in; every other user gets it at the next login. The
+# host service reads the key at its start: bothy-host restart (or install) makes it take effect.
+set -eu
+
+config="/Library/Application Support/bothy-host/config.yaml"
+share="/Library/Application Support/bothy-host/share"
+agent="com.example.bothy-computer-helper"
+
+sh "$(dirname "$0")/set-computer-use.sh" "$config"
+
+install -m 0644 -o root -g wheel "$share/$agent.plist" "/Library/LaunchAgents/$agent.plist"
+
+console="$(stat -f %u /dev/console)"
+if [ "$console" -ne 0 ]; then
+  launchctl bootout "gui/$console/$agent" 2>/dev/null || true
+  launchctl bootstrap gui/"$console" "/Library/LaunchAgents/$agent.plist" || true
+fi
+exit 0

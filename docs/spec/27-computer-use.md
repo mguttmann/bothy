@@ -410,7 +410,11 @@ when the person installing selects the helper component. `bothy-host
 doctor` prints a section `computer` (no HD check: the doctor list of 24 3.5 stays HD1 to HD11 and the
 server refuses another): helper installed and trusted (9.4), connected, enabled, the permissions of
 9.1 granted, signed or a development build; the same state goes to the server in the `report` object
-`computer` (12.3). A build
+`computer` (12.3). Places (D-CU-02-3): macOS `Bothy Computer Helper.app` in
+`/Library/Application Support/bothy-host/desktop/` with the LaunchAgent
+`/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
+`%ProgramFiles%\bothy-host\desktop\bothy-computer-helper.exe` with the value `BothyComputerHelper` of the
+machine's `Run` key; the enablement's state file in the user's account (D-CU-02-4). A build
 without a signature that verifies is for development only and says so in the doctor and in the
 report (D-CU-01-29).
 
@@ -439,6 +443,13 @@ the normal mode with a service user (D-CU-01-26).
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
   Otherwise the connection is closed and logged with `computer_peer_refused`.
+- Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the socket's peer
+  (`getpeereid`) is not the helper's own user and owns the endpoint folder; on Windows the pipe
+  server's process (`GetNamedPipeServerProcessId`) runs as `NT SERVICE\bothy-host` or `LocalSystem`.
+  Otherwise the helper disconnects and tries again later. A development build (signature
+  `development`) takes its endpoint from the environment variable `BOTHY_COMPUTER_HELPER_CHANNEL`
+  instead and skips this check, for the CI jobs of section 16; a verified build ignores the
+  variable.
 - Protocol: frames of a 4-byte big-endian length (of type byte and content, at most
   `host_service.computer_frame_max_bytes`), one type byte and the content: `0x01` a UTF-8 JSON object,
   `0x02` the bytes of one image, sent directly after the `done` that announces it. The channel
@@ -684,7 +695,10 @@ the thread (the agent reports it).
 
 ## 16. Points the build probes
 
-Unverified until the named ticket probes them; each has its fallback.
+Unverified until the named ticket probes them; each has its fallback. The CU-02 rows are probed by
+the jobs `helper-macos` and `helper-windows` of `.github/workflows/host-platform.yml` (the probe
+records, the native jobs `helper-macos-native` and `helper-windows-native` test only where it
+passed); the job results land here after the stage's CI round, which has not run yet.
 
 | Point | Probed by | Fallback when it does not hold |
 |---|---|---|
