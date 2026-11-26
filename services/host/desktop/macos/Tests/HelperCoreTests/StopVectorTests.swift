@@ -67,36 +67,13 @@ final class StopVectorTests: XCTestCase {
             return message
         }
         let expected = try XCTUnwrap(expect["sent"]?.arrayValue, name)
-        let compare = {
-            XCTAssertEqual(sent.count, expected.count, "\(name): frames \(sent)")
-            for (got, want) in zip(sent, expected) {
-                for (key, value) in want.objectValue ?? [:] {
-                    XCTAssertEqual(got[key], value, "\(name): member \(key)")
-                }
+        XCTAssertEqual(sent.count, expected.count, "\(name): frames \(sent)")
+        for (got, want) in zip(sent, expected) {
+            for (key, value) in want.objectValue ?? [:] {
+                XCTAssertEqual(got[key], value, "\(name): member \(key)")
             }
-        }
-        if frameMax < Self.smallestDone, !expected.isEmpty {
-            // A done carries app and screen and is longer than such a small frame limit, so the
-            // helper's codec cannot send it (D-CU-02-8). Reported to the coordinator; strict, so
-            // a corrected vector makes this test fail until the exception is removed.
-            XCTExpectFailure("\(name): a done does not fit frame_max_bytes \(frameMax)", strict: true) {
-                compare()
-            }
-        } else {
-            compare()
         }
     }
-
-    /// The length of the shortest `done` the controller sends with the fakes (type byte and
-    /// content), measured instead of assumed.
-    static let smallestDone: Int = {
-        let rig = Rig()
-        rig.host(["op": "position", "seq": 1])
-        guard let done = rig.channel.messages.last,
-            let bytes = try? FrameCodec(maxFrameBytes: HostConfig.defaultFrameMaxBytes).encode(.message(done))
-        else { return 0 }
-        return bytes.count - 4
-    }()
 
     /// Raises an interrupt the way the platform layer does, from outside the controller.
     private static func raise(_ kind: String, on rig: Rig) {
