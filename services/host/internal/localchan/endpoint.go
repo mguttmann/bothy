@@ -2,7 +2,7 @@
 
 package localchan
 
-import "path/filepath"
+import "path"
 
 // Endpoint folders and names (D-M2-42-11, D-M2-42-13).
 const (
@@ -17,9 +17,9 @@ func HelperEndpoint(goos, sessionUser string) string {
 	case "windows":
 		return `\\.\pipe\bothy-host-helper-` + sessionUser
 	case "darwin":
-		return filepath.Join(DarwinRunDir, "helper-"+sessionUser+".sock")
+		return path.Join(DarwinRunDir, "helper-"+sessionUser+".sock")
 	}
-	return filepath.Join(LinuxRunDir, "helper-"+sessionUser+".sock")
+	return path.Join(LinuxRunDir, "helper-"+sessionUser+".sock")
 }
 
 // EndpointDir returns the folder of the helper endpoints on goos ("" on Windows: pipes have no

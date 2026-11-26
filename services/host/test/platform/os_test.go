@@ -195,6 +195,9 @@ func uninstall(t *testing.T, users []string) {
 			for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 				t.Log(l)
 			}
+			for _, l := range windowsHelperProbe(users) {
+				t.Log(l)
+			}
 		}
 	}
 	_ = os.RemoveAll(stateDir())

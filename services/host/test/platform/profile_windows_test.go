@@ -69,3 +69,33 @@ func adminOwned(path string) error {
 	}
 	return nil
 }
+
+// windowsHelperProbe names what a helper does when its service runs and when it runs by hand
+// (diagnostics of a failed test): the pipes of the host service that exist, then, for the first
+// session user, the helper service stopped and the helper started as that user for a few seconds
+// with its standard error kept, which a service loses.
+func windowsHelperProbe(users []string) []string {
+	if len(users) == 0 {
+		return nil
+	}
+	pipes, _ := try("powershell", "-NoProfile", "-Command",
+		"[System.IO.Directory]::GetFiles('\\\\.\\pipe\\') | Where-Object { $_ -match 'bothy' }")
+	out := []string{"pipes: " + strings.Join(strings.Fields(pipes), " ")}
+	u := users[0]
+	_, _ = try("sc.exe", "stop", "bothy-host-helper-"+u)
+	_, _ = try("net", "user", u, windowsPassword)
+	errFile := filepath.Join(os.TempDir(), "bothy-helper-probe.err")
+	script := "$p = ConvertTo-SecureString '" + windowsPassword + "' -AsPlainText -Force; " +
+		"$c = New-Object System.Management.Automation.PSCredential('" + u + "', $p); " +
+		"$r = Start-Process -PassThru -NoNewWindow -Credential $c -FilePath '" + installedBinary() + "' " +
+		"-ArgumentList 'pty-helper','--session-user','" + u + "' -RedirectStandardError '" + errFile + "' -RedirectStandardOutput '" + errFile + ".out'; " +
+		"if ($r.WaitForExit(10000)) { 'helper by hand: exit ' + $r.ExitCode } else { 'helper by hand: still running after 10 s'; Stop-Process -Id $r.Id -Force }"
+	res, _ := try("powershell", "-NoProfile", "-Command", script)
+	out = append(out, strings.Join(strings.Fields(res), " "))
+	if b, err := os.ReadFile(errFile); err == nil { //nolint:gosec // G304: the file of this probe
+		out = append(out, "helper by hand, standard error: "+strings.Join(strings.Fields(string(b)), " "))
+	}
+	_ = os.Remove(errFile)
+	_ = os.Remove(errFile + ".out")
+	return out
+}

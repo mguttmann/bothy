@@ -11,3 +11,6 @@ func deleteWindowsProfile(string) {}
 
 // adminOwned is a no-op on Linux and macOS: root owns what the suite creates.
 func adminOwned(string) error { return nil }
+
+// windowsHelperProbe exists only on Windows.
+func windowsHelperProbe([]string) []string { return nil }
