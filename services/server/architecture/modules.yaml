@@ -207,8 +207,10 @@ modules:
   terminal:
     tables: [hosts, host_session_users, terminal_sessions, computer_sessions]
     actions: [host.read, host.manage, host.pair, host.connect, terminal.open, terminal.attach,
-              terminal.stream, terminal.read_own, terminal.close, terminal.terminate]
-    events: [host.updated, terminal_session.changed]
+              terminal.stream, terminal.read_own, terminal.close, terminal.terminate,
+              computer.desktops.list, computer.open, computer.attach, computer.session.read,
+              computer.stop, computer.device.disable, computer.terminate]
+    events: [host.updated, terminal_session.changed, computer_session.changed]
     ephemeral_events: [host.presence_changed]
     ws_ops: []
     depends_on: [instance, identity, authz, agents]

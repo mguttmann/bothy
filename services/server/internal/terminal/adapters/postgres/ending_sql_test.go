@@ -12,9 +12,11 @@ import (
 )
 
 // TestEndingSQLOnlyInEndSessions (M2-46 Tests, unit; Design note 1): exactly one statement of
-// queries/*.sql sets close_reason, EndTerminalSession in ending.sql, the closing statement of the
-// one end function EndSessions. A second writer of close_reason would bypass the pair rule, the
-// audit entry and the event of that function.
+// queries/*.sql sets close_reason per table: EndTerminalSession in ending.sql, the closing
+// statement of the one end function EndSessions, and EndComputerSession in computer.sql, the
+// closing statement of the one end function of computer sessions (CU-04, endComputer). A second
+// writer of close_reason would bypass the pair rule, the audit entry and the event of that
+// function.
 func TestEndingSQLOnlyInEndSessions(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("queries", "*.sql"))
 	if err != nil || len(files) == 0 {
@@ -30,7 +32,7 @@ func TestEndingSQLOnlyInEndSessions(t *testing.T) {
 			got = append(got, filepath.Base(f)+":"+name)
 		}
 	}
-	if want := []string{"ending.sql:EndTerminalSession"}; !slices.Equal(got, want) {
+	if want := []string{"computer.sql:EndComputerSession", "ending.sql:EndTerminalSession"}; !slices.Equal(got, want) {
 		t.Fatalf("statements that set close_reason: %v, want %v", got, want)
 	}
 

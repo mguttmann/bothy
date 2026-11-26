@@ -353,6 +353,18 @@ type StrictServerInterface interface {
 	// CreateInteraction Use a button, select or form
 	// (POST /components/{component_id}/interactions)
 	CreateInteraction(ctx context.Context, request CreateInteractionRequestObject) (CreateInteractionResponseObject, error)
+	// ListComputerDesktops List the desktops of the run's owner
+	// (GET /computer/desktops)
+	ListComputerDesktops(ctx context.Context, request ListComputerDesktopsRequestObject) (ListComputerDesktopsResponseObject, error)
+	// ListComputerSessions List one's own computer sessions
+	// (GET /computer/sessions)
+	ListComputerSessions(ctx context.Context, request ListComputerSessionsRequestObject) (ListComputerSessionsResponseObject, error)
+	// OpenComputerSession Open a computer session on a desktop for the bound run
+	// (POST /computer/sessions)
+	OpenComputerSession(ctx context.Context, request OpenComputerSessionRequestObject) (OpenComputerSessionResponseObject, error)
+	// StopComputerSession Stop a computer session
+	// (POST /computer/sessions/{session_id}/stop)
+	StopComputerSession(ctx context.Context, request StopComputerSessionRequestObject) (StopComputerSessionResponseObject, error)
 	// GetConsoleSession Read the console session
 	// (GET /console/session)
 	GetConsoleSession(ctx context.Context, request GetConsoleSessionRequestObject) (GetConsoleSessionResponseObject, error)
@@ -491,6 +503,9 @@ type StrictServerInterface interface {
 	// UpdateHost Change name or assignee of a host
 	// (PATCH /hosts/{host_id})
 	UpdateHost(ctx context.Context, request UpdateHostRequestObject) (UpdateHostResponseObject, error)
+	// DisableComputerDevice Switch the computer enablement of a host off
+	// (POST /hosts/{host_id}/computer/disable)
+	DisableComputerDevice(ctx context.Context, request DisableComputerDeviceRequestObject) (DisableComputerDeviceResponseObject, error)
 	// ConfirmHost Confirm the fingerprint and declare the LLM login
 	// (POST /hosts/{host_id}/confirm)
 	ConfirmHost(ctx context.Context, request ConfirmHostRequestObject) (ConfirmHostResponseObject, error)
@@ -4507,6 +4522,114 @@ func (sh *strictHandler) CreateInteraction(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// ListComputerDesktops operation middleware
+func (sh *strictHandler) ListComputerDesktops(w http.ResponseWriter, r *http.Request) {
+	var request ListComputerDesktopsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListComputerDesktops(ctx, request.(ListComputerDesktopsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListComputerDesktops")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListComputerDesktopsResponseObject); ok {
+		if err := validResponse.VisitListComputerDesktopsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListComputerSessions operation middleware
+func (sh *strictHandler) ListComputerSessions(w http.ResponseWriter, r *http.Request, params ListComputerSessionsParams) {
+	var request ListComputerSessionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListComputerSessions(ctx, request.(ListComputerSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListComputerSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListComputerSessionsResponseObject); ok {
+		if err := validResponse.VisitListComputerSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// OpenComputerSession operation middleware
+func (sh *strictHandler) OpenComputerSession(w http.ResponseWriter, r *http.Request) {
+	var request OpenComputerSessionRequestObject
+
+	var body OpenComputerSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpenComputerSession(ctx, request.(OpenComputerSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpenComputerSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpenComputerSessionResponseObject); ok {
+		if err := validResponse.VisitOpenComputerSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StopComputerSession operation middleware
+func (sh *strictHandler) StopComputerSession(w http.ResponseWriter, r *http.Request, sessionId ComputerSessionIdPath, params StopComputerSessionParams) {
+	var request StopComputerSessionRequestObject
+
+	request.SessionId = sessionId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StopComputerSession(ctx, request.(StopComputerSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StopComputerSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StopComputerSessionResponseObject); ok {
+		if err := validResponse.VisitStopComputerSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetConsoleSession operation middleware
 func (sh *strictHandler) GetConsoleSession(w http.ResponseWriter, r *http.Request) {
 	var request GetConsoleSessionRequestObject
@@ -5865,6 +5988,33 @@ func (sh *strictHandler) UpdateHost(w http.ResponseWriter, r *http.Request, host
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateHostResponseObject); ok {
 		if err := validResponse.VisitUpdateHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableComputerDevice operation middleware
+func (sh *strictHandler) DisableComputerDevice(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params DisableComputerDeviceParams) {
+	var request DisableComputerDeviceRequestObject
+
+	request.HostId = hostId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableComputerDevice(ctx, request.(DisableComputerDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableComputerDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableComputerDeviceResponseObject); ok {
+		if err := validResponse.VisitDisableComputerDeviceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

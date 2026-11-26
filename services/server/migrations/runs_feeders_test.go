@@ -99,6 +99,7 @@ func TestMigration_EveryRunReferenceIsClassified(t *testing.T) {
 		"run_wakes.source_run_id":     "no input: the wake-up the run's agent created; it reaches a run as agent.wake_input, recorded by the delivery",
 		"run_wakes.fired_run_id":      "no input: the wake run it fired, whose trigger runs_record_feeder records",
 		"run_wakes.fired_into_run_id": "no input: the run it fired into; the delivery of agent.wake_input records it",
+		"computer_sessions.run_id":    "no input: the computer session the run opened (CU-04); screen content reaches the agent through its own tool, never as an input of the run",
 	}
 	rows, err := conn.Query(context.Background(), `SELECT c.conrelid::regclass::text || '.' || a.attname
 		FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)

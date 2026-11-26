@@ -165,6 +165,9 @@ type Handlers struct {
 	// TerminalSessions implements openTerminalSession, attachTerminalSession, listTerminalSessions,
 	// getTerminalSession and closeTerminalSession (terminal, M2-44).
 	*terminalhttp.TerminalSessions
+	// Computers implements listComputerDesktops, openComputerSession, listComputerSessions,
+	// stopComputerSession and disableComputerDevice (terminal, CU-04).
+	*terminalhttp.Computers
 	// Local implements loginWithPassword and setMyLocalCredential (identity, M1-39).
 	*identityhttp.Local
 	// Console implements getConsoleSession, endViewAs, stepUpWithPassword,

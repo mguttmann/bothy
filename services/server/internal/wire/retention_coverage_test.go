@@ -50,7 +50,6 @@ var handledElsewhere = map[string]string{
 	"file_upload_parts":    "job:files.cleanup_pending",
 	"gateway_presence":     "module:gateway deletes the rows of ended connections and stale nodes (R-DM-51)",
 	"dev_environments":     "ticket:V2",
-	"computer_sessions":    "ticket:CU-04",
 }
 
 // withParent are the tables whose rows go with a parent row by the deletion path of 20 section 2

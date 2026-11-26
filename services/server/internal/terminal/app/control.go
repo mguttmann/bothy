@@ -239,6 +239,58 @@ func (s *Service) LoginWrite(ctx context.Context, l Login, in Identify) ([]domai
 // host_restarted and returns the session.close frames of the listed sessions the server closed or
 // does not know (ReconcileLiveSessions).
 func (s *Service) reconcile(ctx context.Context, hostID ids.ID, live []ids.ID) ([]domain.SessionClose, error) {
+	live, computerCloses, err := s.reconcileComputer(ctx, hostID, live)
+	if err != nil {
+		return nil, err
+	}
+	closes, err := s.reconcileTerminal(ctx, hostID, live)
+	return append(closes, computerCloses...), err
+}
+
+// reconcileComputer applies live_sessions to the computer sessions of the host (27 8.4 item 1, 24
+// 6.2): an active or paused computer session the host no longer names ends with host_restarted;
+// a named computer session that is closed gets computer.close with its reason. It returns live
+// without the computer sessions, for the terminal reconciliation.
+func (s *Service) reconcileComputer(ctx context.Context, hostID ids.ID, live []ids.ID) ([]ids.ID, []domain.SessionClose, error) {
+	if s.d.Computer == nil {
+		return live, nil, nil
+	}
+	open, err := s.d.Computer.LockOpenComputerSessionsOfHost(ctx, hostID)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, ses := range open {
+		if (ses.State == domain.ComputerActive || ses.State == domain.ComputerPaused) && !slices.Contains(live, ses.ID) {
+			if _, err := s.endComputer(ctx, ses, domain.ComputerServerEnd(domain.ComputerHostRestarted)); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	named, err := s.d.Computer.ComputerSessionsByIDs(ctx, live)
+	if err != nil {
+		return nil, nil, err
+	}
+	var closes []domain.SessionClose
+	rest := make([]ids.ID, 0, len(live))
+	for _, id := range live {
+		i := slices.IndexFunc(named, func(c domain.ComputerSession) bool { return c.ID == id })
+		if i < 0 {
+			rest = append(rest, id)
+			continue
+		}
+		c := named[i]
+		switch {
+		case c.HostID != hostID:
+			closes = append(closes, domain.SessionClose{SessionID: id, Computer: true, ComputerReason: domain.ComputerAccessRevoked})
+		case c.State == domain.ComputerClosed:
+			closes = append(closes, domain.SessionClose{SessionID: id, Computer: true, ComputerReason: c.CloseReason})
+		}
+	}
+	return rest, closes, nil
+}
+
+// reconcileTerminal is the reconciliation of the terminal sessions (M2-43).
+func (s *Service) reconcileTerminal(ctx context.Context, hostID ids.ID, live []ids.ID) ([]domain.SessionClose, error) {
 	open, err := s.d.Store.LockOpenSessions(ctx, hostID, ids.ID{})
 	if err != nil {
 		return nil, err
@@ -429,14 +481,38 @@ func (s *Service) reportWrite(ctx context.Context, hostID ids.ID, r domain.Repor
 			return ReportResult{}, err
 		}
 	}
+	if diff.Computer {
+		if err := s.recordComputerReport(ctx, h, r.Computer); err != nil {
+			return ReportResult{}, err
+		}
+	}
 	return out, nil
+}
+
+// recordComputerReport writes the allow entry host.connect of a change of the reported computer
+// object (27 13.1): host_id, from_enabled, to_enabled, generation, the operating system account
+// (under os_user, the one key of a session user name) and the permission states; never a path or a
+// version text.
+func (s *Service) recordComputerReport(ctx context.Context, h domain.Host, after *domain.ReportedComputer) error {
+	from := h.ReportedComputer != nil && h.ReportedComputer.Enabled
+	attrs := auditing.Attrs{attrHostID: auditing.ID(h.ID), attrFromEnabled: auditing.Bool(from), attrToEnabled: auditing.Bool(after != nil && after.Enabled)}
+	if after != nil {
+		attrs[attrGeneration] = auditing.Int(after.Generation)
+		attrs[attrCapture] = auditing.Code(after.Capture)
+		attrs[attrInput] = auditing.Code(after.Input)
+		if after.OSAccount != "" {
+			attrs[attrOSUser] = auditing.OSUserName(after.OSAccount)
+		}
+	}
+	return s.d.Audit.Record(ctx, auditing.Entry{Action: string(authorize.ActionHostConnect), Decision: auditing.DecisionAllow,
+		ResourceKind: resourceHost, ResourceID: h.ID, Attrs: attrs})
 }
 
 // writeReport writes the changed reported columns of h with one new version and one host.updated:
 // with changed session users through ApplySessionUserReport (the other columns first, without a
 // version of their own), which returns the sessions SR12 ended; otherwise directly.
 func (s *Service) writeReport(ctx context.Context, h domain.Host, diff domain.ReportDiff, r domain.Report) ([]ids.ID, error) {
-	others := diff.Profiles || diff.Doctor || diff.IsServerHost || diff.RequireLocalConfirm || diff.OSVersion
+	others := diff.Profiles || diff.Doctor || diff.IsServerHost || diff.RequireLocalConfirm || diff.OSVersion || diff.Computer
 	if diff.SessionUsers {
 		if others {
 			if err := s.d.Store.UpdateHostReport(ctx, h.ID, r, h.Version); err != nil {
@@ -611,7 +687,8 @@ func (s *Service) ConnectionLost(ctx context.Context, hostID ids.ID) error {
 				return err
 			}
 		}
-		return nil
+		// A computer session has no reattach: the broken control connection ends it (27 8.3).
+		return s.endComputerOfHost(ctx, hostID, domain.ComputerServerEnd(domain.ComputerConnectionLost))
 	})
 }
 

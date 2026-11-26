@@ -35,6 +35,8 @@ type sessions struct {
 	err    error
 	// totals are the inputs of ApplyCostTotals.
 	totals []agents.SessionCostTotal
+	// computerEnded are the threads of EndForComputerUse (CU-04).
+	computerEnded []ids.ID
 }
 
 func (s *sessions) List(context.Context, actor.Actor, ids.ID) ([]agents.Session, error) {
@@ -73,6 +75,14 @@ func (s *sessions) AttachOnStart(ctx context.Context, cmd agents.AttachOnStartCm
 func (s *sessions) CheckStartModel(string) error { return nil }
 
 func (s *sessions) AddCost(context.Context, agents.AddSessionCost) error { return nil }
+
+// EndForComputerUse records the thread whose session a computer run ended (CU-04).
+func (s *sessions) EndForComputerUse(_ context.Context, threadID ids.ID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.computerEnded = append(s.computerEnded, threadID)
+	return s.err
+}
 
 func (s *sessions) ApplyCostTotals(ctx context.Context, totals []agents.SessionCostTotal) error {
 	s.mu.Lock()

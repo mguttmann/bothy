@@ -271,6 +271,17 @@ func toHost(row sqlcgen.Host) domain.Host {
 		v := row.ReportedRequireLocalConfirm.Bool
 		h.RequireLocalConfirm = &v
 	}
+	if len(row.ReportedComputer) > 0 {
+		var c domain.ReportedComputer
+		// A stored object that does not decode reads as no report: no desktop (fail closed).
+		if json.Unmarshal(row.ReportedComputer, &c) == nil {
+			h.ReportedComputer = &c
+		}
+	}
+	if row.ComputerDisabledGeneration.Valid {
+		g := int64(row.ComputerDisabledGeneration.Int32)
+		h.ComputerDisabledGeneration = &g
+	}
 	return h
 }
 

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from ..models.channel_updated_event import ChannelUpdatedEvent
     from ..models.command_changed_event import CommandChangedEvent
     from ..models.command_invoked_event import CommandInvokedEvent
+    from ..models.computer_session_changed_event import ComputerSessionChangedEvent
     from ..models.device_pending_event import DevicePendingEvent
     from ..models.draft_deleted_event import DraftDeletedEvent
     from ..models.draft_updated_event import DraftUpdatedEvent
@@ -78,15 +79,15 @@ class EventPage:
             AgentFollowupEvent | AgentHostingChangedEvent | AgentInvocationEvent | AgentSessionChangedEvent |
             AgentUpdatedEvent | AgentWakeInputEvent | ChannelArchivedEvent | ChannelCreatedEvent |
             ChannelSettingsChangedEvent | ChannelUpdatedEvent | CommandChangedEvent | CommandInvokedEvent |
-            DevicePendingEvent | DraftDeletedEvent | DraftUpdatedEvent | FileUpdatedEvent | GdprRequestDueEvent |
-            GdprRequestUpdatedEvent | GrantChangedEvent | GroupChangedEvent | HostUpdatedEvent | ImportProgressEvent |
-            InstanceUpdatedEvent | InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent
-            | NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent |
-            ReactionRemovedEvent | ReadStateUpdatedEvent | RunCancelRequestedEvent | RunStateChangedEvent |
-            RunWakeChangedEvent | SessionRevokedEvent | SettingsUpdatedEvent | SidebarChannelUpdatedEvent |
-            SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent | StatusUpdatedEvent |
-            TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent | ThreadMovedOutEvent |
-            ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
+            ComputerSessionChangedEvent | DevicePendingEvent | DraftDeletedEvent | DraftUpdatedEvent | FileUpdatedEvent |
+            GdprRequestDueEvent | GdprRequestUpdatedEvent | GrantChangedEvent | GroupChangedEvent | HostUpdatedEvent |
+            ImportProgressEvent | InstanceUpdatedEvent | InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent
+            | MessageUpdatedEvent | NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent
+            | ReactionAddedEvent | ReactionRemovedEvent | ReadStateUpdatedEvent | RunCancelRequestedEvent |
+            RunStateChangedEvent | RunWakeChangedEvent | SessionRevokedEvent | SettingsUpdatedEvent |
+            SidebarChannelUpdatedEvent | SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent |
+            StatusUpdatedEvent | TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent |
+            ThreadMovedOutEvent | ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
         next_cursor (int): Highest checked `seq`; use as `after` for the next call even if `events` is empty.
         head_seq (int):
         sync_epoch (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -109,6 +110,7 @@ class EventPage:
         | ChannelUpdatedEvent
         | CommandChangedEvent
         | CommandInvokedEvent
+        | ComputerSessionChangedEvent
         | DevicePendingEvent
         | DraftDeletedEvent
         | DraftUpdatedEvent
@@ -208,6 +210,7 @@ class EventPage:
         from ..models.space_created_event import SpaceCreatedEvent
         from ..models.space_updated_event import SpaceUpdatedEvent
         from ..models.status_updated_event import StatusUpdatedEvent
+        from ..models.terminal_session_changed_event import TerminalSessionChangedEvent
         from ..models.thread_closed_event import ThreadClosedEvent
         from ..models.thread_created_event import ThreadCreatedEvent
         from ..models.thread_moved_event import ThreadMovedEvent
@@ -276,6 +279,7 @@ class EventPage:
                 or isinstance(events_item_data, RunWakeChangedEvent)
                 or isinstance(events_item_data, AgentWakeInputEvent)
                 or isinstance(events_item_data, HostUpdatedEvent)
+                or isinstance(events_item_data, TerminalSessionChangedEvent)
             ):
                 events_item = events_item_data.to_dict()
             else:
@@ -320,6 +324,7 @@ class EventPage:
         from ..models.channel_updated_event import ChannelUpdatedEvent
         from ..models.command_changed_event import CommandChangedEvent
         from ..models.command_invoked_event import CommandInvokedEvent
+        from ..models.computer_session_changed_event import ComputerSessionChangedEvent
         from ..models.device_pending_event import DevicePendingEvent
         from ..models.draft_deleted_event import DraftDeletedEvent
         from ..models.draft_updated_event import DraftUpdatedEvent
@@ -388,6 +393,7 @@ class EventPage:
                 | ChannelUpdatedEvent
                 | CommandChangedEvent
                 | CommandInvokedEvent
+                | ComputerSessionChangedEvent
                 | DevicePendingEvent
                 | DraftDeletedEvent
                 | DraftUpdatedEvent
@@ -940,13 +946,23 @@ class EventPage:
                     return componentsschemas_event_type_55
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    componentsschemas_event_type_56 = (
+                        TerminalSessionChangedEvent.from_dict(data)
+                    )
+
+                    return componentsschemas_event_type_56
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                componentsschemas_event_type_56 = TerminalSessionChangedEvent.from_dict(
+                componentsschemas_event_type_57 = ComputerSessionChangedEvent.from_dict(
                     data
                 )
 
-                return componentsschemas_event_type_56
+                return componentsschemas_event_type_57
 
             events_item = _parse_events_item(events_item_data)
 

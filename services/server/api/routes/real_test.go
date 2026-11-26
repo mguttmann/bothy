@@ -1181,6 +1181,26 @@ func (stubServer) CloseTerminalSession(context.Context, rest.CloseTerminalSessio
 	return nil, nil
 }
 
+func (stubServer) ListComputerDesktops(context.Context, rest.ListComputerDesktopsRequestObject) (rest.ListComputerDesktopsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) OpenComputerSession(context.Context, rest.OpenComputerSessionRequestObject) (rest.OpenComputerSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListComputerSessions(context.Context, rest.ListComputerSessionsRequestObject) (rest.ListComputerSessionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) StopComputerSession(context.Context, rest.StopComputerSessionRequestObject) (rest.StopComputerSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DisableComputerDevice(context.Context, rest.DisableComputerDeviceRequestObject) (rest.DisableComputerDeviceResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateHost(context.Context, rest.UpdateHostRequestObject) (rest.UpdateHostResponseObject, error) {
 	return nil, nil
 }

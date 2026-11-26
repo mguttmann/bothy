@@ -346,3 +346,32 @@ func TestAgentInvoke_WithoutInteractionUnchanged(t *testing.T) {
 		t.Fatalf("own active run: %+v, %v", got, err)
 	}
 }
+
+// TestInteractionCreate_ComputerHeld (CU-04, 07 SR13 item 5, CU-T25): while the run of a
+// component holds a computer session, only the person who triggered the run operates it; anyone
+// else, owners included, is refused with computer_not_owner_run.
+func TestInteractionCreate_ComputerHeld(t *testing.T) {
+	t.Parallel()
+	held := func(starter ids.ID) *domain.InteractionFacts {
+		f := cardFacts(domain.InteractionStageAccept)
+		f.ComponentRunID, f.ComponentRunActive, f.RunStarterID, f.ComputerHeld = ids.New(), true, starter, true
+		return f
+	}
+	got, err := domain.Decide(interactionInput(t, "interaction.create", trigger, held(starterID)))
+	if err != nil || got != denied(domain.ReasonComputerNotOwnerRun) {
+		t.Fatalf("another person: %+v %v", got, err)
+	}
+	owner := trigger
+	owner.Owner = true
+	if got, err := domain.Decide(interactionInput(t, "interaction.create", owner, held(starterID))); err != nil || got != denied(domain.ReasonComputerNotOwnerRun) {
+		t.Fatalf("an owner who did not trigger the run: %+v %v", got, err)
+	}
+	if got, err := domain.Decide(interactionInput(t, "interaction.create", trigger, held(alexID))); err != nil || got != domain.Allow {
+		t.Fatalf("the person who triggered the run: %+v %v", got, err)
+	}
+	free := held(starterID)
+	free.ComputerHeld = false
+	if got, err := domain.Decide(interactionInput(t, "interaction.create", trigger, free)); err != nil || got != domain.Allow {
+		t.Fatalf("without a computer session: %+v %v", got, err)
+	}
+}

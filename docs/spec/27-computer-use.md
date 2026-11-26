@@ -586,6 +586,26 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 `/api/v1/hosts/computer-sessions/{session_id}/stream` (the host service; `hello` and `identify` as
 `hostData`, then binary Noise frames only). Close codes as for the terminal streams (24 5.3, 6.1).
 
+Build details of CU-04 (rulings in [decisions.d/CU-04.md](../decisions.d/CU-04.md)):
+
+- `computerAttach`: the server sends `hello` (`protocol_versions`, `server_time`); C1 sends one
+  `identify` (`protocol_version`, `token`) within `computer.open_timeout`. A refused attach closes
+  with `4004` and the reason code (`token_invalid`, `token_expired`, `token_replayed` or the reason
+  of `authorize`), an ended session with `4100`; a refusal never ends the session. The relay holds
+  at most two messages of a side that arrived before its counterpart (the first Noise message of
+  C1) and writes them at the pairing (D-CU-04-11).
+- `ComputerSession` carries the host's name as `desktop`; `listComputerSessions` returns at most
+  `api.page_size_max` sessions, newest first, without a cursor (D-CU-04-13).
+- The schema `Host` carries `computer` (the reported object), `computer_listed` (a desktop of the
+  reading owner) and `computer_disabled_generation` only for an active owner who reads it with
+  `getHost`, `listHosts` or `disableComputerDevice` (D-CU-04-6).
+- Signals between api nodes (24 9): `terminal.computer_open` (`host_id`, `session_id`) from the
+  unit of `computer.open`, on which every node expects the session and the node of the control
+  connection sends `computer.open`; `terminal.computer_disable` (`host_id`) from the unit of
+  `computer.device.disable`, on which that node sends `computer.disable`. The end has no signal:
+  `computer_session.changed` in state `closed` reaches every node through the log tail, which closes
+  both sides with `4100` and sends `computer.close` (D-CU-04-10).
+
 ### 12.3 Host control ops
 
 | Op | Direction | Content |
@@ -605,8 +625,11 @@ The host service sends only the close reasons `done`, `stopped_by_user`, `device
 
 - Durable `computer_session.changed` (resource `computer_session`, receive action self, audience the
   triggering owner): state, reason, desktop, frontmost app identity, action count.
-- `host.updated` carries the listed state of 4 item 3 and the reported `computer` object only to
-  active owners with `host.read` (07 2.15 item 5); other readers get the host without them.
+- `host.updated` carries the listed state of 4 item 3 and the reported `computer` object to
+  nobody: the event log has one payload for every reader with `host.read`, so the event carries the
+  host without them, and every change of the object or of the disabled generation raises the host's
+  version and appends `host.updated`, after which an active owner's client reads the host
+  (`getHost`), which carries them for active owners only (07 2.15 item 5; D-CU-04-6).
 - Refusals: `403 forbidden` with `reason` `computer_not_owner_run` (SR13), `computer_tool_class`
   (SR2), `computer_not_enabled` (section 4 item 3); `409 conflict` with `reason` `computer_busy`
   or `computer_run_busy`; `409 host_unavailable`; `404 not_found`; `invocation_token_invalid` as SR9.
@@ -621,11 +644,11 @@ The host service sends only the close reasons `done`, `stopped_by_user`, `device
 | Action | When | Details (`audit_details.v1`) |
 |---|---|---|
 | `computer.open` | allow and deny | `host_id`, `session_id`, `run_id`, `agent_id`, `key_generation`, `pin_changed`, `generation` |
-| `computer.attach` | allow and deny | `session_id`, reason code of a denial |
+| `computer.attach` | allow and deny | `session_id`, reason code of a denial (a refusal `authorize` does not decide, of the token, a replay or an ended session, as reason `unauthenticated` with `code`, D-CU-04-8) |
 | `computer.stop` | allow and deny | `session_id`, `device_id` |
 | `computer.device.disable` | allow and deny | `host_id`, `generation` |
-| `host.connect` | a change of the reported `computer` object | `host_id`, `from_enabled`, `to_enabled`, `generation`, `os_account`, the permission states |
-| `computer.terminate` | every end | actor `system`; `session_id`, `close_reason`, `close_detail`, `duration_ms`, `paused_ms`, `action_counts` (a count per action kind), `apps` (at most `computer.audit_apps_max` identities of frontmost apps: bundle ID or executable name with the signer's team ID or subject) |
+| `host.connect` | a change of the reported `computer` object | `host_id`, `from_enabled`, `to_enabled`, `generation`, `os_account` (under the key `os_user`, D-CU-04-9), the permission states (`capture`, `input`) |
+| `computer.terminate` | every end | actor `system`; `session_id`, `close_reason`, `close_detail`, `duration_ms`, `paused_ms`, `action_counts` (a count per action kind, as codes `<action>:<count>`), `apps` (at most `computer.audit_apps_max` identities of frontmost apps: bundle ID or executable name with the signer's team ID or subject, as codes in lower case, D-CU-04-9) |
 
 Never in the audit, the log, telemetry, the event log, search or push: images, coordinates, typed
 text, key names, window titles, URLs.

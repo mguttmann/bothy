@@ -884,9 +884,11 @@ func newMeasuredChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log 
 }
 
 // InBandPatterns is the closed list of the routes marked httpserver.Operation.AuthorizedInBand:
-// the gateway and the three terminal upgrades. The chain refuses the marker on any other pattern.
+// the gateway, the three terminal upgrades and the two upgrades of computer sessions (CU-04). The
+// chain refuses the marker on any other pattern.
 func InBandPatterns() []string {
-	return []string{GatewayOperation().Pattern, HostConnectOperation().Pattern, TerminalStreamOperation().Pattern, HostDataOperation().Pattern}
+	return []string{GatewayOperation().Pattern, HostConnectOperation().Pattern, TerminalStreamOperation().Pattern, HostDataOperation().Pattern,
+		ComputerAttachOperation().Pattern, HostComputerDataOperation().Pattern}
 }
 
 // enabledValidator compiles the request validator of the enabled operations once per process: the

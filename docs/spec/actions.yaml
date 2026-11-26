@@ -2845,6 +2845,83 @@ actions:
   rights_change: false
   rl_class: none
   effect: write
+- id: computer.desktops.list
+  section: terminal
+  description: 'list the desktops of the run''s owner ([27-computer-use.md](27-computer-use.md) 5.1, CU-04)'
+  resource: run
+  right: agent-self, bound to an active run by SR9 whose run satisfies SR13
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
+- id: computer.open
+  section: terminal
+  description: 'open a computer session on a desktop for the bound run ([27-computer-use.md](27-computer-use.md) 5.1, CU-04)'
+  resource: host
+  right: agent-self, bound to an active run by SR9; SR2; SR13
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: computer.attach
+  section: terminal
+  description: 'attach the MCP server of the run to its session ([27-computer-use.md](27-computer-use.md) 5.4, CU-04)'
+  resource: computer_session
+  right: holder of the session's attach token; run active; SR13
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: computer.session.read
+  section: terminal
+  description: 'list one''s own computer sessions ([27-computer-use.md](27-computer-use.md) 12.2, CU-04)'
+  resource: computer_session
+  right: the triggering owner of the session
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: computer.stop
+  section: terminal
+  description: 'stop a computer session ([27-computer-use.md](27-computer-use.md) 8.3, CU-04)'
+  resource: computer_session
+  right: an active owner in a session
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: computer.device.disable
+  section: terminal
+  description: 'switch the enablement of a host off ([27-computer-use.md](27-computer-use.md) 4, CU-04)'
+  resource: host
+  right: an active owner in a session
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: computer.terminate
+  section: terminal
+  description: 'every end of a computer session by the server or the host ([27-computer-use.md](27-computer-use.md) 8.4, CU-04)'
+  resource: computer_session
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
 events:
 - type: message.created
   kind: durable
@@ -3217,6 +3294,14 @@ events:
   receive_action: self
   audience: self
   note: 'to the person of the session: state, device, `close_reason`; never contents'
+  resource_version: true
+- type: computer_session.changed
+  kind: durable
+  resource: computer_session
+  receive_action: self
+  audience: self
+  note: 'to the triggering owner: state, reason, desktop, frontmost app identity, action count; never an image
+    ([27-computer-use.md](27-computer-use.md) 12.4)'
   resource_version: true
 - type: typing.started
   kind: ephemeral

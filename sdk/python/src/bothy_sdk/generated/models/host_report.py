@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.host_computer import HostComputer
     from ..models.host_doctor_check import HostDoctorCheck
     from ..models.host_profile import HostProfile
     from ..models.host_reported_session_user import HostReportedSessionUser
@@ -31,6 +32,9 @@ class HostReport:
             is_server_host (bool):
             require_local_confirm (bool):
             os_version (str | Unset):
+            computer (HostComputer | Unset): The state of the computer helper of a host (schema `host_computer.v1`,
+                docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in
+                `hosts.reported_computer`. Never a path, a key or screen content.
     """
 
     profiles: list[HostProfile]
@@ -39,6 +43,7 @@ class HostReport:
     is_server_host: bool
     require_local_confirm: bool
     os_version: str | Unset = UNSET
+    computer: HostComputer | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,6 +68,10 @@ class HostReport:
 
         os_version = self.os_version
 
+        computer: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.computer, Unset):
+            computer = self.computer.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -76,11 +85,14 @@ class HostReport:
         )
         if os_version is not UNSET:
             field_dict["os_version"] = os_version
+        if computer is not UNSET:
+            field_dict["computer"] = computer
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        from ..models.host_computer import HostComputer
         from ..models.host_doctor_check import HostDoctorCheck
         from ..models.host_profile import HostProfile
         from ..models.host_reported_session_user import HostReportedSessionUser
@@ -115,6 +127,13 @@ class HostReport:
 
         os_version = d.pop("os_version", UNSET)
 
+        _computer = d.pop("computer", UNSET)
+        computer: HostComputer | Unset
+        if isinstance(_computer, Unset):
+            computer = UNSET
+        else:
+            computer = HostComputer.from_dict(_computer)
+
         host_report = cls(
             profiles=profiles,
             session_users=session_users,
@@ -122,6 +141,7 @@ class HostReport:
             is_server_host=is_server_host,
             require_local_confirm=require_local_confirm,
             os_version=os_version,
+            computer=computer,
         )
 
         host_report.additional_properties = d

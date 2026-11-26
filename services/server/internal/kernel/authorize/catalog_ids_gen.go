@@ -145,6 +145,20 @@ const (
 	ActionCommandRemove Action = "command.remove"
 	// ActionComponentUpdate is the action component.update.
 	ActionComponentUpdate Action = "component.update"
+	// ActionComputerAttach is the action computer.attach.
+	ActionComputerAttach Action = "computer.attach"
+	// ActionComputerDesktopsList is the action computer.desktops.list.
+	ActionComputerDesktopsList Action = "computer.desktops.list"
+	// ActionComputerDeviceDisable is the action computer.device.disable.
+	ActionComputerDeviceDisable Action = "computer.device.disable"
+	// ActionComputerOpen is the action computer.open.
+	ActionComputerOpen Action = "computer.open"
+	// ActionComputerSessionRead is the action computer.session.read.
+	ActionComputerSessionRead Action = "computer.session.read"
+	// ActionComputerStop is the action computer.stop.
+	ActionComputerStop Action = "computer.stop"
+	// ActionComputerTerminate is the action computer.terminate.
+	ActionComputerTerminate Action = "computer.terminate"
 	// ActionConsoleCspReport is the action console.csp_report.
 	ActionConsoleCspReport Action = "console.csp_report"
 	// ActionCostReadAggregate is the action cost.read.aggregate.
@@ -561,6 +575,13 @@ var actionByID = map[string]Action{
 	"command.register":             ActionCommandRegister,
 	"command.remove":               ActionCommandRemove,
 	"component.update":             ActionComponentUpdate,
+	"computer.attach":              ActionComputerAttach,
+	"computer.desktops.list":       ActionComputerDesktopsList,
+	"computer.device.disable":      ActionComputerDeviceDisable,
+	"computer.open":                ActionComputerOpen,
+	"computer.session.read":        ActionComputerSessionRead,
+	"computer.stop":                ActionComputerStop,
+	"computer.terminate":           ActionComputerTerminate,
 	"console.csp_report":           ActionConsoleCspReport,
 	"cost.read.aggregate":          ActionCostReadAggregate,
 	"cost.read.thread":             ActionCostReadThread,
@@ -804,6 +825,13 @@ var actionList = []Action{
 	ActionCommandRegister,
 	ActionCommandRemove,
 	ActionComponentUpdate,
+	ActionComputerAttach,
+	ActionComputerDesktopsList,
+	ActionComputerDeviceDisable,
+	ActionComputerOpen,
+	ActionComputerSessionRead,
+	ActionComputerStop,
+	ActionComputerTerminate,
 	ActionConsoleCspReport,
 	ActionCostReadAggregate,
 	ActionCostReadThread,
@@ -1035,6 +1063,8 @@ const (
 	EventCommandChanged EventType = "command.changed"
 	// EventCommandInvoked is the event type command.invoked.
 	EventCommandInvoked EventType = "command.invoked"
+	// EventComputerSessionChanged is the event type computer_session.changed.
+	EventComputerSessionChanged EventType = "computer_session.changed"
 	// EventDevicePending is the event type device.pending.
 	EventDevicePending EventType = "device.pending"
 	// EventDraftDeleted is the event type draft.deleted.
@@ -1152,6 +1182,7 @@ var eventTypeByID = map[string]EventType{
 	"command.autocomplete_requested": EventCommandAutocompleteRequested,
 	"command.changed":                EventCommandChanged,
 	"command.invoked":                EventCommandInvoked,
+	"computer_session.changed":       EventComputerSessionChanged,
 	"device.pending":                 EventDevicePending,
 	"draft.deleted":                  EventDraftDeleted,
 	"draft.updated":                  EventDraftUpdated,
@@ -1222,6 +1253,7 @@ var eventTypeList = []EventType{
 	EventCommandAutocompleteRequested,
 	EventCommandChanged,
 	EventCommandInvoked,
+	EventComputerSessionChanged,
 	EventDevicePending,
 	EventDraftDeleted,
 	EventDraftUpdated,
@@ -1421,6 +1453,8 @@ const (
 	ResourceCommand ResourceKind = "command"
 	// ResourceComponent is the resource kind component.
 	ResourceComponent ResourceKind = "component"
+	// ResourceComputerSession is the resource kind computer_session.
+	ResourceComputerSession ResourceKind = "computer_session"
 	// ResourceDevEnvironment is the resource kind dev_environment.
 	ResourceDevEnvironment ResourceKind = "dev_environment"
 	// ResourceDevice is the resource kind device.
@@ -1479,6 +1513,7 @@ var resourceKindByID = map[string]ResourceKind{
 	"channel":           ResourceChannel,
 	"command":           ResourceCommand,
 	"component":         ResourceComponent,
+	"computer_session":  ResourceComputerSession,
 	"dev_environment":   ResourceDevEnvironment,
 	"device":            ResourceDevice,
 	"draft":             ResourceDraft,
@@ -1514,6 +1549,7 @@ var resourceKindList = []ResourceKind{
 	ResourceChannel,
 	ResourceCommand,
 	ResourceComponent,
+	ResourceComputerSession,
 	ResourceDevEnvironment,
 	ResourceDevice,
 	ResourceDraft,

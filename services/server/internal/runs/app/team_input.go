@@ -507,7 +507,11 @@ func (s *Service) teamDeliver(ctx context.Context, b *teamBox, team TeamRow, mem
 		if s.fu == nil {
 			return false, errs.New(errs.CodeInternalError, "runs: a team input into a running run needs the follow-ups")
 		}
-		if err := s.fu.store(ctx, copied.ID, *active); err != nil {
+		held, err := s.heldForComputer(ctx, *active, src.authority)
+		if err != nil {
+			return false, err
+		}
+		if err := s.fu.store(ctx, copied.ID, *active, held); err != nil {
 			return false, err
 		}
 	} else if err := s.openTeamRun(ctx, member, members, in, src); err != nil {

@@ -216,6 +216,20 @@ from .component_state import ComponentState
 from .component_type import ComponentType
 from .component_update import ComponentUpdate
 from .component_update_state import ComponentUpdateState
+from .computer_attach_hello import ComputerAttachHello
+from .computer_attach_identify import ComputerAttachIdentify
+from .computer_close_detail import ComputerCloseDetail
+from .computer_close_reason import ComputerCloseReason
+from .computer_desktop import ComputerDesktop
+from .computer_desktop_list import ComputerDesktopList
+from .computer_session import ComputerSession
+from .computer_session_changed_event import ComputerSessionChangedEvent
+from .computer_session_changed_event_type import ComputerSessionChangedEventType
+from .computer_session_grant import ComputerSessionGrant
+from .computer_session_list import ComputerSessionList
+from .computer_session_open import ComputerSessionOpen
+from .computer_session_pause_reason import ComputerSessionPauseReason
+from .computer_session_state import ComputerSessionState
 from .console_session import ConsoleSession
 from .console_session_step_up_method import ConsoleSessionStepUpMethod
 from .console_session_step_up_methods_available_item import (
@@ -381,6 +395,24 @@ from .heartbeat_ack import HeartbeatAck
 from .heartbeat_state import HeartbeatState
 from .host import Host
 from .host_channel_hello import HostChannelHello
+from .host_computer import HostComputer
+from .host_computer_close import HostComputerClose
+from .host_computer_disable import HostComputerDisable
+from .host_computer_ended import HostComputerEnded
+from .host_computer_ended_action_counts import HostComputerEndedActionCounts
+from .host_computer_ended_close_reason import HostComputerEndedCloseReason
+from .host_computer_helper import HostComputerHelper
+from .host_computer_open import HostComputerOpen
+from .host_computer_permissions import HostComputerPermissions
+from .host_computer_permissions_capture import HostComputerPermissionsCapture
+from .host_computer_permissions_input import HostComputerPermissionsInput
+from .host_computer_settings import HostComputerSettings
+from .host_computer_signature import HostComputerSignature
+from .host_computer_started import HostComputerStarted
+from .host_computer_started_state import HostComputerStartedState
+from .host_computer_state import HostComputerState
+from .host_computer_state_reason import HostComputerStateReason
+from .host_computer_state_state import HostComputerStateState
 from .host_confirm import HostConfirm
 from .host_create import HostCreate
 from .host_disabled_reason import HostDisabledReason
@@ -1139,6 +1171,20 @@ __all__ = (
     "ComponentType",
     "ComponentUpdate",
     "ComponentUpdateState",
+    "ComputerAttachHello",
+    "ComputerAttachIdentify",
+    "ComputerCloseDetail",
+    "ComputerCloseReason",
+    "ComputerDesktop",
+    "ComputerDesktopList",
+    "ComputerSession",
+    "ComputerSessionChangedEvent",
+    "ComputerSessionChangedEventType",
+    "ComputerSessionGrant",
+    "ComputerSessionList",
+    "ComputerSessionOpen",
+    "ComputerSessionPauseReason",
+    "ComputerSessionState",
     "ConsoleSession",
     "ConsoleSessionStepUpMethod",
     "ConsoleSessionStepUpMethodsAvailableItem",
@@ -1296,6 +1342,24 @@ __all__ = (
     "HeartbeatState",
     "Host",
     "HostChannelHello",
+    "HostComputer",
+    "HostComputerClose",
+    "HostComputerDisable",
+    "HostComputerEnded",
+    "HostComputerEndedActionCounts",
+    "HostComputerEndedCloseReason",
+    "HostComputerHelper",
+    "HostComputerOpen",
+    "HostComputerPermissions",
+    "HostComputerPermissionsCapture",
+    "HostComputerPermissionsInput",
+    "HostComputerSettings",
+    "HostComputerSignature",
+    "HostComputerStarted",
+    "HostComputerStartedState",
+    "HostComputerState",
+    "HostComputerStateReason",
+    "HostComputerStateState",
     "HostConfirm",
     "HostCreate",
     "HostDisabledReason",

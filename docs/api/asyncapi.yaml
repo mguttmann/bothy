@@ -205,6 +205,8 @@ channels:
         $ref: '#/components/messages/event.host.updated'
       event.terminal_session.changed:
         $ref: '#/components/messages/event.terminal_session.changed'
+      event.computer_session.changed:
+        $ref: '#/components/messages/event.computer_session.changed'
       event.host.presence_changed:
         $ref: '#/components/messages/event.host.presence_changed'
       event.stats.live:
@@ -362,6 +364,18 @@ channels:
         $ref: '#/components/messages/host.session.started'
       host.session.ended:
         $ref: '#/components/messages/host.session.ended'
+      host.computer.open:
+        $ref: '#/components/messages/host.computer.open'
+      host.computer.close:
+        $ref: '#/components/messages/host.computer.close'
+      host.computer.disable:
+        $ref: '#/components/messages/host.computer.disable'
+      host.computer.started:
+        $ref: '#/components/messages/host.computer.started'
+      host.computer.state:
+        $ref: '#/components/messages/host.computer.state'
+      host.computer.ended:
+        $ref: '#/components/messages/host.computer.ended'
       host.error:
         $ref: '#/components/messages/host.error'
     bindings:
@@ -484,6 +498,94 @@ channels:
     - code: 4114
       name: host_version_unsupported
       client_action: protocol version too old; update the host service, do not reconnect
+
+  computerAttach:
+    address: /computer/sessions/{session_id}/attach
+    title: Attach connection of bothy-computer-mcp for one computer session
+    description: 'Opened by `bothy-computer-mcp` with the attach path of `openComputerSession` (docs/spec/27-computer-use.md 5.4). The server sends `hello`; `identify` carries the single-use attach token (no agent token), which the server checks with its own key (signature, `typ = computer-session+jwt`, `sid`, `exp`), together with the session in `opening` and never attached, the run still active and SR13 (`computer.attach`, audited). A second `identify` for the same session is refused; there is no reattach. Then only binary frames, each one Noise message (`Noise_NK_25519_ChaChaPoly_SHA256`, prologue `bothy-computer/1`), forwarded unchanged to and from the computer data connection of the host. The relay counts only lengths and times; nothing of the stream enters the event log, a log, a metric or the audit.'
+    x-protocol-versions: [1]
+    parameters:
+      session_id:
+        description: Computer session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-operations.md, section 4.4).
+    messages:
+      computer.hello:
+        $ref: '#/components/messages/computer.hello'
+      computer.identify:
+        $ref: '#/components/messages/computer.identify'
+      noise.frame:
+        $ref: '#/components/messages/noise.frame'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: session ended normally; do not reconnect
+    - code: 4002
+      name: decode_error
+      client_action: text frame after `identify`, invalid JSON or frame over the Noise limit; report the error
+    - code: 4004
+      name: authentication_failed
+      client_action: 'the attach token is invalid, expired or used, the run ended, SR13 no longer holds, or `identify` did not arrive within `computer.open_timeout`; the session ends; open a new one'
+    - code: 4100
+      name: terminal_closed
+      client_action: 'the session ended; the close reason holds `close_reason`; do not reconnect, open a new session when needed'
+    - code: 4102
+      name: terminal_host_unavailable
+      client_action: 'the host side did not arrive on this node within `computer.open_timeout`; the session ended `open_failed`; open a new one later'
+  hostComputerData:
+    address: /hosts/computer-sessions/{session_id}/stream
+    title: Computer data connection of a host service for one computer session
+    description: 'Opened by the host service after `computer.open`, exactly one per `computer.open` (docs/spec/27-computer-use.md 5.1 step 7). `hello` and `identify` (with `session_id`) as on `hostData`; the session must be a computer session of this host that is not closed. Then only binary Noise frames, forwarded unchanged to and from the attach connection of `bothy-computer-mcp`. The host service refuses a handshake by closing the connection with `4101` (`token_expired`, `token_replayed`, `helper_absent`, `not_enabled`, `busy`) or `4104` (every other detail of 27 5.3) and the `close_detail` code as the close reason, and reports `computer.ended` with `open_failed`.'
+    x-protocol-versions: [1]
+    parameters:
+      session_id:
+        description: Computer session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-operations.md, section 4.4).
+    messages:
+      host.hello:
+        $ref: '#/components/messages/host.hello'
+      host.identify:
+        $ref: '#/components/messages/host.identify'
+      host.error:
+        $ref: '#/components/messages/host.error'
+      noise.frame:
+        $ref: '#/components/messages/noise.frame'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: 'no expectation on this node or a paired host side exists: end the computer session locally'
+    - code: 4000
+      name: unknown_error
+      client_action: end the computer session locally
+    - code: 4002
+      name: decode_error
+      client_action: report the error, end the computer session locally
+    - code: 4100
+      name: terminal_closed
+      client_action: 'the session ended; release every key and button and hide the indicator'
+    - code: 4101
+      name: terminal_token_stale
+      client_action: 'sent by the host service: it refused message 1 with a detail of 27 5.3 that names no tampering'
+    - code: 4102
+      name: terminal_host_unavailable
+      client_action: 'no counterpart on this node within `computer.open_timeout`; the session ended `open_failed`'
+    - code: 4104
+      name: terminal_handshake_failed
+      client_action: 'sent by the host service: it refused message 1 for any other detail of 27 5.3'
+    - code: 4110
+      name: host_unpaired
+      client_action: keys unknown or replaced by a re-pairing; stop and run `bothy-host pair` again
+    - code: 4111
+      name: host_disabled
+      client_action: the host is disabled or retired; end every session
+    - code: 4113
+      name: host_auth_failed
+      client_action: proof invalid or not sent within `terminal.host_auth_timeout`; check clock and keys
 
 operations:
   receive.identify:
@@ -754,6 +856,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.agent.hosting_changed'
     - $ref: '#/channels/gateway/messages/event.host.updated'
     - $ref: '#/channels/gateway/messages/event.terminal_session.changed'
+    - $ref: '#/channels/gateway/messages/event.computer_session.changed'
     - $ref: '#/channels/gateway/messages/event.typing.started'
     - $ref: '#/channels/gateway/messages/event.run.updated'
     - $ref: '#/channels/gateway/messages/event.agent.presence_changed'
@@ -963,6 +1066,142 @@ operations:
     summary: Noise message from the device, forwarded to the host.
     messages:
     - $ref: '#/channels/hostData/messages/noise.frame'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+
+  computerAttach.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/computerAttach'
+    summary: First frame of the attach connection.
+    messages:
+    - $ref: '#/channels/computerAttach/messages/computer.hello'
+    x-authz-action: computer.attach
+    x-rate-limit-class: rl.agent_runtime
+  computerAttach.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/computerAttach'
+    summary: The single-use attach token; `computer.attach` decides it once per session.
+    messages:
+    - $ref: '#/channels/computerAttach/messages/computer.identify'
+    x-authz-action: computer.attach
+    x-rate-limit-class: rl.agent_runtime
+  computerAttach.receive.frame:
+    action: receive
+    channel:
+      $ref: '#/channels/computerAttach'
+    summary: Noise message from bothy-computer-mcp, forwarded to the host.
+    messages:
+    - $ref: '#/channels/computerAttach/messages/noise.frame'
+    x-authz-action: computer.attach
+    x-rate-limit-class: rl.agent_runtime
+  computerAttach.send.frame:
+    action: send
+    channel:
+      $ref: '#/channels/computerAttach'
+    summary: Noise message from the host, forwarded to bothy-computer-mcp.
+    messages:
+    - $ref: '#/channels/computerAttach/messages/noise.frame'
+    x-authz-action: computer.attach
+    x-rate-limit-class: rl.agent_runtime
+  hostControl.send.computer.open:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Ask for the computer data connection of a computer session (27 5.1 step 7).
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.computer.open'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.computer.close:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: End a computer session on the host (27 8.4).
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.computer.close'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.computer.disable:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Switch the enablement of the helper off (27 4 item 4).
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.computer.disable'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.computer.started:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: The handshake of a computer session is done; the session is active or paused.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.computer.started'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.computer.state:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: State, action count and frontmost app of a computer session, at most every `computer.status_interval` while actions run.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.computer.state'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.computer.ended:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: A computer session ended on the host.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.computer.ended'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostComputerData.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/hostComputerData'
+    summary: First frame with challenge.
+    messages:
+    - $ref: '#/channels/hostComputerData/messages/host.hello'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostComputerData.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/hostComputerData'
+    summary: Login with `session_id`; the computer session must belong to this host and not be closed.
+    messages:
+    - $ref: '#/channels/hostComputerData/messages/host.identify'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostComputerData.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/hostComputerData'
+    summary: Error before the first Noise frame.
+    messages:
+    - $ref: '#/channels/hostComputerData/messages/host.error'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostComputerData.receive.frame:
+    action: receive
+    channel:
+      $ref: '#/channels/hostComputerData'
+    summary: Noise message from the host, forwarded to bothy-computer-mcp.
+    messages:
+    - $ref: '#/channels/hostComputerData/messages/noise.frame'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostComputerData.send.frame:
+    action: send
+    channel:
+      $ref: '#/channels/hostComputerData'
+    summary: Noise message from bothy-computer-mcp, forwarded to the host.
+    messages:
+    - $ref: '#/channels/hostComputerData/messages/noise.frame'
     x-authz-action: host.connect
     x-rate-limit-class: rl.host
 
@@ -2389,6 +2628,110 @@ components:
             enum: [session.ended]
           d:
             $ref: ./openapi.yaml#/components/schemas/HostSessionEnded
+    computer.hello:
+      name: hello
+      title: hello
+      summary: First frame on the attach connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [hello]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ComputerAttachHello
+    computer.identify:
+      name: identify
+      title: identify
+      summary: The single-use attach token of the computer session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [identify]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ComputerAttachIdentify
+    host.computer.open:
+      name: computer.open
+      title: computer.open
+      summary: Open the computer data connection of a computer session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [computer.open]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostComputerOpen
+    host.computer.close:
+      name: computer.close
+      title: computer.close
+      summary: End a computer session on the host.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [computer.close]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostComputerClose
+    host.computer.disable:
+      name: computer.disable
+      title: computer.disable
+      summary: Switch the enablement of the helper off.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [computer.disable]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostComputerDisable
+    host.computer.started:
+      name: computer.started
+      title: computer.started
+      summary: The handshake of a computer session is done.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [computer.started]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostComputerStarted
+    host.computer.state:
+      name: computer.state
+      title: computer.state
+      summary: State, action count and frontmost app of a computer session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [computer.state]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostComputerState
+    host.computer.ended:
+      name: computer.ended
+      title: computer.ended
+      summary: A computer session ended on the host.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [computer.ended]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostComputerEnded
     host.error:
       name: error
       title: error
@@ -2433,6 +2776,23 @@ components:
             enum: [dispatch]
           d:
             $ref: ./openapi.yaml#/components/schemas/TerminalSessionChangedEvent
+      x-audience: self
+    event.computer_session.changed:
+      name: computer_session.changed
+      title: dispatch computer_session.changed
+      summary: Durable event, at least once, in `seq` order.
+      description: Only to the triggering owner of the session. State, reason, desktop, frontmost app identity and action count; never an image (docs/spec/27-computer-use.md, section 12.4).
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ComputerSessionChangedEvent
       x-audience: self
     event.host.presence_changed:
       name: host.presence_changed

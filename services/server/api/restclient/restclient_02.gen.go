@@ -1485,6 +1485,45 @@ type ClientInterface interface {
 	// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
 	CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListComputerDesktops List the desktops of the run's owner
+	//
+	// The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is `active` and connected, whose last `report` has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header `Invocation-Token` to an active run under tool class `host` that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 `forbidden` with `reason: computer_not_owner_run` or `computer_tool_class`, or 403 `invocation_token_invalid` (`run_inactive` for an ended run). Denials are audited.
+	//
+	// Corresponds with GET /computer/desktops (the `ListComputerDesktops` operationId).
+	ListComputerDesktops(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListComputerSessions List one's own computer sessions
+	//
+	// The computer sessions the caller triggered as an active owner, newest first, at most `api.page_size_max` (docs/spec/27-computer-use.md 12.2, 07 2.15 item 5). Metadata only; never an image, the token or its `jti`.
+	//
+	// Corresponds with GET /computer/sessions (the `ListComputerSessions` operationId).
+	ListComputerSessions(ctx context.Context, params *ListComputerSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenComputerSessionWithBody Open a computer session on a desktop for the bound run
+	//
+	// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+	OpenComputerSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenComputerSession Open a computer session on a desktop for the bound run
+	//
+	// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+	OpenComputerSession(ctx context.Context, body OpenComputerSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopComputerSession Stop a computer session
+	//
+	// Any active owner in a session stops any computer session of the instance, from any device, without step-up (docs/spec/27-computer-use.md 8.3, 07 2.15 item 4). The session ends with `stopped_by_user` and `close_detail = client_stop`; the server closes both connections and sends `computer.close` to the host service. A closed session answers unchanged. Audited.
+	//
+	// Corresponds with POST /computer/sessions/{session_id}/stop (the `StopComputerSession` operationId).
+	StopComputerSession(ctx context.Context, sessionId ComputerSessionIdPath, params *StopComputerSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetConsoleSession Read the console session
 	//
 	// Corresponds with GET /console/session (the `GetConsoleSession` operationId).
@@ -2129,6 +2168,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with PATCH /hosts/{host_id} (the `UpdateHost` operationId).
 	UpdateHost(ctx context.Context, hostId HostIdPath, params *UpdateHostParams, body UpdateHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableComputerDevice Switch the computer enablement of a host off
+	//
+	// Any active owner in a session switches the enablement of a host off, from any device, without step-up (docs/spec/27-computer-use.md 4 item 4). The server stores the reported generation as the disabled generation, ends the host's computer session with `device_disabled` in the same transaction and sends `computer.disable` over the control connection; the host stays unlisted until a new local switch-on raises the generation. A host without a reported helper answers unchanged. Switching on is no operation of the API. Audited.
+	//
+	// Corresponds with POST /hosts/{host_id}/computer/disable (the `DisableComputerDevice` operationId).
+	DisableComputerDevice(ctx context.Context, hostId HostIdPath, params *DisableComputerDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ConfirmHostWithBody Confirm the fingerprint and declare the LLM login
 	//
@@ -7547,6 +7593,95 @@ func (c *Client) CreateInteraction(ctx context.Context, componentId ComponentIdP
 	return c.Client.Do(req)
 }
 
+// ListComputerDesktops List the desktops of the run's owner
+//
+// The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is `active` and connected, whose last `report` has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header `Invocation-Token` to an active run under tool class `host` that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 `forbidden` with `reason: computer_not_owner_run` or `computer_tool_class`, or 403 `invocation_token_invalid` (`run_inactive` for an ended run). Denials are audited.
+//
+// Corresponds with GET /computer/desktops (the `ListComputerDesktops` operationId).
+func (c *Client) ListComputerDesktops(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListComputerDesktopsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListComputerSessions List one's own computer sessions
+//
+// The computer sessions the caller triggered as an active owner, newest first, at most `api.page_size_max` (docs/spec/27-computer-use.md 12.2, 07 2.15 item 5). Metadata only; never an image, the token or its `jti`.
+//
+// Corresponds with GET /computer/sessions (the `ListComputerSessions` operationId).
+func (c *Client) ListComputerSessions(ctx context.Context, params *ListComputerSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListComputerSessionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// OpenComputerSessionWithBody Open a computer session on a desktop for the bound run
+//
+// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+func (c *Client) OpenComputerSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOpenComputerSessionRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// OpenComputerSession Open a computer session on a desktop for the bound run
+//
+// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+func (c *Client) OpenComputerSession(ctx context.Context, body OpenComputerSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOpenComputerSessionRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopComputerSession Stop a computer session
+//
+// Any active owner in a session stops any computer session of the instance, from any device, without step-up (docs/spec/27-computer-use.md 8.3, 07 2.15 item 4). The session ends with `stopped_by_user` and `close_detail = client_stop`; the server closes both connections and sends `computer.close` to the host service. A closed session answers unchanged. Audited.
+//
+// Corresponds with POST /computer/sessions/{session_id}/stop (the `StopComputerSession` operationId).
+func (c *Client) StopComputerSession(ctx context.Context, sessionId ComputerSessionIdPath, params *StopComputerSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopComputerSessionRequest(c.Server, sessionId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetConsoleSession Read the console session
 //
 // Corresponds with GET /console/session (the `GetConsoleSession` operationId).
@@ -8882,6 +9017,23 @@ func (c *Client) UpdateHostWithBody(ctx context.Context, hostId HostIdPath, para
 // Corresponds with PATCH /hosts/{host_id} (the `UpdateHost` operationId).
 func (c *Client) UpdateHost(ctx context.Context, hostId HostIdPath, params *UpdateHostParams, body UpdateHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateHostRequest(c.Server, hostId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableComputerDevice Switch the computer enablement of a host off
+//
+// Any active owner in a session switches the enablement of a host off, from any device, without step-up (docs/spec/27-computer-use.md 4 item 4). The server stores the reported generation as the disabled generation, ends the host's computer session with `device_disabled` in the same transaction and sends `computer.disable` over the control connection; the host stays unlisted until a new local switch-on raises the generation. A host without a reported helper answers unchanged. Switching on is no operation of the API. Audited.
+//
+// Corresponds with POST /hosts/{host_id}/computer/disable (the `DisableComputerDevice` operationId).
+func (c *Client) DisableComputerDevice(ctx context.Context, hostId HostIdPath, params *DisableComputerDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableComputerDeviceRequest(c.Server, hostId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -19762,6 +19914,176 @@ func NewCreateInteractionRequestWithBody(server string, componentId ComponentIdP
 	return req, nil
 }
 
+// NewListComputerDesktopsRequest constructs an http.Request for the ListComputerDesktops method
+func NewListComputerDesktopsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/computer/desktops")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListComputerSessionsRequest constructs an http.Request for the ListComputerSessions method
+func NewListComputerSessionsRequest(server string, params *ListComputerSessionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/computer/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewOpenComputerSessionRequest calls the generic OpenComputerSession builder with application/json body
+func NewOpenComputerSessionRequest(server string, body OpenComputerSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewOpenComputerSessionRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewOpenComputerSessionRequestWithBody constructs an http.Request for the OpenComputerSession method, with any body, and a specified content type
+func NewOpenComputerSessionRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/computer/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewStopComputerSessionRequest constructs an http.Request for the StopComputerSession method
+func NewStopComputerSessionRequest(server string, sessionId ComputerSessionIdPath, params *StopComputerSessionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session_id", sessionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/computer/sessions/%s/stop", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetConsoleSessionRequest constructs an http.Request for the GetConsoleSession method
 func NewGetConsoleSessionRequest(server string) (*http.Request, error) {
 	var err error
@@ -20601,565 +20923,6 @@ func NewDownloadFileRequest(server string, fileId FileIdPath, params *DownloadFi
 			req.Header.Set("If-Range", headerParam1)
 		}
 
-	}
-
-	return req, nil
-}
-
-// NewDownloadThumbnailRequest constructs an http.Request for the DownloadThumbnail method
-func NewDownloadThumbnailRequest(server string, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "variant", variant, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/files/%s/thumbnails/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Ticket != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ticket", *params.Ticket, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.Range != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Range", *params.Range, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Range", headerParam0)
-		}
-
-		if params.IfRange != nil {
-			var headerParam1 string
-
-			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Range", *params.IfRange, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("If-Range", headerParam1)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewCreateFileTicketRequest calls the generic CreateFileTicket builder with application/json body
-func NewCreateFileTicketRequest(server string, fileId FileIdPath, body CreateFileTicketJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateFileTicketRequestWithBody(server, fileId, "application/json", bodyReader)
-}
-
-// NewCreateFileTicketRequestWithBody constructs an http.Request for the CreateFileTicket method, with any body, and a specified content type
-func NewCreateFileTicketRequestWithBody(server string, fileId FileIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/files/%s/tickets", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewRequestTranscriptionRequest constructs an http.Request for the RequestTranscription method
-func NewRequestTranscriptionRequest(server string, fileId FileIdPath, params *RequestTranscriptionParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/files/%s/transcribe", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetTranscriptRequest constructs an http.Request for the GetTranscript method
-func NewGetTranscriptRequest(server string, fileId FileIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/files/%s/transcript", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSubmitTranscriptRequest calls the generic SubmitTranscript builder with application/json body
-func NewSubmitTranscriptRequest(server string, fileId FileIdPath, params *SubmitTranscriptParams, body SubmitTranscriptJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSubmitTranscriptRequestWithBody(server, fileId, params, "application/json", bodyReader)
-}
-
-// NewSubmitTranscriptRequestWithBody constructs an http.Request for the SubmitTranscript method, with any body, and a specified content type
-func NewSubmitTranscriptRequestWithBody(server string, fileId FileIdPath, params *SubmitTranscriptParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/files/%s/transcript", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam0)
-
-	}
-
-	return req, nil
-}
-
-// NewListGdprRequestsRequest constructs an http.Request for the ListGdprRequests method
-func NewListGdprRequestsRequest(server string, params *ListGdprRequestsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/gdpr-requests")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.SubjectUserId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "subject_user_id", *params.SubjectUserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.State != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateGdprRequestRequest calls the generic CreateGdprRequest builder with application/json body
-func NewCreateGdprRequestRequest(server string, params *CreateGdprRequestParams, body CreateGdprRequestJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateGdprRequestRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateGdprRequestRequestWithBody constructs an http.Request for the CreateGdprRequest method, with any body, and a specified content type
-func NewCreateGdprRequestRequestWithBody(server string, params *CreateGdprRequestParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/gdpr-requests")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetGdprRequestRequest constructs an http.Request for the GetGdprRequest method
-func NewGetGdprRequestRequest(server string, requestId RequestIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/gdpr-requests/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDecideGdprRequestRequest calls the generic DecideGdprRequest builder with application/json body
-func NewDecideGdprRequestRequest(server string, requestId RequestIdPath, params *DecideGdprRequestParams, body DecideGdprRequestJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewDecideGdprRequestRequestWithBody(server, requestId, params, "application/json", bodyReader)
-}
-
-// NewDecideGdprRequestRequestWithBody constructs an http.Request for the DecideGdprRequest method, with any body, and a specified content type
-func NewDecideGdprRequestRequestWithBody(server string, requestId RequestIdPath, params *DecideGdprRequestParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/gdpr-requests/%s/decide", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDownloadGdprExportRequest constructs an http.Request for the DownloadGdprExport method
-func NewDownloadGdprExportRequest(server string, requestId RequestIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/gdpr-requests/%s/export", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
 	}
 
 	return req, nil

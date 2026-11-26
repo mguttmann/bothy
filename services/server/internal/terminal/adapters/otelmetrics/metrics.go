@@ -28,6 +28,8 @@ import (
 type Metrics struct {
 	unpaired, closed *metrics.Counter
 	active, hosts    *metrics.UpDownCounter
+	// relayBytes and relayMessages count the forwarded messages of computer sessions (CU-04).
+	relayBytes, relayMessages *metrics.Counter
 }
 
 // Compile-time checks: Metrics is the outgoing port of app.
@@ -55,7 +57,22 @@ func New(mp metric.MeterProvider) (*Metrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	return &Metrics{unpaired: unpaired, closed: closed, active: active, hosts: hosts}, nil
+	relayBytes, err := metrics.NewCounter(mp, metrics.TerminalComputerRelayBytes, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	relayMessages, err := metrics.NewCounter(mp, metrics.TerminalComputerRelayMessages, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &Metrics{unpaired: unpaired, closed: closed, active: active, hosts: hosts, relayBytes: relayBytes, relayMessages: relayMessages}, nil
+}
+
+// ComputerRelayed implements wsrelay.ComputerMetrics: the length of one forwarded message of a
+// computer session and the message itself, by direction; never content (CU-04).
+func (m *Metrics) ComputerRelayed(ctx context.Context, direction string, n int) {
+	m.relayBytes.Add(ctx, int64(n), direction)
+	m.relayMessages.Add(ctx, 1, direction)
 }
 
 // SessionClosed implements app.SessionMetrics.

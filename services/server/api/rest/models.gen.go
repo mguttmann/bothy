@@ -684,6 +684,7 @@ func (e AgentRuntimeState) Valid() bool {
 // Defines values for AgentSessionEndReason.
 const (
 	AgentSessionEndReasonAgentChanged AgentSessionEndReason = "agent_changed"
+	AgentSessionEndReasonComputerUse  AgentSessionEndReason = "computer_use"
 	AgentSessionEndReasonImport       AgentSessionEndReason = "import"
 	AgentSessionEndReasonRebind       AgentSessionEndReason = "rebind"
 	AgentSessionEndReasonReset        AgentSessionEndReason = "reset"
@@ -693,6 +694,8 @@ const (
 func (e AgentSessionEndReason) Valid() bool {
 	switch e {
 	case AgentSessionEndReasonAgentChanged:
+		return true
+	case AgentSessionEndReasonComputerUse:
 		return true
 	case AgentSessionEndReasonImport:
 		return true
@@ -1581,6 +1584,177 @@ func (e ComponentUpdateState) Valid() bool {
 	case ComponentUpdateStateActive:
 		return true
 	case ComponentUpdateStateDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComputerCloseDetail.
+const (
+	ComputerCloseDetailBusy            ComputerCloseDetail = "busy"
+	ComputerCloseDetailClientStop      ComputerCloseDetail = "client_stop"
+	ComputerCloseDetailHandshakeFailed ComputerCloseDetail = "handshake_failed"
+	ComputerCloseDetailHelperAbsent    ComputerCloseDetail = "helper_absent"
+	ComputerCloseDetailHelperCrashed   ComputerCloseDetail = "helper_crashed"
+	ComputerCloseDetailHelperUntrusted ComputerCloseDetail = "helper_untrusted"
+	ComputerCloseDetailIndicatorStop   ComputerCloseDetail = "indicator_stop"
+	ComputerCloseDetailLocalEscape     ComputerCloseDetail = "local_escape"
+	ComputerCloseDetailNotEnabled      ComputerCloseDetail = "not_enabled"
+	ComputerCloseDetailOpenTimeout     ComputerCloseDetail = "open_timeout"
+	ComputerCloseDetailStreamFault     ComputerCloseDetail = "stream_fault"
+	ComputerCloseDetailTokenExpired    ComputerCloseDetail = "token_expired"
+	ComputerCloseDetailTokenInvalid    ComputerCloseDetail = "token_invalid"
+	ComputerCloseDetailTokenReplayed   ComputerCloseDetail = "token_replayed"
+)
+
+// Valid indicates whether the value is a known member of the ComputerCloseDetail enum.
+func (e ComputerCloseDetail) Valid() bool {
+	switch e {
+	case ComputerCloseDetailBusy:
+		return true
+	case ComputerCloseDetailClientStop:
+		return true
+	case ComputerCloseDetailHandshakeFailed:
+		return true
+	case ComputerCloseDetailHelperAbsent:
+		return true
+	case ComputerCloseDetailHelperCrashed:
+		return true
+	case ComputerCloseDetailHelperUntrusted:
+		return true
+	case ComputerCloseDetailIndicatorStop:
+		return true
+	case ComputerCloseDetailLocalEscape:
+		return true
+	case ComputerCloseDetailNotEnabled:
+		return true
+	case ComputerCloseDetailOpenTimeout:
+		return true
+	case ComputerCloseDetailStreamFault:
+		return true
+	case ComputerCloseDetailTokenExpired:
+		return true
+	case ComputerCloseDetailTokenInvalid:
+		return true
+	case ComputerCloseDetailTokenReplayed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComputerCloseReason.
+const (
+	ComputerCloseReasonAccessRevoked  ComputerCloseReason = "access_revoked"
+	ComputerCloseReasonConnectionLost ComputerCloseReason = "connection_lost"
+	ComputerCloseReasonDeviceDisabled ComputerCloseReason = "device_disabled"
+	ComputerCloseReasonDone           ComputerCloseReason = "done"
+	ComputerCloseReasonError          ComputerCloseReason = "error"
+	ComputerCloseReasonHostDisabled   ComputerCloseReason = "host_disabled"
+	ComputerCloseReasonHostRekeyed    ComputerCloseReason = "host_rekeyed"
+	ComputerCloseReasonHostRestarted  ComputerCloseReason = "host_restarted"
+	ComputerCloseReasonHostRetired    ComputerCloseReason = "host_retired"
+	ComputerCloseReasonOpenFailed     ComputerCloseReason = "open_failed"
+	ComputerCloseReasonRunEnded       ComputerCloseReason = "run_ended"
+	ComputerCloseReasonStoppedByUser  ComputerCloseReason = "stopped_by_user"
+)
+
+// Valid indicates whether the value is a known member of the ComputerCloseReason enum.
+func (e ComputerCloseReason) Valid() bool {
+	switch e {
+	case ComputerCloseReasonAccessRevoked:
+		return true
+	case ComputerCloseReasonConnectionLost:
+		return true
+	case ComputerCloseReasonDeviceDisabled:
+		return true
+	case ComputerCloseReasonDone:
+		return true
+	case ComputerCloseReasonError:
+		return true
+	case ComputerCloseReasonHostDisabled:
+		return true
+	case ComputerCloseReasonHostRekeyed:
+		return true
+	case ComputerCloseReasonHostRestarted:
+		return true
+	case ComputerCloseReasonHostRetired:
+		return true
+	case ComputerCloseReasonOpenFailed:
+		return true
+	case ComputerCloseReasonRunEnded:
+		return true
+	case ComputerCloseReasonStoppedByUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComputerSessionPauseReason.
+const (
+	ComputerSessionPauseReasonLocked ComputerSessionPauseReason = "locked"
+)
+
+// Valid indicates whether the value is a known member of the ComputerSessionPauseReason enum.
+func (e ComputerSessionPauseReason) Valid() bool {
+	switch e {
+	case ComputerSessionPauseReasonLocked:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComputerSessionChangedEventAudience.
+const (
+	ComputerSessionChangedEventAudienceSelf ComputerSessionChangedEventAudience = "self"
+)
+
+// Valid indicates whether the value is a known member of the ComputerSessionChangedEventAudience enum.
+func (e ComputerSessionChangedEventAudience) Valid() bool {
+	switch e {
+	case ComputerSessionChangedEventAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComputerSessionChangedEventType.
+const (
+	ComputerSessionChanged ComputerSessionChangedEventType = "computer_session.changed"
+)
+
+// Valid indicates whether the value is a known member of the ComputerSessionChangedEventType enum.
+func (e ComputerSessionChangedEventType) Valid() bool {
+	switch e {
+	case ComputerSessionChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComputerSessionState.
+const (
+	ComputerSessionStateActive  ComputerSessionState = "active"
+	ComputerSessionStateClosed  ComputerSessionState = "closed"
+	ComputerSessionStateOpening ComputerSessionState = "opening"
+	ComputerSessionStatePaused  ComputerSessionState = "paused"
+)
+
+// Valid indicates whether the value is a known member of the ComputerSessionState enum.
+func (e ComputerSessionState) Valid() bool {
+	switch e {
+	case ComputerSessionStateActive:
+		return true
+	case ComputerSessionStateClosed:
+		return true
+	case ComputerSessionStateOpening:
+		return true
+	case ComputerSessionStatePaused:
 		return true
 	default:
 		return false
@@ -2493,6 +2667,168 @@ func (e HostDisabledReason) Valid() bool {
 	case HostDisabledReasonDuplicateConnection:
 		return true
 	case HostDisabledReasonOwner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerHelper.
+const (
+	HostComputerHelperAbsent    HostComputerHelper = "absent"
+	HostComputerHelperConnected HostComputerHelper = "connected"
+	HostComputerHelperRefused   HostComputerHelper = "refused"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerHelper enum.
+func (e HostComputerHelper) Valid() bool {
+	switch e {
+	case HostComputerHelperAbsent:
+		return true
+	case HostComputerHelperConnected:
+		return true
+	case HostComputerHelperRefused:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerSignature.
+const (
+	Development HostComputerSignature = "development"
+	Verified    HostComputerSignature = "verified"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerSignature enum.
+func (e HostComputerSignature) Valid() bool {
+	switch e {
+	case Development:
+		return true
+	case Verified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerEndedCloseReason.
+const (
+	HostComputerEndedCloseReasonConnectionLost HostComputerEndedCloseReason = "connection_lost"
+	HostComputerEndedCloseReasonDeviceDisabled HostComputerEndedCloseReason = "device_disabled"
+	HostComputerEndedCloseReasonDone           HostComputerEndedCloseReason = "done"
+	HostComputerEndedCloseReasonError          HostComputerEndedCloseReason = "error"
+	HostComputerEndedCloseReasonOpenFailed     HostComputerEndedCloseReason = "open_failed"
+	HostComputerEndedCloseReasonStoppedByUser  HostComputerEndedCloseReason = "stopped_by_user"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerEndedCloseReason enum.
+func (e HostComputerEndedCloseReason) Valid() bool {
+	switch e {
+	case HostComputerEndedCloseReasonConnectionLost:
+		return true
+	case HostComputerEndedCloseReasonDeviceDisabled:
+		return true
+	case HostComputerEndedCloseReasonDone:
+		return true
+	case HostComputerEndedCloseReasonError:
+		return true
+	case HostComputerEndedCloseReasonOpenFailed:
+		return true
+	case HostComputerEndedCloseReasonStoppedByUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerPermissionsCapture.
+const (
+	HostComputerPermissionsCaptureDenied  HostComputerPermissionsCapture = "denied"
+	HostComputerPermissionsCaptureGranted HostComputerPermissionsCapture = "granted"
+	HostComputerPermissionsCaptureUnknown HostComputerPermissionsCapture = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerPermissionsCapture enum.
+func (e HostComputerPermissionsCapture) Valid() bool {
+	switch e {
+	case HostComputerPermissionsCaptureDenied:
+		return true
+	case HostComputerPermissionsCaptureGranted:
+		return true
+	case HostComputerPermissionsCaptureUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerPermissionsInput.
+const (
+	HostComputerPermissionsInputDenied  HostComputerPermissionsInput = "denied"
+	HostComputerPermissionsInputGranted HostComputerPermissionsInput = "granted"
+	HostComputerPermissionsInputUnknown HostComputerPermissionsInput = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerPermissionsInput enum.
+func (e HostComputerPermissionsInput) Valid() bool {
+	switch e {
+	case HostComputerPermissionsInputDenied:
+		return true
+	case HostComputerPermissionsInputGranted:
+		return true
+	case HostComputerPermissionsInputUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerStartedState.
+const (
+	HostComputerStartedStateActive HostComputerStartedState = "active"
+	HostComputerStartedStatePaused HostComputerStartedState = "paused"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerStartedState enum.
+func (e HostComputerStartedState) Valid() bool {
+	switch e {
+	case HostComputerStartedStateActive:
+		return true
+	case HostComputerStartedStatePaused:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerStateReason.
+const (
+	HostComputerStateReasonLocked HostComputerStateReason = "locked"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerStateReason enum.
+func (e HostComputerStateReason) Valid() bool {
+	switch e {
+	case HostComputerStateReasonLocked:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostComputerStateState.
+const (
+	HostComputerStateStateActive HostComputerStateState = "active"
+	HostComputerStateStatePaused HostComputerStateState = "paused"
+)
+
+// Valid indicates whether the value is a known member of the HostComputerStateState enum.
+func (e HostComputerStateState) Valid() bool {
+	switch e {
+	case HostComputerStateStateActive:
+		return true
+	case HostComputerStateStatePaused:
 		return true
 	default:
 		return false
@@ -5525,52 +5861,52 @@ func (e TemplateScope) Valid() bool {
 
 // Defines values for TerminalCloseDetail.
 const (
-	HandshakeFailed           TerminalCloseDetail = "handshake_failed"
-	HelperUntrusted           TerminalCloseDetail = "helper_untrusted"
-	LocalConfirmDenied        TerminalCloseDetail = "local_confirm_denied"
-	OpenTimeout               TerminalCloseDetail = "open_timeout"
-	ProfileUnknown            TerminalCloseDetail = "profile_unknown"
-	PtyFailed                 TerminalCloseDetail = "pty_failed"
-	ServerHostOwnerOnly       TerminalCloseDetail = "server_host_owner_only"
-	SessionUserMismatch       TerminalCloseDetail = "session_user_mismatch"
-	SessionUserUnknown        TerminalCloseDetail = "session_user_unknown"
-	SharedLocation            TerminalCloseDetail = "shared_location"
-	SubscriptionLoginDetected TerminalCloseDetail = "subscription_login_detected"
-	TokenExpired              TerminalCloseDetail = "token_expired"
-	TokenInvalid              TerminalCloseDetail = "token_invalid"
-	TokenReplayed             TerminalCloseDetail = "token_replayed"
+	TerminalCloseDetailHandshakeFailed           TerminalCloseDetail = "handshake_failed"
+	TerminalCloseDetailHelperUntrusted           TerminalCloseDetail = "helper_untrusted"
+	TerminalCloseDetailLocalConfirmDenied        TerminalCloseDetail = "local_confirm_denied"
+	TerminalCloseDetailOpenTimeout               TerminalCloseDetail = "open_timeout"
+	TerminalCloseDetailProfileUnknown            TerminalCloseDetail = "profile_unknown"
+	TerminalCloseDetailPtyFailed                 TerminalCloseDetail = "pty_failed"
+	TerminalCloseDetailServerHostOwnerOnly       TerminalCloseDetail = "server_host_owner_only"
+	TerminalCloseDetailSessionUserMismatch       TerminalCloseDetail = "session_user_mismatch"
+	TerminalCloseDetailSessionUserUnknown        TerminalCloseDetail = "session_user_unknown"
+	TerminalCloseDetailSharedLocation            TerminalCloseDetail = "shared_location"
+	TerminalCloseDetailSubscriptionLoginDetected TerminalCloseDetail = "subscription_login_detected"
+	TerminalCloseDetailTokenExpired              TerminalCloseDetail = "token_expired"
+	TerminalCloseDetailTokenInvalid              TerminalCloseDetail = "token_invalid"
+	TerminalCloseDetailTokenReplayed             TerminalCloseDetail = "token_replayed"
 )
 
 // Valid indicates whether the value is a known member of the TerminalCloseDetail enum.
 func (e TerminalCloseDetail) Valid() bool {
 	switch e {
-	case HandshakeFailed:
+	case TerminalCloseDetailHandshakeFailed:
 		return true
-	case HelperUntrusted:
+	case TerminalCloseDetailHelperUntrusted:
 		return true
-	case LocalConfirmDenied:
+	case TerminalCloseDetailLocalConfirmDenied:
 		return true
-	case OpenTimeout:
+	case TerminalCloseDetailOpenTimeout:
 		return true
-	case ProfileUnknown:
+	case TerminalCloseDetailProfileUnknown:
 		return true
-	case PtyFailed:
+	case TerminalCloseDetailPtyFailed:
 		return true
-	case ServerHostOwnerOnly:
+	case TerminalCloseDetailServerHostOwnerOnly:
 		return true
-	case SessionUserMismatch:
+	case TerminalCloseDetailSessionUserMismatch:
 		return true
-	case SessionUserUnknown:
+	case TerminalCloseDetailSessionUserUnknown:
 		return true
-	case SharedLocation:
+	case TerminalCloseDetailSharedLocation:
 		return true
-	case SubscriptionLoginDetected:
+	case TerminalCloseDetailSubscriptionLoginDetected:
 		return true
-	case TokenExpired:
+	case TerminalCloseDetailTokenExpired:
 		return true
-	case TokenInvalid:
+	case TerminalCloseDetailTokenInvalid:
 		return true
-	case TokenReplayed:
+	case TerminalCloseDetailTokenReplayed:
 		return true
 	default:
 		return false
@@ -9719,6 +10055,215 @@ type ComponentUpdate struct {
 // ComponentUpdateState defines model for ComponentUpdate.State.
 type ComponentUpdateState string
 
+// ComputerAttachHello First text frame of the computer attach connection; `identify` follows, then binary Noise frames only.
+type ComputerAttachHello struct {
+	ProtocolVersions []int `json:"protocol_versions"`
+
+	// ServerTime RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ServerTime Timestamp `json:"server_time"`
+}
+
+// ComputerAttachIdentify The single-use attach token of the session (27 5.4); the connection carries no agent token.
+type ComputerAttachIdentify struct {
+	// ProtocolVersion Examples: 1
+	ProtocolVersion int    `json:"protocol_version"`
+	Token           string `json:"token"`
+}
+
+// ComputerCloseDetail Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).
+type ComputerCloseDetail string
+
+// ComputerCloseReason Why a computer session ended (docs/spec/27-computer-use.md 8.3).
+type ComputerCloseReason string
+
+// ComputerDesktop defines model for ComputerDesktop.
+type ComputerDesktop struct {
+	// Busy Another computer session on the host is not closed.
+	Busy bool `json:"busy"`
+
+	// HostId UUIDv7 (RFC 9562), lowercase canonical form.
+	HostId Uuid `json:"host_id"`
+
+	// Locked The screen is locked (`report.computer.locked`).
+	Locked bool `json:"locked"`
+
+	// Name Examples: Desk
+	Name     string       `json:"name"`
+	Online   bool         `json:"online"`
+	Platform HostPlatform `json:"platform"`
+}
+
+// ComputerDesktopList defines model for ComputerDesktopList.
+type ComputerDesktopList struct {
+	Items []ComputerDesktop `json:"items"`
+}
+
+// ComputerSession Metadata of a computer session (03 `computer_sessions`) with the name of its desktop. Never an image, a coordinate, typed text, a key name, the attach token or its `jti`.
+type ComputerSession struct {
+	ActionCount int `json:"action_count"`
+
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// AttachedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	AttachedAt *Timestamp `json:"attached_at,omitempty"`
+
+	// CloseDetail Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).
+	CloseDetail *ComputerCloseDetail `json:"close_detail,omitempty"`
+
+	// CloseReason Why a computer session ended (docs/spec/27-computer-use.md 8.3).
+	CloseReason *ComputerCloseReason `json:"close_reason,omitempty"`
+
+	// ClosedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ClosedAt *Timestamp `json:"closed_at,omitempty"`
+
+	// Desktop The name of the host (`hosts.name`).
+	//
+	// Examples: Desk
+	Desktop string `json:"desktop"`
+
+	// FrontApp Identity of the frontmost app of the last `computer.state` (bundle ID or executable name); never a window title.
+	//
+	// Examples: com.example.editor
+	FrontApp *string `json:"front_app,omitempty"`
+
+	// Generation The enablement generation the session was opened with (claim `gen`).
+	Generation int `json:"generation"`
+
+	// HostId UUIDv7 (RFC 9562), lowercase canonical form.
+	HostId Uuid `json:"host_id"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id            Uuid `json:"id"`
+	KeyGeneration int  `json:"key_generation"`
+
+	// OpenedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OpenedAt    Timestamp                   `json:"opened_at"`
+	PauseReason *ComputerSessionPauseReason `json:"pause_reason,omitempty"`
+
+	// PausedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	PausedAt *Timestamp `json:"paused_at,omitempty"`
+	PausedMs int64      `json:"paused_ms"`
+
+	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	RunId Uuid `json:"run_id"`
+
+	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StartedAt *Timestamp `json:"started_at,omitempty"`
+
+	// State State of a computer session (docs/spec/27-computer-use.md 8.1).
+	State ComputerSessionState `json:"state"`
+
+	// StoppedBy UUIDv7 (RFC 9562), lowercase canonical form.
+	StoppedBy *Uuid `json:"stopped_by,omitempty"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId  Uuid  `json:"user_id"`
+	Version int64 `json:"version"`
+}
+
+// ComputerSessionPauseReason defines model for ComputerSession.PauseReason.
+type ComputerSessionPauseReason string
+
+// ComputerSessionChangedEvent Durable personal event `computer_session.changed` to the triggering owner (27 12.4); never an image.
+type ComputerSessionChangedEvent struct {
+	Actor    *EventActor                          `json:"actor,omitempty"`
+	Audience *ComputerSessionChangedEventAudience `json:"audience,omitempty"`
+
+	// ClientMsgId UUIDv7 (RFC 9562), lowercase canonical form.
+	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
+
+	// CorrelationId W3C trace ID (16 bytes) of the request, written as a lowercase UUID; not a UUIDv7. Generated by the server.
+	//
+	// Examples: 4bf92f35-77b3-4da6-a3ce-929d0e0e4736
+	CorrelationId *CorrelationId `json:"correlation_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// InvocationToken Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
+	InvocationToken *string `json:"invocation_token,omitempty"`
+
+	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OccurredAt Timestamp `json:"occurred_at"`
+
+	// Payload Metadata of a computer session (03 `computer_sessions`) with the name of its desktop. Never an image, a coordinate, typed text, a key name, the attach token or its `jti`.
+	Payload           ComputerSession `json:"payload"`
+	PermissionVersion *int64          `json:"permission_version,omitempty"`
+	Redacted          *bool           `json:"redacted,omitempty"`
+
+	// Redelivered Set on redelivery to an agent consumer after `agent.ack_timeout`.
+	Redelivered *bool         `json:"redelivered,omitempty"`
+	Resource    EventResource `json:"resource"`
+
+	// SchemaVersion Examples: 1
+	SchemaVersion int `json:"schema_version"`
+
+	// Scope Location of the event. Members are absent where not applicable.
+	Scope EventScope `json:"scope"`
+
+	// Seq Global commit-ordered sequence; absent for ephemeral events.
+	//
+	// Examples: 5301
+	Seq *int64 `json:"seq,omitempty"`
+
+	// SyncEpoch Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
+	SyncEpoch *Uuid `json:"sync_epoch,omitempty"`
+
+	// TraceContext W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+	//
+	// Examples: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	TraceContext *string `json:"trace_context,omitempty"`
+
+	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
+	Truncated *bool                           `json:"truncated,omitempty"`
+	Type      ComputerSessionChangedEventType `json:"type"`
+}
+
+// ComputerSessionChangedEventAudience defines model for ComputerSessionChangedEvent.Audience.
+type ComputerSessionChangedEventAudience string
+
+// ComputerSessionChangedEventType defines model for ComputerSessionChangedEvent.Type.
+type ComputerSessionChangedEventType string
+
+// ComputerSessionGrant Everything `bothy-computer-mcp` needs to attach and run the Noise handshake (27 5.1 step 6). The token is valid once and for `computer.attach_token_ttl`.
+type ComputerSessionGrant struct {
+	// AttachPath Examples: /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach
+	AttachPath string `json:"attach_path"`
+
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt      Timestamp `json:"expires_at"`
+	KeyFingerprint string    `json:"key_fingerprint"`
+	KeyGeneration  int       `json:"key_generation"`
+	NoisePublicKey string    `json:"noise_public_key"`
+
+	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	SessionId Uuid `json:"session_id"`
+
+	// Token Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2.
+	Token string `json:"token"`
+}
+
+// ComputerSessionList defines model for ComputerSessionList.
+type ComputerSessionList struct {
+	Items []ComputerSession `json:"items"`
+}
+
+// ComputerSessionOpen defines model for ComputerSessionOpen.
+type ComputerSessionOpen struct {
+	// ClientEphemeralKeyHash SHA-256 of the ephemeral X25519 public key that `bothy-computer-mcp` sends in Noise message 1, base64url without padding; becomes the claim `cek`.
+	ClientEphemeralKeyHash string `json:"client_ephemeral_key_hash"`
+
+	// HostId UUIDv7 (RFC 9562), lowercase canonical form.
+	HostId Uuid `json:"host_id"`
+
+	// PinChanged `true` when `bothy-computer-mcp` replaced its pin of the host key after a re-pairing (27 10.4); recorded in the audit entry of `computer.open`.
+	PinChanged *bool `json:"pin_changed,omitempty"`
+}
+
+// ComputerSessionState State of a computer session (docs/spec/27-computer-use.md 8.1).
+type ComputerSessionState string
+
 // ConsoleSession defines model for ConsoleSession.
 type ConsoleSession struct {
 	DisplayName string `json:"display_name"`
@@ -11725,6 +12270,15 @@ type Host struct {
 	// AssignedUserId Person the host is assigned to (SR10); absent means owners only.
 	AssignedUserId *Uuid `json:"assigned_user_id,omitempty"`
 
+	// Computer The reported state of the computer helper (27 12.3); only for active owners with `host.read` (07 2.15 item 5), absent for every other reader, in `host.updated` and while the host service reports none.
+	Computer *HostComputer `json:"computer,omitempty"`
+
+	// ComputerDisabledGeneration The enablement generation that `computer.device.disable` switched off (27 4 item 4); only for active owners, absent while none was switched off remotely.
+	ComputerDisabledGeneration *int `json:"computer_disabled_generation,omitempty"`
+
+	// ComputerListed The host is a desktop of the reading owner (27 4 item 3); only for active owners, like `computer`.
+	ComputerListed *bool `json:"computer_listed,omitempty"`
+
 	// Connected Usable for sessions, from the first `report` after `ready` to the end of the control connection (24, 3.5).
 	Connected bool `json:"connected"`
 
@@ -11819,6 +12373,140 @@ type HostChannelHello struct {
 	// ServerTime RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ServerTime Timestamp `json:"server_time"`
 }
+
+// HostComputer The state of the computer helper of a host (schema `host_computer.v1`, docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in `hosts.reported_computer`. Never a path, a key or screen content.
+type HostComputer struct {
+	Enabled       bool                    `json:"enabled"`
+	Generation    int                     `json:"generation"`
+	Helper        HostComputerHelper      `json:"helper"`
+	HelperVersion string                  `json:"helper_version"`
+	Locked        bool                    `json:"locked"`
+	OsAccount     string                  `json:"os_account"`
+	Permissions   HostComputerPermissions `json:"permissions"`
+	Signature     HostComputerSignature   `json:"signature"`
+}
+
+// HostComputerHelper defines model for HostComputer.Helper.
+type HostComputerHelper string
+
+// HostComputerSignature defines model for HostComputer.Signature.
+type HostComputerSignature string
+
+// HostComputerClose defines model for HostComputerClose.
+type HostComputerClose struct {
+	// Reason Why a computer session ended (docs/spec/27-computer-use.md 8.3).
+	Reason ComputerCloseReason `json:"reason"`
+
+	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	SessionId Uuid `json:"session_id"`
+}
+
+// HostComputerDisable defines model for HostComputerDisable.
+type HostComputerDisable struct {
+	Generation int `json:"generation"`
+}
+
+// HostComputerEnded defines model for HostComputerEnded.
+type HostComputerEnded struct {
+	// ActionCounts A count per action kind of 27 6.4.
+	ActionCounts *map[string]int `json:"action_counts,omitempty"`
+
+	// Apps Identities of the frontmost apps (bundle ID or executable name with the signer's team ID or subject); the server keeps at most `computer.audit_apps_max`.
+	Apps *[]string `json:"apps,omitempty"`
+
+	// CloseDetail Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).
+	CloseDetail *ComputerCloseDetail `json:"close_detail,omitempty"`
+
+	// CloseReason The host service sends only these reasons (27 12.3).
+	CloseReason HostComputerEndedCloseReason `json:"close_reason"`
+	PausedMs    *int64                       `json:"paused_ms,omitempty"`
+
+	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	SessionId Uuid `json:"session_id"`
+}
+
+// HostComputerEndedCloseReason The host service sends only these reasons (27 12.3).
+type HostComputerEndedCloseReason string
+
+// HostComputerOpen The server asks the host service to open the computer data connection of a session (27 5.1 step 7); `user_id` is the triggering owner (`sub` of the attach token).
+type HostComputerOpen struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId   Uuid   `json:"agent_id"`
+	AgentName string `json:"agent_name"`
+
+	// DataPath Examples: /api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream
+	DataPath string `json:"data_path"`
+
+	// ExpiresAt Without both sides paired and the handshake done until then the session ends `open_failed` with `open_timeout` (`computer.open_timeout`).
+	ExpiresAt Timestamp `json:"expires_at"`
+
+	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	RunId Uuid `json:"run_id"`
+
+	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	SessionId Uuid `json:"session_id"`
+
+	// Settings The server values of a computer session (27 18), sent with `computer.open`.
+	Settings HostComputerSettings `json:"settings"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId Uuid `json:"user_id"`
+}
+
+// HostComputerPermissions defines model for HostComputerPermissions.
+type HostComputerPermissions struct {
+	Capture HostComputerPermissionsCapture `json:"capture"`
+	Input   HostComputerPermissionsInput   `json:"input"`
+}
+
+// HostComputerPermissionsCapture defines model for HostComputerPermissions.Capture.
+type HostComputerPermissionsCapture string
+
+// HostComputerPermissionsInput defines model for HostComputerPermissions.Input.
+type HostComputerPermissionsInput string
+
+// HostComputerSettings The server values of a computer session (27 18), sent with `computer.open`.
+type HostComputerSettings struct {
+	AuditAppsMax     int   `json:"audit_apps_max"`
+	AutoScreenshot   bool  `json:"auto_screenshot"`
+	ImageMaxEdge     int   `json:"image_max_edge"`
+	JpegQuality      int   `json:"jpeg_quality"`
+	KeyRepeatMax     int   `json:"key_repeat_max"`
+	SettleMs         int64 `json:"settle_ms"`
+	StatusIntervalMs int64 `json:"status_interval_ms"`
+	WaitMaxMs        int64 `json:"wait_max_ms"`
+}
+
+// HostComputerStarted defines model for HostComputerStarted.
+type HostComputerStarted struct {
+	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	SessionId Uuid                     `json:"session_id"`
+	State     HostComputerStartedState `json:"state"`
+}
+
+// HostComputerStartedState defines model for HostComputerStarted.State.
+type HostComputerStartedState string
+
+// HostComputerState defines model for HostComputerState.
+type HostComputerState struct {
+	ActionCount int `json:"action_count"`
+
+	// FrontApp Identity of the frontmost app (bundle ID or executable name).
+	FrontApp *string `json:"front_app,omitempty"`
+
+	// Reason Present exactly with `paused`.
+	Reason *HostComputerStateReason `json:"reason,omitempty"`
+
+	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
+	SessionId Uuid                   `json:"session_id"`
+	State     HostComputerStateState `json:"state"`
+}
+
+// HostComputerStateReason Present exactly with `paused`.
+type HostComputerStateReason string
+
+// HostComputerStateState defines model for HostComputerState.State.
+type HostComputerStateState string
 
 // HostConfirm defines model for HostConfirm.
 type HostConfirm struct {
@@ -12057,6 +12745,9 @@ type HostReady struct {
 
 // HostReport Report of profiles, session users and self-checks; never content, paths or values. Sent after every `ready` before the host service accepts `session.open`, and on every change. When `doctor` refuses the start, the host service still logs in, sends one `report` and closes the connection without accepting `session.open` (24 section 2.2).
 type HostReport struct {
+	// Computer The state of the computer helper (27 4 item 2 and 12.3); absent while `host_service.computer_use` is off. Not a doctor check (the list stays HD1 to HD11).
+	Computer *HostComputer `json:"computer,omitempty"`
+
 	// Doctor One entry per check HD1 to HD11; a failed HD6, HD9, HD10 or HD11 has one entry per account named by the rule for names (24, 2.2).
 	Doctor              []HostDoctorCheck         `json:"doctor"`
 	IsServerHost        bool                      `json:"is_server_host"`
@@ -19402,6 +20093,12 @@ type CommandIdPath = Uuid
 // ComponentIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type ComponentIdPath = Uuid
 
+// ComputerSessionIdPath UUIDv7 (RFC 9562), lowercase canonical form.
+type ComputerSessionIdPath = Uuid
+
+// ComputerSessionStateQuery State of a computer session (docs/spec/27-computer-use.md 8.1).
+type ComputerSessionStateQuery = ComputerSessionState
+
 // ConsoleRequest defines model for ConsoleRequest.
 type ConsoleRequest string
 
@@ -20130,6 +20827,18 @@ type UpdateComponentParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ListComputerSessionsParams defines parameters for ListComputerSessions.
+type ListComputerSessionsParams struct {
+	// State Only computer sessions in this state; without it, all states.
+	State *ComputerSessionStateQuery `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// StopComputerSessionParams defines parameters for StopComputerSession.
+type StopComputerSessionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // EndViewAsParams defines parameters for EndViewAs.
 type EndViewAsParams struct {
 	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
@@ -20366,6 +21075,12 @@ type UpdateHostParams struct {
 
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// DisableComputerDeviceParams defines parameters for DisableComputerDevice.
+type DisableComputerDeviceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // ConfirmHostParams defines parameters for ConfirmHost.
@@ -21370,6 +22085,9 @@ type UpdateComponentJSONRequestBody = ComponentUpdate
 
 // CreateInteractionJSONRequestBody defines body for CreateInteraction for application/json ContentType.
 type CreateInteractionJSONRequestBody = InteractionCreate
+
+// OpenComputerSessionJSONRequestBody defines body for OpenComputerSession for application/json ContentType.
+type OpenComputerSessionJSONRequestBody = ComputerSessionOpen
 
 // ReconcileCostsJSONRequestBody defines body for ReconcileCosts for application/json ContentType.
 type ReconcileCostsJSONRequestBody = CostReconcile
@@ -23884,6 +24602,40 @@ func (t *Event) MergeTerminalSessionChangedEvent(v TerminalSessionChangedEvent) 
 	return err
 }
 
+// AsComputerSessionChangedEvent returns the union data inside the Event as a ComputerSessionChangedEvent
+func (t Event) AsComputerSessionChangedEvent() (ComputerSessionChangedEvent, error) {
+	var body ComputerSessionChangedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromComputerSessionChangedEvent overwrites any union data inside the Event as the provided ComputerSessionChangedEvent
+func (t *Event) FromComputerSessionChangedEvent(v ComputerSessionChangedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"computer_session.changed"}`))
+	t.union = b
+	return err
+}
+
+// MergeComputerSessionChangedEvent performs a merge with any union data inside the Event, using the provided ComputerSessionChangedEvent
+func (t *Event) MergeComputerSessionChangedEvent(v ComputerSessionChangedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"computer_session.changed"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t Event) Discriminator() (string, error) {
 	var discriminator struct {
 		Discriminator string `json:"type"`
@@ -23930,6 +24682,8 @@ func (t Event) ValueByDiscriminator() (interface{}, error) {
 		return t.AsCommandChangedEvent()
 	case "command.invoked":
 		return t.AsCommandInvokedEvent()
+	case "computer_session.changed":
+		return t.AsComputerSessionChangedEvent()
 	case "device.pending":
 		return t.AsDevicePendingEvent()
 	case "draft.deleted":

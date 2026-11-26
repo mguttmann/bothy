@@ -23,3 +23,10 @@ SELECT id FROM hosts WHERE retired_at < @cutoff ORDER BY retired_at, id LIMIT @r
 
 -- name: DeleteHost :execrows
 DELETE FROM hosts WHERE id = @id AND retired_at < @cutoff;
+
+-- name: ExpiredComputerSessions :many
+-- 03 computer_sessions (CU-04): metadata of computer sessions after closed_at.
+SELECT id FROM computer_sessions WHERE closed_at < @cutoff ORDER BY closed_at, id LIMIT @row_limit;
+
+-- name: DeleteComputerSession :execrows
+DELETE FROM computer_sessions WHERE id = @id AND closed_at < @cutoff;

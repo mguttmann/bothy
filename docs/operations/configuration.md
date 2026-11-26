@@ -1080,16 +1080,16 @@ Source: [27-computer-use.md](../spec/27-computer-use.md), section 18.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `computer.attach_token_ttl` | `BOTHY_COMPUTER__ATTACH_TOKEN_TTL` | Server |  | `30s` | validity of an attach token (5.2) | planned (CU) |
-| `computer.open_timeout` | `BOTHY_COMPUTER__OPEN_TIMEOUT` | Server |  | `20s` | deadline until both sides are paired and the handshake is done (5.1) | planned (CU) |
-| `computer.image_max_edge` | `BOTHY_COMPUTER__IMAGE_MAX_EDGE` | Server |  | `1280` | longest edge of a screenshot in pixels, sent to the host with `computer.open` (6.5) | planned (CU) |
-| `computer.jpeg_quality` | `BOTHY_COMPUTER__JPEG_QUALITY` | Server |  | `80` | JPEG quality of a screenshot, 1 to 100 (6.5) | planned (CU) |
-| `computer.settle` | `BOTHY_COMPUTER__SETTLE` | Server |  | `500ms` | wait after an action before its automatic image (6.4) | planned (CU) |
-| `computer.auto_screenshot` | `BOTHY_COMPUTER__AUTO_SCREENSHOT` | Server |  | `true` | an image after every action that changes the screen (6.4) | planned (CU) |
-| `computer.wait_max` | `BOTHY_COMPUTER__WAIT_MAX` | Server |  | `60s` | longest `wait` of one action (6.4) | planned (CU) |
-| `computer.key_repeat_max` | `BOTHY_COMPUTER__KEY_REPEAT_MAX` | Server |  | `50` | highest `repeat` of one `key` action (6.4) | planned (CU) |
-| `computer.audit_apps_max` | `BOTHY_COMPUTER__AUDIT_APPS_MAX` | Server |  | `32` | most app identities in the audit entry of an end (13.1) | planned (CU) |
-| `computer.status_interval` | `BOTHY_COMPUTER__STATUS_INTERVAL` | Server |  | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) | planned (CU) |
+| `computer.attach_token_ttl` | `BOTHY_COMPUTER__ATTACH_TOKEN_TTL` | Server | duration | `30s` | validity of an attach token (5.2) | active |
+| `computer.open_timeout` | `BOTHY_COMPUTER__OPEN_TIMEOUT` | Server | duration | `20s` | deadline until both sides are paired and the handshake is done (5.1) | active |
+| `computer.image_max_edge` | `BOTHY_COMPUTER__IMAGE_MAX_EDGE` | Server | int | `1280` | longest edge of a screenshot in pixels, sent to the host with `computer.open` (6.5) | active |
+| `computer.jpeg_quality` | `BOTHY_COMPUTER__JPEG_QUALITY` | Server | int | `80` | JPEG quality of a screenshot, 1 to 100 (6.5) | active |
+| `computer.settle` | `BOTHY_COMPUTER__SETTLE` | Server | duration | `500ms` | wait after an action before its automatic image (6.4) | active |
+| `computer.auto_screenshot` | `BOTHY_COMPUTER__AUTO_SCREENSHOT` | Server | bool | `true` | an image after every action that changes the screen (6.4) | active |
+| `computer.wait_max` | `BOTHY_COMPUTER__WAIT_MAX` | Server | duration | `60s` | longest `wait` of one action (6.4) | active |
+| `computer.key_repeat_max` | `BOTHY_COMPUTER__KEY_REPEAT_MAX` | Server | int | `50` | highest `repeat` of one `key` action (6.4) | active |
+| `computer.audit_apps_max` | `BOTHY_COMPUTER__AUDIT_APPS_MAX` | Server | int | `32` | most app identities in the audit entry of an end (13.1) | active |
+| `computer.status_interval` | `BOTHY_COMPUTER__STATUS_INTERVAL` | Server | duration | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) | active |
 | `host_service.computer_frame_max_bytes` |  | Host service |  | `67108864` | longest frame on the helper channel, an image included (9.4); the host service closes a channel that sends a longer one |  |
 | `runner.computer_use` |  | Runner |  | `false` | load `bothy-computer-mcp` in `host` turns (10.1) |  |
 | `runner.computer_mcp_bin` |  | Runner |  | empty | absolute path of `bothy-computer-mcp`; required with `runner.computer_use` (10.1) |  |

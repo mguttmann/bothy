@@ -22,7 +22,8 @@ WHERE id = @id AND (last_seen_at IS NULL OR last_seen_at < @older_than);
 UPDATE hosts
 SET reported_profiles = @reported_profiles::jsonb, reported_doctor = @reported_doctor::jsonb,
     reported_is_server_host = @reported_is_server_host, reported_require_local_confirm = @reported_require_local_confirm,
-    reported_os_version = sqlc.narg(reported_os_version), version = @version
+    reported_os_version = sqlc.narg(reported_os_version), reported_computer = sqlc.narg(reported_computer)::jsonb,
+    version = @version
 WHERE id = @id;
 
 -- name: LockSession :one

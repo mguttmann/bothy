@@ -1,6 +1,6 @@
 # Module `terminal`
 
-Status: host records (M2-39), terminal rights (M2-40), pairing (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44), the terminal across several api nodes (M2-47), revocation of every kind, the server's own limits of a session, session limits, rate limits of the terminal channels and the session metrics (M2-46). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
+Status: host records (M2-39), terminal rights (M2-40), pairing (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44), the terminal across several api nodes (M2-47), revocation of every kind, the server's own limits of a session, session limits, rate limits of the terminal channels and the session metrics (M2-46), computer sessions (CU-04). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md), for computer sessions [docs/spec/27-computer-use.md](../../../../docs/spec/27-computer-use.md); where they differ, the chapter applies.
 
 ## Purpose
 
@@ -55,11 +55,11 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 ## Actions (05-actions.md)
 
-`host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate`.
+`host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate`; computer use (CU-04): `computer.desktops.list`, `computer.open`, `computer.attach`, `computer.session.read`, `computer.stop`, `computer.device.disable`, `computer.terminate`.
 
 ## Events and WebSocket ops
 
-- Durable: `host.updated` (M2-39), `terminal_session.changed` (M2-44).
+- Durable: `host.updated` (M2-39), `terminal_session.changed` (M2-44), `computer_session.changed` (CU-04).
 - Ephemeral: `host.presence_changed` (M2-43).
 - WebSocket ops (client to server): none on the shared WebSocket; separate connections with their own ops (05, section 7).
 
@@ -430,6 +430,31 @@ are the rows `D-M2-46-<n>` of [docs/decisions.d/M2-46.md](../../../../docs/decis
   (`relay_limits_internal_test.go`), `adapters/otelmetrics` (`TestTerminalMetrics_ClosedAttributes`)
   and the integration tests of `test/terminal` over the full-server harness with the Fake-Hosts on a
   fake clock with the deadline scheduler `fakehost.ClockTimers`.
+
+## Built in CU-04
+
+Computer sessions ([27-computer-use.md](../../../../docs/spec/27-computer-use.md), rulings in
+[decisions.d/CU-04.md](../../../../docs/decisions.d/CU-04.md)):
+
+- `app/computer.go` and `computer_ports.go`: the five operations of 27 12.2 (`Service.Computers`,
+  the incoming port `terminal.Computers`), the attach of bothy-computer-mcp (`AttachComputer`),
+  the host ops `computer.started`, `computer.state` and `computer.ended`, and the one end function
+  `endComputer` (closing statement, `computer.terminate` as the system, `computer_session.changed`).
+  The run facts of SR13 come from `runs` through `ComputerRuns`; `runs` ends the session of an
+  ending run through `OnComputerRunEnded` in its own transaction and asks
+  `RunHoldsComputerSession` for the follow-up rule of SR13 item 5. Ends from outside: a lost owner
+  role (`OnAccessChanged`), a disabled person (`OnSessionEnded` with `user_disabled`), a host state
+  change (`endSessions` of a host with `host_disabled`, `host_retired`, `host_rekeyed`), a lost
+  control connection (`ConnectionLost`), `live_sessions` (`reconcile`), `terminal.sweep` for
+  openings past `computer.open_timeout`.
+- `domain/computer.go`: states, the closed lists of 27 8.3, the reported object `host_computer.v1`,
+  the listed desktop of 27 4 item 3 (`DesktopListed`) and the attach token claims of 27 5.2.
+- `adapters/wsrelay/computer.go`: the computer relay, the attach handler and the computer data
+  handler; it forwards ciphertext unchanged and counts lengths only.
+- `adapters/httpapi/computer.go`: the five REST handlers; `adapters/postgres/computer.go` with
+  `queries/computer.sql`: the store, `EndComputerSession` the one closing statement.
+- Retention: `computer_sessions` after `closed_at` in the participant of `retention.security`,
+  before `terminal_sessions`.
 
 ## Personal data (M7-06)
 

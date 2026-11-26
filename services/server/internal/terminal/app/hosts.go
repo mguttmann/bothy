@@ -34,7 +34,7 @@ func (s *Service) Get(ctx context.Context, a actor.Actor, hostID ids.ID) (termin
 	if !found {
 		return terminal.HostView{}, invisible()
 	}
-	return s.view(ctx, h), nil
+	return s.withComputerView(ctx, a.ID, h)
 }
 
 // person checks that id is a principal of kind user that is not deleted; otherwise 400

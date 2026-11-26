@@ -106,7 +106,11 @@ func (f *Followups) Accept(ctx context.Context, ev messaging.MessagePosted, info
 	if err != nil || !allowed {
 		return err
 	}
-	return f.store(ctx, ev.MessageID, run)
+	held, err := f.s.heldForComputer(ctx, run, p.ID)
+	if err != nil {
+		return err
+	}
+	return f.store(ctx, ev.MessageID, run, held)
 }
 
 // authorizeFollowup decides run.followup.create for p (design note 3 c and d): a candidate that M
@@ -144,7 +148,7 @@ func (f *Followups) authorizeFollowup(ctx context.Context, ev messaging.MessageP
 // store writes an allowed follow-up (design note 3 e): the row in queued, one version step of the
 // run, trigger_state received, for a run in waiting_input the disabling of its open components
 // (M2-15) and agent.followup when the effective mode asks for it.
-func (f *Followups) store(ctx context.Context, message ids.ID, run RunRow) error {
+func (f *Followups) store(ctx context.Context, message ids.ID, run RunRow, held bool) error {
 	s := f.s
 	if err := f.rows.InsertFollowup(ctx, run.ID, message); err != nil {
 		return err
@@ -161,6 +165,11 @@ func (f *Followups) store(ctx context.Context, message ids.ID, run RunRow) error
 		if err := s.DisableRunComponents(ctx, run.ID); err != nil {
 			return err
 		}
+	}
+	if held {
+		// SR13 item 5: a follow-up of another principal is not delivered into a run with a
+		// computer session; it stays queued and becomes deferred at the run's end.
+		return nil
 	}
 	mode, err := f.mode(ctx, run.AgentID)
 	if err != nil {
@@ -244,10 +253,15 @@ func (f *Followups) ForDelivery(ctx context.Context, runID, messageID ids.ID) (b
 		return false, err
 	}
 	m, err := f.s.d.Messages.TriggerMessageOf(ctx, messageID)
-	if err != nil {
+	if err != nil || m.Deleted {
 		return false, err
 	}
-	return !m.Deleted, nil
+	run, found, err := f.s.d.Repo.Run(ctx, runID)
+	if err != nil || !found {
+		return false, err
+	}
+	held, err := f.s.heldForComputer(ctx, run, m.Author.ID)
+	return !held, err
 }
 
 // RefuseDelivery settles a follow-up whose delivery agent.invoke refused (design note 6): the row
@@ -511,4 +525,15 @@ func (f *Followups) moveRest(ctx context.Context, endedID ids.ID, sum runs.RunSu
 		}
 	}
 	return nil
+}
+
+// heldForComputer reports whether an input of by into run is held back by SR13 item 5 (07, CU-04):
+// the run has a computer session that is not closed and by is not the run's triggered_by. A
+// follow-up held back stays queued (deferred at the run's end); an interaction is refused.
+func (s *Service) heldForComputer(ctx context.Context, run RunRow, by ids.ID) (bool, error) {
+	c := s.computerSessions()
+	if c == nil || run.ID.IsZero() || by == run.TriggeredBy {
+		return false, nil
+	}
+	return c.RunHoldsComputerSession(ctx, run.ID)
 }

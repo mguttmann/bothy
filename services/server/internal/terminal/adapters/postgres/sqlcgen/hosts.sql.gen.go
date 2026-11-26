@@ -13,7 +13,7 @@ import (
 
 const getHost = `-- name: GetHost :one
 
-SELECT id, name, state, platform, assigned_user_id, dev_environment_id, llm_credentials, credential_holder_id, llm_credentials_declared_by, llm_credentials_declared_at, declared_server_host, pairing_code_hash, pairing_expires_at, noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, fingerprint_failures, paired_at, confirmed_by, confirmed_at, reported_profiles, reported_session_users, reported_doctor, reported_is_server_host, reported_require_local_confirm, reported_os_version, reported_host_version, last_seen_at, created_by, created_at, disabled_at, disabled_reason, retired_at, version FROM hosts WHERE id = $1
+SELECT id, name, state, platform, assigned_user_id, dev_environment_id, llm_credentials, credential_holder_id, llm_credentials_declared_by, llm_credentials_declared_at, declared_server_host, pairing_code_hash, pairing_expires_at, noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, fingerprint_failures, paired_at, confirmed_by, confirmed_at, reported_profiles, reported_session_users, reported_doctor, reported_is_server_host, reported_require_local_confirm, reported_os_version, reported_host_version, last_seen_at, created_by, created_at, disabled_at, disabled_reason, retired_at, version, reported_computer, computer_disabled_generation FROM hosts WHERE id = $1
 `
 
 // SPDX-License-Identifier: Apache-2.0
@@ -58,6 +58,8 @@ func (q *Queries) GetHost(ctx context.Context, id pgtype.UUID) (Host, error) {
 		&i.DisabledReason,
 		&i.RetiredAt,
 		&i.Version,
+		&i.ReportedComputer,
+		&i.ComputerDisabledGeneration,
 	)
 	return i, err
 }
@@ -143,7 +145,7 @@ func (q *Queries) ListHostIDsAssignedTo(ctx context.Context, userID pgtype.UUID)
 }
 
 const listHostsPage = `-- name: ListHostsPage :many
-SELECT id, name, state, platform, assigned_user_id, dev_environment_id, llm_credentials, credential_holder_id, llm_credentials_declared_by, llm_credentials_declared_at, declared_server_host, pairing_code_hash, pairing_expires_at, noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, fingerprint_failures, paired_at, confirmed_by, confirmed_at, reported_profiles, reported_session_users, reported_doctor, reported_is_server_host, reported_require_local_confirm, reported_os_version, reported_host_version, last_seen_at, created_by, created_at, disabled_at, disabled_reason, retired_at, version FROM hosts
+SELECT id, name, state, platform, assigned_user_id, dev_environment_id, llm_credentials, credential_holder_id, llm_credentials_declared_by, llm_credentials_declared_at, declared_server_host, pairing_code_hash, pairing_expires_at, noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, fingerprint_failures, paired_at, confirmed_by, confirmed_at, reported_profiles, reported_session_users, reported_doctor, reported_is_server_host, reported_require_local_confirm, reported_os_version, reported_host_version, last_seen_at, created_by, created_at, disabled_at, disabled_reason, retired_at, version, reported_computer, computer_disabled_generation FROM hosts
 WHERE ($1::boolean OR id = ANY ($2::uuid[]))
   AND (lower(name), id) > (lower($3::text), $4::uuid)
 ORDER BY lower(name), id
@@ -212,6 +214,8 @@ func (q *Queries) ListHostsPage(ctx context.Context, arg ListHostsPageParams) ([
 			&i.DisabledReason,
 			&i.RetiredAt,
 			&i.Version,
+			&i.ReportedComputer,
+			&i.ComputerDisabledGeneration,
 		); err != nil {
 			return nil, err
 		}
@@ -224,7 +228,7 @@ func (q *Queries) ListHostsPage(ctx context.Context, arg ListHostsPageParams) ([
 }
 
 const lockHost = `-- name: LockHost :one
-SELECT id, name, state, platform, assigned_user_id, dev_environment_id, llm_credentials, credential_holder_id, llm_credentials_declared_by, llm_credentials_declared_at, declared_server_host, pairing_code_hash, pairing_expires_at, noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, fingerprint_failures, paired_at, confirmed_by, confirmed_at, reported_profiles, reported_session_users, reported_doctor, reported_is_server_host, reported_require_local_confirm, reported_os_version, reported_host_version, last_seen_at, created_by, created_at, disabled_at, disabled_reason, retired_at, version FROM hosts WHERE id = $1 FOR UPDATE
+SELECT id, name, state, platform, assigned_user_id, dev_environment_id, llm_credentials, credential_holder_id, llm_credentials_declared_by, llm_credentials_declared_at, declared_server_host, pairing_code_hash, pairing_expires_at, noise_public_key, auth_public_jwk, auth_jkt, key_fingerprint, key_generation, fingerprint_failures, paired_at, confirmed_by, confirmed_at, reported_profiles, reported_session_users, reported_doctor, reported_is_server_host, reported_require_local_confirm, reported_os_version, reported_host_version, last_seen_at, created_by, created_at, disabled_at, disabled_reason, retired_at, version, reported_computer, computer_disabled_generation FROM hosts WHERE id = $1 FOR UPDATE
 `
 
 // The host row of a write, locked until the end of the unit of work (03 section 6.3).
@@ -268,6 +272,8 @@ func (q *Queries) LockHost(ctx context.Context, id pgtype.UUID) (Host, error) {
 		&i.DisabledReason,
 		&i.RetiredAt,
 		&i.Version,
+		&i.ReportedComputer,
+		&i.ComputerDisabledGeneration,
 	)
 	return i, err
 }

@@ -151,8 +151,11 @@ func TestHostClientFramesValid(t *testing.T) {
 		}
 	}
 	for op := range hostOps {
-		if !ops[op] {
+		switch {
+		case !ops[op] && !hostOpsRecordedLater[op]:
 			t.Errorf("the recording has no %s", op)
+		case ops[op] && hostOpsRecordedLater[op]:
+			t.Errorf("the recording holds %s now; remove it from hostOpsRecordedLater", op)
 		}
 	}
 	k, err := jose.ParseJWK(rec.PublicJWK)

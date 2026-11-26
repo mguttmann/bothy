@@ -59,9 +59,12 @@ const (
 	unitNotification = "{notification}"
 	unitRequest      = "{request}"
 	unitConnection   = "{connection}"
-	unitRun          = "{run}"
-	unitSession      = "{session}"
-	unitFile         = "{file}"
+	// keyComputerDirection is the direction of a message the relay of a computer session
+	// forwarded (CU-04).
+	keyComputerDirection = "bothy.terminal.computer.direction"
+	unitRun              = "{run}"
+	unitSession          = "{session}"
+	unitFile             = "{file}"
 )
 
 // Closed literal sets shared by several instruments.
@@ -671,6 +674,20 @@ var (
 		Name: "bothy.terminal.hosts.connected", Kind: KindUpDownCounter, Unit: "{host}",
 		Description: "Control connections of host services in this process that are usable for sessions.",
 	}
+	// TerminalComputerRelayBytes is bothy.terminal.computer.relay.bytes (4.3a, CU-04): the lengths
+	// of the messages the relay of a computer session forwarded, by direction; never content.
+	TerminalComputerRelayBytes = Spec{
+		Name: "bothy.terminal.computer.relay.bytes", Kind: KindCounter, Unit: "By",
+		Description: "Bytes of Noise messages the relay of computer sessions forwarded, by direction.",
+		Attrs:       []Attr{{Key: keyComputerDirection, Values: []string{"to_host", "to_agent"}}},
+	}
+	// TerminalComputerRelayMessages is bothy.terminal.computer.relay.messages (4.3a, CU-04): the
+	// messages the relay of a computer session forwarded, by direction.
+	TerminalComputerRelayMessages = Spec{
+		Name: "bothy.terminal.computer.relay.messages", Kind: KindCounter, Unit: "{message}",
+		Description: "Noise messages the relay of computer sessions forwarded, by direction.",
+		Attrs:       []Attr{{Key: keyComputerDirection, Values: []string{"to_host", "to_agent"}}},
+	}
 	// SecretsRefreshFailures is bothy.secrets.refresh.failures (4.6, M1-09).
 	SecretsRefreshFailures = Spec{
 		Name: "bothy.secrets.refresh.failures", Kind: KindCounter, Unit: "{refresh}",
@@ -699,5 +716,6 @@ func All() []Spec {
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 		ClientMetricsDiscarded,
 		TerminalRelayUnpaired, TerminalSessionsActive, TerminalSessionsClosed, TerminalHostsConnected,
+		TerminalComputerRelayBytes, TerminalComputerRelayMessages,
 	}, Client()...)
 }

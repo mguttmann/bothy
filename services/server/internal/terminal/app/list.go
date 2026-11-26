@@ -62,9 +62,13 @@ func (s *Service) List(ctx context.Context, a actor.Actor, p terminal.Page) (ter
 	if err != nil {
 		return terminal.HostPage{}, err
 	}
+	owner, err := s.d.People.IsActiveOwner(ctx, a.ID)
+	if err != nil {
+		return terminal.HostPage{}, err
+	}
 	out := terminal.HostPage{Items: make([]terminal.HostView, 0, len(visible))}
 	for _, h := range visible {
-		out.Items = append(out.Items, s.view(ctx, hostState{host: h, users: users[h.ID]}))
+		out.Items = append(out.Items, s.ownerView(ctx, hostState{host: h, users: users[h.ID]}, owner))
 	}
 	if full {
 		last := visible[len(visible)-1]

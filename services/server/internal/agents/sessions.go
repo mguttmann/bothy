@@ -17,6 +17,9 @@ const (
 	EndRebind       = "rebind"
 	EndImport       = "import"
 	EndAgentChanged = "agent_changed"
+	// EndComputerUse ends the session of a thread whose run opened a computer session (27 10.5,
+	// CU-04).
+	EndComputerUse = "computer_use"
 )
 
 // BindFailedSessionMissing is the only value of AgentSessionReport.bind_failed: the bound session
@@ -186,6 +189,18 @@ type Sessions interface {
 	//
 	//	err := sessions.ApplyCostTotals(ctx, []agents.SessionCostTotal{{SessionID: s, AmountMicros: 1500, Currency: "USD"}})
 	ApplyCostTotals(ctx context.Context, totals []SessionCostTotal) error
+	// EndForComputerUse ends the thread's current session with computer_use and appends
+	// agent_session.changed inside the caller's unit of work (27 10.5, CU-04): runs calls it in the
+	// transaction that ends a run that opened a computer session, so the next run of the thread
+	// starts a new session and no screenshot of the ended one is resumed. A thread without a
+	// current session changes nothing. It never opens a unit of work and never authorizes (the run
+	// ended under its own decision).
+	// Errors: internal_error outside a unit of work; the errors of the store.
+	//
+	// Example:
+	//
+	//	err := sessions.EndForComputerUse(ctx, run.ThreadID)
+	EndForComputerUse(ctx context.Context, threadID ids.ID) error
 }
 
 // SessionCostTotal is one input of Sessions.ApplyCostTotals: the valid cost total of a session
