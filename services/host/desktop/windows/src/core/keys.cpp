@@ -26,6 +26,7 @@ constexpr Name kNames[] = {
     {"enter", KeyCode::Return},        {"tab", KeyCode::Tab},
     {"escape", KeyCode::Escape},       {"esc", KeyCode::Escape},
     {"backspace", KeyCode::BackSpace}, {"delete", KeyCode::Delete},
+    {"del", KeyCode::Delete},  // D-CU-02-14: CU-T15 names ctrl+alt+del
     {"insert", KeyCode::Insert},       {"space", KeyCode::Space},
     {"up", KeyCode::Up},               {"down", KeyCode::Down},
     {"left", KeyCode::Left},           {"right", KeyCode::Right},

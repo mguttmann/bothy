@@ -19,6 +19,8 @@ constexpr const char* kInvalid = "invalid_action";
 constexpr const char* kLocked = "screen_locked";
 constexpr const char* kSecure = "secure_desktop";
 constexpr const char* kRefused = "os_refused";
+// Not a code: the channel broke, so nothing is answered (27 9.6 item 2).
+constexpr const char* kSilent = "";
 
 const std::string* member_string(const Value& o, const char* name) {
   const Value* v = o.find(name);
@@ -123,6 +125,10 @@ void Controller::start() {
   session_.reset();
   enablement_ = p_.store.load();
   p_.indicator.set_enabled(enablement_.enabled);
+  if (interrupt_ != nullptr) {
+    interrupt_->set_shown(std::string());
+    interrupt_->clear();
+  }
   lock_ = p_.lock.current();
 }
 
@@ -147,6 +153,7 @@ void Controller::on_connected() {
 }
 
 void Controller::on_channel_broken() {
+  if (interrupt_ != nullptr) interrupt_->clear(Interrupt::Kind::ChannelBroken);
   connected_ = false;
   end_session();
 }
@@ -172,6 +179,7 @@ void Controller::end_session() {
   p_.indicator.hide();
   p_.waker.allow_sleep();
   session_.reset();
+  if (interrupt_ != nullptr) interrupt_->set_shown(std::string());
 }
 
 std::size_t Controller::send_input(const std::vector<InputEvent>& events) {
@@ -209,6 +217,7 @@ void Controller::on_escape() {
 }
 
 void Controller::on_stop_button() {
+  if (interrupt_ != nullptr) interrupt_->clear(Interrupt::Kind::StopButton);
   if (!session_) return;
   std::string id = session_->id;
   end_session();
@@ -251,7 +260,31 @@ LockState Controller::refresh_lock() {
 
 void Controller::on_lock_changed() { refresh_lock(); }
 
+const char* Controller::take_interrupt() {
+  if (interrupt_ == nullptr) return nullptr;
+  switch (interrupt_->take()) {
+    case Interrupt::Kind::None:
+    case Interrupt::Kind::Lock: return nullptr;  // the caller asks the lock monitor next
+    case Interrupt::Kind::Hide:
+    case Interrupt::Kind::Disable:
+      // The frame itself follows in the queue and does the rest (a disable switches off there).
+      if (session_) end_session();
+      return kInvalid;
+    case Interrupt::Kind::ChannelBroken:
+      on_channel_broken();
+      return kSilent;
+    case Interrupt::Kind::StopButton:
+      on_stop_button();
+      return kInvalid;
+    case Interrupt::Kind::Escape:
+      on_escape();
+      return kInvalid;
+  }
+  return nullptr;
+}
+
 const char* Controller::gate() {
+  if (const char* code = take_interrupt()) return code;
   if (!session_) return kInvalid;
   LockState now = refresh_lock();
   if (now.locked) return kLocked;
@@ -303,6 +336,11 @@ bool Controller::handle_show(const Value& o) {
   if (session_ && session_->id == *id && session_->agent_name == *name) return true;
   if (session_ && session_->id != *id) release_pressed();  // the old session's input ends here
   session_ = Session{*id, *name};
+  if (interrupt_ != nullptr) {
+    // A new session starts with no stop pending from an earlier one.
+    interrupt_->clear();
+    interrupt_->set_shown(*id);
+  }
   p_.indicator.show(*name);
   p_.esc_tap.start();
   p_.waker.keep_awake();
@@ -312,6 +350,7 @@ bool Controller::handle_show(const Value& o) {
 bool Controller::handle_hide(const Value& o) {
   const std::string* id = member_string(o, "session_id");
   if (id == nullptr) return false;
+  if (interrupt_ != nullptr) interrupt_->clear(Interrupt::Kind::Hide);
   if (session_ && session_->id == *id) end_session();
   return true;  // a hide for a session that is no longer shown is stale, not an error
 }
@@ -319,9 +358,9 @@ bool Controller::handle_hide(const Value& o) {
 bool Controller::handle_disable(const Value& o) {
   std::optional<std::int64_t> generation = member_int(o, "generation");
   if (!generation) return false;
-  // A disable older than the last local switch-on was overtaken by the person at the machine; the
-  // server keeps the host unlisted by generation anyway (D-CU-01-25).
-  if (*generation < enablement_.generation) return true;
+  if (interrupt_ != nullptr) interrupt_->clear(Interrupt::Kind::Disable);
+  // D-CU-02-14: every disable switches off, whatever its generation; the server's generation keeps
+  // the host unlisted (D-CU-01-25), the helper obeys.
   end_session();
   if (enablement_.enabled) {
     enablement_.enabled = false;
@@ -336,7 +375,7 @@ bool Controller::handle_capture(const Value& o) {
   std::optional<std::int64_t> seq = member_int(o, "seq");
   if (!seq) return false;
   if (const char* refused = gate()) {
-    answer(*seq, refused, AppIdentity{}, session_ ? p_.capturer.screen() : std::nullopt);
+    if (refused != kSilent) answer(*seq, refused, AppIdentity{}, session_ ? p_.capturer.screen() : std::nullopt);
     return true;
   }
   std::optional<ScreenInfo> screen = p_.capturer.screen();
@@ -379,8 +418,9 @@ bool Controller::handle_capture(const Value& o) {
     return true;
   }
   if (!frame_fits(bytes->size(), info_.frame_max_bytes)) {
-    // The host service would close the channel on a longer frame (host_service.computer_frame_max_bytes).
-    answer(*seq, kInvalid, app, screen);
+    // The host service would close the channel on a longer frame
+    // (host_service.computer_frame_max_bytes); D-CU-02-14 answers os_refused, as on macOS.
+    answer(*seq, kRefused, app, screen);
     return true;
   }
   send(Value::object({{"op", "done"},
@@ -400,7 +440,7 @@ bool Controller::handle_position(const Value& o) {
   std::optional<std::int64_t> seq = member_int(o, "seq");
   if (!seq) return false;
   if (const char* refused = gate()) {
-    answer(*seq, refused, AppIdentity{}, session_ ? p_.capturer.screen() : std::nullopt);
+    if (refused != kSilent) answer(*seq, refused, AppIdentity{}, session_ ? p_.capturer.screen() : std::nullopt);
     return true;
   }
   std::optional<Point> at = p_.injector.cursor();
@@ -423,7 +463,7 @@ bool Controller::handle_do(const Value& o) {
   std::optional<std::int64_t> seq = member_int(o, "seq");
   if (!seq) return false;
   if (const char* refused = gate()) {
-    answer(*seq, refused, AppIdentity{}, session_ ? p_.capturer.screen() : std::nullopt);
+    if (refused != kSilent) answer(*seq, refused, AppIdentity{}, session_ ? p_.capturer.screen() : std::nullopt);
     return true;
   }
   const std::string* action = member_string(o, "action");
@@ -444,14 +484,19 @@ bool Controller::handle_do(const Value& o) {
                            : a == "middle_click" ? MouseButton::Middle
                                                  : MouseButton::Left;
       int count = a == "double_click" ? 2 : a == "triple_click" ? 3 : 1;
-      // Modifiers go down before and up after the click (D-CU-02-7).
-      events.push_back(move_event(*at));
-      press(events, *mods);
+      // Modifiers go down before and up after the click (D-CU-02-7). One step per click; the
+      // first carries the move and the modifiers, the last releases them.
       for (int i = 0; i < count; ++i) {
-        events.push_back(button_event(InputEvent::Type::ButtonDown, button));
-        events.push_back(button_event(InputEvent::Type::ButtonUp, button));
+        std::vector<InputEvent> step;
+        if (i == 0) {
+          step.push_back(move_event(*at));
+          press(step, *mods);
+        }
+        step.push_back(button_event(InputEvent::Type::ButtonDown, button));
+        step.push_back(button_event(InputEvent::Type::ButtonUp, button));
+        if (i == count - 1) unpress(step, *mods);
+        steps.push_back(std::move(step));
       }
-      unpress(events, *mods);
     }
   } else if (a == "mouse_move") {
     std::optional<Point> at = member_point(o);
@@ -469,17 +514,24 @@ bool Controller::handle_do(const Value& o) {
       else if (*dir == "left") d = ScrollDirection::Left;
       else if (*dir == "right") d = ScrollDirection::Right;
     }
-    // amount must fit the event; any count of lines the operating system takes is allowed.
-    valid = at && mods && d && amount && *amount >= 1 && *amount <= 0x7FFFFFFF;
+    // A line is one step; computer.scroll_amount_max bounds the count here as on the host (27 9.6).
+    valid = at && mods && d && amount && *amount >= 1 && *amount <= info_.scroll_amount_max;
     if (valid) {
-      events.push_back(move_event(*at));
-      press(events, *mods);
-      InputEvent s;
-      s.type = InputEvent::Type::Scroll;
-      s.direction = *d;
-      s.amount = static_cast<int>(*amount);
-      events.push_back(s);
-      unpress(events, *mods);
+      // One step per line, so an Esc or a lock stops a long scroll between two lines.
+      for (std::int64_t i = 0; i < *amount; ++i) {
+        std::vector<InputEvent> step;
+        if (i == 0) {
+          step.push_back(move_event(*at));
+          press(step, *mods);
+        }
+        InputEvent line;
+        line.type = InputEvent::Type::Scroll;
+        line.direction = *d;
+        line.amount = 1;
+        step.push_back(line);
+        if (i == *amount - 1) unpress(step, *mods);
+        steps.push_back(std::move(step));
+      }
     }
   } else if (a == "type") {
     const std::string* text = member_string(o, "text");
@@ -549,25 +601,24 @@ bool Controller::handle_do(const Value& o) {
     return true;
   }
   const char* code = run_steps(steps);
+  if (code == kSilent) return true;
   answer(*seq, code, session_ ? p_.apps.frontmost() : AppIdentity{}, screen);
   return true;
 }
 
 const char* Controller::run_steps(const std::vector<std::vector<InputEvent>>& steps) {
-  for (std::size_t i = 0; i < steps.size(); ++i) {
-    if (i > 0) {
-      // The person's Esc ends the session in the middle of an action (R-CU-09); the hook raised the
-      // flag on its own thread because this thread is busy here.
-      if (interrupt_ != nullptr && interrupt_->escape_pending()) {
-        on_escape();
-        return kInvalid;  // the session is no longer shown
-      }
-      // A lock or the secure desktop stops the rest; refresh_lock() releases what is held.
-      LockState now = refresh_lock();
-      if (now.locked) return kLocked;
-      if (now.secure_desktop) return kSecure;
+  for (const std::vector<InputEvent>& step : steps) {
+    // Before every step, the first included (27 9.6 item 1): an Esc, the stop button, a hide, a
+    // disable or a broken channel raised on another thread ends the action here, and a lock or the
+    // secure desktop pauses it; both paths release every key and button first.
+    if (const char* code = take_interrupt()) return code;
+    if (!session_) return kInvalid;
+    LockState now = refresh_lock();
+    if (now.locked || now.secure_desktop) {
+      release_pressed();
+      return now.locked ? kLocked : kSecure;
     }
-    if (send_input(steps[i]) < steps[i].size()) return kRefused;
+    if (send_input(step) < step.size()) return kRefused;
   }
   return kOk;
 }

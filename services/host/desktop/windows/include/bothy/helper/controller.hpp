@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -44,23 +45,76 @@ struct HelperInfo {
   /// (27 section 18). The host service enforces the server's value; the helper holds the default as
   /// well, so a faulty host cannot make one action run for long.
   std::int64_t key_repeat_max = 50;
+  /// The highest `amount` of one `scroll`: the default of `computer.scroll_amount_max`
+  /// (27 section 18, 9.6 item 3), held here for the same reason as key_repeat_max.
+  std::int64_t scroll_amount_max = 50;
 };
 
-/// A flag that another thread raises to stop a running action between two of its steps. The Win32
-/// Esc hook runs on its own thread and raises it at once, while the UI thread may still be busy
-/// with a long `key` or `type`; the Controller checks it after every step (R-CU-09: the person's
-/// Esc always ends the session, also in the middle of an action).
+/// The interrupt flag of the stop contract (27 9.6): the Esc tap, the stop button, the lock
+/// monitor and the channel reader raise it on their own threads, and the Controller checks it
+/// before every step of an action, so a stop never waits for an action to finish. When several
+/// kinds are raised, the strongest wins (an Esc over a lock), because it decides the answer.
+///
+/// Example:
+/// @code
+///   Interrupt interrupt;
+///   interrupt.raise_escape();                      // from the keyboard hook thread
+///   Controller c(platform, info, &interrupt);      // c stops the running action at its next step
+/// @endcode
 class Interrupt {
  public:
-  /// Marks a real Esc; safe from any thread.
-  void raise_escape() { escape_.store(true); }
+  /// The kinds, weakest first.
+  enum class Kind : int {
+    None = 0,           ///< nothing pending
+    Lock = 1,           ///< the lock monitor saw a lock or the secure desktop
+    Hide = 2,           ///< the host hid the shown session
+    Disable = 3,        ///< the host switched the enablement off
+    ChannelBroken = 4,  ///< the channel to the host broke
+    StopButton = 5,     ///< the person clicked the stop button
+    Escape = 6,         ///< the person pressed a real Esc
+  };
+
+  /// Raises a kind; safe from any thread. A weaker kind never replaces a stronger pending one.
+  /// @param kind the kind.
+  void raise(Kind kind) {
+    int want = static_cast<int>(kind);
+    int now = kind_.load();
+    while (now < want && !kind_.compare_exchange_weak(now, want)) {
+    }
+  }
+  /// Raises Kind::Escape; safe from any thread.
+  void raise_escape() { raise(Kind::Escape); }
+  /// Raises Kind::Hide when `session_id` is the shown session; a stale hide stops nothing.
+  /// @param session_id the session of the host's `hide`.
+  void raise_hide(const std::string& session_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!shown_.empty() && shown_ == session_id) raise(Kind::Hide);
+  }
+  /// @return the pending kind without clearing it.
+  Kind peek() const { return static_cast<Kind>(kind_.load()); }
+  /// @return the pending kind, and clears it.
+  Kind take() { return static_cast<Kind>(kind_.exchange(0)); }
   /// @return true while a raised Esc has not been handled.
-  bool escape_pending() const { return escape_.load(); }
-  /// Clears the flag; the Controller calls it when it ends the session for the Esc.
-  void clear() { escape_.store(false); }
+  bool escape_pending() const { return peek() == Kind::Escape; }
+  /// Clears every pending kind.
+  void clear() { kind_.store(0); }
+  /// Clears `kind` if it is the pending one; the Controller calls it when it handles that frame.
+  /// @param kind the kind.
+  void clear(Kind kind) {
+    int expected = static_cast<int>(kind);
+    kind_.compare_exchange_strong(expected, 0);
+  }
+  /// Records the shown session for raise_hide(); empty when none (Controller only).
+  /// @param session_id the session.
+  void set_shown(const std::string& session_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    shown_ = session_id;
+  }
 
  private:
-  std::atomic<bool> escape_{false};
+  std::atomic<int> kind_{0};
+  std::mutex mutex_;
+  std::string shown_;
 };
 
 /// The helper's state machine. Not thread-safe: call every method from one thread.
@@ -146,6 +200,7 @@ class Controller {
   bool handle_do(const json::Value& object);
   bool handle_position(const json::Value& object);
   const char* gate();
+  const char* take_interrupt();
 
   Platform p_;
   HelperInfo info_;

@@ -23,3 +23,34 @@ TapDecision EscFilter::decide(const TapEvent& event, bool active) {
 }
 
 }  // namespace bothy::helper
+
+namespace bothy::helper {
+
+std::uint64_t TapGeneration::begin() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  ++generation_;
+  live_ = true;
+  return generation_;
+}
+
+bool TapGeneration::current(std::uint64_t generation) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return live_ && generation == generation_;
+}
+
+bool TapGeneration::end(std::uint64_t generation, const std::function<void()>& teardown) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!live_ || generation != generation_) return false;
+  live_ = false;
+  teardown();
+  return true;
+}
+
+bool TapGeneration::run_if_current(std::uint64_t generation, const std::function<void()>& action) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!live_ || generation != generation_) return false;
+  action();
+  return true;
+}
+
+}  // namespace bothy::helper

@@ -330,7 +330,8 @@ class Parser {
     }
     double d = 0;
     auto r = std::from_chars(first, last, d);
-    if (r.ptr != last || !std::isfinite(d)) return fail("number out of range");
+    // from_chars leaves d unchanged on overflow on some libraries; the error code is what counts.
+    if (r.ec != std::errc() || r.ptr != last || !std::isfinite(d)) return fail("number out of range");
     return Value(d);
   }
 

@@ -193,12 +193,14 @@ CHECK_TEST(disable_switches_off_and_ends_the_session) {
   CHECK(!rig.channel.last().find("enabled")->as_bool());
 }
 
-CHECK_TEST(disable_of_an_older_generation_is_ignored) {
+CHECK_TEST(every_disable_switches_off) {
+  // D-CU-02-14: a disable switches off whatever its generation; the server's generation check
+  // keeps the host unlisted, the helper only obeys.
   Rig rig;
   rig.controller.on_switch_clicked();
   rig.controller.on_switch_clicked();  // generation 2, on
   CHECK(rig.host(Value::object({{"op", "disable"}, {"generation", 1}})));
-  CHECK(rig.controller.enablement() == (EnablementState{true, 2}));
+  CHECK(rig.controller.enablement() == (EnablementState{false, 2}));
 }
 
 CHECK_TEST(release_on_hide_broken_channel_and_start) {
@@ -227,7 +229,7 @@ CHECK_TEST(release_on_hide_broken_channel_and_start) {
   {
     Rig rig(false);
     rig.indicator.shown = true;
-    rig.tap.started = true;
+    rig.tap.start();
     rig.waker.awake = true;
     int before = rig.injector.release_all_calls;
     rig.controller.start();
@@ -255,6 +257,7 @@ CHECK_TEST(shortcuts_pass_unchanged) {
   } rows[] = {
       {"cmd+q", {Key{KeyCode::Cmd, 0}, Key{KeyCode::Character, 'q'}}},
       {"ctrl+alt+Delete", {Key{KeyCode::Ctrl, 0}, Key{KeyCode::Alt, 0}, Key{KeyCode::Delete, 0}}},
+      {"ctrl+alt+del", {Key{KeyCode::Ctrl, 0}, Key{KeyCode::Alt, 0}, Key{KeyCode::Delete, 0}}},
       {"cmd+space", {Key{KeyCode::Cmd, 0}, Key{KeyCode::Space, 0}}},
       {"win+r", {Key{KeyCode::Cmd, 0}, Key{KeyCode::Character, 'r'}}},
       {"F5", {Key{KeyCode::Function, 5}}},
@@ -474,15 +477,17 @@ CHECK_TEST(capture_too_large_for_a_frame_sends_no_image) {
                             rig.indicator, rig.store, channel},
                    info);
   small.start();
-  small.on_switch_clicked();
+  if (!small.enablement().enabled) small.on_switch_clicked();  // the store is shared with rig
+  REQUIRE(small.enablement().enabled);
   small.on_connected();
   Frame show;
   show.object = Value::object({{"op", "show"}, {"session_id", "s"}, {"agent_name", "A"}});
   CHECK(small.on_frame(show));
+  REQUIRE(small.session_shown());
   Frame cap;
   cap.object = capture_frame(1);
   CHECK(small.on_frame(cap));
-  CHECK_EQ(code_of(channel.last()), std::string("invalid_action"));
+  CHECK_EQ(code_of(channel.last()), std::string("os_refused"));  // D-CU-02-14
   CHECK(channel.images.empty());
 }
 
@@ -536,10 +541,13 @@ CHECK_TEST(move_scroll_and_position) {
 
   rig.injector.events.clear();
   CHECK(rig.host(do_frame(2, "scroll", {{"x", 10}, {"y", 20}, {"direction", "down"}, {"amount", 3}})));
-  REQUIRE(rig.injector.events.size() == 2);
-  CHECK(rig.injector.events[1].type == Type::Scroll);
-  CHECK(rig.injector.events[1].direction == ScrollDirection::Down);
-  CHECK_EQ(rig.injector.events[1].amount, 3);
+  // One step per line (27 9.6 item 1).
+  REQUIRE(rig.injector.events.size() == 4);
+  for (std::size_t i = 1; i < 4; ++i) {
+    CHECK(rig.injector.events[i].type == Type::Scroll);
+    CHECK(rig.injector.events[i].direction == ScrollDirection::Down);
+    CHECK_EQ(rig.injector.events[i].amount, 1);
+  }
   CHECK(rig.host(do_frame(3, "scroll", {{"x", 10}, {"y", 20}, {"direction", "sideways"}, {"amount", 3}})));
   CHECK_EQ(code_of(rig.channel.last()), std::string("invalid_action"));
   CHECK(rig.host(do_frame(4, "scroll", {{"x", 10}, {"y", 20}, {"direction", "up"}, {"amount", 0}})));
@@ -679,15 +687,26 @@ CHECK_TEST(repeat_and_text_over_their_caps_are_invalid) {
                             rig.indicator, rig.store, channel},
                    info);
   small.start();
-  small.on_switch_clicked();
+  if (!small.enablement().enabled) small.on_switch_clicked();  // the store is shared with rig
+  REQUIRE(small.enablement().enabled);
   small.on_connected();
   Frame show;
   show.object = Value::object({{"op", "show"}, {"session_id", "s"}, {"agent_name", "A"}});
   CHECK(small.on_frame(show));
+  REQUIRE(small.session_shown());
   rig.injector.events.clear();
   Frame type;
   type.object = do_frame(1, "type", {{"text", std::string(64, 'x')}});
   CHECK(small.on_frame(type));
   CHECK_EQ(code_of(channel.last()), std::string("invalid_action"));
+  CHECK(rig.injector.events.empty());
+}
+
+CHECK_TEST(scroll_amount_over_its_cap_is_invalid) {
+  // computer.scroll_amount_max (27 section 18) bounds amount on the helper too (27 9.6 item 3).
+  Rig rig;
+  rig.show();
+  CHECK(rig.host(do_frame(1, "scroll", {{"x", 1}, {"y", 2}, {"direction", "up"}, {"amount", rig.info.scroll_amount_max + 1}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("invalid_action"));
   CHECK(rig.injector.events.empty());
 }

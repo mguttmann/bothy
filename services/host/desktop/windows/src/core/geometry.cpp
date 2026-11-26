@@ -37,11 +37,10 @@ std::optional<PixelRect> native_rect(const ScreenInfo& screen, const std::option
   double y0 = std::floor(snap((r.y - screen.y) * screen.scale));
   double x1 = std::ceil(snap((r.x + r.width - screen.x) * screen.scale));
   double y1 = std::ceil(snap((r.y + r.height - screen.y) * screen.scale));
-  x0 = std::max(x0, 0.0);
-  y0 = std::max(y0, 0.0);
-  x1 = std::min(x1, static_cast<double>(native_w));
-  y1 = std::min(y1, static_cast<double>(native_h));
-  if (x1 <= x0 || y1 <= y0) return std::nullopt;
+  // D-CU-02-14: the region lies inside the screen, as on macOS; the host maps it from a
+  // screenshot of the same screen, so a region across the edge is a fault of the request.
+  if (x0 < 0 || y0 < 0 || x1 > static_cast<double>(native_w) || y1 > static_cast<double>(native_h))
+    return std::nullopt;
   return PixelRect{static_cast<std::int64_t>(x0), static_cast<std::int64_t>(y0),
                    static_cast<std::int64_t>(x1 - x0), static_cast<std::int64_t>(y1 - y0)};
 }

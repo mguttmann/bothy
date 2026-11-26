@@ -67,8 +67,9 @@ CHECK_TEST(keys_refuse_unknown_names) {
 }
 
 CHECK_TEST(keys_parse_combinations) {
-  auto c = parse_keys("CTRL+Alt+del");
-  CHECK(!c.has_value());  // "del" is no name of D-CU-02-7
+  auto c = parse_keys("CTRL+Alt+del");  // D-CU-02-14: Del is an alias of Delete (CU-T15)
+  REQUIRE(c && c->size() == 3);
+  CHECK((*c)[2] == k(KeyCode::Delete));
   c = parse_keys("ctrl+alt+Delete");
   REQUIRE(c && c->size() == 3);
   CHECK((*c)[2] == k(KeyCode::Delete));
@@ -102,8 +103,9 @@ CHECK_TEST(geometry_native_rect_with_scales_and_origins) {
   r = native_rect(ScreenInfo{0, 0, 1536, 864, 1.25}, Rect{10.1, 10.1, 1, 1});
   REQUIRE(r);
   CHECK(*r == (PixelRect{12, 12, 2, 2}));
-  // Clipped to the screen.
-  r = native_rect(ScreenInfo{0, 0, 100, 100, 1}, Rect{90, 90, 50, 50});
+  // D-CU-02-14: a region must lie inside the screen; one that crosses its edge is refused.
+  CHECK(!native_rect(ScreenInfo{0, 0, 100, 100, 1}, Rect{90, 90, 50, 50}));
+  r = native_rect(ScreenInfo{0, 0, 100, 100, 1}, Rect{90, 90, 10, 10});
   REQUIRE(r);
   CHECK(*r == (PixelRect{90, 90, 10, 10}));
   // Outside, empty or not finite.
@@ -195,6 +197,11 @@ CHECK_TEST(escape_real_is_swallowed_and_stops_injected_passes) {
   CHECK(f.decide({true, true, false, 0}, false) == TapDecision::Pass);
 }
 
+CHECK_TEST(json_refuses_numbers_out_of_range) {
+  CHECK(!bothy::helper::json::parse("1e999").has_value());
+  CHECK(!bothy::helper::json::parse("-1e999").has_value());
+}
+
 CHECK_TEST(utf_conversion) {
   auto u = utf8_to_utf16("a\xC3\xA9\xE4\xB8\x96\xF0\x9F\x98\x80");
   REQUIRE(u);
@@ -228,4 +235,27 @@ CHECK_TEST(pipe_server_rule) {
   // A helper that itself runs as LocalSystem would trust itself; that is refused too.
   CHECK(!pipe_server_allowed("S-1-5-18", "S-1-5-18", service));
   CHECK(!pipe_server_allowed(service, service, service));
+}
+
+CHECK_TEST(escape_filter_reset_forgets_a_held_escape) {
+  EscFilter f(kInjectedMarker);
+  CHECK(f.decide({true, true, false, 0}, true) == TapDecision::SwallowAndStop);
+  CHECK(f.holding());
+  f.reset();  // the tap starts again for a new session
+  CHECK(!f.holding());
+  CHECK(f.decide({true, true, false, 0}, true) == TapDecision::SwallowAndStop);
+}
+
+CHECK_TEST(tap_generation_lets_only_the_current_tap_end) {
+  TapGeneration g;
+  std::uint64_t first = g.begin();
+  std::uint64_t second = g.begin();
+  int ended = 0;
+  CHECK(!g.end(first, [&] { ++ended; }));  // a late teardown of the older tap
+  CHECK_EQ(ended, 0);
+  CHECK(g.current(second));
+  CHECK(!g.current(first));
+  CHECK(g.end(second, [&] { ++ended; }));
+  CHECK_EQ(ended, 1);
+  CHECK(!g.current(second));  // ended: no tap is current
 }

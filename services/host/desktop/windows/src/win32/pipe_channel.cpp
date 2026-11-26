@@ -5,6 +5,7 @@
 
 #include "win32.hpp"  // first: windows.h must precede the other Windows headers
 
+#include <aclapi.h>
 #include <sddl.h>
 
 #include <memory>
@@ -58,9 +59,28 @@ std::string account_sid(const wchar_t* name) {
   return out;
 }
 
+std::string pipe_owner_sid(HANDLE pipe) {
+  PSID owner = nullptr;
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  if (GetSecurityInfo(pipe, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr,
+                      nullptr, &sd) != ERROR_SUCCESS)
+    return {};
+  std::string out;
+  LPWSTR text = nullptr;
+  if (owner != nullptr && ConvertSidToStringSidW(owner, &text)) {
+    out = to_utf8(text);
+    LocalFree(text);
+  }
+  LocalFree(sd);
+  return out;
+}
+
 }  // namespace
 
 bool pipe_server_trusted(HANDLE pipe) {
+  // Services run in session 0, a person's processes never do.
+  ULONG session = 0;
+  if (!GetNamedPipeServerSessionId(pipe, &session) || session != 0) return false;
   ULONG pid = 0;
   if (!GetNamedPipeServerProcessId(pipe, &pid) || pid == 0) return false;
   std::string server;
@@ -69,13 +89,22 @@ bool pipe_server_trusted(HANDLE pipe) {
     server = process_user_sid(process);
     CloseHandle(process);
   }
+  // A standard user may not open the token of a service process. The owner of the pipe object
+  // comes from the creating token, and no user process can make it LocalSystem or the service
+  // account; the host service sets it explicitly when it creates the pipe.
+  if (server.empty()) server = pipe_owner_sid(pipe);
   // Empty strings (nothing could be opened or looked up) refuse in the rule itself.
   return pipe_server_allowed(server, process_user_sid(GetCurrentProcess()),
                              account_sid(L"NT SERVICE\\bothy-host"));
 }
 
-PipeChannel::PipeChannel(HWND window, std::wstring pipe_name, bool check_server, std::uint64_t frame_max)
-    : window_(window), pipe_name_(std::move(pipe_name)), check_server_(check_server), frame_max_(frame_max) {
+PipeChannel::PipeChannel(HWND window, std::wstring pipe_name, bool check_server, std::uint64_t frame_max,
+                         Interrupt* interrupt)
+    : window_(window),
+      pipe_name_(std::move(pipe_name)),
+      check_server_(check_server),
+      frame_max_(frame_max),
+      interrupt_(interrupt) {
   quit_event_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 }
 
@@ -194,7 +223,20 @@ void PipeChannel::run() {
       if (!GetOverlappedResult(h, &ov, &got, FALSE) || got == 0) break;
       std::vector<Frame> frames;
       CodecError e = reader.feed(buf.data(), got, frames);
-      for (Frame& f : frames) push(Event{Event::Kind::Frame, std::move(f), id});
+      for (Frame& f : frames) {
+        // hide and disable stop a running action at once (27 9.6 item 1); the frame itself still
+        // goes to the UI thread, which does the rest.
+        if (interrupt_ != nullptr && f.type == kFrameObject) {
+          const json::Value* op = f.object.find("op");
+          const json::Value* sid = f.object.find("session_id");
+          if (op != nullptr && op->is_string() && op->as_string() == "hide" && sid != nullptr &&
+              sid->is_string())
+            interrupt_->raise_hide(sid->as_string());
+          if (op != nullptr && op->is_string() && op->as_string() == "disable")
+            interrupt_->raise(Interrupt::Kind::Disable);
+        }
+        push(Event{Event::Kind::Frame, std::move(f), id});
+      }
       if (e != CodecError::None) break;  // a longer or malformed frame ends the connection (D-CU-02-8)
     }
     if (ov.hEvent != nullptr) CloseHandle(ov.hEvent);
@@ -203,6 +245,7 @@ void PipeChannel::run() {
       pipe_ = INVALID_HANDLE_VALUE;
     }
     CloseHandle(h);
+    if (interrupt_ != nullptr) interrupt_->raise(Interrupt::Kind::ChannelBroken);
     push(Event{Event::Kind::Broken, Frame{}, id});
   }
 }

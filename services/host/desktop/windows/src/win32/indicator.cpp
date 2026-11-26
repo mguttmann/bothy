@@ -38,9 +38,35 @@ int scaled(int px96, UINT dpi) { return MulDiv(px96, static_cast<int>(dpi), 96);
 
 }  // namespace
 
-Win32Indicator::Win32Indicator(HINSTANCE instance, HWND window, std::function<void()> on_stop,
-                               std::function<void()> on_switch)
-    : instance_(instance), window_(window), on_stop_(std::move(on_stop)), on_switch_(std::move(on_switch)) {
+Win32Indicator::Win32Indicator(HINSTANCE instance, HWND window, Interrupt* interrupt,
+                               std::function<void()> on_stop, std::function<void()> on_switch)
+    : instance_(instance),
+      window_(window),
+      interrupt_(interrupt),
+      on_stop_(std::move(on_stop)),
+      on_switch_(std::move(on_switch)) {
+  thread_ = std::thread([this] { run_windows(); });
+  // The windows must exist before show() can place them.
+  while (!ready_.load()) Sleep(0);
+  taskbar_created_ = RegisterWindowMessageW(L"TaskbarCreated");
+  add_tray();
+}
+
+Win32Indicator::~Win32Indicator() {
+  NOTIFYICONDATAW nid{};
+  nid.cbSize = sizeof nid;
+  nid.hWnd = window_;
+  nid.uID = kTrayId;
+  Shell_NotifyIconW(NIM_DELETE, &nid);
+  // The windows belong to the indicator thread and go with it.
+  PostThreadMessageW(thread_id_.load(), WM_QUIT, 0, 0);
+  if (thread_.joinable()) thread_.join();
+}
+
+void Win32Indicator::run_windows() {
+  MSG msg;
+  PeekMessageW(&msg, nullptr, WM_USER, WM_USER, PM_NOREMOVE);  // creates the queue
+  thread_id_ = GetCurrentThreadId();
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof wc;
   wc.lpfnWndProc = border_proc;
@@ -60,7 +86,8 @@ Win32Indicator::Win32Indicator(HINSTANCE instance, HWND window, std::function<vo
                             kBorderClass, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance_, this);
   if (border_ != nullptr) {
     SetLayeredWindowAttributes(border_, kColorKey, 255, LWA_COLORKEY);
-    SetWindowDisplayAffinity(border_, WDA_EXCLUDEFROMCAPTURE);
+    if (!SetWindowDisplayAffinity(border_, WDA_EXCLUDEFROMCAPTURE))
+      OutputDebugStringW(L"bothy-computer-helper: the border cannot be excluded from capture\n");
   }
   button_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kButtonClass, L"",
                             WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance_, this);
@@ -68,20 +95,14 @@ Win32Indicator::Win32Indicator(HINSTANCE instance, HWND window, std::function<vo
     CreateWindowExW(0, L"BUTTON", L"Stop the agent (Esc)", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0,
                     0, 0, button_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kStopButtonId)),
                     instance_, nullptr);
-    SetWindowDisplayAffinity(button_, WDA_EXCLUDEFROMCAPTURE);
+    if (!SetWindowDisplayAffinity(button_, WDA_EXCLUDEFROMCAPTURE))
+      OutputDebugStringW(L"bothy-computer-helper: the stop button cannot be excluded from capture\n");
   }
-  taskbar_created_ = RegisterWindowMessageW(L"TaskbarCreated");
-  add_tray();
-}
-
-Win32Indicator::~Win32Indicator() {
-  NOTIFYICONDATAW nid{};
-  nid.cbSize = sizeof nid;
-  nid.hWnd = window_;
-  nid.uID = kTrayId;
-  Shell_NotifyIconW(NIM_DELETE, &nid);
-  if (button_ != nullptr) DestroyWindow(button_);
-  if (border_ != nullptr) DestroyWindow(border_);
+  ready_ = true;
+  while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    TranslateMessage(&msg);
+    DispatchMessageW(&msg);
+  }
 }
 
 void Win32Indicator::add_tray() {
@@ -122,8 +143,9 @@ void Win32Indicator::place() {
   UINT dpi = border_ != nullptr ? GetDpiForWindow(border_) : 96;
   if (dpi == 0) dpi = 96;
   if (border_ != nullptr) {
+    // Asynchronous: the windows belong to the indicator thread, and the UI thread must not wait.
     SetWindowPos(border_, HWND_TOPMOST, r.left, r.top, r.right - r.left, r.bottom - r.top,
-                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
     InvalidateRect(border_, nullptr, TRUE);
   }
   if (button_ != nullptr) {
@@ -131,9 +153,12 @@ void Win32Indicator::place() {
     int h = scaled(kButtonHeight96, dpi);
     int b = scaled(kBorderWidth96, dpi);
     int x = r.left + (r.right - r.left - w) / 2;
-    SetWindowPos(button_, HWND_TOPMOST, x, r.top + b, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    SetWindowPos(button_, HWND_TOPMOST, x, r.top + b, w, h,
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
     HWND child = GetDlgItem(button_, kStopButtonId);
-    if (child != nullptr) SetWindowPos(child, nullptr, b / 2, b / 2, w - b, h - b, SWP_NOZORDER | SWP_NOACTIVATE);
+    if (child != nullptr)
+      SetWindowPos(child, nullptr, b / 2, b / 2, w - b, h - b,
+                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
   }
 }
 
@@ -147,8 +172,8 @@ void Win32Indicator::show(const std::string& agent_name) {
 void Win32Indicator::hide() {
   shown_ = false;
   agent_.clear();
-  if (border_ != nullptr) ShowWindow(border_, SW_HIDE);
-  if (button_ != nullptr) ShowWindow(button_, SW_HIDE);
+  if (border_ != nullptr) ShowWindowAsync(border_, SW_HIDE);
+  if (button_ != nullptr) ShowWindowAsync(button_, SW_HIDE);
   update_tray_text();
 }
 
@@ -223,7 +248,12 @@ LRESULT CALLBACK Win32Indicator::button_proc(HWND hwnd, UINT msg, WPARAM wp, LPA
   if (msg == WM_MOUSEACTIVATE) return MA_NOACTIVATE;  // a click must not steal the agent's focus
   if (msg == WM_COMMAND && LOWORD(wp) == kStopButtonId && HIWORD(wp) == BN_CLICKED) {
     auto* self = reinterpret_cast<Win32Indicator*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-    if (self != nullptr && self->shown_) self->on_stop_();
+    if (self != nullptr && self->shown_) {
+      // Runs on the indicator thread: raise the interrupt for a running action, then let the UI
+      // thread end the session (it checks the flag, so a stop it already handled is not repeated).
+      if (self->interrupt_ != nullptr) self->interrupt_->raise(Interrupt::Kind::StopButton);
+      PostMessageW(self->window_, kMsgStop, 0, 0);
+    }
     return 0;
   }
   return DefWindowProcW(hwnd, msg, wp, lp);

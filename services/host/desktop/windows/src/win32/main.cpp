@@ -27,9 +27,9 @@ struct App {
   App(HINSTANCE instance, HWND window, const std::wstring& pipe, bool check_server, HelperInfo info)
       : lock(window, [this] { controller.on_lock_changed(); }),
         esc_tap(window, &interrupt),
-        indicator(instance, window, [this] { controller.on_stop_button(); },
+        indicator(instance, window, &interrupt, [this] { controller.on_stop_button(); },
                   [this] { controller.on_switch_clicked(); }),
-        channel(window, pipe, check_server, info.frame_max_bytes),
+        channel(window, pipe, check_server, info.frame_max_bytes, &interrupt),
         controller(Platform{capturer, injector, apps, lock, waker, esc_tap, indicator, store, channel},
                    info, &interrupt) {}
 
@@ -55,7 +55,10 @@ struct App {
           break;
         case PipeChannel::Event::Kind::Frame:
           // Frames of an earlier connection arrive after its break; they belong to nobody now.
-          if (e.connection == connection && !controller.on_frame(e.frame)) channel.close();
+          if (e.connection == connection && !controller.on_frame(e.frame)) {
+            channel.close();
+            connection = 0;  // the rest of this connection's frames are dropped
+          }
           break;
         case PipeChannel::Event::Kind::Broken:
           if (e.connection == connection) {
@@ -72,8 +75,14 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
   auto* app = reinterpret_cast<App*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (app != nullptr) {
     LRESULT result = 0;
+    // The flag tells whether the stop is still open: a running action may have handled it already,
+    // and a later session must not end for an earlier Esc or click.
     if (msg == kMsgEscape) {
-      app->controller.on_escape();
+      if (app->interrupt.escape_pending()) app->controller.on_escape();
+      return 0;
+    }
+    if (msg == kMsgStop) {
+      if (app->interrupt.peek() == Interrupt::Kind::StopButton) app->controller.on_stop_button();
       return 0;
     }
     if (msg == kMsgChannel) {

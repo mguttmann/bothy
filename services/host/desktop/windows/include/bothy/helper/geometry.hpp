@@ -23,11 +23,11 @@ struct PixelSize {
 
 /// The native pixels of a screen, or of a region of it for `zoom`.
 /// @param screen the screen (origin and size in screen space, `scale` pixels per unit).
-/// @param region an optional region in screen space; it is clipped to the screen, and its edges are
-///        widened to whole pixels so that nothing the agent asked for is cut off.
+/// @param region an optional region in screen space; its edges are widened to whole pixels so that
+///        nothing the agent asked for is cut off.
 /// @return the pixel rectangle relative to the screen's native image, or std::nullopt when the
 ///         screen is empty, the region has no positive size, a value is not finite, or the region
-///         lies outside the screen.
+///         does not lie inside the screen (D-CU-02-14).
 /// Example: a 1512 x 982 screen at scale 2 yields {0, 0, 3024, 1964}.
 std::optional<PixelRect> native_rect(const ScreenInfo& screen, const std::optional<Rect>& region);
 

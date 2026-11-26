@@ -7,6 +7,8 @@
 /// out of the Win32 hook so the rule is tested without a desktop (CU-T14).
 
 #include <cstdint>
+#include <functional>
+#include <mutex>
 
 namespace bothy::helper {
 
@@ -51,9 +53,52 @@ class EscFilter {
   ///         keyboard may stop the session, and injected text must never stop anything (R-CU-09).
   TapDecision decide(const TapEvent& event, bool active);
 
+  /// Forgets a held Esc. The tap calls it whenever it starts, so an Esc held during an earlier
+  /// session can never make the first real Esc of a new one look like auto-repeat (27 9.6 item 4).
+  void reset() { holding_ = false; }
+
+  /// @return true while a swallowed Esc is still held (its release not seen yet).
+  bool holding() const { return holding_; }
+
  private:
   std::uintptr_t marker_;
   bool holding_ = false;
+};
+
+/// The generation of the Esc tap (27 9.6 item 5): every start raises it, and the callback or the
+/// teardown of a tap acts only while its generation is the current one, checked and done under one
+/// lock. So the late teardown of an older tap (a queued removal, a callback that fires after the
+/// next start) never removes the tap of the next session.
+///
+/// Example:
+/// @code
+///   TapGeneration g;
+///   auto mine = g.begin();
+///   g.end(mine, [&] { /* remove the hook */ });   // runs only if no newer start came
+/// @endcode
+class TapGeneration {
+ public:
+  /// Starts a new generation; safe from any thread.
+  /// @return the new generation (never 0).
+  std::uint64_t begin();
+  /// @param generation a generation from begin().
+  /// @return true while it is current (started and not ended).
+  bool current(std::uint64_t generation);
+  /// Ends `generation` and runs `teardown` under the lock, but only if it is current.
+  /// @param generation the generation to end.
+  /// @param teardown what removing the tap means for the platform.
+  /// @return true when it was current and `teardown` ran.
+  bool end(std::uint64_t generation, const std::function<void()>& teardown);
+  /// Runs `action` under the lock if `generation` is current (a tap callback).
+  /// @param generation the callback's generation.
+  /// @param action what the callback does.
+  /// @return true when it ran.
+  bool run_if_current(std::uint64_t generation, const std::function<void()>& action);
+
+ private:
+  std::mutex mutex_;
+  std::uint64_t generation_ = 0;
+  bool live_ = false;
 };
 
 }  // namespace bothy::helper

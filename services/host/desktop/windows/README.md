@@ -31,20 +31,26 @@ Every platform call sits behind one interface of `platform.hpp` (brief CU-02 ite
 | `AppInspector` | foreground window, process, executable name, version resource, Authenticode signer (embedded or catalog) |
 | `LockMonitor` | `WTSRegisterSessionNotification`, `GUID_CONSOLE_DISPLAY_STATE`, the screen saver, `OpenInputDesktop` for the secure desktop |
 | `Waker` | `SetThreadExecutionState(ES_CONTINUOUS \| ES_DISPLAY_REQUIRED)` |
-| `EscTap` | `WH_KEYBOARD_LL` hook on its own thread; a real Esc (no `LLKHF_INJECTED`, no marker) is swallowed and ends the session |
-| `Indicator` | click-through topmost border in `#FF6A00` and a stop button, both with `WDA_EXCLUDEFROMCAPTURE`; tray icon with the menu "Allow computer control" |
+| `EscTap` | `WH_KEYBOARD_LL` hook on its own thread; a real Esc (no `LLKHF_INJECTED`, no marker) is swallowed and ends the session; the hook carries the tap generation (27 9.6 item 5) |
+| `Indicator` | click-through topmost border in `#FF6A00` and a stop button, both with `WDA_EXCLUDEFROMCAPTURE` and on their own thread; tray icon with the menu "Allow computer control" |
 | `EnablementStore` | `%LOCALAPPDATA%\bothy-computer-helper\state.json`, written atomically |
 | `HostChannel` | named pipe client of `\\.\pipe\bothy-host-computer` with reconnect and the server check of D-CU-02-5 |
 
-The pipe server must run as LocalSystem or `NT SERVICE\bothy-host` and never as the helper's own
-user; a server process whose token cannot be read is refused (`trust.hpp`). A development build
+The pipe server must run in session 0, and its account must be exactly LocalSystem or
+`NT SERVICE\bothy-host` and never the helper's own user (`trust.hpp`). The account comes from the
+server process's token; a standard user may not open a service's token, so then the owner of the
+pipe object decides, which the host service sets to its own account when it creates the pipe and
+which no user process can set to either account. Anything that cannot be read refuses. A development build
 (no verified signature) takes another pipe name from `BOTHY_COMPUTER_HELPER_CHANNEL`, for example
 `\\.\pipe\bothy-ci-1234`, and skips that check; a verified build ignores the variable.
 
-A long action runs step by step: between two steps the `Controller` checks the Esc flag that the
-keyboard hook raises from its own thread and asks the lock monitor again, so an Esc or a lock stops
-it at once and nothing stays pressed. `repeat` is bounded by the default of
-`computer.key_repeat_max`, a `type` text by `host_service.computer_frame_max_bytes`.
+The stop contract of 27 9.6 holds for every action: it runs one step at a time (a press of a
+combination, a character, a line of scroll, a click), and before every step, the first included,
+the `Controller` checks the `Interrupt` flag and asks the lock monitor again. The keyboard hook,
+the stop button and the pipe reader (`hide`, `disable`, a broken channel) raise the flag on their
+own threads, so a stop never waits for an action to finish and nothing stays pressed. `repeat`,
+a scroll `amount` and a `type` text are bounded by the defaults of `computer.key_repeat_max` and
+`computer.scroll_amount_max` and by `host_service.computer_frame_max_bytes`.
 
 ## Build
 
@@ -80,7 +86,9 @@ They read every vector of `services/host/testdata/computer/channel-vectors.json`
 CMake as `CHANNEL_VECTORS_PATH`) and drive the `Controller` against the fakes of `test/fakes.hpp`:
 enablement and generation, show and hide, real and injected Esc (CU-T14), the shortcut table
 (CU-T15), release on every end, lock and secure desktop gating, scaling and the `screen` member,
-`invalid_action` for unknown names and actions outside a session. Run one test with
+`invalid_action` for unknown names and actions outside a session. Every case of the shared stop
+contract vectors `services/host/testdata/computer/stop-vectors.json` (path passed as
+`STOP_VECTORS_PATH`) runs against the `Controller` too. Run one test with
 `helper_core_tests <name>`, list them with `helper_core_tests --list`. The native behaviour on a
 real desktop is checked by the CI jobs of `host-platform.yml`, not here.
 

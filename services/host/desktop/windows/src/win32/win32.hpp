@@ -32,6 +32,7 @@ enum : UINT {
   kMsgEscape = WM_APP + 1,   ///< the Esc tap saw a real Esc (posted by the hook thread)
   kMsgChannel = WM_APP + 2,  ///< the pipe channel has events in its queue (posted by its thread)
   kMsgTray = WM_APP + 3,     ///< the tray icon's callback message
+  kMsgStop = WM_APP + 4,     ///< the stop button was clicked (posted by the indicator thread)
 };
 
 /// Converts UTF-8 to UTF-16 for Win32; invalid input yields an empty string.
@@ -177,20 +178,28 @@ class Win32EscTap final : public EscTap {
   std::thread thread_;
   std::atomic<DWORD> thread_id_{0};
   std::atomic<bool> active_{false};
-  EscFilter filter_{kInjectedMarker};
+  EscFilter filter_{kInjectedMarker};  // used on the hook thread only
   HHOOK hook_ = nullptr;
+  TapGeneration generations_;          // 27 9.6 item 5: only the current tap acts or ends
+  std::atomic<std::uint64_t> started_generation_{0};  // set by start(), read by stop()
+  std::uint64_t hook_generation_ = 0;  // hook thread only: the start the hook serves
+  std::uint64_t remove_pending_ = 0;   // hook thread only: end this generation once Esc is up
 };
 
 /// Indicator: a click-through, topmost, layered border window in the indicator color with a
 /// separate stop button window, both excluded from capture with WDA_EXCLUDEFROMCAPTURE; and the
 /// tray icon with its text and its menu ("Allow computer control", "Stop the agent").
+/// The border and the stop button live on their own thread with their own message loop, so a
+/// click on the stop button raises the interrupt while the UI thread is busy with an action
+/// (27 9.6 item 1); the tray stays on the UI thread, whose menu cannot open during an action.
 class Win32Indicator final : public Indicator {
  public:
   /// @param instance the module instance.
-  /// @param window the main window that receives the tray messages.
-  /// @param on_stop called when the person clicks the stop button or the tray's stop item.
+  /// @param window the main window that receives the tray messages and kMsgStop.
+  /// @param interrupt raised with Kind::StopButton by a click on the stop button.
+  /// @param on_stop called on the UI thread when the person picks the tray's stop item.
   /// @param on_switch called when the person clicks "Allow computer control".
-  Win32Indicator(HINSTANCE instance, HWND window, std::function<void()> on_stop,
+  Win32Indicator(HINSTANCE instance, HWND window, Interrupt* interrupt, std::function<void()> on_stop,
                  std::function<void()> on_switch);
   ~Win32Indicator() override;
   Win32Indicator(const Win32Indicator&) = delete;
@@ -208,6 +217,7 @@ class Win32Indicator final : public Indicator {
  private:
   static LRESULT CALLBACK border_proc(HWND, UINT, WPARAM, LPARAM);
   static LRESULT CALLBACK button_proc(HWND, UINT, WPARAM, LPARAM);
+  void run_windows();
   void add_tray();
   void update_tray_text();
   void place();
@@ -215,12 +225,16 @@ class Win32Indicator final : public Indicator {
 
   HINSTANCE instance_;
   HWND window_;
+  Interrupt* interrupt_;
   std::function<void()> on_stop_;
   std::function<void()> on_switch_;
-  HWND border_ = nullptr;
-  HWND button_ = nullptr;
+  std::thread thread_;
+  std::atomic<DWORD> thread_id_{0};
+  std::atomic<bool> ready_{false};
+  HWND border_ = nullptr;  // written by the indicator thread before ready_
+  HWND button_ = nullptr;  // written by the indicator thread before ready_
   UINT taskbar_created_ = 0;
-  bool shown_ = false;
+  std::atomic<bool> shown_{false};
   bool enabled_ = false;
   std::wstring agent_;
 };
@@ -252,7 +266,10 @@ class PipeChannel final : public HostChannel {
   /// @param pipe_name the pipe to connect to.
   /// @param check_server false only for a development build with BOTHY_COMPUTER_HELPER_CHANNEL.
   /// @param frame_max `host_service.computer_frame_max_bytes`.
-  PipeChannel(HWND window, std::wstring pipe_name, bool check_server, std::uint64_t frame_max);
+  /// @param interrupt raised by the reader thread for a `hide` of the shown session, a `disable`
+  ///        and a broken channel, so a running action stops at its next step (27 9.6 item 1).
+  PipeChannel(HWND window, std::wstring pipe_name, bool check_server, std::uint64_t frame_max,
+              Interrupt* interrupt);
   ~PipeChannel() override;
   PipeChannel(const PipeChannel&) = delete;
   PipeChannel& operator=(const PipeChannel&) = delete;
@@ -277,6 +294,7 @@ class PipeChannel final : public HostChannel {
   std::wstring pipe_name_;
   bool check_server_;
   std::uint64_t frame_max_;
+  Interrupt* interrupt_;
   std::thread thread_;
   std::atomic<bool> quit_{false};
   HANDLE quit_event_ = nullptr;
@@ -286,9 +304,12 @@ class PipeChannel final : public HostChannel {
   std::deque<Event> queue_;
 };
 
-/// Checks that the server end of a connected pipe belongs to the host service (D-CU-02-5): the
-/// user of the server process's token is exactly LocalSystem or `NT SERVICE\bothy-host` and not the
-/// helper's own user (pipe_server_allowed()). A process or token that cannot be opened refuses.
+/// Checks that the server end of a connected pipe belongs to the host service (D-CU-02-5). The
+/// server must run in session 0 (services only), and its account, read from the server process's
+/// token or, when a standard user may not open that token, from the owner of the pipe object, must
+/// be exactly LocalSystem or `NT SERVICE\bothy-host` and not the helper's own user
+/// (pipe_server_allowed()). A user process cannot create a pipe owned by either account. Anything
+/// that cannot be read refuses.
 /// @param pipe the connected pipe.
 /// @return true when the server is the host service.
 bool pipe_server_trusted(HANDLE pipe);

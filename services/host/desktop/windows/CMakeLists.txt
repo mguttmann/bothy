@@ -48,6 +48,7 @@ if(HELPER_BUILD_TESTS)
     test/test_codec.cpp
     test/test_small.cpp
     test/test_controller.cpp
+    test/test_stop_vectors.cpp
   )
   add_executable(helper_core_tests test/main.cpp ${HELPER_TEST_SOURCES})
   target_link_libraries(helper_core_tests PRIVATE helper_core)
@@ -55,7 +56,10 @@ if(HELPER_BUILD_TESTS)
   # The shared vectors of the channel (CU-01); every codec of the channel must read them.
   get_filename_component(HELPER_VECTORS
     "${CMAKE_CURRENT_SOURCE_DIR}/../../testdata/computer/channel-vectors.json" ABSOLUTE)
-  target_compile_definitions(helper_core_tests PRIVATE CHANNEL_VECTORS_PATH="${HELPER_VECTORS}")
+  get_filename_component(HELPER_STOP_VECTORS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../testdata/computer/stop-vectors.json" ABSOLUTE)
+  target_compile_definitions(helper_core_tests PRIVATE CHANNEL_VECTORS_PATH="${HELPER_VECTORS}"
+    STOP_VECTORS_PATH="${HELPER_STOP_VECTORS}")
 
   # One CTest test per CHECK_TEST, read from the sources, so a new test needs no CMake edit.
   foreach(source IN LISTS HELPER_TEST_SOURCES)

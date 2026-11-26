@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "bothy/helper/controller.hpp"
+#include "bothy/helper/escape.hpp"
 #include "bothy/helper/platform.hpp"
 
 namespace fakes {
@@ -37,6 +38,7 @@ struct FakeCapturer : Capturer {
 /// Injector that records every event and tracks what is held.
 struct FakeInjector : Injector {
   std::vector<InputEvent> events;     ///< every event accepted, in order
+  std::vector<std::vector<InputEvent>> batches;  ///< every send() call's accepted events
   std::optional<std::size_t> partial_once;  ///< the next send() accepts only this many events
   int sends = 0;                            ///< calls of send()
   std::function<void(int)> after_send;      ///< called with the call count after each send()
@@ -60,6 +62,7 @@ struct FakeInjector : Injector {
       events.push_back(e);
       ++n;
     }
+    batches.emplace_back(batch.begin(), batch.begin() + static_cast<std::ptrdiff_t>(n));
     ++sends;
     if (after_send) after_send(sends);
     return n;
@@ -129,9 +132,21 @@ struct FakeWaker : Waker {
 
 /// EscTap that records whether it is started.
 struct FakeTap : EscTap {
-  bool started = false;  ///< the tap
-  void start() override { started = true; }
-  void stop() override { started = false; }
+  bool started = false;           ///< the tap
+  EscFilter* filter = nullptr;    ///< the filter the tap resets when it starts (27 9.6 item 4)
+  TapGeneration generations;      ///< the generation rule of 27 9.6 item 5
+  std::uint64_t generation = 0;   ///< the generation of the last start
+  void start() override {
+    generation = generations.begin();
+    started = true;
+    if (filter != nullptr) filter->reset();
+  }
+  void stop() override { teardown(generation); }
+  /// The teardown of tap generation `g`; only the current generation may remove the tap.
+  /// @param g the generation whose teardown runs.
+  void teardown(std::uint64_t g) {
+    generations.end(g, [this] { started = false; });
+  }
 };
 
 /// Indicator that records what it shows.
@@ -201,7 +216,16 @@ struct Rig {
 
   /// Starts the controller, enables it by a click when asked, connects and clears the frames.
   /// @param enable switch on before connecting.
-  explicit Rig(bool enable = true) {
+  explicit Rig(bool enable = true) { init(enable); }
+
+  /// As Rig(bool) with other helper facts (frame limit, repeat cap).
+  /// @param enable switch on before connecting.
+  /// @param custom the facts.
+  Rig(bool enable, const HelperInfo& custom) : info(custom) { init(enable); }
+
+  /// Starts, enables when asked, connects and clears the frames.
+  /// @param enable switch on before connecting.
+  void init(bool enable) {
     controller.start();
     if (enable) controller.on_switch_clicked();
     controller.on_connected();

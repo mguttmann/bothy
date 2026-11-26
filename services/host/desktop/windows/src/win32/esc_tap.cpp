@@ -29,13 +29,15 @@ Win32EscTap::~Win32EscTap() {
 }
 
 void Win32EscTap::start() {
+  std::uint64_t g = generations_.begin();
+  started_generation_ = g;
   active_ = true;
-  PostThreadMessageW(thread_id_.load(), kInstall, 0, 0);
+  PostThreadMessageW(thread_id_.load(), kInstall, static_cast<WPARAM>(g), 0);
 }
 
 void Win32EscTap::stop() {
   active_ = false;
-  PostThreadMessageW(thread_id_.load(), kRemove, 0, 0);
+  PostThreadMessageW(thread_id_.load(), kRemove, static_cast<WPARAM>(started_generation_.load()), 0);
 }
 
 void Win32EscTap::run() {
@@ -43,11 +45,29 @@ void Win32EscTap::run() {
   PeekMessageW(&msg, nullptr, WM_USER, WM_USER, PM_NOREMOVE);  // creates the queue
   thread_id_ = GetCurrentThreadId();
   while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
-    if (msg.message == kInstall && hook_ == nullptr) {
-      hook_ = SetWindowsHookExW(WH_KEYBOARD_LL, hook_proc, GetModuleHandleW(nullptr), 0);
-    } else if (msg.message == kRemove && hook_ != nullptr && !active_) {
-      UnhookWindowsHookEx(hook_);
-      hook_ = nullptr;
+    auto g = static_cast<std::uint64_t>(msg.wParam);
+    if (msg.message == kInstall) {
+      // A new session: its first real Esc must stop it, whatever an earlier one held (27 9.6 item 4).
+      generations_.run_if_current(g, [this, g] {
+        filter_.reset();
+        remove_pending_ = 0;
+        hook_generation_ = g;
+        if (hook_ == nullptr) hook_ = SetWindowsHookExW(WH_KEYBOARD_LL, hook_proc, GetModuleHandleW(nullptr), 0);
+      });
+    } else if (msg.message == kRemove) {
+      if (filter_.holding() && generations_.current(g)) {
+        // The Esc that stopped is still down: keep the hook until its release, so its auto-repeat
+        // and key up are swallowed and reach no app (27 9.6 item 4).
+        remove_pending_ = g;
+      } else {
+        // Only the teardown of the current generation removes the hook; a late one of an older
+        // tap finds a newer start and leaves the hook of the next session in place (item 5).
+        generations_.end(g, [this] {
+          if (hook_ != nullptr) UnhookWindowsHookEx(hook_);
+          hook_ = nullptr;
+          remove_pending_ = 0;
+        });
+      }
     }
   }
   if (hook_ != nullptr) UnhookWindowsHookEx(hook_);
@@ -64,11 +84,18 @@ LRESULT CALLBACK Win32EscTap::hook_proc(int code, WPARAM wp, LPARAM lp) {
     e.extra_info = static_cast<std::uintptr_t>(k->dwExtraInfo);
     TapDecision d = g_tap->filter_.decide(e, g_tap->active_.load());
     if (d == TapDecision::SwallowAndStop) {
-      // The hook only raises the flag; the UI thread ends the session, so the hook returns at once.
-      g_tap->active_ = false;
-      if (g_tap->interrupt_ != nullptr) g_tap->interrupt_->raise_escape();
-      PostMessageW(g_tap->window_, kMsgEscape, 0, 0);
+      // Only the tap of the current session stops it; the hook raises the flag and returns at
+      // once, and the UI thread ends the session.
+      Win32EscTap* tap = g_tap;
+      bool fired = tap->generations_.run_if_current(tap->hook_generation_, [tap] {
+        tap->active_ = false;
+        if (tap->interrupt_ != nullptr) tap->interrupt_->raise_escape();
+        PostMessageW(tap->window_, kMsgEscape, 0, 0);
+      });
+      if (!fired) d = TapDecision::Pass;  // a stale hook decides nothing
     }
+    if (g_tap->remove_pending_ != 0 && !g_tap->filter_.holding())
+      PostThreadMessageW(g_tap->thread_id_.load(), kRemove, static_cast<WPARAM>(g_tap->remove_pending_), 0);
     if (d != TapDecision::Pass) return 1;
   }
   return CallNextHookEx(nullptr, code, wp, lp);
