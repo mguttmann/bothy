@@ -565,7 +565,7 @@ func interactionFacts(f *authorize.InteractionFacts) *domain.InteractionFacts {
 	}
 	return &domain.InteractionFacts{Stage: f.Stage, OwnerKind: f.OwnerKind, ComponentState: f.ComponentState, ExpiresAt: f.ExpiresAt,
 		RequiredCapability: f.RequiredCapability, RestrictedTo: f.RestrictedTo, ComponentRunID: f.ComponentRunID,
-		ComponentRunActive: f.ComponentRunActive, RunStarterID: f.RunStarterID}
+		ComponentRunActive: f.ComponentRunActive, RunStarterID: f.RunStarterID, ComputerHeld: f.ComputerHeld}
 }
 
 // invocationFacts converts the token facts of run.start and run.token.renew (M2-09).

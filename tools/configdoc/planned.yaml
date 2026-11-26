@@ -9,8 +9,6 @@
 rules:
   - match: auth.require_key_attestation  # V3-09
     milestone: V3
-  - match: "computer."  # CU-04 (server keys of computer use, docs/spec/27-computer-use.md section 18)
-    milestone: CU
   - match: "dev."  # V2-01, V2-04
     milestone: V2
   - match: "file."  # V3-31 (scan alert), V3-32 (presigned upload, poster, libvips)

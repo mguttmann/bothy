@@ -8,6 +8,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ComputerSession struct {
+	ID            pgtype.UUID
+	HostID        pgtype.UUID
+	UserID        pgtype.UUID
+	AgentID       pgtype.UUID
+	RunID         pgtype.UUID
+	State         string
+	PauseReason   pgtype.Text
+	TokenJti      pgtype.UUID
+	Generation    int32
+	KeyGeneration int32
+	AttachedAt    pgtype.Timestamptz
+	OpenedAt      pgtype.Timestamptz
+	StartedAt     pgtype.Timestamptz
+	PausedAt      pgtype.Timestamptz
+	PausedMs      int64
+	ClosedAt      pgtype.Timestamptz
+	StoppedBy     pgtype.UUID
+	CloseReason   pgtype.Text
+	CloseDetail   pgtype.Text
+	ActionCount   int32
+	FrontApp      pgtype.Text
+	Version       int64
+}
+
 type Host struct {
 	ID                          pgtype.UUID
 	Name                        string
@@ -45,6 +70,8 @@ type Host struct {
 	DisabledReason              pgtype.Text
 	RetiredAt                   pgtype.Timestamptz
 	Version                     int64
+	ReportedComputer            []byte
+	ComputerDisabledGeneration  pgtype.Int4
 }
 
 type HostSessionUser struct {

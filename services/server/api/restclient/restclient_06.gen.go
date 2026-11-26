@@ -13,6 +13,907 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ApplyImportBatchWithBodyWithResponse Write a batch of imported objects
+//
+// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/batches (the `ApplyImportBatch` operationId).
+func (c *ClientWithResponses) ApplyImportBatchWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApplyImportBatchResponse, error) {
+	rsp, err := c.ApplyImportBatchWithBody(ctx, importId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApplyImportBatchResponse(rsp)
+}
+
+// ApplyImportBatchWithResponse Write a batch of imported objects
+//
+// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/batches (the `ApplyImportBatch` operationId).
+func (c *ClientWithResponses) ApplyImportBatchWithResponse(ctx context.Context, importId ImportIdPath, body ApplyImportBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*ApplyImportBatchResponse, error) {
+	rsp, err := c.ApplyImportBatch(ctx, importId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApplyImportBatchResponse(rsp)
+}
+
+// CancelImportWithResponse Cancel an import
+//
+// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/cancel (the `CancelImport` operationId).
+func (c *ClientWithResponses) CancelImportWithResponse(ctx context.Context, importId ImportIdPath, params *CancelImportParams, reqEditors ...RequestEditorFn) (*CancelImportResponse, error) {
+	rsp, err := c.CancelImport(ctx, importId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelImportResponse(rsp)
+}
+
+// CompleteImportWithResponse Complete an import
+//
+// When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived space), whose lead can no longer change.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/complete (the `CompleteImport` operationId).
+func (c *ClientWithResponses) CompleteImportWithResponse(ctx context.Context, importId ImportIdPath, params *CompleteImportParams, reqEditors ...RequestEditorFn) (*CompleteImportResponse, error) {
+	rsp, err := c.CompleteImport(ctx, importId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteImportResponse(rsp)
+}
+
+// SetImportCursorWithBodyWithResponse Advance the import cursor
+//
+// Only after a successful batch (22, 7.3).
+// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /imports/{import_id}/cursor (the `SetImportCursor` operationId).
+func (c *ClientWithResponses) SetImportCursorWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetImportCursorResponse, error) {
+	rsp, err := c.SetImportCursorWithBody(ctx, importId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetImportCursorResponse(rsp)
+}
+
+// SetImportCursorWithResponse Advance the import cursor
+//
+// Only after a successful batch (22, 7.3).
+// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /imports/{import_id}/cursor (the `SetImportCursor` operationId).
+func (c *ClientWithResponses) SetImportCursorWithResponse(ctx context.Context, importId ImportIdPath, body SetImportCursorJSONRequestBody, reqEditors ...RequestEditorFn) (*SetImportCursorResponse, error) {
+	rsp, err := c.SetImportCursor(ctx, importId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetImportCursorResponse(rsp)
+}
+
+// CreateImportFileWithBodyWithResponse Reserve an imported file
+//
+// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
+func (c *ClientWithResponses) CreateImportFileWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateImportFileResponse, error) {
+	rsp, err := c.CreateImportFileWithBody(ctx, importId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateImportFileResponse(rsp)
+}
+
+// CreateImportFileWithResponse Reserve an imported file
+//
+// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
+func (c *ClientWithResponses) CreateImportFileWithResponse(ctx context.Context, importId ImportIdPath, body CreateImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateImportFileResponse, error) {
+	rsp, err := c.CreateImportFile(ctx, importId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateImportFileResponse(rsp)
+}
+
+// CompleteImportFileWithBodyWithResponse Finish the upload of an imported file
+//
+// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+func (c *ClientWithResponses) CompleteImportFileWithBodyWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteImportFileResponse, error) {
+	rsp, err := c.CompleteImportFileWithBody(ctx, importId, fileId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteImportFileResponse(rsp)
+}
+
+// CompleteImportFileWithResponse Finish the upload of an imported file
+//
+// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
+func (c *ClientWithResponses) CompleteImportFileWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, body CompleteImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteImportFileResponse, error) {
+	rsp, err := c.CompleteImportFile(ctx, importId, fileId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteImportFileResponse(rsp)
+}
+
+// UploadImportFilePartWithBodyWithResponse Upload one part of an imported file
+//
+// One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /imports/{import_id}/files/{file_id}/parts/{part_number} (the `UploadImportFilePart` operationId).
+func (c *ClientWithResponses) UploadImportFilePartWithBodyWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params *UploadImportFilePartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadImportFilePartResponse, error) {
+	rsp, err := c.UploadImportFilePartWithBody(ctx, importId, fileId, partNumber, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadImportFilePartResponse(rsp)
+}
+
+// ListImportItemsWithResponse List imported items
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /imports/{import_id}/items (the `ListImportItems` operationId).
+func (c *ClientWithResponses) ListImportItemsWithResponse(ctx context.Context, importId ImportIdPath, params *ListImportItemsParams, reqEditors ...RequestEditorFn) (*ListImportItemsResponse, error) {
+	rsp, err := c.ListImportItems(ctx, importId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListImportItemsResponse(rsp)
+}
+
+// SetImportLeadWithBodyWithResponse Set the leading side of a channel
+//
+// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /imports/{import_id}/leads (the `SetImportLead` operationId).
+func (c *ClientWithResponses) SetImportLeadWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetImportLeadResponse, error) {
+	rsp, err := c.SetImportLeadWithBody(ctx, importId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetImportLeadResponse(rsp)
+}
+
+// SetImportLeadWithResponse Set the leading side of a channel
+//
+// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /imports/{import_id}/leads (the `SetImportLead` operationId).
+func (c *ClientWithResponses) SetImportLeadWithResponse(ctx context.Context, importId ImportIdPath, body SetImportLeadJSONRequestBody, reqEditors ...RequestEditorFn) (*SetImportLeadResponse, error) {
+	rsp, err := c.SetImportLead(ctx, importId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetImportLeadResponse(rsp)
+}
+
+// PauseImportWithResponse Pause an import
+//
+// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
+func (c *ClientWithResponses) PauseImportWithResponse(ctx context.Context, importId ImportIdPath, params *PauseImportParams, reqEditors ...RequestEditorFn) (*PauseImportResponse, error) {
+	rsp, err := c.PauseImport(ctx, importId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePauseImportResponse(rsp)
+}
+
+// StartImportWithResponse Start or continue an import
+//
+// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /imports/{import_id}/start (the `StartImport` operationId).
+func (c *ClientWithResponses) StartImportWithResponse(ctx context.Context, importId ImportIdPath, params *StartImportParams, reqEditors ...RequestEditorFn) (*StartImportResponse, error) {
+	rsp, err := c.StartImport(ctx, importId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartImportResponse(rsp)
+}
+
+// RevokeIncomingWebhookWithResponse Revoke an incoming webhook
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /incoming-webhooks/{webhook_id} (the `RevokeIncomingWebhook` operationId).
+func (c *ClientWithResponses) RevokeIncomingWebhookWithResponse(ctx context.Context, webhookId WebhookIdPath, reqEditors ...RequestEditorFn) (*RevokeIncomingWebhookResponse, error) {
+	rsp, err := c.RevokeIncomingWebhook(ctx, webhookId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeIncomingWebhookResponse(rsp)
+}
+
+// GetInstanceWithResponse Instance settings for clients
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance (the `GetInstance` operationId).
+func (c *ClientWithResponses) GetInstanceWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInstanceResponse, error) {
+	rsp, err := c.GetInstance(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetInstanceResponse(rsp)
+}
+
+// SetAllAgentsBillingModeWithBodyWithResponse Switch the backend policy of all agents
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/agent-billing-mode (the `SetAllAgentsBillingMode` operationId).
+func (c *ClientWithResponses) SetAllAgentsBillingModeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAllAgentsBillingModeResponse, error) {
+	rsp, err := c.SetAllAgentsBillingModeWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAllAgentsBillingModeResponse(rsp)
+}
+
+// SetAllAgentsBillingModeWithResponse Switch the backend policy of all agents
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/agent-billing-mode (the `SetAllAgentsBillingMode` operationId).
+func (c *ClientWithResponses) SetAllAgentsBillingModeWithResponse(ctx context.Context, body SetAllAgentsBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAllAgentsBillingModeResponse, error) {
+	rsp, err := c.SetAllAgentsBillingMode(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAllAgentsBillingModeResponse(rsp)
+}
+
+// UpdateBrandingWithBodyWithResponse Change branding
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/branding (the `UpdateBranding` operationId).
+func (c *ClientWithResponses) UpdateBrandingWithBodyWithResponse(ctx context.Context, params *UpdateBrandingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBrandingResponse, error) {
+	rsp, err := c.UpdateBrandingWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBrandingResponse(rsp)
+}
+
+// UpdateBrandingWithResponse Change branding
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/branding (the `UpdateBranding` operationId).
+func (c *ClientWithResponses) UpdateBrandingWithResponse(ctx context.Context, params *UpdateBrandingParams, body UpdateBrandingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBrandingResponse, error) {
+	rsp, err := c.UpdateBranding(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBrandingResponse(rsp)
+}
+
+// DeleteBrandingLogoWithResponse Remove the logo
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /instance/branding/logo (the `DeleteBrandingLogo` operationId).
+func (c *ClientWithResponses) DeleteBrandingLogoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteBrandingLogoResponse, error) {
+	rsp, err := c.DeleteBrandingLogo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBrandingLogoResponse(rsp)
+}
+
+// GetBrandingLogoWithResponse Download the instance logo
+//
+// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
+func (c *ClientWithResponses) GetBrandingLogoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetBrandingLogoResponse, error) {
+	rsp, err := c.GetBrandingLogo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBrandingLogoResponse(rsp)
+}
+
+// UploadBrandingLogoWithBodyWithResponse Upload the logo
+//
+// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/branding/logo (the `UploadBrandingLogo` operationId).
+func (c *ClientWithResponses) UploadBrandingLogoWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBrandingLogoResponse, error) {
+	rsp, err := c.UploadBrandingLogoWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadBrandingLogoResponse(rsp)
+}
+
+// GetDiscoveryWithResponse Public instance metadata
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/discovery (the `GetDiscovery` operationId).
+func (c *ClientWithResponses) GetDiscoveryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDiscoveryResponse, error) {
+	rsp, err := c.GetDiscovery(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDiscoveryResponse(rsp)
+}
+
+// GetJwksWithResponse Public keys for access and invocation tokens
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/jwks (the `GetJwks` operationId).
+func (c *ClientWithResponses) GetJwksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetJwksResponse, error) {
+	rsp, err := c.GetJwks(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetJwksResponse(rsp)
+}
+
+// ListInstanceSettingsWithResponse List all instance settings
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/settings (the `ListInstanceSettings` operationId).
+func (c *ClientWithResponses) ListInstanceSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInstanceSettingsResponse, error) {
+	rsp, err := c.ListInstanceSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListInstanceSettingsResponse(rsp)
+}
+
+// PutInstanceSettingWithBodyWithResponse Set an instance setting
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/settings/{key} (the `PutInstanceSetting` operationId).
+func (c *ClientWithResponses) PutInstanceSettingWithBodyWithResponse(ctx context.Context, key KeyPath, params *PutInstanceSettingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutInstanceSettingResponse, error) {
+	rsp, err := c.PutInstanceSettingWithBody(ctx, key, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutInstanceSettingResponse(rsp)
+}
+
+// PutInstanceSettingWithResponse Set an instance setting
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/settings/{key} (the `PutInstanceSetting` operationId).
+func (c *ClientWithResponses) PutInstanceSettingWithResponse(ctx context.Context, key KeyPath, params *PutInstanceSettingParams, body PutInstanceSettingJSONRequestBody, reqEditors ...RequestEditorFn) (*PutInstanceSettingResponse, error) {
+	rsp, err := c.PutInstanceSetting(ctx, key, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutInstanceSettingResponse(rsp)
+}
+
+// GetWebhookKeysWithResponse Public keys for webhook signatures
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/webhook-keys (the `GetWebhookKeys` operationId).
+func (c *ClientWithResponses) GetWebhookKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetWebhookKeysResponse, error) {
+	rsp, err := c.GetWebhookKeys(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetWebhookKeysResponse(rsp)
+}
+
+// RespondToInteractionWithBodyWithResponse Acknowledge or answer an interaction
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /interactions/{interaction_id}/respond (the `RespondToInteraction` operationId).
+func (c *ClientWithResponses) RespondToInteractionWithBodyWithResponse(ctx context.Context, interactionId InteractionIdPath, params *RespondToInteractionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RespondToInteractionResponse, error) {
+	rsp, err := c.RespondToInteractionWithBody(ctx, interactionId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRespondToInteractionResponse(rsp)
+}
+
+// RespondToInteractionWithResponse Acknowledge or answer an interaction
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /interactions/{interaction_id}/respond (the `RespondToInteraction` operationId).
+func (c *ClientWithResponses) RespondToInteractionWithResponse(ctx context.Context, interactionId InteractionIdPath, params *RespondToInteractionParams, body RespondToInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*RespondToInteractionResponse, error) {
+	rsp, err := c.RespondToInteraction(ctx, interactionId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRespondToInteractionResponse(rsp)
+}
+
+// GetMeWithResponse Read the calling principal
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me (the `GetMe` operationId).
+func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error) {
+	rsp, err := c.GetMe(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMeResponse(rsp)
+}
+
+// DeleteMyAvatarWithResponse Remove own avatar
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/avatar (the `DeleteMyAvatar` operationId).
+func (c *ClientWithResponses) DeleteMyAvatarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteMyAvatarResponse, error) {
+	rsp, err := c.DeleteMyAvatar(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteMyAvatarResponse(rsp)
+}
+
+// SetMyAvatarWithBodyWithResponse Upload own avatar
+//
+// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/avatar (the `SetMyAvatar` operationId).
+func (c *ClientWithResponses) SetMyAvatarWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMyAvatarResponse, error) {
+	rsp, err := c.SetMyAvatarWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetMyAvatarResponse(rsp)
+}
+
+// GetMyCredentialsWithResponse List own identities and passkeys
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/credentials (the `GetMyCredentials` operationId).
+func (c *ClientWithResponses) GetMyCredentialsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMyCredentialsResponse, error) {
+	rsp, err := c.GetMyCredentials(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMyCredentialsResponse(rsp)
+}
+
+// ListMyDevicesWithResponse List own devices
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/devices (the `ListMyDevices` operationId).
+func (c *ClientWithResponses) ListMyDevicesWithResponse(ctx context.Context, params *ListMyDevicesParams, reqEditors ...RequestEditorFn) (*ListMyDevicesResponse, error) {
+	rsp, err := c.ListMyDevices(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyDevicesResponse(rsp)
+}
+
+// RegisterPushWithBodyWithResponse Register a push target for the current device
+//
+// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
+func (c *ClientWithResponses) RegisterPushWithBodyWithResponse(ctx context.Context, params *RegisterPushParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterPushResponse, error) {
+	rsp, err := c.RegisterPushWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegisterPushResponse(rsp)
+}
+
+// RegisterPushWithResponse Register a push target for the current device
+//
+// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
+func (c *ClientWithResponses) RegisterPushWithResponse(ctx context.Context, params *RegisterPushParams, body RegisterPushJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterPushResponse, error) {
+	rsp, err := c.RegisterPush(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegisterPushResponse(rsp)
+}
+
+// ApprovePairingWithBodyWithResponse Approve a device pairing with its code
+//
+// Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/devices/pairings (the `ApprovePairing` operationId).
+func (c *ClientWithResponses) ApprovePairingWithBodyWithResponse(ctx context.Context, params *ApprovePairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApprovePairingResponse, error) {
+	rsp, err := c.ApprovePairingWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApprovePairingResponse(rsp)
+}
+
+// ApprovePairingWithResponse Approve a device pairing with its code
+//
+// Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/devices/pairings (the `ApprovePairing` operationId).
+func (c *ClientWithResponses) ApprovePairingWithResponse(ctx context.Context, params *ApprovePairingParams, body ApprovePairingJSONRequestBody, reqEditors ...RequestEditorFn) (*ApprovePairingResponse, error) {
+	rsp, err := c.ApprovePairing(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApprovePairingResponse(rsp)
+}
+
+// ListMyDmsWithResponse List own direct message channels
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/dms (the `ListMyDms` operationId).
+func (c *ClientWithResponses) ListMyDmsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyDmsResponse, error) {
+	rsp, err := c.ListMyDms(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyDmsResponse(rsp)
+}
+
+// ListMyDraftsWithResponse List own drafts
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/drafts (the `ListMyDrafts` operationId).
+func (c *ClientWithResponses) ListMyDraftsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyDraftsResponse, error) {
+	rsp, err := c.ListMyDrafts(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyDraftsResponse(rsp)
+}
+
+// BeginIdentityLinkWithBodyWithResponse Start linking another identity
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/identities/begin (the `BeginIdentityLink` operationId).
+func (c *ClientWithResponses) BeginIdentityLinkWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BeginIdentityLinkResponse, error) {
+	rsp, err := c.BeginIdentityLinkWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBeginIdentityLinkResponse(rsp)
+}
+
+// BeginIdentityLinkWithResponse Start linking another identity
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/identities/begin (the `BeginIdentityLink` operationId).
+func (c *ClientWithResponses) BeginIdentityLinkWithResponse(ctx context.Context, body BeginIdentityLinkJSONRequestBody, reqEditors ...RequestEditorFn) (*BeginIdentityLinkResponse, error) {
+	rsp, err := c.BeginIdentityLink(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBeginIdentityLinkResponse(rsp)
+}
+
+// CompleteIdentityLinkWithBodyWithResponse Finish linking another identity
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/identities/complete (the `CompleteIdentityLink` operationId).
+func (c *ClientWithResponses) CompleteIdentityLinkWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteIdentityLinkResponse, error) {
+	rsp, err := c.CompleteIdentityLinkWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteIdentityLinkResponse(rsp)
+}
+
+// CompleteIdentityLinkWithResponse Finish linking another identity
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/identities/complete (the `CompleteIdentityLink` operationId).
+func (c *ClientWithResponses) CompleteIdentityLinkWithResponse(ctx context.Context, body CompleteIdentityLinkJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteIdentityLinkResponse, error) {
+	rsp, err := c.CompleteIdentityLink(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteIdentityLinkResponse(rsp)
+}
+
+// SetMyLocalCredentialWithBodyWithResponse Set local password and enroll TOTP
+//
+// Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/local-credential (the `SetMyLocalCredential` operationId).
+func (c *ClientWithResponses) SetMyLocalCredentialWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMyLocalCredentialResponse, error) {
+	rsp, err := c.SetMyLocalCredentialWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetMyLocalCredentialResponse(rsp)
+}
+
+// SetMyLocalCredentialWithResponse Set local password and enroll TOTP
+//
+// Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/local-credential (the `SetMyLocalCredential` operationId).
+func (c *ClientWithResponses) SetMyLocalCredentialWithResponse(ctx context.Context, body SetMyLocalCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMyLocalCredentialResponse, error) {
+	rsp, err := c.SetMyLocalCredential(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetMyLocalCredentialResponse(rsp)
+}
+
+// ListMyMentionsWithResponse List own mentions
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/mentions (the `ListMyMentions` operationId).
+func (c *ClientWithResponses) ListMyMentionsWithResponse(ctx context.Context, params *ListMyMentionsParams, reqEditors ...RequestEditorFn) (*ListMyMentionsResponse, error) {
+	rsp, err := c.ListMyMentions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyMentionsResponse(rsp)
+}
+
+// ListMyNotificationPreferencesWithResponse List notification levels
+//
+// The caller's own levels, ordered by target kind, then target id. Only targets the caller can still read are listed; rows on targets the caller lost stay stored and appear again when the right returns.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/notification-preferences (the `ListMyNotificationPreferences` operationId).
+func (c *ClientWithResponses) ListMyNotificationPreferencesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyNotificationPreferencesResponse, error) {
+	rsp, err := c.ListMyNotificationPreferences(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyNotificationPreferencesResponse(rsp)
+}
+
+// DeleteNotificationPreferenceWithResponse Inherit the notification level again
+//
+// Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is stored (then without event); deleting stays possible on an archived target. A later put starts again at version 1.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/notification-preferences/{target_kind}/{target_id} (the `DeleteNotificationPreference` operationId).
+func (c *ClientWithResponses) DeleteNotificationPreferenceWithResponse(ctx context.Context, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath, reqEditors ...RequestEditorFn) (*DeleteNotificationPreferenceResponse, error) {
+	rsp, err := c.DeleteNotificationPreference(ctx, targetKind, targetId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteNotificationPreferenceResponse(rsp)
+}
+
+// PutNotificationPreferenceWithBodyWithResponse Set the notification level of a target
+//
+// Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/notification-preferences/{target_kind}/{target_id} (the `PutNotificationPreference` operationId).
+func (c *ClientWithResponses) PutNotificationPreferenceWithBodyWithResponse(ctx context.Context, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutNotificationPreferenceResponse, error) {
+	rsp, err := c.PutNotificationPreferenceWithBody(ctx, targetKind, targetId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutNotificationPreferenceResponse(rsp)
+}
+
+// PutNotificationPreferenceWithResponse Set the notification level of a target
+//
+// Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/notification-preferences/{target_kind}/{target_id} (the `PutNotificationPreference` operationId).
+func (c *ClientWithResponses) PutNotificationPreferenceWithResponse(ctx context.Context, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, body PutNotificationPreferenceJSONRequestBody, reqEditors ...RequestEditorFn) (*PutNotificationPreferenceResponse, error) {
+	rsp, err := c.PutNotificationPreference(ctx, targetKind, targetId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutNotificationPreferenceResponse(rsp)
+}
+
+// BeginPasskeyRegistrationWithResponse Start registering a passkey
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/passkeys/begin (the `BeginPasskeyRegistration` operationId).
+func (c *ClientWithResponses) BeginPasskeyRegistrationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*BeginPasskeyRegistrationResponse, error) {
+	rsp, err := c.BeginPasskeyRegistration(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBeginPasskeyRegistrationResponse(rsp)
+}
+
+// CompletePasskeyRegistrationWithBodyWithResponse Finish registering a passkey
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/passkeys/complete (the `CompletePasskeyRegistration` operationId).
+func (c *ClientWithResponses) CompletePasskeyRegistrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompletePasskeyRegistrationResponse, error) {
+	rsp, err := c.CompletePasskeyRegistrationWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompletePasskeyRegistrationResponse(rsp)
+}
+
+// CompletePasskeyRegistrationWithResponse Finish registering a passkey
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/passkeys/complete (the `CompletePasskeyRegistration` operationId).
+func (c *ClientWithResponses) CompletePasskeyRegistrationWithResponse(ctx context.Context, body CompletePasskeyRegistrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CompletePasskeyRegistrationResponse, error) {
+	rsp, err := c.CompletePasskeyRegistration(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompletePasskeyRegistrationResponse(rsp)
+}
+
+// UpdateMyProfileWithBodyWithResponse Change own profile
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /me/profile (the `UpdateMyProfile` operationId).
+func (c *ClientWithResponses) UpdateMyProfileWithBodyWithResponse(ctx context.Context, params *UpdateMyProfileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMyProfileResponse, error) {
+	rsp, err := c.UpdateMyProfileWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMyProfileResponse(rsp)
+}
+
+// UpdateMyProfileWithResponse Change own profile
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /me/profile (the `UpdateMyProfile` operationId).
+func (c *ClientWithResponses) UpdateMyProfileWithResponse(ctx context.Context, params *UpdateMyProfileParams, body UpdateMyProfileJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMyProfileResponse, error) {
+	rsp, err := c.UpdateMyProfile(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMyProfileResponse(rsp)
+}
+
+// ListMyQuietHoursWithResponse List quiet hours
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/quiet-hours (the `ListMyQuietHours` operationId).
+func (c *ClientWithResponses) ListMyQuietHoursWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyQuietHoursResponse, error) {
+	rsp, err := c.ListMyQuietHours(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyQuietHoursResponse(rsp)
+}
+
+// CreateQuietHoursRuleWithBodyWithResponse Add a quiet hours rule
+//
+// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/quiet-hours (the `CreateQuietHoursRule` operationId).
+func (c *ClientWithResponses) CreateQuietHoursRuleWithBodyWithResponse(ctx context.Context, params *CreateQuietHoursRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateQuietHoursRuleResponse, error) {
+	rsp, err := c.CreateQuietHoursRuleWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateQuietHoursRuleResponse(rsp)
+}
+
+// CreateQuietHoursRuleWithResponse Add a quiet hours rule
+//
+// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/quiet-hours (the `CreateQuietHoursRule` operationId).
+func (c *ClientWithResponses) CreateQuietHoursRuleWithResponse(ctx context.Context, params *CreateQuietHoursRuleParams, body CreateQuietHoursRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateQuietHoursRuleResponse, error) {
+	rsp, err := c.CreateQuietHoursRule(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateQuietHoursRuleResponse(rsp)
+}
+
+// DeleteQuietHoursRuleWithResponse Delete a quiet hours rule
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/quiet-hours/{rule_id} (the `DeleteQuietHoursRule` operationId).
+func (c *ClientWithResponses) DeleteQuietHoursRuleWithResponse(ctx context.Context, ruleId RuleIdPath, reqEditors ...RequestEditorFn) (*DeleteQuietHoursRuleResponse, error) {
+	rsp, err := c.DeleteQuietHoursRule(ctx, ruleId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteQuietHoursRuleResponse(rsp)
+}
+
 // PutQuietHoursRuleWithBodyWithResponse Change a quiet hours rule
 //
 // Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
@@ -20660,1282 +21561,6 @@ func ParseRestoreChannelResponse(rsp *http.Response) (*RestoreChannelResponse, e
 		response.Headers429 = &headers
 	case true:
 		var headers RestoreChannelResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseListForumTagsResponse parses an HTTP response from a ListForumTagsWithResponse call
-func ParseListForumTagsResponse(rsp *http.Response) (*ListForumTagsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListForumTagsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ForumTagList
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers ListForumTagsResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers ListForumTagsResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers ListForumTagsResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers ListForumTagsResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers ListForumTagsResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 429:
-		var headers ListForumTagsResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers ListForumTagsResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseCreateForumTagResponse parses an HTTP response from a CreateForumTagWithResponse call
-func ParseCreateForumTagResponse(rsp *http.Response) (*CreateForumTagResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateForumTagResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest ForumTag
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON422 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 201:
-		var headers CreateForumTagResponse201Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers201 = &headers
-	case rsp.StatusCode == 400:
-		var headers CreateForumTagResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers CreateForumTagResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers CreateForumTagResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers CreateForumTagResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers CreateForumTagResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 422:
-		var headers CreateForumTagResponse422Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers422 = &headers
-	case rsp.StatusCode == 429:
-		var headers CreateForumTagResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers CreateForumTagResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseDeleteForumTagResponse parses an HTTP response from a DeleteForumTagWithResponse call
-func ParseDeleteForumTagResponse(rsp *http.Response) (*DeleteForumTagResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteForumTagResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case rsp.StatusCode == 204:
-		break // No content-type
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 204:
-		var headers DeleteForumTagResponse204Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers204 = &headers
-	case rsp.StatusCode == 400:
-		var headers DeleteForumTagResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers DeleteForumTagResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers DeleteForumTagResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers DeleteForumTagResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 429:
-		var headers DeleteForumTagResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers DeleteForumTagResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseUpdateForumTagResponse parses an HTTP response from a UpdateForumTagWithResponse call
-func ParseUpdateForumTagResponse(rsp *http.Response) (*UpdateForumTagResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdateForumTagResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ForumTag
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON422 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers UpdateForumTagResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers UpdateForumTagResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers UpdateForumTagResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers UpdateForumTagResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers UpdateForumTagResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers UpdateForumTagResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 422:
-		var headers UpdateForumTagResponse422Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers422 = &headers
-	case rsp.StatusCode == 429:
-		var headers UpdateForumTagResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers UpdateForumTagResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseMoveForumTagResponse parses an HTTP response from a MoveForumTagWithResponse call
-func ParseMoveForumTagResponse(rsp *http.Response) (*MoveForumTagResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &MoveForumTagResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ForumTag
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest UnprocessableEntity
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON422 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers MoveForumTagResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers MoveForumTagResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers MoveForumTagResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers MoveForumTagResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers MoveForumTagResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers MoveForumTagResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 422:
-		var headers MoveForumTagResponse422Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers422 = &headers
-	case rsp.StatusCode == 429:
-		var headers MoveForumTagResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers MoveForumTagResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseDisableChannelTeamResponse parses an HTTP response from a DisableChannelTeamWithResponse call
-func ParseDisableChannelTeamResponse(rsp *http.Response) (*DisableChannelTeamResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DisableChannelTeamResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case rsp.StatusCode == 204:
-		break // No content-type
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 204:
-		var headers DisableChannelTeamResponse204Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers204 = &headers
-	case rsp.StatusCode == 400:
-		var headers DisableChannelTeamResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers DisableChannelTeamResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers DisableChannelTeamResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers DisableChannelTeamResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 429:
-		var headers DisableChannelTeamResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers DisableChannelTeamResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {

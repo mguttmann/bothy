@@ -645,6 +645,10 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 		return authorize.Decision{}, err
 	}
 	t := a.clock.Now()
+	if domain.IsComputerAgentAction(spec.ID) {
+		// The agent actions of computer use decide SR9, SR2 and SR13 on their own path (CU-04).
+		return a.authorizeComputer(ctx, p, spec, r, t)
+	}
 	if req.IsHostSelf() || (p != nil && p.PrincipalKind() == domain.KindHost) {
 		return a.authorizeHost(ctx, p, spec, req, r, t)
 	}

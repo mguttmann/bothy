@@ -20,6 +20,10 @@ const (
 	// kindTerminalSession is a terminal session (M2-40): visible to its person and to effective
 	// owners, whatever the requirement.
 	kindTerminalSession = "terminal_session"
+	// kindComputerSession is a computer session (CU-04): visible to its triggering owner and to
+	// effective owners; the agent actions of computer use decide outside this table
+	// (DecideComputer).
+	kindComputerSession = "computer_session"
 	// kindFile is a file (M3-03): its visibility depends on its purpose and attachment.
 	kindFile = "file"
 	// purposeAttachment is files.purpose of a file uploaded into a channel; purposeAvatar and
@@ -141,6 +145,9 @@ var kindRules = map[string]func(in Input) (bool, Reason, error){
 	},
 	kindHost: hostVisible,
 	kindTerminalSession: func(in Input) (bool, Reason, error) {
+		return isSelf(in) || in.Eff.Owner, ReasonNotSelf, nil
+	},
+	kindComputerSession: func(in Input) (bool, Reason, error) {
 		return isSelf(in) || in.Eff.Owner, ReasonNotSelf, nil
 	},
 }

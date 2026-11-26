@@ -56,11 +56,17 @@ func (r *Repository) UpdateHostReport(ctx context.Context, id ids.ID, rep domain
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "terminal: encoding the reported checks")
 	}
+	var computer []byte
+	if rep.Computer != nil {
+		if computer, err = json.Marshal(rep.Computer); err != nil {
+			return errs.Wrap(errs.CodeInternalError, err, "terminal: encoding the reported computer state")
+		}
+	}
 	n, err := q.UpdateHostReport(ctx, sqlcgen.UpdateHostReportParams{
 		ID: uuid(id), ReportedProfiles: profiles, ReportedDoctor: doctor,
 		ReportedIsServerHost:        pgtype.Bool{Bool: rep.IsServerHost, Valid: true},
 		ReportedRequireLocalConfirm: pgtype.Bool{Bool: rep.RequireLocalConfirm, Valid: true},
-		ReportedOsVersion:           optionalText(rep.OSVersion), Version: version,
+		ReportedOsVersion:           optionalText(rep.OSVersion), ReportedComputer: computer, Version: version,
 	})
 	return oneRow(n, err, "writing the report of a host")
 }

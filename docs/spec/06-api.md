@@ -382,6 +382,8 @@ all texts of the YAML files (R-API-15); every response component names its statu
    | `listPendingRunWakes` | `run.wake_max_pending` per thread, none over all threads of the agent |
    | `getStatsSlo`, `getStatsBackends` | reports: one row per objective or per backend |
    | `listPrices` | the price table with closed rows, ordered by `provider`, `model`, `unit`, `valid_from`, then `id` |
+   | `listComputerDesktops` | none named; the desktops of the run's owner (27 4 item 3) |
+   | `listComputerSessions` | `api.page_size_max`; the newest computer sessions of the caller (27 12.2, D-CU-04-13) |
 7. Three page forms are built. A generic page iterator of the SDKs (section 14 item 2) follows
    only the first; the event poll of each SDK has its own loop.
 
@@ -447,6 +449,7 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `completePasskeyRegistration` | POST | `/api/v1/me/passkeys/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `createExtensionSession` | POST | `/api/v1/me/sessions/extensions` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `pairHost` | POST | `/api/v1/hosts/pair` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `openComputerSession` | POST | `/api/v1/computer/sessions` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `openTerminalSession` | POST | `/api/v1/hosts/{host_id}/terminal/sessions` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `attachTerminalSession` | POST | `/api/v1/terminal/sessions/{session_id}/attach` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `previewGrant` | POST | `/api/v1/grants/preview` | reads only, changes no durable state |
@@ -1175,6 +1178,8 @@ Generated from openapi.yaml.
 | POST | `/api/v1/wakes/{wake_id}/check` | `checkRunWake` | `run.wake.check` | Check the next execution of a pending check |
 | POST | `/api/v1/wakes/{wake_id}/fire` | `fireRunWake` | `run.wake.fire` | Fire a checked wake-up, end it failed or return a skipped wake input |
 | POST | `/api/v1/command-autocompletions/{request_id}/answer` | `answerAutocomplete` | `command.autocomplete.respond` | Answer an autocomplete request |
+| GET | `/api/v1/computer/desktops` | `listComputerDesktops` | `computer.desktops.list` | List the desktops of the run's owner |
+| POST | `/api/v1/computer/sessions` | `openComputerSession` | `computer.open` | Open a computer session on a desktop for the bound run |
 
 #### Runs
 
@@ -1326,6 +1331,9 @@ Generated from openapi.yaml.
 
 | Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
+| GET | `/api/v1/computer/sessions` | `listComputerSessions` | `computer.session.read` | List one's own computer sessions |
+| POST | `/api/v1/computer/sessions/{session_id}/stop` | `stopComputerSession` | `computer.stop` | Stop a computer session |
+| POST | `/api/v1/hosts/{host_id}/computer/disable` | `disableComputerDevice` | `computer.device.disable` | Switch the computer enablement of a host off |
 | POST | `/api/v1/hosts/{host_id}/terminal/sessions` | `openTerminalSession` | `terminal.open` | Open a terminal session |
 | GET | `/api/v1/terminal/sessions` | `listTerminalSessions` | `terminal.read_own` | List terminal sessions |
 | GET | `/api/v1/terminal/sessions/{session_id}` | `getTerminalSession` | `terminal.read_own` | Read a terminal session |
@@ -1426,6 +1434,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `agent.hosting_changed` | durable | `agent.hosted.list` | self | `AgentHostingChangedEvent` |  |
 | `host.updated` | durable | `host.read` |  | `HostUpdatedEvent` |  |
 | `terminal_session.changed` | durable | `self` | self | `TerminalSessionChangedEvent` |  |
+| `computer_session.changed` | durable | `self` | self | `ComputerSessionChangedEvent` |  |
 | `typing.started` | ephemeral | `thread.read` |  | `TypingStartedEvent` |  |
 | `run.updated` | ephemeral | `run.read` |  | `RunUpdatedEvent` |  |
 | `agent.presence_changed` | ephemeral | `agent.read` |  | `AgentPresenceChangedEvent` |  |

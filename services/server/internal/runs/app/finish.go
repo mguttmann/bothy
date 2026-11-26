@@ -331,6 +331,9 @@ func (s *Service) endRun(ctx context.Context, row RunRow, to domain.State, reaso
 	if err := s.DisableRunComponents(ctx, row.ID); err != nil {
 		return Transitioned{}, err
 	}
+	if err := s.endComputerRun(ctx, row); err != nil {
+		return Transitioned{}, err
+	}
 	// The thread is free: a wake-up that waited for this run fires now (09 5.8.3, AR-04).
 	if err := s.onThreadFree(ctx, row.ThreadID); err != nil {
 		return Transitioned{}, err
@@ -339,6 +342,22 @@ func (s *Service) endRun(ctx context.Context, row RunRow, to domain.State, reaso
 		return t, nil
 	}
 	return t, s.fu.OnRunEnded(ctx, t)
+}
+
+// endComputerRun ends the computer session of the run that ended in the same unit of work
+// (run_ended, 27 8.4 item 3) and, when the run opened a computer session at all, ends the thread's
+// current agent session with computer_use and agent_session.changed, so the next run starts a new
+// Claude Code session and no screenshot of this one is resumed (27 10.5, CU-04).
+func (s *Service) endComputerRun(ctx context.Context, row RunRow) error {
+	c := s.computerSessions()
+	if c == nil {
+		return nil
+	}
+	had, err := c.OnComputerRunEnded(ctx, row.ID)
+	if err != nil || !had || s.d.Sessions == nil {
+		return err
+	}
+	return s.d.Sessions.EndForComputerUse(ctx, row.ThreadID)
 }
 
 // auditReportedMismatch writes the audit entry of an I3 mismatch the adapter reported (design note

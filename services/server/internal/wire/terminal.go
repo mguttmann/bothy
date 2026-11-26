@@ -29,6 +29,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/otelmetrics"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
@@ -119,6 +120,8 @@ type Terminal struct {
 	Handlers *terminalhttp.Hosts
 	// Sessions are the REST handlers of the terminal sessions (M2-44).
 	Sessions *terminalhttp.TerminalSessions
+	// Computers are the REST handlers of the computer sessions (CU-04).
+	Computers *terminalhttp.Computers
 	// Metrics are the OpenTelemetry instruments of the module (M2-44, M2-46), created once per
 	// process by bindSessionMetrics; nil before.
 	Metrics *otelmetrics.Metrics
@@ -157,13 +160,14 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		Store: terminalpg.NewRepository(pool), PairingCodes: pairingCodes{tokens: id.Tokens},
 		Instance: instanceIdentity{state: instanceapp.NewState(instancepg.NewRepository(pool), uow)},
 		People:   people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
-		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk,
+		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk, Computer: terminalpg.NewRepository(pool),
 		StepUps: lateStepUps{id: id}, AuthSessions: lateAuthSessions{id: id}, BeforeOpenCommit: beforeOpenCommit,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc), Sessions: terminalhttp.NewSessions(svc.Sessions())}, nil
+	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc), Sessions: terminalhttp.NewSessions(svc.Sessions()),
+		Computers: terminalhttp.NewComputers(svc.Computers())}, nil
 }
 
 // fillHandlers sets the REST handlers of the module in h where none are set (tests inject their
@@ -177,6 +181,9 @@ func (t *Terminal) fillHandlers(h *Handlers) {
 	}
 	if h.TerminalSessions == nil {
 		h.TerminalSessions = t.Sessions
+	}
+	if h.Computers == nil {
+		h.Computers = t.Computers
 	}
 }
 
@@ -308,3 +315,28 @@ func (c *HostControl) Mount(mux Mux, chain *httpserver.Chain) {
 func (c *HostControl) StopConnections() lifecycle.StopStep {
 	return lifecycle.StopStep{Name: "host_control_connections", Phase: lifecycle.PhaseConnections, Run: c.Links.Shutdown}
 }
+
+// computerRuns binds terminal/app.ComputerRuns to the run facts of runs (CU-04 Design note 3): the
+// run, its trigger, its agent and its feeders, read in the transaction of the check.
+type computerRuns struct{ runs *runsapp.Service }
+
+// ComputerRun implements terminalapp.ComputerRuns.
+func (c computerRuns) ComputerRun(ctx context.Context, runID ids.ID) (terminalapp.ComputerRunFacts, bool, error) {
+	f, found, err := c.runs.ComputerFacts(ctx, runID)
+	if err != nil || !found {
+		return terminalapp.ComputerRunFacts{}, found, err
+	}
+	out := terminalapp.ComputerRunFacts{RunID: f.RunID, ThreadID: f.ThreadID, AgentID: f.AgentID, TriggeredBy: f.TriggeredBy, Active: f.Active,
+		ToolClass: f.ToolClass, TriggerKind: f.TriggerKind, TriggerOrigin: f.TriggerOrigin, TriggerAuthorID: f.TriggerAuthorID,
+		TriggeringCommand: f.TriggeringCommand, AgentName: f.AgentHandle}
+	for _, fd := range f.Feeders {
+		out.Feeders = append(out.Feeders, authorize.ComputerFeeder{PrincipalID: fd.PrincipalID, Source: fd.Source})
+	}
+	return out, true, nil
+}
+
+// Compile-time checks: the ports of computer use between terminal and runs (CU-04).
+var (
+	_ terminalapp.ComputerRuns = computerRuns{}
+	_ runsapp.ComputerSessions = (*terminalapp.Service)(nil)
+)

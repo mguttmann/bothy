@@ -50,6 +50,12 @@ command.invoke
 command.register
 command.remove
 component.update
+computer.attach
+computer.desktops.list
+computer.device.disable
+computer.open
+computer.stop
+computer.terminate
 console.csp_report
 cost.reconcile
 cost.reconcile.submit

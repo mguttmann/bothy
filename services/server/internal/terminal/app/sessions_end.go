@@ -91,7 +91,25 @@ func (s *Service) endSessions(ctx context.Context, sel SessionSelector, end doma
 		}
 		ended = append(ended, ses.ID)
 	}
+	if err := s.endComputerForHostState(ctx, sel, end); err != nil {
+		return nil, err
+	}
 	return ended, nil
+}
+
+// endComputerForHostState ends the computer sessions of a host whose terminal sessions end for a
+// state change of the host (27 4 item 4, 8.3: host_disabled, host_retired, host_rekeyed): every
+// such revocation of 24 8.3 that ends the host's terminal sessions ends its computer session too,
+// in the same transaction.
+func (s *Service) endComputerForHostState(ctx context.Context, sel SessionSelector, end domain.End) error {
+	if sel.HostID.IsZero() || !sel.UserID.IsZero() || !sel.ExceptUserID.IsZero() || !sel.SessionID.IsZero() {
+		return nil
+	}
+	if end.Reason != domain.CloseHostDisabled && end.Reason != domain.CloseHostRetired &&
+		end.Reason != domain.CloseHostRekeyed {
+		return nil
+	}
+	return s.endComputerOfHost(ctx, sel.HostID, domain.ComputerServerEnd(domain.ComputerEndForHost(end.Reason)))
 }
 
 // lockSelected locks the open sessions the most specific member of sel names, in ascending id.

@@ -125,6 +125,8 @@ section 10.4).
 | `bothy.terminal.sessions.closed` | Counter | `{session}` | `bothy.reason` (codes from 24, section 10.3) | api, worker: +1 per ended session after the commit of the end, in the process that committed it (a request, a subscriber, the relay or the job `terminal.sweep`); a rolled back end counts nothing (M2-46) | `bothy_terminal_sessions_closed_total` |
 | `bothy.terminal.relay.unpaired` | Counter | `{connection}` | `bothy.terminal.side` (`client`, `host`) | api: one side found no counterpart within `terminal.open_timeout` (24, section 9) | `bothy_terminal_relay_unpaired_total` |
 | `bothy.terminal.hosts.connected` | UpDownCounter | `{host}` | none | api: each api process counts its control connections that are usable for sessions (+1 when one becomes usable, -1 when it stops being usable); the sum over the api processes counts connected hosts (M2-46) | `bothy_terminal_hosts_connected` |
+| `bothy.terminal.computer.relay.size` | Counter | `By` | `bothy.terminal.computer.direction` (`to_host`, `to_agent`) | api: the length of each Noise message the relay of a computer session forwarded, after the write; never content, never an ID ([27-computer-use.md](../spec/27-computer-use.md) 13, CU-04) | `bothy_terminal_computer_relay_size_bytes_total` |
+| `bothy.terminal.computer.relay.messages` | Counter | `{message}` | `bothy.terminal.computer.direction` (`to_host`, `to_agent`) | api: +1 per Noise message the relay of a computer session forwarded (CU-04) | `bothy_terminal_computer_relay_messages_total` |
 
 ### 4.3b Own measurement and live statistics
 

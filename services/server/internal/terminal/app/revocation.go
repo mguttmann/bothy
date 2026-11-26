@@ -40,6 +40,11 @@ func (s *Service) OnAccessChanged(ctx context.Context, ev authorize.AccessChange
 		if err := s.endSR10Lost(ctx, ev.Action, c.PrincipalID); err != nil {
 			return err
 		}
+		// A person who is no longer an active owner loses every computer session (SR13 item 3,
+		// 27 8.4 item 3).
+		if err := s.endComputerOfLostOwner(ctx, c.PrincipalID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -119,6 +124,13 @@ func (s *Service) OnSessionEnded(ctx context.Context, ev identity.SessionEnded) 
 	if len(ev.SessionIDs) == 0 {
 		return nil
 	}
-	_, err := s.endSessions(ctx, SessionSelector{AuthSessionIDs: ev.SessionIDs}, domain.ServerEnd(domain.ReasonForSessionEnd(string(ev.Reason))))
-	return err
+	if _, err := s.endSessions(ctx, SessionSelector{AuthSessionIDs: ev.SessionIDs}, domain.ServerEnd(domain.ReasonForSessionEnd(string(ev.Reason)))); err != nil {
+		return err
+	}
+	// A disabled person loses every computer session (27 8.4 item 3); no device holds one, so the
+	// end of a login session alone ends none.
+	if ev.Reason == identity.RevokeUserDisabled && !ev.UserID.IsZero() {
+		return s.endComputerOfUser(ctx, ev.UserID, domain.ComputerServerEnd(domain.ComputerAccessRevoked))
+	}
+	return nil
 }

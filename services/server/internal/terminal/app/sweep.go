@@ -86,9 +86,16 @@ func (s *Service) Sweep(ctx context.Context) (SweepResult, error) {
 		return SweepResult{}, errs.New(errs.CodeInternalError, "terminal: terminal.sweep needs its windows and the login sessions of identity")
 	}
 	ctx = system(ctx)
+	// Computer sessions still in opening past computer.open_timeout end open_failed (CU-04): the
+	// relay of the pairing node ends them at its deadline; the sweep catches an opening whose
+	// pairing never reached any node.
+	computerEnded, err := s.sweepComputer(ctx)
+	if err != nil {
+		return SweepResult{Ended: computerEnded}, err
+	}
 	list, err := s.d.Store.SweepCandidates(ctx)
 	if err != nil || len(list) == 0 {
-		return SweepResult{}, err
+		return SweepResult{Ended: computerEnded}, err
 	}
 	now := s.d.Clock.Now()
 	auth := make([]ids.ID, 0, len(list))
@@ -103,7 +110,7 @@ func (s *Service) Sweep(ctx context.Context) (SweepResult, error) {
 	for _, id := range endedList {
 		ended[id] = true
 	}
-	var res SweepResult
+	res := SweepResult{Ended: computerEnded}
 	var failed []error
 	for _, c := range list {
 		done, err := s.sweepOne(ctx, c, ended[c.AuthSessionID], now, w)

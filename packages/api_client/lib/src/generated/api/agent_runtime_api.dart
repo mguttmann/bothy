@@ -18,6 +18,9 @@ import 'package:api_client/src/generated/model/agent_session_report.dart';
 import 'package:api_client/src/generated/model/agent_triggerers.dart';
 import 'package:api_client/src/generated/model/api_token_created.dart';
 import 'package:api_client/src/generated/model/autocomplete_answer.dart';
+import 'package:api_client/src/generated/model/computer_desktop_list.dart';
+import 'package:api_client/src/generated/model/computer_session_grant.dart';
+import 'package:api_client/src/generated/model/computer_session_open.dart';
 import 'package:api_client/src/generated/model/consumer_ack.dart';
 import 'package:api_client/src/generated/model/consumer_state.dart';
 import 'package:api_client/src/generated/model/event_page.dart';
@@ -1404,6 +1407,87 @@ class AgentRuntimeApi {
     );
   }
 
+  /// List the desktops of the run&#39;s owner
+  /// The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is &#x60;active&#x60; and connected, whose last &#x60;report&#x60; has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header &#x60;Invocation-Token&#x60; to an active run under tool class &#x60;host&#x60; that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 &#x60;forbidden&#x60; with &#x60;reason: computer_not_owner_run&#x60; or &#x60;computer_tool_class&#x60;, or 403 &#x60;invocation_token_invalid&#x60; (&#x60;run_inactive&#x60; for an ended run). Denials are audited.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ComputerDesktopList] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ComputerDesktopList>> listComputerDesktops({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/computer/desktops';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ComputerDesktopList? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ComputerDesktopList),
+            ) as ComputerDesktopList;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ComputerDesktopList>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// List the built-in agents this runner hosts
   /// The active agents whose &#x60;hosted_by&#x60; is the calling agent (26 3.2), ascending by id. A Claude Code runner with &#x60;runner.hosted_agents&#x60; reads it at start, on &#x60;agent.hosting_changed&#x60; and every &#x60;runner.channels_resync_interval&#x60;; for any other agent the list is empty. Only the agent itself may call it (agent-self).
   ///
@@ -1656,6 +1740,108 @@ class AgentRuntimeApi {
     }
 
     return Response<AgentChannelConfigList>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Open a computer session on a desktop for the bound run
+  /// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header &#x60;Invocation-Token&#x60; to an active run (07 SR9) under tool class &#x60;host&#x60; (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 &#x60;invocation_token_invalid&#x60; (&#x60;run_inactive&#x60; for an ended run); 404 &#x60;not_found&#x60; for a host the owner cannot read; 403 &#x60;forbidden&#x60; with &#x60;reason: computer_tool_class&#x60; or &#x60;computer_not_owner_run&#x60;; 409 &#x60;host_unavailable&#x60; for a host that is not &#x60;active&#x60; or not connected; 403 &#x60;forbidden&#x60; with &#x60;reason: computer_not_enabled&#x60; for a host that is no enabled desktop of the owner; 409 &#x60;conflict&#x60; with &#x60;reason: computer_busy&#x60; (another session on the host) or &#x60;computer_run_busy&#x60; (another session of the run). One transaction writes the session in &#x60;opening&#x60;, the audit entry and &#x60;computer_session.changed&#x60;; after the commit the server sends &#x60;computer.open&#x60; to the host service. The answer carries the single-use attach token (&#x60;typ &#x3D; computer-session+jwt&#x60;, valid &#x60;computer.attach_token_ttl&#x60;), which is never stored; the request is exempt from &#x60;Idempotency-Key&#x60;. Allows and denials are audited.
+  ///
+  /// Parameters:
+  /// * [computerSessionOpen]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ComputerSessionGrant] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ComputerSessionGrant>> openComputerSession({
+    required ComputerSessionOpen computerSessionOpen,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/computer/sessions';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(ComputerSessionOpen);
+      _bodyData = _serializers.serialize(
+        computerSessionOpen,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ComputerSessionGrant? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ComputerSessionGrant),
+            ) as ComputerSessionGrant;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ComputerSessionGrant>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

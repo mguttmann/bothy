@@ -192,8 +192,9 @@ const updateHostReport = `-- name: UpdateHostReport :execrows
 UPDATE hosts
 SET reported_profiles = $1::jsonb, reported_doctor = $2::jsonb,
     reported_is_server_host = $3, reported_require_local_confirm = $4,
-    reported_os_version = $5, version = $6
-WHERE id = $7
+    reported_os_version = $5, reported_computer = $6::jsonb,
+    version = $7
+WHERE id = $8
 `
 
 type UpdateHostReportParams struct {
@@ -202,6 +203,7 @@ type UpdateHostReportParams struct {
 	ReportedIsServerHost        pgtype.Bool
 	ReportedRequireLocalConfirm pgtype.Bool
 	ReportedOsVersion           pgtype.Text
+	ReportedComputer            []byte
 	Version                     int64
 	ID                          pgtype.UUID
 }
@@ -215,6 +217,7 @@ func (q *Queries) UpdateHostReport(ctx context.Context, arg UpdateHostReportPara
 		arg.ReportedIsServerHost,
 		arg.ReportedRequireLocalConfirm,
 		arg.ReportedOsVersion,
+		arg.ReportedComputer,
 		arg.Version,
 		arg.ID,
 	)

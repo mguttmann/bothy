@@ -407,3 +407,15 @@ type RunBindings interface {
 	// errors (internal for a failed read).
 	RunBinding(ctx context.Context, id ids.ID) (binding domain.RunBinding, found bool, err error)
 }
+
+// ComputerSessions is the outgoing port of runs to the computer sessions of the module terminal
+// (CU-04 Design note 2; internal/wire binds it to terminal/app.Service). terminal never imports
+// runs internals; runs calls this port inside its own unit of work.
+type ComputerSessions interface {
+	// OnComputerRunEnded ends the run's computer session that is not closed with run_ended in the
+	// caller's unit of work and reports whether the run ever opened a computer session (27 10.5).
+	OnComputerRunEnded(ctx context.Context, runID ids.ID) (bool, error)
+	// RunHoldsComputerSession reports whether the run has a computer session that is not closed
+	// (07 SR13 item 5).
+	RunHoldsComputerSession(ctx context.Context, runID ids.ID) (bool, error)
+}

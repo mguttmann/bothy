@@ -39,6 +39,12 @@ const (
 	// SignalSessionPaired tells every node that the session paired on some node (host_id,
 	// session_id); only for a session in opening on a host with require_local_confirm.
 	SignalSessionPaired SignalKind = "terminal.session_paired"
+	// SignalComputerOpen asks every node to expect the computer session and the node of the
+	// control connection to send computer.open (host_id, session_id; CU-04, 27 5.1 step 7).
+	SignalComputerOpen SignalKind = "terminal.computer_open"
+	// SignalComputerDisable asks the node of the control connection to send computer.disable with
+	// the stored disabled generation (host_id; CU-04, 27 4 item 4).
+	SignalComputerDisable SignalKind = "terminal.computer_disable"
 )
 
 // SignalPrefix is the namespace of the terminal kinds; M7-17 adds its own kinds to the same
@@ -70,7 +76,7 @@ const (
 // signalFields are the ID members of each kind besides host_id.
 var signalFields = map[SignalKind]string{
 	SignalSessionOpen: fieldSession, SignalHostClose: "", SignalHostPresent: fieldConn, SignalHostGone: fieldConn,
-	SignalSessionPaired: fieldSession,
+	SignalSessionPaired: fieldSession, SignalComputerOpen: fieldSession, SignalComputerDisable: "",
 }
 
 // ErrMalformedSignal is a terminal payload that is no valid signal: the receiver drops it with one

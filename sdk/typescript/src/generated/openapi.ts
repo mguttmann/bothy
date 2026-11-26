@@ -5838,6 +5838,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/computer/desktops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the desktops of the run's owner
+         * @description The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is `active` and connected, whose last `report` has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header `Invocation-Token` to an active run under tool class `host` that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 `forbidden` with `reason: computer_not_owner_run` or `computer_tool_class`, or 403 `invocation_token_invalid` (`run_inactive` for an ended run). Denials are audited.
+         */
+        get: operations["listComputerDesktops"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/computer/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List one's own computer sessions
+         * @description The computer sessions the caller triggered as an active owner, newest first, at most `api.page_size_max` (docs/spec/27-computer-use.md 12.2, 07 2.15 item 5). Metadata only; never an image, the token or its `jti`.
+         */
+        get: operations["listComputerSessions"];
+        put?: never;
+        /**
+         * Open a computer session on a desktop for the bound run
+         * @description Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+         */
+        post: operations["openComputerSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/computer/sessions/{session_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop a computer session
+         * @description Any active owner in a session stops any computer session of the instance, from any device, without step-up (docs/spec/27-computer-use.md 8.3, 07 2.15 item 4). The session ends with `stopped_by_user` and `close_detail = client_stop`; the server closes both connections and sends `computer.close` to the host service. A closed session answers unchanged. Audited.
+         */
+        post: operations["stopComputerSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hosts/{host_id}/computer/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch the computer enablement of a host off
+         * @description Any active owner in a session switches the enablement of a host off, from any device, without step-up (docs/spec/27-computer-use.md 4 item 4). The server stores the reported generation as the disabled generation, ends the host's computer session with `device_disabled` in the same transaction and sends `computer.disable` over the control connection; the host stays unlisted until a new local switch-on raises the generation. A host without a reported helper answers unchanged. Switching on is no operation of the API. Audited.
+         */
+        post: operations["disableComputerDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/hosts/{host_id}/terminal/sessions": {
         parameters: {
             query?: never;
@@ -8205,7 +8289,7 @@ export interface components {
             created_at: components["schemas"]["Timestamp"];
             ended_at?: components["schemas"]["Timestamp"];
             /** @enum {string} */
-            end_reason?: "reset" | "rebind" | "import" | "agent_changed";
+            end_reason?: "reset" | "rebind" | "import" | "agent_changed" | "computer_use";
             /**
              * Format: int64
              * @description The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).
@@ -12191,7 +12275,7 @@ export interface components {
             image_url?: string;
         };
         /** @description Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor. */
-        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["AgentHostingChangedEvent"] | components["schemas"]["RunWakeChangedEvent"] | components["schemas"]["AgentWakeInputEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
+        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["AgentHostingChangedEvent"] | components["schemas"]["RunWakeChangedEvent"] | components["schemas"]["AgentWakeInputEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"] | components["schemas"]["ComputerSessionChangedEvent"];
         /** @description One page. `next_cursor` is absent on the last page. */
         MentionItemPage: {
             items: components["schemas"]["MentionItem"][];
@@ -13003,6 +13087,12 @@ export interface components {
             /** @example Debian 13 */
             os_version?: string;
             last_seen_at?: components["schemas"]["Timestamp"];
+            /** @description The reported state of the computer helper (27 12.3); only for active owners with `host.read` (07 2.15 item 5), absent for every other reader, in `host.updated` and while the host service reports none. */
+            computer?: components["schemas"]["HostComputer"];
+            /** @description The host is a desktop of the reading owner (27 4 item 3); only for active owners, like `computer`. */
+            computer_listed?: boolean;
+            /** @description The enablement generation that `computer.device.disable` switched off (27 4 item 4); only for active owners, absent while none was switched off remotely. */
+            computer_disabled_generation?: number;
             created_at: components["schemas"]["Timestamp"];
             /** Format: int64 */
             version: number;
@@ -13275,6 +13365,8 @@ export interface components {
             is_server_host: boolean;
             require_local_confirm: boolean;
             os_version?: string;
+            /** @description The state of the computer helper (27 4 item 2 and 12.3); absent while `host_service.computer_use` is off. Not a doctor check (the list stays HD1 to HD11). */
+            computer?: components["schemas"]["HostComputer"];
         };
         /** @description The server asks the host service to open the data connection of a session. */
         HostSessionOpen: {
@@ -13297,6 +13389,219 @@ export interface components {
             close_reason: components["schemas"]["TerminalCloseReason"];
             close_detail?: components["schemas"]["TerminalCloseDetail"];
             exit_code?: number;
+        };
+        /**
+         * @description State of a computer session (docs/spec/27-computer-use.md 8.1).
+         * @enum {string}
+         */
+        ComputerSessionState: "opening" | "active" | "paused" | "closed";
+        /**
+         * @description Why a computer session ended (docs/spec/27-computer-use.md 8.3).
+         * @enum {string}
+         */
+        ComputerCloseReason: "done" | "stopped_by_user" | "device_disabled" | "run_ended" | "access_revoked" | "host_disabled" | "host_retired" | "host_rekeyed" | "host_restarted" | "connection_lost" | "open_failed" | "error";
+        /**
+         * @description Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).
+         * @enum {string}
+         */
+        ComputerCloseDetail: "local_escape" | "indicator_stop" | "client_stop" | "token_invalid" | "token_expired" | "token_replayed" | "handshake_failed" | "helper_absent" | "helper_untrusted" | "not_enabled" | "busy" | "open_timeout" | "stream_fault" | "helper_crashed";
+        /** @description Metadata of a computer session (03 `computer_sessions`) with the name of its desktop. Never an image, a coordinate, typed text, a key name, the attach token or its `jti`. */
+        ComputerSession: {
+            id: components["schemas"]["Uuid"];
+            host_id: components["schemas"]["Uuid"];
+            /**
+             * @description The name of the host (`hosts.name`).
+             * @example Desk
+             */
+            desktop: string;
+            user_id: components["schemas"]["Uuid"];
+            agent_id: components["schemas"]["Uuid"];
+            run_id: components["schemas"]["Uuid"];
+            state: components["schemas"]["ComputerSessionState"];
+            /** @enum {string} */
+            pause_reason?: "locked";
+            /** @description The enablement generation the session was opened with (claim `gen`). */
+            generation: number;
+            key_generation: number;
+            attached_at?: components["schemas"]["Timestamp"];
+            opened_at: components["schemas"]["Timestamp"];
+            started_at?: components["schemas"]["Timestamp"];
+            paused_at?: components["schemas"]["Timestamp"];
+            /** Format: int64 */
+            paused_ms: number;
+            closed_at?: components["schemas"]["Timestamp"];
+            stopped_by?: components["schemas"]["Uuid"];
+            close_reason?: components["schemas"]["ComputerCloseReason"];
+            close_detail?: components["schemas"]["ComputerCloseDetail"];
+            action_count: number;
+            /**
+             * @description Identity of the frontmost app of the last `computer.state` (bundle ID or executable name); never a window title.
+             * @example com.example.editor
+             */
+            front_app?: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ComputerSessionList: {
+            items: components["schemas"]["ComputerSession"][];
+        };
+        ComputerSessionOpen: {
+            host_id: components["schemas"]["Uuid"];
+            /** @description SHA-256 of the ephemeral X25519 public key that `bothy-computer-mcp` sends in Noise message 1, base64url without padding; becomes the claim `cek`. */
+            client_ephemeral_key_hash: string;
+            /**
+             * @description `true` when `bothy-computer-mcp` replaced its pin of the host key after a re-pairing (27 10.4); recorded in the audit entry of `computer.open`.
+             * @default false
+             */
+            pin_changed: boolean;
+        };
+        /** @description Everything `bothy-computer-mcp` needs to attach and run the Noise handshake (27 5.1 step 6). The token is valid once and for `computer.attach_token_ttl`. */
+        ComputerSessionGrant: {
+            session_id: components["schemas"]["Uuid"];
+            /** @description Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2. */
+            token: string;
+            /** @example /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach */
+            attach_path: string;
+            noise_public_key: string;
+            key_fingerprint: string;
+            key_generation: number;
+            expires_at: components["schemas"]["Timestamp"];
+        };
+        ComputerDesktop: {
+            host_id: components["schemas"]["Uuid"];
+            /** @example Desk */
+            name: string;
+            platform: components["schemas"]["HostPlatform"];
+            online: boolean;
+            /** @description The screen is locked (`report.computer.locked`). */
+            locked: boolean;
+            /** @description Another computer session on the host is not closed. */
+            busy: boolean;
+        };
+        ComputerDesktopList: {
+            items: components["schemas"]["ComputerDesktop"][];
+        };
+        /** @description The state of the computer helper of a host (schema `host_computer.v1`, docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in `hosts.reported_computer`. Never a path, a key or screen content. */
+        HostComputer: {
+            /** @enum {string} */
+            helper: "connected" | "absent" | "refused";
+            enabled: boolean;
+            generation: number;
+            os_account: string;
+            permissions: components["schemas"]["HostComputerPermissions"];
+            helper_version: string;
+            /** @enum {string} */
+            signature: "verified" | "development";
+            locked: boolean;
+        };
+        HostComputerPermissions: {
+            /** @enum {string} */
+            capture: "granted" | "denied" | "unknown";
+            /** @enum {string} */
+            input: "granted" | "denied" | "unknown";
+        };
+        /** @description The server values of a computer session (27 18), sent with `computer.open`. */
+        HostComputerSettings: {
+            image_max_edge: number;
+            jpeg_quality: number;
+            /** Format: int64 */
+            settle_ms: number;
+            auto_screenshot: boolean;
+            /** Format: int64 */
+            wait_max_ms: number;
+            key_repeat_max: number;
+            audit_apps_max: number;
+            /** Format: int64 */
+            status_interval_ms: number;
+        };
+        /** @description The server asks the host service to open the computer data connection of a session (27 5.1 step 7); `user_id` is the triggering owner (`sub` of the attach token). */
+        HostComputerOpen: {
+            session_id: components["schemas"]["Uuid"];
+            run_id: components["schemas"]["Uuid"];
+            agent_id: components["schemas"]["Uuid"];
+            agent_name: string;
+            user_id: components["schemas"]["Uuid"];
+            /** @example /api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream */
+            data_path: string;
+            /** @description Without both sides paired and the handshake done until then the session ends `open_failed` with `open_timeout` (`computer.open_timeout`). */
+            expires_at: components["schemas"]["Timestamp"];
+            settings: components["schemas"]["HostComputerSettings"];
+        };
+        HostComputerClose: {
+            session_id: components["schemas"]["Uuid"];
+            reason: components["schemas"]["ComputerCloseReason"];
+        };
+        HostComputerDisable: {
+            generation: number;
+        };
+        HostComputerStarted: {
+            session_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            state: "active" | "paused";
+        };
+        /** @description Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path. */
+        HostComputerApp: {
+            /**
+             * @description Bundle ID or executable name.
+             * @example com.example.editor
+             */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /** @description Team ID or subject of the signer. */
+            signer: string;
+        };
+        HostComputerState: {
+            session_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            state: "active" | "paused";
+            /**
+             * @description `locked` exactly with `paused`, empty otherwise.
+             * @enum {string}
+             */
+            reason: "" | "locked";
+            action_count: number;
+            front_app: components["schemas"]["HostComputerApp"];
+        };
+        HostComputerEnded: {
+            session_id: components["schemas"]["Uuid"];
+            /**
+             * @description The host service sends only these reasons (27 12.3).
+             * @enum {string}
+             */
+            close_reason: "done" | "stopped_by_user" | "device_disabled" | "connection_lost" | "open_failed" | "error";
+            close_detail?: components["schemas"]["ComputerCloseDetail"];
+            /** @description A count per action kind of 27 6.4. */
+            action_counts: {
+                [key: string]: number;
+            };
+            /** @description Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry. */
+            apps: components["schemas"]["HostComputerApp"][];
+            /** Format: int64 */
+            paused_ms: number;
+        };
+        /** @description First text frame of the computer attach connection; `identify` follows, then binary Noise frames only. */
+        ComputerAttachHello: {
+            protocol_versions: number[];
+            server_time: components["schemas"]["Timestamp"];
+        };
+        /** @description The single-use attach token of the session (27 5.4); the connection carries no agent token. */
+        ComputerAttachIdentify: {
+            /** @example 1 */
+            protocol_version: number;
+            token: string;
+        };
+        /** @description Durable personal event `computer_session.changed` to the triggering owner (27 12.4); never an image. */
+        ComputerSessionChangedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "computer_session.changed";
+            payload: components["schemas"]["ComputerSession"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "computer_session.changed";
         };
         /**
          * Format: binary
@@ -13576,6 +13881,9 @@ export interface components {
         HostIdQuery: components["schemas"]["Uuid"];
         /** @description Only sessions in this state; without it, all states. */
         TerminalSessionStateQuery: components["schemas"]["TerminalSessionState"];
+        ComputerSessionIdPath: components["schemas"]["Uuid"];
+        /** @description Only computer sessions in this state; without it, all states. */
+        ComputerSessionStateQuery: components["schemas"]["ComputerSessionState"];
         ConsumerPath: string;
         RunIdPath: components["schemas"]["Uuid"];
         WakeIdPath: components["schemas"]["Uuid"];
@@ -26054,6 +26362,164 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listComputerDesktops: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerDesktopList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listComputerSessions: {
+        parameters: {
+            query?: {
+                /** @description Only computer sessions in this state; without it, all states. */
+                state?: components["parameters"]["ComputerSessionStateQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerSessionList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    openComputerSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComputerSessionOpen"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerSessionGrant"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    stopComputerSession: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                session_id: components["parameters"]["ComputerSessionIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputerSession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    disableComputerDevice: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                host_id: components["parameters"]["HostIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Host"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

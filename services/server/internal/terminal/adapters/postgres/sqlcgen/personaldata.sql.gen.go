@@ -11,6 +11,61 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const personalDataComputerSessions = `-- name: PersonalDataComputerSessions :many
+SELECT id, host_id, agent_id, run_id, state, opened_at, started_at, closed_at, close_reason, paused_ms, action_count, front_app
+FROM computer_sessions WHERE user_id = $1 ORDER BY opened_at, id
+`
+
+type PersonalDataComputerSessionsRow struct {
+	ID          pgtype.UUID
+	HostID      pgtype.UUID
+	AgentID     pgtype.UUID
+	RunID       pgtype.UUID
+	State       string
+	OpenedAt    pgtype.Timestamptz
+	StartedAt   pgtype.Timestamptz
+	ClosedAt    pgtype.Timestamptz
+	CloseReason pgtype.Text
+	PausedMs    int64
+	ActionCount int32
+	FrontApp    pgtype.Text
+}
+
+// The person's computer sessions (27, 20 section 2): never the token ID, the generations, the
+// close detail or who stopped the session.
+func (q *Queries) PersonalDataComputerSessions(ctx context.Context, subject pgtype.UUID) ([]PersonalDataComputerSessionsRow, error) {
+	rows, err := q.db.Query(ctx, personalDataComputerSessions, subject)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PersonalDataComputerSessionsRow
+	for rows.Next() {
+		var i PersonalDataComputerSessionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.HostID,
+			&i.AgentID,
+			&i.RunID,
+			&i.State,
+			&i.OpenedAt,
+			&i.StartedAt,
+			&i.ClosedAt,
+			&i.CloseReason,
+			&i.PausedMs,
+			&i.ActionCount,
+			&i.FrontApp,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const personalDataHostSessionUsers = `-- name: PersonalDataHostSessionUsers :many
 SELECT id, host_id, os_user, created_at, revoked_at
 FROM host_session_users WHERE user_id = $1 ORDER BY created_at, id
@@ -77,8 +132,8 @@ type PersonalDataHostsRow struct {
 // The participant of terminal in the privacy export (M7-06, docs/spec/20-privacy.md section 5.2):
 // the hosts a person is the assignee or credential holder of (a host the person only created is
 // the host of someone else: its name and times are that person's data; creating it is in the
-// audit entries), the person's session users
-// and terminal sessions. Only names, states, times and counts leave: never keys, fingerprints,
+// audit entries), the person's session users,
+// terminal sessions and computer sessions. Only names, states, times and counts leave: never keys, fingerprints,
 // pairing codes, reported data of the host, token IDs or the close detail.
 func (q *Queries) PersonalDataHosts(ctx context.Context, subject pgtype.UUID) ([]PersonalDataHostsRow, error) {
 	rows, err := q.db.Query(ctx, personalDataHosts, subject)

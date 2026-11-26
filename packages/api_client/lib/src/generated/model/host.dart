@@ -11,6 +11,7 @@ import 'package:api_client/src/generated/model/host_state.dart';
 import 'package:api_client/src/generated/model/host_reported_session_user.dart';
 import 'package:api_client/src/generated/model/host_doctor_check.dart';
 import 'package:api_client/src/generated/model/host_profile.dart';
+import 'package:api_client/src/generated/model/host_computer.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -41,6 +42,9 @@ part 'host.g.dart';
 /// * [hostVersion]
 /// * [osVersion]
 /// * [lastSeenAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [computer] - The reported state of the computer helper (27 12.3); only for active owners with `host.read` (07 2.15 item 5), absent for every other reader, in `host.updated` and while the host service reports none.
+/// * [computerListed] - The host is a desktop of the reading owner (27 4 item 3); only for active owners, like `computer`.
+/// * [computerDisabledGeneration] - The enablement generation that `computer.device.disable` switched off (27 4 item 4); only for active owners, absent while none was switched off remotely.
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [version]
 @BuiltValue()
@@ -127,6 +131,18 @@ abstract class Host implements Built<Host, HostBuilder> {
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'last_seen_at')
   DateTime? get lastSeenAt;
+
+  /// The reported state of the computer helper (27 12.3); only for active owners with `host.read` (07 2.15 item 5), absent for every other reader, in `host.updated` and while the host service reports none.
+  @BuiltValueField(wireName: r'computer')
+  HostComputer? get computer;
+
+  /// The host is a desktop of the reading owner (27 4 item 3); only for active owners, like `computer`.
+  @BuiltValueField(wireName: r'computer_listed')
+  bool? get computerListed;
+
+  /// The enablement generation that `computer.device.disable` switched off (27 4 item 4); only for active owners, absent while none was switched off remotely.
+  @BuiltValueField(wireName: r'computer_disabled_generation')
+  int? get computerDisabledGeneration;
 
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'created_at')
@@ -294,6 +310,27 @@ class _$HostSerializer implements PrimitiveSerializer<Host> {
       yield serializers.serialize(
         object.lastSeenAt,
         specifiedType: const FullType(DateTime),
+      );
+    }
+    if (object.computer != null) {
+      yield r'computer';
+      yield serializers.serialize(
+        object.computer,
+        specifiedType: const FullType(HostComputer),
+      );
+    }
+    if (object.computerListed != null) {
+      yield r'computer_listed';
+      yield serializers.serialize(
+        object.computerListed,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.computerDisabledGeneration != null) {
+      yield r'computer_disabled_generation';
+      yield serializers.serialize(
+        object.computerDisabledGeneration,
+        specifiedType: const FullType(int),
       );
     }
     yield r'created_at';
@@ -505,6 +542,30 @@ class _$HostSerializer implements PrimitiveSerializer<Host> {
           ) as DateTime?;
           if (valueDes == null) continue;
           result.lastSeenAt = valueDes;
+          break;
+        case r'computer':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(HostComputer),
+          ) as HostComputer?;
+          if (valueDes == null) continue;
+          result.computer.replace(valueDes);
+          break;
+        case r'computer_listed':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.computerListed = valueDes;
+          break;
+        case r'computer_disabled_generation':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.computerDisabledGeneration = valueDes;
           break;
         case r'created_at':
           final valueDes = serializers.deserialize(

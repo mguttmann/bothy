@@ -29,8 +29,8 @@ import (
 
 // TestGatewayRoute_AuthorizedInBandOnlyUpgrades (M1-64): the gateway route is registered with
 // gateway.connect and rl.gateway_connect and passes the catalogue check of the start (AZ-P1).
-// The marker AuthorizedInBand is on the gateway and the three terminal upgrades, which make up
-// wire.InBandPatterns, and on no contract route.
+// The marker AuthorizedInBand is on the gateway, the three terminal upgrades and the two upgrades
+// of computer sessions (CU-04), which make up wire.InBandPatterns, and on no contract route.
 func TestGatewayRoute_AuthorizedInBandOnlyUpgrades(t *testing.T) {
 	t.Parallel()
 	op := wire.GatewayOperation()
@@ -38,7 +38,8 @@ func TestGatewayRoute_AuthorizedInBandOnlyUpgrades(t *testing.T) {
 		t.Fatalf("gateway operation %+v", op)
 	}
 	var marked []string
-	for _, o := range []httpserver.Operation{wire.GatewayOperation(), wire.HostConnectOperation(), wire.TerminalStreamOperation(), wire.HostDataOperation()} {
+	for _, o := range []httpserver.Operation{wire.GatewayOperation(), wire.HostConnectOperation(), wire.TerminalStreamOperation(), wire.HostDataOperation(),
+		wire.ComputerAttachOperation(), wire.HostComputerDataOperation()} {
 		if !o.AuthorizedInBand {
 			t.Errorf("%s is not marked AuthorizedInBand", o.Pattern)
 		}

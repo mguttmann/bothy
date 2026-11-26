@@ -75,6 +75,13 @@ func TestHostFramesRecordingCurrent(t *testing.T) {
 			mustFrame(t, opReport, rep),
 			mustFrame(t, opSessionStarted, SessionStarted{SessionID: recordingSession}),
 			mustFrame(t, opSessionEnded, SessionEnded{SessionID: recordingSession, CloseReason: "process_exited", ExitCode: &code}),
+			// The computer ops of the host service (27 12.3, recorded with CU-04).
+			mustFrame(t, opComputerStarted, ComputerStarted{SessionID: recordingSession, State: "active"}),
+			mustFrame(t, opComputerState, ComputerState{SessionID: recordingSession, State: "paused", Reason: "locked", ActionCount: 4,
+				FrontApp: AppIdentity{ID: "com.example.editor", Name: "Editor", Signer: "ABCDE12345"}}),
+			mustFrame(t, opComputerEnded, ComputerEnded{SessionID: recordingSession, CloseReason: "stopped_by_user", CloseDetail: "local_escape",
+				ActionCounts: map[string]int64{"left_click": 3}, Apps: []AppIdentity{{ID: "com.example.editor", Name: "Editor", Signer: "ABCDE12345"}},
+				PausedMs: 1500}),
 		},
 	}
 	want, err := json.MarshalIndent(rec, "", "  ")
@@ -133,6 +140,11 @@ func TestServerFramesDecodeStrictly(t *testing.T) {
 		}
 	}
 	for op := range required {
+		if !ops[op] {
+			t.Errorf("the recording has no %s", op)
+		}
+	}
+	for op := range requiredComputer {
 		if !ops[op] {
 			t.Errorf("the recording has no %s", op)
 		}

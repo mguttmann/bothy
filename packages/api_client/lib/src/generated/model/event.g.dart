@@ -165,6 +165,8 @@ const EventTypeEnum _$eventTypeEnum_hostPeriodUpdated = const EventTypeEnum._(
 );
 const EventTypeEnum _$eventTypeEnum_terminalSessionPeriodChanged =
     const EventTypeEnum._('terminalSessionPeriodChanged');
+const EventTypeEnum _$eventTypeEnum_computerSessionPeriodChanged =
+    const EventTypeEnum._('computerSessionPeriodChanged');
 const EventTypeEnum _$eventTypeEnum_unknownDefaultOpenApi =
     const EventTypeEnum._('unknownDefaultOpenApi');
 
@@ -284,6 +286,8 @@ EventTypeEnum _$eventTypeEnumValueOf(String name) {
       return _$eventTypeEnum_hostPeriodUpdated;
     case 'terminalSessionPeriodChanged':
       return _$eventTypeEnum_terminalSessionPeriodChanged;
+    case 'computerSessionPeriodChanged':
+      return _$eventTypeEnum_computerSessionPeriodChanged;
     case 'unknownDefaultOpenApi':
       return _$eventTypeEnum_unknownDefaultOpenApi;
     default:
@@ -350,6 +354,7 @@ final BuiltSet<EventTypeEnum> _$eventTypeEnumValues = BuiltSet<EventTypeEnum>(
     _$eventTypeEnum_agentPeriodWakeInput,
     _$eventTypeEnum_hostPeriodUpdated,
     _$eventTypeEnum_terminalSessionPeriodChanged,
+    _$eventTypeEnum_computerSessionPeriodChanged,
     _$eventTypeEnum_unknownDefaultOpenApi,
   ],
 );
@@ -451,6 +456,7 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'agentPeriodWakeInput': 'agent.wake_input',
     'hostPeriodUpdated': 'host.updated',
     'terminalSessionPeriodChanged': 'terminal_session.changed',
+    'computerSessionPeriodChanged': 'computer_session.changed',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
@@ -511,6 +517,7 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'agent.wake_input': 'agentPeriodWakeInput',
     'host.updated': 'hostPeriodUpdated',
     'terminal_session.changed': 'terminalSessionPeriodChanged',
+    'computer_session.changed': 'computerSessionPeriodChanged',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 

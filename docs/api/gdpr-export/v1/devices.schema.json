@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "devices.json",
-  "description": "Devices, sessions (times, login method, last IP), personal API tokens, push targets and terminal hosts and sessions of the person, without tokens or keys. One member per section; each section is written by the participant of the module that owns its table.",
+  "description": "Devices, sessions (times, login method, last IP), personal API tokens, push targets, terminal hosts and sessions and the computer sessions of the person, without tokens or keys. One member per section; each section is written by the participant of the module that owns its table.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "api_tokens",
+    "computer_sessions",
     "devices",
     "host_session_users",
     "hosts",
@@ -16,6 +17,9 @@
   "properties": {
     "api_tokens": {
       "$ref": "sections/devices.api_tokens.schema.json"
+    },
+    "computer_sessions": {
+      "$ref": "sections/devices.computer_sessions.schema.json"
     },
     "devices": {
       "$ref": "sections/devices.devices.schema.json"

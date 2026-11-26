@@ -169,6 +169,8 @@ type lockedCard struct {
 	facts              messaging.CardFacts
 	cur                ComponentRow
 	group              []ComponentRow
+	// computerHeld reports a computer session of the component's run that is not closed (CU-04).
+	computerHeld bool
 }
 
 // createInteraction is the unit of work of Create.
@@ -220,6 +222,11 @@ func (s *Service) lockInteraction(ctx context.Context, row ComponentRow, card me
 		return l, err
 	}
 	l.cur, l.group, err = s.lockForInteraction(ctx, row)
+	c := s.computerSessions()
+	if err != nil || c == nil || l.compRun.ID.IsZero() {
+		return l, err
+	}
+	l.computerHeld, err = c.RunHoldsComputerSession(ctx, l.compRun.ID)
 	return l, err
 }
 
@@ -359,6 +366,7 @@ func interactionResource(l lockedCard) authorize.Resource {
 	}
 	if !l.cur.RunID.IsZero() && l.compRun.ID == l.cur.RunID {
 		ix.ComponentRunActive, ix.RunStarterID = l.compRun.State.Active(), l.compRun.TriggeredBy
+		ix.ComputerHeld = l.computerHeld
 	}
 	return authorize.Resource{
 		Kind: authorize.ResourceComponent, ID: l.cur.ID, ThreadID: l.facts.ThreadID, OwnerID: l.facts.AuthorID,

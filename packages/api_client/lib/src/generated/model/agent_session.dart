@@ -67,7 +67,7 @@ abstract class AgentSession
 
   @BuiltValueField(wireName: r'end_reason')
   AgentSessionEndReasonEnum? get endReason;
-  // enum endReasonEnum {  reset,  rebind,  import,  agent_changed,  };
+  // enum endReasonEnum {  reset,  rebind,  import,  agent_changed,  computer_use,  };
 
   /// The cumulative amount of the external session before it was bound to this row (`agent_sessions.cost_baseline_micros`, 22 9 step 7), in micro units of `currency`; present only when above 0. An adapter whose runtime reports cumulative session values books per run only the part above it (09, 18.7; RK-75).
   @BuiltValueField(wireName: r'cost_baseline_micros')
@@ -358,6 +358,9 @@ class AgentSessionEndReasonEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'agent_changed')
   static const AgentSessionEndReasonEnum agentChanged =
       _$agentSessionEndReasonEnum_agentChanged;
+  @BuiltValueEnumConst(wireName: r'computer_use')
+  static const AgentSessionEndReasonEnum computerUse =
+      _$agentSessionEndReasonEnum_computerUse;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const AgentSessionEndReasonEnum unknownDefaultOpenApi =
       _$agentSessionEndReasonEnum_unknownDefaultOpenApi;

@@ -516,7 +516,7 @@ and `result_expires_at = now + privacy.export_ttl`; its row exists before its ob
 and becomes deliverable only when length and SHA-256 match (12 section 12, row "Export package
 not completed"). `access.json` also holds the person's own
 privacy requests, agents whose credentials the person holds and app installations the person made;
-`devices.json` also holds push targets and terminal hosts and sessions.
+`devices.json` also holds push targets, terminal hosts and sessions and computer sessions ([27](27-computer-use.md)).
 
 ### 5.3 Rectification
 

@@ -109,6 +109,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteWebhookSubscription
   - disableAgent
   - disableChannelTeam
+  - disableComputerDevice
   - disableUser
   - downloadFile
   - downloadGdprExport
@@ -196,6 +197,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listAuditEvents
   - listChannelCommands
   - listChannelThreads
+  - listComputerDesktops
+  - listComputerSessions
   - listCostEstimates
   - listEvents
   - listExpiringAccess
@@ -252,6 +255,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - moveForumTag
   - moveSpace
   - moveThread
+  - openComputerSession
   - openTerminalSession
   - pairHost
   - patchRun
@@ -331,6 +335,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - startRun
   - stepUpWithPassword
   - stopChannelTeam
+  - stopComputerSession
   - submitClientMetrics
   - submitCostReconciliation
   - submitCspReport

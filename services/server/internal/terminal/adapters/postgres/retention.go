@@ -14,7 +14,8 @@ import (
 )
 
 // Retention is the participant of terminal in the job retention.security (M7-05,
-// docs/spec/20-privacy.md 2 and 4.1): terminal_sessions after closed_at, host_session_users and
+// docs/spec/20-privacy.md 2 and 4.1): computer_sessions (CU-04) and terminal_sessions after
+// closed_at, host_session_users and
 // hosts after retired_at of the host. A row another row still holds by a foreign key (a session
 // its session user, a grant its target host) stays until that row is gone.
 type Retention struct {
@@ -32,7 +33,7 @@ func (*Retention) Class() retention.Class { return retention.ClassSecurity }
 
 // Tables returns the tables in the order Purge deletes from them.
 func (*Retention) Tables() []string {
-	return []string{"terminal_sessions", "host_session_users", "hosts"}
+	return []string{"computer_sessions", "terminal_sessions", "host_session_users", "hosts"}
 }
 
 // Purge implements retention.Participant: one batch of at most batch rows per table, each in one
@@ -44,6 +45,14 @@ func (r *Retention) Purge(ctx context.Context, cutoff time.Time, batch int) (int
 		candidates func(ctx context.Context, q *sqlcgen.Queries) ([]pgtype.UUID, error)
 		del        func(ctx context.Context, q *sqlcgen.Queries, id pgtype.UUID) (int64, error)
 	}{
+		{
+			func(ctx context.Context, q *sqlcgen.Queries) ([]pgtype.UUID, error) {
+				return q.ExpiredComputerSessions(ctx, sqlcgen.ExpiredComputerSessionsParams{Cutoff: c, RowLimit: limit})
+			},
+			func(ctx context.Context, q *sqlcgen.Queries, id pgtype.UUID) (int64, error) {
+				return q.DeleteComputerSession(ctx, sqlcgen.DeleteComputerSessionParams{ID: id, Cutoff: c})
+			},
+		},
 		{
 			func(ctx context.Context, q *sqlcgen.Queries) ([]pgtype.UUID, error) {
 				return q.ExpiredTerminalSessions(ctx, sqlcgen.ExpiredTerminalSessionsParams{Cutoff: c, RowLimit: limit})

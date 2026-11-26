@@ -316,7 +316,7 @@ table with the catalogue (section 7.3).
 | `importer` | `import.read`, `import.manage`, `import.apply` |
 | `privacy` | `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download` |
 | `status` | `status.public.read`, `status.read`, `status.manage` |
-| `terminal` | `host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate` |
+| `terminal` | `host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate`, `computer.desktops.list`, `computer.open`, `computer.attach`, `computer.session.read`, `computer.stop`, `computer.device.disable`, `computer.terminate` |
 
 Rationale for borderline cases:
 
@@ -367,7 +367,7 @@ An event type has exactly one producing module. The receive action is in 05 sect
 | `gateway` | | `typing.started` | `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop` |
 | `search` | | `search.assist_requested` | |
 | `stats` | | `stats.live` | `stats.subscribe`, `stats.unsubscribe` (through the shared WebSocket hub) |
-| `terminal` | `host.updated`, `terminal_session.changed` | `host.presence_changed` | none on the shared WebSocket; separate connections with their own ops (05, section 7) |
+| `terminal` | `host.updated`, `terminal_session.changed`, `computer_session.changed` | `host.presence_changed` | none on the shared WebSocket; separate connections with their own ops (05, section 7) |
 
 `messaging` produces `message.updated` for `trigger_state`, even when `runs` triggers the change
 (through `Messages.SetTriggerState`). Reason: one event type, one producer, one payload definition.

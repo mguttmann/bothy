@@ -38,6 +38,10 @@ type UseCases interface {
 	ConnectionLost(ctx context.Context, hostID ids.ID) error
 	StaleReplaced(ctx context.Context, hostID ids.ID) error
 	ResolveDuplicate(ctx context.Context, hostID ids.ID) error
+	// The computer ops of the host service (CU-04, 27 12.3).
+	ComputerStarted(ctx context.Context, l app.Login, sessionID ids.ID, state string) (app.SessionAnswer, domain.CloseCode, error)
+	ComputerState(ctx context.Context, l app.Login, r app.ComputerStateReport) (app.SessionAnswer, domain.CloseCode, error)
+	ComputerEnded(ctx context.Context, l app.Login, sessionID ids.ID, end domain.ComputerEnd) (app.SessionAnswer, domain.CloseCode, error)
 }
 
 // Compile-time check: the use cases of the module.
@@ -442,6 +446,17 @@ func (c *conn) ops(ctx context.Context) {
 			d := f.d.(*rest.HostSessionEnded)
 			a, code, err := c.h.d.UseCases.SessionEnded(ctx, c.k.login, ids.ID(d.SessionId), endOf(d))
 			c.answer(ctx, opSessionEnded, a, code, err)
+		case opComputerStarted:
+			d := f.d.(*rest.HostComputerStarted)
+			a, code, err := c.h.d.UseCases.ComputerStarted(ctx, c.k.login, ids.ID(d.SessionId), string(d.State))
+			c.answer(ctx, opComputerStarted, a, code, err)
+		case opComputerState:
+			a, code, err := c.h.d.UseCases.ComputerState(ctx, c.k.login, computerStateOf(f.d.(*rest.HostComputerState)))
+			c.answer(ctx, opComputerState, a, code, err)
+		case opComputerEnded:
+			d := f.d.(*rest.HostComputerEnded)
+			a, code, err := c.h.d.UseCases.ComputerEnded(ctx, c.k.login, ids.ID(d.SessionId), computerEndOf(d))
+			c.answer(ctx, opComputerEnded, a, code, err)
 		default:
 			// A second identify (Design note 2).
 			c.k.close(domain.CodeDecodeError)

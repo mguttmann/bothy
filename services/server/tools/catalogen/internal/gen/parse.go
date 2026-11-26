@@ -133,7 +133,7 @@ const (
 // Allowed directions (tools/catalog: DIRECTION_TEXT and CHANNEL_DIRECTION_TEXT).
 var (
 	opDirections      = []string{"client_to_server", "agent_to_server", "agent_or_app_to_server", "server_to_client"}
-	channelDirections = []string{"server_to_device", "device_to_server", "server_to_host", "host_to_server", "both"}
+	channelDirections = []string{"server_to_device", "device_to_server", "server_to_host", "host_to_server", "server_to_agent", "agent_to_server", "both"}
 	receivers         = []string{"principal", "agent", "agent_or_app"}
 )
 

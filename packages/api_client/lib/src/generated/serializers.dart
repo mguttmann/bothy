@@ -163,6 +163,18 @@ import 'package:api_client/src/generated/model/component_create.dart';
 import 'package:api_client/src/generated/model/component_restriction.dart';
 import 'package:api_client/src/generated/model/component_type.dart';
 import 'package:api_client/src/generated/model/component_update.dart';
+import 'package:api_client/src/generated/model/computer_attach_hello.dart';
+import 'package:api_client/src/generated/model/computer_attach_identify.dart';
+import 'package:api_client/src/generated/model/computer_close_detail.dart';
+import 'package:api_client/src/generated/model/computer_close_reason.dart';
+import 'package:api_client/src/generated/model/computer_desktop.dart';
+import 'package:api_client/src/generated/model/computer_desktop_list.dart';
+import 'package:api_client/src/generated/model/computer_session.dart';
+import 'package:api_client/src/generated/model/computer_session_changed_event.dart';
+import 'package:api_client/src/generated/model/computer_session_grant.dart';
+import 'package:api_client/src/generated/model/computer_session_list.dart';
+import 'package:api_client/src/generated/model/computer_session_open.dart';
+import 'package:api_client/src/generated/model/computer_session_state.dart';
 import 'package:api_client/src/generated/model/console_session.dart';
 import 'package:api_client/src/generated/model/console_session_view_as.dart';
 import 'package:api_client/src/generated/model/consumer_ack.dart';
@@ -283,6 +295,16 @@ import 'package:api_client/src/generated/model/heartbeat.dart';
 import 'package:api_client/src/generated/model/heartbeat_ack.dart';
 import 'package:api_client/src/generated/model/host.dart';
 import 'package:api_client/src/generated/model/host_channel_hello.dart';
+import 'package:api_client/src/generated/model/host_computer.dart';
+import 'package:api_client/src/generated/model/host_computer_app.dart';
+import 'package:api_client/src/generated/model/host_computer_close.dart';
+import 'package:api_client/src/generated/model/host_computer_disable.dart';
+import 'package:api_client/src/generated/model/host_computer_ended.dart';
+import 'package:api_client/src/generated/model/host_computer_open.dart';
+import 'package:api_client/src/generated/model/host_computer_permissions.dart';
+import 'package:api_client/src/generated/model/host_computer_settings.dart';
+import 'package:api_client/src/generated/model/host_computer_started.dart';
+import 'package:api_client/src/generated/model/host_computer_state.dart';
 import 'package:api_client/src/generated/model/host_confirm.dart';
 import 'package:api_client/src/generated/model/host_create.dart';
 import 'package:api_client/src/generated/model/host_doctor_check.dart';
@@ -853,6 +875,18 @@ part 'serializers.g.dart';
   ComponentRestriction,
   ComponentType,
   ComponentUpdate,
+  ComputerAttachHello,
+  ComputerAttachIdentify,
+  ComputerCloseDetail,
+  ComputerCloseReason,
+  ComputerDesktop,
+  ComputerDesktopList,
+  ComputerSession,
+  ComputerSessionChangedEvent,
+  ComputerSessionGrant,
+  ComputerSessionList,
+  ComputerSessionOpen,
+  ComputerSessionState,
   ConsoleSession,
   ConsoleSessionViewAs,
   ConsumerAck,
@@ -974,6 +1008,16 @@ part 'serializers.g.dart';
   HeartbeatAck,
   Host,
   HostChannelHello,
+  HostComputer,
+  HostComputerApp,
+  HostComputerClose,
+  HostComputerDisable,
+  HostComputerEnded,
+  HostComputerOpen,
+  HostComputerPermissions,
+  HostComputerSettings,
+  HostComputerStarted,
+  HostComputerState,
   HostConfirm,
   HostCreate,
   HostDoctorCheck,
@@ -1528,6 +1572,10 @@ Serializers serializers =
             () => ListBuilder<BuiltMap>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(HostComputerApp)]),
+            () => ListBuilder<HostComputerApp>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsLiveTask)]),
             () => ListBuilder<StatsLiveTask>(),
           )
@@ -1560,6 +1608,10 @@ Serializers serializers =
             () => ListBuilder<Device>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ComputerSession)]),
+            () => ListBuilder<ComputerSession>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Identity)]),
             () => ListBuilder<Identity>(),
           )
@@ -1570,6 +1622,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(EvaluatedFlag)]),
             () => ListBuilder<EvaluatedFlag>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ComputerDesktop)]),
+            () => ListBuilder<ComputerDesktop>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [
@@ -1951,6 +2007,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(HostReportedSessionUser)]),
             () => ListBuilder<HostReportedSessionUser>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, [FullType(String), FullType(int)]),
+            () => MapBuilder<String, int>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Price)]),

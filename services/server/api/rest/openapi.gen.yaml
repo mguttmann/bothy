@@ -21316,6 +21316,241 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /computer/desktops:
+    get:
+      operationId: listComputerDesktops
+      summary: List the desktops of the run's owner
+      tags: [Agent runtime]
+      description: |-
+        The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is `active` and connected, whose last `report` has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header `Invocation-Token` to an active run under tool class `host` that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 `forbidden` with `reason: computer_not_owner_run` or `computer_tool_class`, or 403 `invocation_token_invalid` (`run_inactive` for an ended run). Denials are audited.
+      x-authz-action: computer.desktops.list
+      x-rate-limit-class: rl.agent_runtime
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerDesktopList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                      name: Desk
+                      platform: macos
+                      online: true
+                      locked: false
+                      busy: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /computer/sessions:
+    post:
+      operationId: openComputerSession
+      summary: Open a computer session on a desktop for the bound run
+      tags: [Agent runtime]
+      description: |-
+        Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+      x-authz-action: computer.open
+      x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: auth_flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputerSessionOpen'
+            examples:
+              default:
+                summary: Request
+                value:
+                  host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                  client_ephemeral_key_hash: EXAMPLE-sha256-of-ephemeral-key-base64url00
+                  pin_changed: false
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerSessionGrant'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    session_id: 0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f
+                    token: eyJhbGciOiJFZERTQSIsImtpZCI6InRlcm0tMjAyNi0xMCIsInR5cCI6ImNvbXB1dGVyLXNlc3Npb24rand0In0.EXAMPLE.EXAMPLE
+                    attach_path: /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach
+                    noise_public_key: Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    expires_at: '2026-11-26T09:31:30.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    get:
+      operationId: listComputerSessions
+      summary: List one's own computer sessions
+      tags: [Terminal]
+      description: |-
+        The computer sessions the caller triggered as an active owner, newest first, at most `api.page_size_max` (docs/spec/27-computer-use.md 12.2, 07 2.15 item 5). Metadata only; never an image, the token or its `jti`.
+      x-authz-action: computer.session.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/ComputerSessionStateQuery'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerSessionList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f
+                      host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                      desktop: Desk
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      run_id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
+                      state: active
+                      generation: 3
+                      key_generation: 1
+                      opened_at: '2026-11-26T09:31:00.000Z'
+                      attached_at: '2026-11-26T09:31:01.000Z'
+                      started_at: '2026-11-26T09:31:01.000Z'
+                      paused_ms: 0
+                      action_count: 12
+                      front_app: com.example.editor
+                      version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /computer/sessions/{session_id}/stop:
+    post:
+      operationId: stopComputerSession
+      summary: Stop a computer session
+      tags: [Terminal]
+      description: |-
+        Any active owner in a session stops any computer session of the instance, from any device, without step-up (docs/spec/27-computer-use.md 8.3, 07 2.15 item 4). The session ends with `stopped_by_user` and `close_detail = client_stop`; the server closes both connections and sends `computer.close` to the host service. A closed session answers unchanged. Audited.
+      x-authz-action: computer.stop
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ComputerSessionIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputerSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}/computer/disable:
+    post:
+      operationId: disableComputerDevice
+      summary: Switch the computer enablement of a host off
+      tags: [Terminal]
+      description: |-
+        Any active owner in a session switches the enablement of a host off, from any device, without step-up (docs/spec/27-computer-use.md 4 item 4). The server stores the reported generation as the disabled generation, ends the host's computer session with `device_disabled` in the same transaction and sends `computer.disable` over the control connection; the host stays unlisted until a new local switch-on raises the generation. A host without a reported helper answers unchanged. Switching on is no operation of the API. Audited.
+      x-authz-action: computer.device.disable
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /hosts/{host_id}/terminal/sessions:
     post:
       operationId: openTerminalSession
@@ -23954,6 +24189,18 @@ components:
       description: Only sessions in this state; without it, all states.
       schema:
         $ref: '#/components/schemas/TerminalSessionState'
+    ComputerSessionIdPath:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    ComputerSessionStateQuery:
+      name: state
+      in: query
+      description: Only computer sessions in this state; without it, all states.
+      schema:
+        $ref: '#/components/schemas/ComputerSessionState'
     ConsumerPath:
       name: consumer
       in: path
@@ -27476,7 +27723,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
         end_reason:
           type: string
-          enum: [reset, rebind, import, agent_changed]
+          enum: [reset, rebind, import, agent_changed, computer_use]
         cost_baseline_micros:
           type: integer
           format: int64
@@ -34043,6 +34290,7 @@ components:
       - $ref: '#/components/schemas/AgentWakeInputEvent'
       - $ref: '#/components/schemas/HostUpdatedEvent'
       - $ref: '#/components/schemas/TerminalSessionChangedEvent'
+      - $ref: '#/components/schemas/ComputerSessionChangedEvent'
       discriminator:
         propertyName: type
         mapping:
@@ -34103,6 +34351,7 @@ components:
           agent.wake_input: '#/components/schemas/AgentWakeInputEvent'
           host.updated: '#/components/schemas/HostUpdatedEvent'
           terminal_session.changed: '#/components/schemas/TerminalSessionChangedEvent'
+          computer_session.changed: '#/components/schemas/ComputerSessionChangedEvent'
     MentionItemPage:
       type: object
       description: One page. `next_cursor` is absent on the last page.
@@ -35486,6 +35735,15 @@ components:
           examples: [Debian 13]
         last_seen_at:
           $ref: '#/components/schemas/Timestamp'
+        computer:
+          $ref: '#/components/schemas/HostComputer'
+          description: The reported state of the computer helper (27 12.3); only for active owners with `host.read` (07 2.15 item 5), absent for every other reader, in `host.updated` and while the host service reports none.
+        computer_listed:
+          type: boolean
+          description: The host is a desktop of the reading owner (27 4 item 3); only for active owners, like `computer`.
+        computer_disabled_generation:
+          type: integer
+          description: The enablement generation that `computer.device.disable` switched off (27 4 item 4); only for active owners, absent while none was switched off remotely.
         created_at:
           $ref: '#/components/schemas/Timestamp'
         version:
@@ -35966,6 +36224,9 @@ components:
           type: boolean
         os_version:
           type: string
+        computer:
+          $ref: '#/components/schemas/HostComputer'
+          description: The state of the computer helper (27 4 item 2 and 12.3); absent while `host_service.computer_use` is off. Not a doctor check (the list stays HD1 to HD11).
     HostSessionOpen:
       type: object
       description: The server asks the host service to open the data connection of a session.
@@ -36007,6 +36268,352 @@ components:
           $ref: '#/components/schemas/TerminalCloseDetail'
         exit_code:
           type: integer
+    ComputerSessionState:
+      type: string
+      description: State of a computer session (docs/spec/27-computer-use.md 8.1).
+      enum: [opening, active, paused, closed]
+    ComputerCloseReason:
+      type: string
+      description: Why a computer session ended (docs/spec/27-computer-use.md 8.3).
+      enum: [done, stopped_by_user, device_disabled, run_ended, access_revoked, host_disabled, host_retired, host_rekeyed, host_restarted, connection_lost, open_failed, error]
+    ComputerCloseDetail:
+      type: string
+      description: 'Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).'
+      enum: [local_escape, indicator_stop, client_stop, token_invalid, token_expired, token_replayed, handshake_failed, helper_absent, helper_untrusted, not_enabled, busy, open_timeout, stream_fault, helper_crashed]
+    ComputerSession:
+      type: object
+      description: Metadata of a computer session (03 `computer_sessions`) with the name of its desktop. Never an image, a coordinate, typed text, a key name, the attach token or its `jti`.
+      required: [id, host_id, desktop, user_id, agent_id, run_id, state, generation, key_generation, opened_at, paused_ms, action_count, version]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        desktop:
+          type: string
+          description: The name of the host (`hosts.name`).
+          examples: [Desk]
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          $ref: '#/components/schemas/ComputerSessionState'
+        pause_reason:
+          type: string
+          enum: [locked]
+        generation:
+          type: integer
+          description: The enablement generation the session was opened with (claim `gen`).
+        key_generation:
+          type: integer
+        attached_at:
+          $ref: '#/components/schemas/Timestamp'
+        opened_at:
+          $ref: '#/components/schemas/Timestamp'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        paused_at:
+          $ref: '#/components/schemas/Timestamp'
+        paused_ms:
+          type: integer
+          format: int64
+        closed_at:
+          $ref: '#/components/schemas/Timestamp'
+        stopped_by:
+          $ref: '#/components/schemas/Uuid'
+        close_reason:
+          $ref: '#/components/schemas/ComputerCloseReason'
+        close_detail:
+          $ref: '#/components/schemas/ComputerCloseDetail'
+        action_count:
+          type: integer
+        front_app:
+          type: string
+          description: Identity of the frontmost app of the last `computer.state` (bundle ID or executable name); never a window title.
+          examples: [com.example.editor]
+        version:
+          type: integer
+          format: int64
+    ComputerSessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComputerSession'
+    ComputerSessionOpen:
+      type: object
+      additionalProperties: false
+      required: [host_id, client_ephemeral_key_hash]
+      properties:
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        client_ephemeral_key_hash:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$'
+          description: SHA-256 of the ephemeral X25519 public key that `bothy-computer-mcp` sends in Noise message 1, base64url without padding; becomes the claim `cek`.
+        pin_changed:
+          type: boolean
+          default: false
+          description: '`true` when `bothy-computer-mcp` replaced its pin of the host key after a re-pairing (27 10.4); recorded in the audit entry of `computer.open`.'
+    ComputerSessionGrant:
+      type: object
+      description: Everything `bothy-computer-mcp` needs to attach and run the Noise handshake (27 5.1 step 6). The token is valid once and for `computer.attach_token_ttl`.
+      required: [session_id, token, attach_path, noise_public_key, key_fingerprint, key_generation, expires_at]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        token:
+          type: string
+          description: Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2.
+        attach_path:
+          type: string
+          examples: [/api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach]
+        noise_public_key:
+          type: string
+        key_fingerprint:
+          type: string
+        key_generation:
+          type: integer
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    ComputerDesktop:
+      type: object
+      required: [host_id, name, platform, online, locked, busy]
+      properties:
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+          examples: [Desk]
+        platform:
+          $ref: '#/components/schemas/HostPlatform'
+        online:
+          type: boolean
+        locked:
+          type: boolean
+          description: The screen is locked (`report.computer.locked`).
+        busy:
+          type: boolean
+          description: Another computer session on the host is not closed.
+    ComputerDesktopList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComputerDesktop'
+    HostComputer:
+      type: object
+      additionalProperties: false
+      description: 'The state of the computer helper of a host (schema `host_computer.v1`, docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in `hosts.reported_computer`. Never a path, a key or screen content.'
+      required: [helper, enabled, generation, os_account, permissions, helper_version, signature, locked]
+      properties:
+        helper:
+          type: string
+          enum: [connected, absent, refused]
+        enabled:
+          type: boolean
+        generation:
+          type: integer
+          minimum: 0
+        os_account:
+          type: string
+        permissions:
+          $ref: '#/components/schemas/HostComputerPermissions'
+        helper_version:
+          type: string
+        signature:
+          type: string
+          enum: [verified, development]
+        locked:
+          type: boolean
+    HostComputerPermissions:
+      type: object
+      additionalProperties: false
+      required: [capture, input]
+      properties:
+        capture:
+          type: string
+          enum: [granted, denied, unknown]
+        input:
+          type: string
+          enum: [granted, denied, unknown]
+    HostComputerSettings:
+      type: object
+      description: The server values of a computer session (27 18), sent with `computer.open`.
+      required: [image_max_edge, jpeg_quality, settle_ms, auto_screenshot, wait_max_ms, key_repeat_max, audit_apps_max, status_interval_ms]
+      properties:
+        image_max_edge:
+          type: integer
+        jpeg_quality:
+          type: integer
+        settle_ms:
+          type: integer
+          format: int64
+        auto_screenshot:
+          type: boolean
+        wait_max_ms:
+          type: integer
+          format: int64
+        key_repeat_max:
+          type: integer
+        audit_apps_max:
+          type: integer
+        status_interval_ms:
+          type: integer
+          format: int64
+    HostComputerOpen:
+      type: object
+      description: The server asks the host service to open the computer data connection of a session (27 5.1 step 7); `user_id` is the triggering owner (`sub` of the attach token).
+      required: [session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_name:
+          type: string
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        data_path:
+          type: string
+          examples: [/api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream]
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Without both sides paired and the handshake done until then the session ends `open_failed` with `open_timeout` (`computer.open_timeout`).
+        settings:
+          $ref: '#/components/schemas/HostComputerSettings'
+    HostComputerClose:
+      type: object
+      required: [session_id, reason]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        reason:
+          $ref: '#/components/schemas/ComputerCloseReason'
+    HostComputerDisable:
+      type: object
+      required: [generation]
+      properties:
+        generation:
+          type: integer
+          minimum: 0
+    HostComputerStarted:
+      type: object
+      additionalProperties: false
+      required: [session_id, state]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          type: string
+          enum: [active, paused]
+    HostComputerApp:
+      type: object
+      additionalProperties: false
+      description: Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path.
+      required: [id, name, signer]
+      properties:
+        id:
+          type: string
+          description: Bundle ID or executable name.
+          examples: [com.example.editor]
+        name:
+          type: string
+          description: Display name.
+        signer:
+          type: string
+          description: Team ID or subject of the signer.
+    HostComputerState:
+      type: object
+      additionalProperties: false
+      required: [session_id, state, reason, action_count, front_app]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          type: string
+          enum: [active, paused]
+        reason:
+          type: string
+          enum: ['', locked]
+          description: '`locked` exactly with `paused`, empty otherwise.'
+        action_count:
+          type: integer
+          minimum: 0
+        front_app:
+          $ref: '#/components/schemas/HostComputerApp'
+    HostComputerEnded:
+      type: object
+      additionalProperties: false
+      required: [session_id, close_reason, action_counts, apps, paused_ms]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        close_reason:
+          type: string
+          description: The host service sends only these reasons (27 12.3).
+          enum: [done, stopped_by_user, device_disabled, connection_lost, open_failed, error]
+        close_detail:
+          $ref: '#/components/schemas/ComputerCloseDetail'
+        action_counts:
+          type: object
+          description: A count per action kind of 27 6.4.
+          additionalProperties:
+            type: integer
+            minimum: 0
+        apps:
+          type: array
+          description: Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry.
+          items:
+            $ref: '#/components/schemas/HostComputerApp'
+        paused_ms:
+          type: integer
+          format: int64
+          minimum: 0
+    ComputerAttachHello:
+      type: object
+      description: First text frame of the computer attach connection; `identify` follows, then binary Noise frames only.
+      required: [protocol_versions, server_time]
+      properties:
+        protocol_versions:
+          type: array
+          items:
+            type: integer
+            examples: [1]
+        server_time:
+          $ref: '#/components/schemas/Timestamp'
+    ComputerAttachIdentify:
+      type: object
+      additionalProperties: false
+      description: The single-use attach token of the session (27 5.4); the connection carries no agent token.
+      required: [protocol_version, token]
+      properties:
+        protocol_version:
+          type: integer
+          examples: [1]
+        token:
+          type: string
+    ComputerSessionChangedEvent:
+      description: Durable personal event `computer_session.changed` to the triggering owner (27 12.4); never an image.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [computer_session.changed]
+          payload:
+            $ref: '#/components/schemas/ComputerSession'
     NoiseFrame:
       type: string
       format: binary
