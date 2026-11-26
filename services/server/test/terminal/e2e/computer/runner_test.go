@@ -242,13 +242,15 @@ func (r *runnerMachine) checkTurn(t *testing.T, runID string) {
 			}
 		case "computer_server":
 			servers++
-			want := []string{"BOTHY_COMPUTER_DIR", "BOTHY_COMPUTER_NONCE", "BOTHY_COMPUTER_PINS", "BOTHY_COMPUTER_SERVER", "BOTHY_COMPUTER_TIMEOUT_MS"}
+			// The runner of the stack trusts the TLS front through SSL_CERT_FILE, so the sixth
+			// variable carries that CA to bothy-computer-mcp (D-CU-06-12).
+			want := []string{"BOTHY_COMPUTER_CA_FILE", "BOTHY_COMPUTER_DIR", "BOTHY_COMPUTER_NONCE", "BOTHY_COMPUTER_PINS", "BOTHY_COMPUTER_SERVER", "BOTHY_COMPUTER_TIMEOUT_MS"}
 			if rec.Command != mcpBin || strings.Join(rec.EnvKeys, ",") != strings.Join(want, ",") {
 				t.Errorf("the MCP server of the turn: %s with %v", rec.Command, rec.EnvKeys)
 			}
 		}
 	}
-	t.Logf("runner: %d turn with --mcp-config after --permission-prompts none, %d computer server with the five variables", turns, servers)
+	t.Logf("runner: %d turn with --mcp-config after --permission-prompts none, %d computer server with the five variables and the CA file", turns, servers)
 	if turns != 1 || servers != 1 {
 		t.Errorf("%d turns and %d computer servers, want one each", turns, servers)
 	}
