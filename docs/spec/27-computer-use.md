@@ -245,7 +245,7 @@ kind, and every other type, a wrong direction or a wrong content ends the sessio
 | `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click` | `coordinate` `[x, y]`, optional `modifiers` (`shift`, `ctrl`, `alt`, `cmd`, `win`) | press and release at the point |
 | `mouse_move` | `coordinate` | move the pointer |
 | `cursor_position` | none | `cursor` in the result |
-| `scroll` | `coordinate`, `direction` (`up`, `down`, `left`, `right`), `amount` (1 or more) | scroll at the point |
+| `scroll` | `coordinate`, `direction` (`up`, `down`, `left`, `right`), `amount` (1 up to `computer.scroll_amount_max`) | scroll at the point |
 | `type` | `text` | the text as Unicode input, whatever the keyboard layout |
 | `key` | `keys` (for example `cmd+shift+t`, `Return`, `F5`), optional `repeat` up to `computer.key_repeat_max` | press and release; every key and combination passes |
 | `wait` | `duration_ms` up to `computer.wait_max` | wait, then an image |
@@ -364,8 +364,12 @@ session on the same host is no conflict.
 
 ### 9.1 macOS
 
-- Swift app with Developer ID, hardened runtime, notarized, without sandbox; registered as a
-  LaunchAgent in the GUI domain of the user; the usage texts stand in the helper's `Info.plist`.
+- Swift app with the hardened runtime, without sandbox, signed on the owner's own Mac with the
+  owner's Developer ID Application identity or, where the login keychain holds none, the owner's
+  Apple Development identity, and not notarized (D-CU-01-29, D-CU-02-22); its designated
+  requirement is `identifier "<bundle ID>" and anchor apple generic and certificate
+  leaf[subject.OU] = "<team>"`, so a renewed certificate of the same team keeps the grants; registered as a LaunchAgent in the GUI domain of
+  the user; the usage texts stand in the helper's `Info.plist`.
 - Capture: ScreenCaptureKit (`SCScreenshotManager`, macOS 14 or later), the indicator window
   excluded with `SCContentFilter`. Input: `CGEvent`. App identity:
   `AXUIElementCopyElementAtPosition`, then the process ID, then the bundle ID and team ID.
@@ -375,15 +379,17 @@ session on the same host is no conflict.
 - Esc tap: an event tap that swallows a real Esc while a session is live.
 - Permissions: screen recording and accessibility for the helper's bundle ID; detected with
   `CGPreflightScreenCaptureAccess` and `AXIsProcessTrusted`; the helper offers a link that opens the
-  right pane of the system settings, never grants itself anything and uses no MDM profile. A
-  release test compares the designated requirement of the signed helper with the previous release,
-  because a changed requirement silently voids the grants.
+  right pane of the system settings, never grants itself anything and uses no MDM profile. The
+  signing step compares the designated requirement of the signed helper with the one of the
+  previous signed build and fails on a change, because a changed requirement silently voids the
+  grants.
 - Indicator: a border window around the screen with a stop button, a menu bar item "Agent <name>
   controls this computer, Esc to stop", and the system's own recording indicator.
 
 ### 9.2 Windows
 
-- A C++ Win32 executable with `uiAccess=true` in its manifest, signed with Authenticode, installed
+- A C++ Win32 executable with `uiAccess=true` in its manifest, signed with Authenticode by a
+  self-signed certificate trusted only on the owner's Windows computer (D-CU-01-29), installed
   under `Program Files` (a condition of `uiAccess`), started at login in the interactive session
   (the host MSI writes the start entry); the host service keeps its normal mode, no owner account
   mode is needed.
@@ -399,15 +405,25 @@ session on the same host is no conflict.
 
 ### 9.3 Install, update, doctor
 
-The helper ships with the host service's packages: macOS in the host `.pkg` (`release-apple` of
-`services/host/Makefile`), Windows in the host MSI (`release-windows`). Both packages set
-`host_service.computer_use` only when the person installing selects the helper component. `bothy-host
+The helper is not published (D-CU-01-29): the release packages of `release.yml` carry no helper.
+On the owner's machine the signed helper goes into a host package with an optional helper
+component, built there: macOS a host `.pkg` (`helper-package-macos` of `services/host/Makefile`),
+Windows a host MSI (`helper-package-windows`). Both packages set `host_service.computer_use` only
+when the person installing selects the helper component. `bothy-host
 doctor` prints a section `computer` (no HD check: the doctor list of 24 3.5 stays HD1 to HD11 and the
 server refuses another): helper installed and trusted (9.4), connected, enabled, the permissions of
 9.1 granted, signed or a development build; the same state goes to the server in the `report` object
-`computer` (12.3). A build
-without a signing identity is for development only and says so in the doctor and in the report
-(D-CU-01-22).
+`computer` (12.3). Places (D-CU-02-3): macOS `bothy-computer-helper.app` in
+`/Library/Application Support/bothy-host/bin/` next to `bothy-host` with the LaunchAgent
+`/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
+`%ProgramFiles%\bothy-host\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
+machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule); the enablement's state file
+in the user's account (D-CU-02-4). A package built from a signed helper sets the host service's
+`buildinfo.ComputerHelperRequirement` to the helper's designated requirement (macOS) or the
+publisher subject of the machine's certificate (Windows); a package without one is a development
+build. A build
+without a signature that verifies is for development only and says so in the doctor and in the
+report (D-CU-01-29).
 
 ### 9.4 Local channel between host service and helper
 
@@ -434,6 +450,21 @@ the normal mode with a service user (D-CU-01-26).
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
   Otherwise the connection is closed and logged with `computer_peer_refused`.
+- Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the expected peer is
+  pinned to the service user `bothy-host` (looked up by name; missing or equal to the helper's own
+  user trusts nobody) or root; the socket's peer (`getpeereid`) must be one of them and never the
+  helper's own user, every folder from `/` to `bothy-host` a real folder owned by root and writable
+  by neither group nor others, the endpoint folder owned by root or the service user with the same
+  rule, and the socket itself (`lstat`) owned by the peer. On Windows the pipe server's process
+  (`GetNamedPipeServerProcessId`) runs exactly as `NT SERVICE\bothy-host` or `LocalSystem` and not
+  as the helper's own user; a standard user cannot read a service's token, so the helper then takes
+  the pipe's owner, which must be one of the two (the host service creates the pipe with its own
+  account as owner, `O:SY` or the service SID), and requires the server to run in session 0; an
+  owner or process that cannot be read is refused.
+  Otherwise the helper disconnects and tries again later. A development build (signature
+  `development`) takes its endpoint from the environment variable `BOTHY_COMPUTER_HELPER_CHANNEL`
+  instead and skips this check, for the CI jobs of section 16; a verified build ignores the
+  variable.
 - Protocol: frames of a 4-byte big-endian length (of type byte and content, at most
   `host_service.computer_frame_max_bytes`), one type byte and the content: `0x01` a UTF-8 JSON object,
   `0x02` the bytes of one image, sent directly after the `done` that announces it. The channel
@@ -469,6 +500,38 @@ row is unverified for this helper and is probed by CU-02 (16):
 | Windows | windows with higher integrity take input only from a helper with `uiAccess` (UIPI) |
 | Windows | the UAC prompt on the secure desktop and the secure attention sequence are out of reach of the user session; the helper reports `secure_desktop` (D-CU-01-12) |
 | both | input into a locked session (8.2) |
+
+### 9.6 Stop contract of the helpers
+
+Both helpers keep one contract, held by the conformance vectors
+`services/host/testdata/computer/stop-vectors.json`, which the Swift and the C++ controller tests
+both run (D-CU-02-16):
+
+1. Every action with steps (a press and release per `repeat` of `key`, a character of `type`, a
+   line of `scroll`, a click of a click action, a move) runs one step at a time. Before the first
+   step and before every later one the helper checks one interrupt flag, which the Esc tap, the
+   stop button, the lock monitor and the channel reader (`hide`, `disable`, a broken channel) set
+   directly on their own threads.
+2. When the flag is set, the helper performs no further step, releases every key and button, and
+   answers: `screen_locked` for a lock (the session stays), `invalid_action` after the `stop`
+   frame for a real Esc (`local_escape`) or the stop button (`indicator_stop`), `invalid_action`
+   for `hide` or `disable`, nothing on a broken channel.
+3. A `repeat` above the default of `computer.key_repeat_max`, an `amount` above the default of
+   `computer.scroll_amount_max` and a `text` longer than one frame of
+   `host_service.computer_frame_max_bytes` are `invalid_action` before any step.
+4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts; a stop
+   keeps only the rest of the Esc that is still held, so its auto-repeat and key up are swallowed
+   and stop nothing more; one held Esc stops once; an injected Esc passes and stops nothing.
+
+
+5. The Esc tap of a session belongs to that session: every start of the tap raises a generation,
+   and a tap's callback or teardown acts only while its generation is the current one, checked and
+   done under one lock, so the end of an older tap never removes a newer one.
+6. A person's stop (a real Esc, the stop button) is never cleared by a new session: a `show` while
+   one is pending shows nothing and answers with `stop` for the new session and the person's detail.
+   Only the weaker interrupts (`hide`, `disable`, a broken channel, a lock that has ended) are cleared
+   by a `show`. A person's stop counts only while it is pending: once the helper has sent the
+   `stop` and ended the session, it is consumed and refuses no later `show`.
 
 ## 10. Runner integration
 
@@ -591,7 +654,7 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 | Op | Direction | Content |
 |---|---|---|
 | `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
-| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `audit_apps_max`, `status_interval_ms` |
+| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `scroll_amount_max`, `audit_apps_max`, `status_interval_ms` |
 | `computer.close` | server to host | `{session_id, reason}` |
 | `computer.disable` | server to host | `{generation}` |
 | `computer.started` | host to server | `{session_id, state}` with `active` or `paused` |
@@ -679,12 +742,18 @@ the thread (the agent reports it).
 
 ## 16. Points the build probes
 
-Unverified until the named ticket probes them; each has its fallback.
+Unverified until the named ticket probes them; each has its fallback. The CU-02 rows are probed by
+the jobs `helper-macos` and `helper-windows` of `.github/workflows/host-platform.yml` (the probe
+records, the native jobs `helper-macos-native` and `helper-windows-native` test only where it
+passed); the job results land here after the stage's CI round, which has not run yet. On a real
+Windows 11 computer the helper built with MSVC, its unit tests passed and its signature with the
+machine certificate of D-CU-01-29 verified (D-CU-02-21); capture, input and `uiAccess` were not run
+there.
 
 | Point | Probed by | Fallback when it does not hold |
 |---|---|---|
 | Hosted `macos-15` runners allow screen capture and accessibility without a dialog; `windows-2025` runners have an interactive desktop for capture and `SendInput` | CU-02 (probe job first) | build, signature and doctor tests only on that platform; the gap is recorded in the stage report and in this table |
-| `uiAccess` reaches windows of higher integrity with a helper signed by the instance's certificate, and with a self-signed certificate in the trusted root store | CU-02 | the helper runs without `uiAccess`; elevated windows answer `os_refused` |
+| `uiAccess` reaches windows of higher integrity with a helper signed by a self-signed certificate in the trusted root store of the machine (D-CU-01-29) | CU-02 | the helper runs without `uiAccess`; elevated windows answer `os_refused` |
 | Which lock and screen saver signals are reliable on macOS 14 and 15; whether the display assertion prevents the automatic lock | CU-02 | lock detection by polling the session dictionary every `computer.settle`; no promise about the automatic lock |
 | The Esc tap sees real keys and tells them from the helper's own events on both platforms; its behaviour under Secure Input | CU-02 | stop by the indicator and from the clients only; the stop paths stay |
 | `Windows.Graphics.Capture` shows no border or consent prompt on Windows 11 when DXGI is not usable | CU-02 | DXGI Desktop Duplication only |
@@ -725,6 +794,7 @@ Claude Code runner; Host service = configuration of `bothy-host` on the host.
 | `computer.auto_screenshot` | Server | `true` | an image after every action that changes the screen (6.4) |
 | `computer.wait_max` | Server | `60s` | longest `wait` of one action (6.4) |
 | `computer.key_repeat_max` | Server | `50` | highest `repeat` of one `key` action (6.4) |
+| `computer.scroll_amount_max` | Server | `50` | highest `amount` of one `scroll` action (6.4) |
 | `computer.audit_apps_max` | Server | `32` | most app identities in the audit entry of an end (13.1) |
 | `computer.status_interval` | Server | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) |
 | `host_service.computer_frame_max_bytes` | Host service | `67108864` | longest frame on the helper channel, an image included (9.4); the host service closes a channel that sends a longer one |

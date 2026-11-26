@@ -38,5 +38,40 @@
     <Feature Id="Main" Title="bothy-host">
       <ComponentRef Id="HostBinary" />
     </Feature>
+    <!-- The computer helper (docs/spec/27-computer-use.md 9.2 and 9.3, docs/decisions.d/CU-02.md
+         D-CU-02-10), only in the package built on the owner's machine with
+         -d HelperPath=<bothy-computer-helper.exe> -d HelperScript=<set-computer-use.ps1>
+         (hostdist.py helper-package-windows); the release MSI carries none of it (D-CU-01-29).
+         The feature is off unless selected (ADDLOCAL=ComputerHelper): the helper goes to
+         %ProgramFiles%\bothy-host next to bothy-host.exe (uiAccess needs a protected folder; D-CU-03-7), its start entry
+         to the Run key of the machine, and set-computer-use.ps1 sets host_service.computer_use
+         in the configuration file as the system account. An uninstall removes helper and start
+         entry; the key stays in the configuration like every other key. -->
+    <?ifdef HelperPath?>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="HelperExe" Bitness="always64">
+        <File Id="HelperExeFile" Name="bothy-computer-helper.exe" Source="$(var.HelperPath)" KeyPath="yes" />
+      </Component>
+      <Component Id="HelperConfigScript" Bitness="always64">
+        <File Id="HelperConfigScriptFile" Name="set-computer-use.ps1" Source="$(var.HelperScript)" KeyPath="yes" />
+      </Component>
+      <Component Id="HelperStartEntry" Bitness="always64">
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                       Name="bothy-computer-helper" Type="string"
+                       Value="&quot;[INSTALLFOLDER]bothy-computer-helper.exe&quot;" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+    <Feature Id="ComputerHelper" Title="Computer helper" Level="1000" AllowAbsent="yes"
+             Description="Lets an agent of the owner control this desktop (sets host_service.computer_use).">
+      <ComponentRef Id="HelperExe" />
+      <ComponentRef Id="HelperConfigScript" />
+      <ComponentRef Id="HelperStartEntry" />
+    </Feature>
+    <CustomAction Id="SetComputerUse" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check"
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]set-computer-use.ps1&quot; -Config &quot;[INSTALLFOLDER]config.yaml&quot;" />
+    <InstallExecuteSequence>
+      <Custom Action="SetComputerUse" After="InstallFiles" Condition="&amp;ComputerHelper=3" />
+    </InstallExecuteSequence>
+    <?endif?>
   </Package>
 </Wix>

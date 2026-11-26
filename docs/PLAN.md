@@ -1988,8 +1988,8 @@ parallel on the stage branch and land together in one pull request (P-30).
 ### Owner
 
 OR-1 of 2026-11-26 and the rulings F3, F13 and F14 are recorded as D-CU-01-1, D-CU-01-10 to
-D-CU-01-12. Which certificates sign the helpers is the instance operator's (OQ-08, ADR 0037,
-D-CU-01-22). The manual evaluation with a real model on the owner's Mac and Windows computer is the
+D-CU-01-12. The helpers are not published; the owner signs them on the owner's own machines (Developer ID on
+the Mac, a self-signed certificate trusted only on the Windows computer, D-CU-01-29). The manual evaluation with a real model on the owner's Mac and Windows computer is the
 owner's step after the merge.
 
 ### Risks

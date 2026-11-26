@@ -33,11 +33,10 @@ _PLATFORM_OUT = re.compile(r"\bPLATFORM_OUT=(/\S+)")
 
 
 def steps() -> list[dict[str, Any]]:
-    """The steps of the one job of the workflow."""
+    """The steps of the platform suite job of the workflow."""
     doc = cr.load_yaml(WORKFLOW.read_text(encoding="utf-8"))
     assert isinstance(doc, dict)
-    (job,) = doc["jobs"].values()
-    found = job["steps"]
+    found = doc["jobs"]["platform"]["steps"]
     assert isinstance(found, list)
     return found
 
