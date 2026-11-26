@@ -14,3 +14,10 @@ Collected minors without a reproduced harm; the next run in this area reads and 
   - `note()` in `pipe_channel.cpp` looks up the folder on every line (only at channel changes).
   - No Windows test runs the peer rule across accounts (service account against a person's process);
     the three cross-account defects of 26.11. were found live only.
+- FIX-windows-data-dir (review of 3825c8bd7, 26.11.):
+  - A failed copy of the old data folder (`legacy_data_dir::Migrate` returns `kFailed`) is not
+    logged; path_provider then creates the empty new folder and the copy is never tried again.
+  - `SanitizedDirectoryName` trims ASCII white space only; Dart's `trimRight` in path_provider also
+    trims Unicode white space (only matters for a brand name ending in such a character).
+  - `BRANDING_APP_NAME_W` with non-ASCII characters depends on MSVC's source character set (no
+    `/utf-8`), while `Runner.rc` reads its narrow name as UTF-8; the two folder names could differ.
