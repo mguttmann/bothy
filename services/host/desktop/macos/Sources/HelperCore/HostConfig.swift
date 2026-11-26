@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// The one value the helper takes from the host service's configuration file (D-CU-02-8):

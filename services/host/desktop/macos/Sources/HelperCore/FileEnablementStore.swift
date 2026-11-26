@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// The enablement in the helper's own state file (D-CU-02-4):

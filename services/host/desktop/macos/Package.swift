@@ -1,4 +1,5 @@
 // swift-tools-version:5.9
+// SPDX-License-Identifier: Apache-2.0
 // The computer helper for macOS (docs/spec/27-computer-use.md section 9.1,
 // docs/decisions.d/CU-02.md D-CU-02-1). HelperCore holds the logic behind the platform
 // interfaces and uses Foundation only, so it runs against fakes on any Mac; HelperMac holds

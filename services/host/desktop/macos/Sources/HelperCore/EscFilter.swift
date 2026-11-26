@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// The state of an Esc tap (27 9.6 item 4): which Esc events to swallow and which one stops the

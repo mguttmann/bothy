@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// A JSON value of the helper channel (docs/spec/27-computer-use.md section 9.4).

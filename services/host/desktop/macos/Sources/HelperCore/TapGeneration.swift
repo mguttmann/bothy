@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// The generation of the Esc tap (27 9.6 item 5): every start raises it, and a tap's callback or

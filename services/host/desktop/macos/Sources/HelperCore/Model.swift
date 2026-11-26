@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// A point in the platform's screen space: macOS points of the global display space, origin at

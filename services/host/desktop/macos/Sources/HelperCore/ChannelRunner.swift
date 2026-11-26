@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// Keeps the channel to the host service: connect, `hello`, read frames, and on every break end

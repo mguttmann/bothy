@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// Modifier keys (D-CU-02-7). `cmd` and `win` both name the Command key on macOS.

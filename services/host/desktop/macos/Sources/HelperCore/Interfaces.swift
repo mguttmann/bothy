@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 // The platform interfaces of brief item 13. Every call into the operating system sits behind one

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// Bounds the helper applies itself, so a request can never make it inject for long without a

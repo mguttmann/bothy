@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// What the peer rule needs to know about one file system entry (from `lstat`, so a symbolic
