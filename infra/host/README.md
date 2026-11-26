@@ -15,7 +15,8 @@ Installation packages of the host service `bothy-host` (brief M7-23,
 | `windows/bothy-host.wxs` | the MSI (WiX Toolset): binary and the service `bothy-host`, stopped, start type demand; with `-d HelperPath` also the feature `ComputerHelper` (CU-02) |
 | `macos/com.example.bothy-computer-helper.plist`, `macos/helper-postinstall` | the LaunchAgent of the computer helper and the postinstall of its package choice (CU-02) |
 | `set-computer-use.sh`, `windows/set-computer-use.ps1` | set `host_service.computer_use: true` in the configuration file when the helper component is selected (CU-02) |
-| `windows/start-computer-helper.ps1` | starts the computer helper in the session of the person at the console right after the MSI installed it (the macOS postinstall does the same with `launchctl bootstrap`) |
+| `windows/start-computer-helper.ps1` | starts the computer helper in the session of the person at the console right after the MSI installed it (the macOS postinstall does the same with `macos/start-computer-helper.sh`) |
+| `macos/start-computer-helper.sh` | (re)starts the helper's LaunchAgent in `gui/<uid>`: waits until `launchctl bootout` has removed the old helper, then `bootstrap`, else `kickstart -k` |
 
 What every package does: it installs the binary into the program folder of
 `bothy-host install` (Linux `/opt/bothy-host/bin`, macOS `/Library/Application

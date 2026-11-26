@@ -443,8 +443,8 @@ server refuses another): helper installed and trusted (9.4), connected, enabled,
 `/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
 `%ProgramFiles%\bothy-host\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
 machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule). The installer starts the
-helper at once in the session of the person at the console (macOS `launchctl bootstrap gui/<uid>`
-in the postinstall, Windows `start-computer-helper.ps1` as a deferred action of the system account
+helper at once in the session of the person at the console (macOS `launchctl bootstrap gui/<uid>`,
+after the old helper is gone, in the postinstall, Windows `start-computer-helper.ps1` as a deferred action of the system account
 with a uiAccess token of that session), so no new login is needed; the enablement's state file
 in the user's account (D-CU-02-4). A package built from a signed helper sets the host service's
 `buildinfo.ComputerHelperRequirement` to the helper's designated requirement (macOS) or the
