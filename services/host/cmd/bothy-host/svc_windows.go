@@ -30,6 +30,7 @@ func (h handler) Execute(args []string, req <-chan svc.ChangeRequest, status cha
 	status <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
 	done := make(chan int, 1)
 	go func() { done <- h.run(ctx, slices.Contains(args, "--doctor-once")) }()
+	var stopping <-chan time.Time
 	for {
 		select {
 		case code := <-done:
@@ -37,17 +38,30 @@ func (h handler) Execute(args []string, req <-chan svc.ChangeRequest, status cha
 				return true, uint32(code) //nolint:gosec // small exit codes
 			}
 			return false, 0
+		case <-stopping:
+			// The stop did not finish within stopGrace: the service reports itself stopped and the
+			// process ends, which ends whatever still waits (AUD-PKG-R2-06/9).
+			_, _ = io.WriteString(serviceStderr(io.Discard), "bothy-host: the stop did not finish in time; the process ends\n")
+			return false, 0
 		case c := <-req:
 			if c.Cmd == svc.Interrogate {
 				status <- c.CurrentStatus
 			}
-			if c.Cmd == svc.Stop || c.Cmd == svc.Shutdown {
-				status <- svc.Status{State: svc.StopPending}
+			if (c.Cmd == svc.Stop || c.Cmd == svc.Shutdown) && stopping == nil {
+				status <- svc.Status{State: svc.StopPending, WaitHint: uint32(stopGrace / time.Millisecond)}
 				cancel()
+				stopping = time.After(stopGrace)
 			}
 		}
 	}
 }
+
+// stopGrace bounds a stop of a Windows service of bothy-host: after it the service reports
+// SERVICE_STOPPED and the process ends even if a part still waits. A PTY helper stayed in
+// STOP_PENDING for the rest of every platform run, so its account and profile could not be
+// deleted and the next install failed with "The specified service has been marked for deletion"
+// (run 45854064951). A protocol constant of the service, not a product window.
+const stopGrace = 10 * time.Second
 
 // serviceMode runs run under the service control manager when the process is a Windows service.
 func serviceMode(run func(ctx context.Context, once bool) int) (int, bool) {
