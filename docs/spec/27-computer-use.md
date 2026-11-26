@@ -443,9 +443,14 @@ the normal mode with a service user (D-CU-01-26).
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
   Otherwise the connection is closed and logged with `computer_peer_refused`.
-- Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the socket's peer
-  (`getpeereid`) is not the helper's own user and owns the endpoint folder; on Windows the pipe
-  server's process (`GetNamedPipeServerProcessId`) runs as `NT SERVICE\bothy-host` or `LocalSystem`.
+- Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the expected peer is
+  pinned to the service user `bothy-host` (looked up by name; missing or equal to the helper's own
+  user trusts nobody) or root; the socket's peer (`getpeereid`) must be one of them and never the
+  helper's own user, every folder from `/` to `bothy-host` a real folder owned by root and writable
+  by neither group nor others, the endpoint folder owned by root or the service user with the same
+  rule, and the socket itself (`lstat`) owned by the peer. On Windows the pipe server's process
+  (`GetNamedPipeServerProcessId`) runs exactly as `NT SERVICE\bothy-host` or `LocalSystem` and not
+  as the helper's own user; a process or token that cannot be read is refused.
   Otherwise the helper disconnects and tries again later. A development build (signature
   `development`) takes its endpoint from the environment variable `BOTHY_COMPUTER_HELPER_CHANNEL`
   instead and skips this check, for the CI jobs of section 16; a verified build ignores the
