@@ -60,6 +60,15 @@ class FakeTray implements TrayPort {
     required String quitLabel,
   }) async => shown.add('$tooltip|$openLabel|$quitLabel');
 
+  /// The computer entry after each change (`null` when removed), and `hide` after a hide.
+  final List<String?> computer = [];
+
+  @override
+  Future<void> setComputerEntry(String? label) async => computer.add(label);
+
+  @override
+  Future<void> hide() async => shown.add('hide');
+
   @override
   Stream<TrayAction> get actions => _actions.stream;
 

@@ -3,7 +3,8 @@
 /// Screen M9 of the phone, hosts and sessions (docs/spec/01-product.md 5.3 M9; brief M5-12
 /// Design note 1): the hosts the person may see with their connection, the badge of the LLM
 /// login and the person's own sessions; a tap on a session attaches it in M8, "New session"
-/// opens one.
+/// opens one. For an owner each host with a computer helper shows its computer control (brief
+/// CU-07; 27 11 item 3).
 ///
 /// It uses the controllers of the desktop (M4-36): `hostsListProvider` (REST, reloaded after
 /// the host events of `sync_engine`, and once when the screen opens) and `terminalTabsProvider`.
@@ -22,6 +23,7 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:terminal_ui/terminal_ui.dart' show TerminalPhase, llmLoginBadge;
 
+import '../../computer/desktop_entry.dart';
 import '../../terminal/providers.dart';
 
 /// The path of M8 for [hostId].
@@ -88,6 +90,8 @@ class _HostsScreenState extends ConsumerState<HostsScreen> {
             onOpen: () => context.go(terminalPathOf(host.id)),
             onSession: (s) => unawaited(_attach(host, s)),
             onNew: (p) => _newSession(host, p),
+            onComputerChanged: () =>
+                unawaited(ref.read(hostsListProvider.notifier).reload()),
           ),
       ],
     );
@@ -125,6 +129,7 @@ class _HostCard extends StatelessWidget {
     required this.onOpen,
     required this.onSession,
     required this.onNew,
+    required this.onComputerChanged,
   });
 
   final Host host;
@@ -133,6 +138,9 @@ class _HostCard extends StatelessWidget {
   final VoidCallback onOpen;
   final ValueChanged<TerminalSession> onSession;
   final ValueChanged<HostProfile> onNew;
+
+  /// Runs after the enablement of the host was switched off (CU-07).
+  final VoidCallback onComputerChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +229,18 @@ class _HostCard extends StatelessWidget {
               ),
             ),
           ),
+          // CU-07: the computer control of the host, for owners only (27 11 item 3).
+          if (ComputerDesktopView.of(
+                hostId: host.id,
+                name: host.name,
+                computer: host.computer,
+                disabledGeneration: host.computerDisabledGeneration,
+              )
+              case final desktop?)
+            ComputerDesktopEntry(
+              desktop: desktop,
+              onChanged: onComputerChanged,
+            ),
           for (final (i, s) in sessions.indexed)
             DsTappable(
               key: ValueKey('phone.hosts.session.${s.id}'),

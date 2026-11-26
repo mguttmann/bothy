@@ -9,6 +9,8 @@ import 'dart:async';
 
 import 'package:window_manager/window_manager.dart';
 
+import 'tray.dart' show TrayWindow;
+
 /// What the window reports (the events of `window_manager`).
 enum DesktopWindowEvent {
   /// The person asked to close the window (only reported while closing is prevented).
@@ -158,7 +160,7 @@ final class WindowManagerWindow with WindowListener implements DesktopWindow {
 /// await behavior.start();
 /// behavior.activeChanges.listen((active) => focus.setVisible(threads, idle: !active));
 /// ```
-final class WindowBehavior {
+final class WindowBehavior implements TrayWindow {
   /// Creates the behavior of [window].
   WindowBehavior({
     required this.window,
@@ -217,9 +219,11 @@ final class WindowBehavior {
   }
 
   /// Shows the window from the notification area and brings it to the front.
+  @override
   Future<void> open() => window.show();
 
   /// Ends the connection and the app; a second call waits for the first.
+  @override
   Future<void> quit() => _quit ??= () async {
     try {
       await _shutdown();

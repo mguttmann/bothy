@@ -441,7 +441,10 @@ AppPorts productionPorts({
             guid: LocalNotificationPresenter.guidFor(branding.bundleId),
           ),
     window: phone ? const NoDesktopWindow() : WindowManagerWindow(),
-    tray: Platform.isWindows ? TrayManagerTray() : const NoTray(),
+    // macOS: the menu bar icon only while a computer session is live (D-CU-07-4).
+    tray: Platform.isWindows || Platform.isMacOS
+        ? TrayManagerTray()
+        : const NoTray(),
     startAtLogin: phone
         ? AppPorts._noStartAtLogin
         : () => platformStartAtLogin(appName: branding.appName),

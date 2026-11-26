@@ -282,6 +282,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     ref.watch(appTelemetryProvider);
     // The window in the notification area and the tray icon on Windows (M4-30).
     ref.watch(desktopShellProvider);
+    // The tray entry that stops the owner's computer sessions (CU-07, 27 11 item 4).
+    ref.watch(computerTrayProvider);
     // Push on iOS, macOS and Android follows the signed-in account (M5-04, M5-05).
     ref.watch(pushPlatformProvider);
     // Sharing on iOS and macOS follows the signed-in account (M5-06).
