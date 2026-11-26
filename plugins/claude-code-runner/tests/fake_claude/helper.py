@@ -51,10 +51,16 @@ def update(wrapper: Path, scenario: dict[str, Any]) -> None:
 
 
 def read_capture(capture: Path) -> list[dict[str, Any]]:
-    """Return the recorded calls in order (empty when nothing ran)."""
+    """Return the recorded calls in order (empty when nothing ran).
+
+    A fake process may be appending a record while this reads the file, so a last line without
+    its newline is a record still being written and is left for the next read.
+    """
     if not capture.exists():
         return []
-    return [json.loads(line) for line in capture.read_text().splitlines() if line.strip()]
+    text = capture.read_text()
+    complete = text[: text.rfind("\n") + 1]
+    return [json.loads(line) for line in complete.splitlines() if line.strip()]
 
 
 def turns(capture: Path) -> list[dict[str, Any]]:

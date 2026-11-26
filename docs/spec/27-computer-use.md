@@ -3,7 +3,7 @@
 Status: normative, planned (CU). Stage "CU Computer use" ([PLAN](../PLAN.md) section 23).
 Normative for computer sessions: an agent in a run of the owner sees the screen of a desktop of
 the owner and operates its mouse and keyboard. Decision:
-[ADR 0078](../adr/0078-agent-computer-use-on-a-paired-desktop.md). Design note with the evidence
+[ADR 0079](../adr/0079-agent-computer-use-on-a-paired-desktop.md). Design note with the evidence
 and the facts of the first draft that the source contradicted:
 [computer-use.md](../design/computer-use.md); where the note and this chapter differ, this chapter
 applies. Rulings of the specification ticket: [decisions.d/CU-01.md](../decisions.d/CU-01.md).

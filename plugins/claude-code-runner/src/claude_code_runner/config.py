@@ -137,6 +137,7 @@ class RunnerConfig:
         anthropic_api_key_ref: ``runner.anthropic_api_key_ref`` (``None`` when empty).
         allow_personal: ``runner.allow_personal``.
         forward_ssh_agent: ``runner.forward_ssh_agent``.
+        cli_telemetry: ``runner.cli_telemetry``.
         cli_probe_timeout: ``runner.cli_probe_timeout``.
         poll_interval: ``runner.poll_interval``.
         claude_bin: ``runner.claude_bin``.
@@ -265,6 +266,7 @@ class RunnerConfig:
     anthropic_api_key_ref: SecretRef | None
     allow_personal: bool
     forward_ssh_agent: bool
+    cli_telemetry: bool
     cli_probe_timeout: float
     poll_interval: float
     claude_bin: str
@@ -739,6 +741,7 @@ def load_config(path: Path) -> RunnerConfig:
         anthropic_api_key_ref=r.secret_ref("anthropic_api_key_ref"),
         allow_personal=r.get("allow_personal", bool, False),
         forward_ssh_agent=r.get("forward_ssh_agent", bool, False),
+        cli_telemetry=r.get("cli_telemetry", bool, False),
         cli_probe_timeout=_positive(r, "cli_probe_timeout", "30s"),
         poll_interval=_positive(r, "poll_interval", "200ms"),
         claude_bin=claude_bin,

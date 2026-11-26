@@ -136,6 +136,17 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   loads no settings of the user ("Turns of built-in agents").
 - `runner.forward_ssh_agent` gives every turn the runner user's SSH keys; keep it off unless the
   projects need it.
+- `runner.cli_telemetry` (default `false`) keeps the Claude Code CLI from sending usage metrics,
+  error reports and other non-essential traffic to its vendor: the runner sets
+  `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`
+  for every CLI it starts. Besides the model calls one request can still leave the host: before
+  a WebFetch call the CLI sends the requested hostname to `api.anthropic.com` for its domain
+  safety check, which these switches do not turn off. Only a turn that may use WebFetch makes
+  it: class `host`, and class `scoped` when `runner.scoped_allowed_tools` names WebFetch; class
+  `chat` has no built-in tools. The CLI documents that these
+  switches also turn off its feature-flag evaluation; the runner's background mode is tested
+  with them set. `true` sets none of them; a value in the runner's own environment never reaches
+  the CLI either way.
 - Keep `runner.progress_patch_interval` below `run.stall_after` of the server, else a run whose
   only progress is a long running tool gets the stall notice; the runner cannot read the server
   value.

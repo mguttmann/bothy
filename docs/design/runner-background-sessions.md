@@ -287,7 +287,9 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
    `worktree.bgIsolation` `"none"`, `permissions.denyInsteadOfPrompting` `true` (a hosted turn
    keeps the members of its own `permissions` beside it), and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`,
    the run's `TMPDIR` and `SSH_AUTH_SOCK`, every name in every file (the agent socket with
-   `runner.forward_ssh_agent`, else the empty text; 4.16). It sets `crossSessionInbound`
+   `runner.forward_ssh_agent`, else the empty text; 4.16), and while `runner.cli_telemetry` is
+   `false` also `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and
+   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` (09 18.2). It sets `crossSessionInbound`
    `"accept"` only when the host user's own `settings.json` gives that setting the value
    `"hold"` (4.14). Reasons: the launching command's environment does not reach the session (item 7);
    without `bgIsolation` `"none"` the session would move into a worktree of its own, against

@@ -131,6 +131,12 @@ public domain (https://sqlite.org/copyright.html). Both are bundled native code,
 the lock file: OSV-Scanner does not see them and `quality/licenses/allowed.txt` stays unchanged;
 MIT is on that list (docs/DECISIONS.md D-M4-12-9).
 
+The MSIX of the Windows app carries the Visual C++ runtime (`msvcp140.dll`, `vcruntime140.dll`,
+`vcruntime140_1.dll`), proprietary Microsoft files, unmodified from the redist folder of the
+Visual Studio that builds the app, which Microsoft lists as Distributable Code
+([ADR 0078](../adr/0078-visual-c-runtime-in-the-windows-package-from-the-toolchain-redist.md),
+`tools/distribution/windows.py`). The build log names the redist version it took.
+
 ## Third-party services of the installation
 
 The Compose stack (`infra/compose/compose.yaml`) pulls the images below unchanged from their

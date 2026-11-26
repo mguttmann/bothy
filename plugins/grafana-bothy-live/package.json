@@ -77,6 +77,7 @@
   "packageManager": "npm@11.17.0",
   "overrides": {
     "react-router@6": "7.18.5",
-    "glob": "$glob"
+    "glob": "$glob",
+    "i18next@<26.3.4": "26.5.2"
   }
 }

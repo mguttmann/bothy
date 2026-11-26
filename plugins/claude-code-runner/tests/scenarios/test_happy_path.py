@@ -29,6 +29,9 @@ ALLOWED_ENV = {
     "ANTHROPIC_API_KEY",
     "CLAUDE_CONFIG_DIR",
     "CLAUDE_PRODUCT_RUN",
+    "DISABLE_TELEMETRY",
+    "DISABLE_ERROR_REPORTING",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
 }
 
 
@@ -88,6 +91,7 @@ async def test_happy_path_organization(world: World) -> None:
     assert set(turn["env"]) <= ALLOWED_ENV | {"__CF_USER_TEXT_ENCODING"}
     assert turn["env"]["ANTHROPIC_API_KEY"] == API_KEY
     assert turn["env"]["CLAUDE_PRODUCT_RUN"] == "1"
+    assert turn["env"]["DISABLE_TELEMETRY"] == "1"
     assert turn["env"]["CLAUDE_CONFIG_DIR"] == str(world.state / "claude-config" / "organization")
     assert Path(turn["cwd"]).resolve() == (world.projects / "website").resolve()
     assert (files_dir / str(attachment)).read_bytes() == b"file canary content"

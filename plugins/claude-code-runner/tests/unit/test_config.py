@@ -47,6 +47,7 @@ def test_defaults_and_required(tmp_path: Path) -> None:
     assert cfg.dpop_key_ref is None
     assert cfg.allow_personal is False
     assert cfg.forward_ssh_agent is False
+    assert cfg.cli_telemetry is False
     assert cfg.cli_probe_timeout == 30.0
     assert cfg.poll_interval == 0.2
     assert cfg.claude_bin == "claude"
@@ -174,6 +175,12 @@ def test_check_argument() -> None:
     assert check_argument("Bash(git status)")
     for bad in ("", "-x", "a\x00b", "a\nb", "a\u200fb", "a\u2066b"):
         assert not check_argument(bad)
+
+
+def test_cli_telemetry_is_a_bool(tmp_path: Path) -> None:
+    assert load_config(write(tmp_path, "cli_telemetry = true\n")).cli_telemetry is True
+    with pytest.raises(ConfigError, match="cli_telemetry"):
+        load_config(write(tmp_path, 'cli_telemetry = "yes"\n'))
 
 
 def test_example_lists_every_runner_key() -> None:

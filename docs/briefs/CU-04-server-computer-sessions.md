@@ -11,7 +11,7 @@ After this ticket the server keeps computer sessions in the module `terminal`: t
 - `docs/spec/27-computer-use.md` sections 4, 5, 8, 12, 13, 14, 15 (CU-T01 to CU-T06, CU-T16 to CU-T18), 18; `docs/spec/07-permissions.md` 2.15, SR2, SR7, SR9, SR13, R-RE-14; `docs/spec/05-actions.md` R-AZ-38 and section 5 "Check without a request"; `docs/spec/03-data-model.md` 4.14 (`hosts`, `computer_sessions`), R-DM-65.
 - `docs/spec/24-terminal.md` 5.3, 6.1, 8.3, 9 (several nodes), 10; `docs/spec/09-agents.md` 4.5 (invocation token), 5.1 (end states).
 - Code on the base branch: `services/server/internal/terminal` (`app/sessions_open.go`, `app/token.go`, `app/revocation.go`, `adapters/wsrelay/relay.go`, `control.go`, `hostdata.go`, `stream.go`, `domain/token.go`), `internal/authz/domain/terminal.go`, `internal/runs` (where a run reaches an end state), `internal/wire/retention_coverage_test.go`, `services/server/migrations`, `docs/api/openapi.yaml`, `docs/api/asyncapi.yaml`, `services/server/api/operations.yaml`, `docs/spec/actions.yaml`, `services/server/architecture/modules.yaml`.
-- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
+- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0079; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
 
@@ -120,7 +120,7 @@ make check
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - An entry `changelog.d/CU-04.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/CU-04.md`, one row each with date, ruling and reason; every name that differs from chapter 27 is a ruling and a change of chapter 27 in the same commit.
-- An ADR only if you take an architecture decision beyond ADR 0078 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond ADR 0079 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green for the components you changed.
 - An independent review of your diff by a fresh reviewer (one follow-up round at most); record its verdict. The red team of the stage runs once over the whole stage diff before the pull request; it checks at least, for this ticket: no run other than the owner's own `host` run lists, opens or attaches; the attach token is single-use and bound; a remote disable holds; every revocation and the end of the run end the session in the same transaction; no screenshot byte reaches a table, log, audit entry, event or telemetry; terminal sessions behave as before.
 

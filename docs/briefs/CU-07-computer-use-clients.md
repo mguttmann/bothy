@@ -10,7 +10,7 @@ After this ticket the apps show computer use: a status chip in the thread of a r
 
 - `docs/spec/27-computer-use.md` sections 4, 8.1 to 8.3, 11, 12.2, 12.4; `docs/spec/01-product.md` 3.9; `docs/spec/15-client-architecture.md` R-CL-17 and R-CL-18; `docs/spec/07-permissions.md` 2.15.
 - Code on the base branch after CU-04: `apps/client/lib/terminal/` (host list and settings as the model), `apps/client/lib/desktop/tray.dart`, the thread view and its run chips, `packages/admin_ui` (host settings of the console), the generated Dart client and `packages/sync_engine` (fake server and event catalogue).
-- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
+- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0079; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
 
@@ -106,7 +106,7 @@ make check
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - An entry `changelog.d/CU-07.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/CU-07.md`, one row each with date, ruling and reason; every name that differs from chapter 27 is a ruling and a change of chapter 27 in the same commit.
-- An ADR only if you take an architecture decision beyond ADR 0078 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond ADR 0079 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green for the components you changed.
 - An independent review of your diff by a fresh reviewer (one follow-up round at most); record its verdict. The red team of the stage runs once over the whole stage diff before the pull request; it checks at least, for this ticket: no view shows or caches a screenshot; no switch turns an enablement on; stop and switch-off reach the API from every platform; non-owners see nothing.
 

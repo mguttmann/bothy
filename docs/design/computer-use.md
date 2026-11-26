@@ -2,7 +2,7 @@
 
 Status: design of 2026-11-26, revised the same day after the owner ruling OR-1 (section 0). Ticket
 CU-01 turned it into the normative [chapter 27](../spec/27-computer-use.md), 07 2.15 and SR13, the
-tables of 03, the threat model sections 5.18 and 6.10, [ADR 0078](../adr/0078-agent-computer-use-on-a-paired-desktop.md),
+tables of 03, the threat model sections 5.18 and 6.10, [ADR 0079](../adr/0079-agent-computer-use-on-a-paired-desktop.md),
 the rulings [decisions.d/CU-01.md](../decisions.d/CU-01.md), [PLAN](../PLAN.md) section 23 and the
 briefs CU-02 to CU-07. Nothing of it is built yet. This note keeps the goal, the evidence, the
 comparison of the approaches and the facts of the first draft that the source contradicted; where
@@ -53,7 +53,7 @@ Done criterion of the first stage (macOS and Windows, owner only):
    layout).
 5. The whole path runs in CI on Linux with Xvfb and XTest, without GUI tests on the owner's
    machines: runner, MCP server, relay, Noise, host session, coordinates.
-6. ADR 0078 accepted; the `never` rows, SPEC sections 4 and 5, the threat model and the privacy
+6. ADR 0079 accepted; the `never` rows, SPEC sections 4 and 5, the threat model and the privacy
    chapter changed in the same change (CU-01).
 
 ## 2. Model: what Claude Cowork does
@@ -115,12 +115,12 @@ The built-in tool acts on the runner's machine, needs an interactive session and
 The agent opens the session itself, only in a run the owner started with an own message
 (`origin = 'human'`) and only on a desktop of the owner with an active enablement. No card, no
 lease, no confirmation at the target, no step-up per session. R-AZ-03 is untouched because
-`computer.open` is no step-up action. T-TM-09 ("agents never reach a host") is reworded in ADR 0078:
+`computer.open` is no step-up action. T-TM-09 ("agents never reach a host") is reworded in ADR 0079:
 an agent reaches a desktop only in the owner's run and only on a machine enabled locally.
 
 ### E4: Specification first
 
-CU-01 before any code: OR-1 as a ruling, ADR 0078, the `never` rows of 01, SPEC sections 4 to 6,
+CU-01 before any code: OR-1 as a ruling, ADR 0079, the `never` rows of 01, SPEC sections 4 to 6,
 the threat model. SPEC section 6 requires a new ADR for a weakened invariant, and the threat model
 treats every new flow across a boundary without an entry as a merge blocker (section 9 there).
 

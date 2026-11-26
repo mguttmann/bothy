@@ -488,6 +488,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.anthropic_api_key_ref` |  | Runner |  | empty | `secret_ref` of the API key for `organization`; empty means: `organization` cannot be proven |  |
 | `runner.allow_personal` |  | Runner |  | `false` | runs in mode `personal` with the login of the runner user allowed |  |
 | `runner.forward_ssh_agent` |  | Runner |  | `false` | pass `SSH_AUTH_SOCK` on to the turn |  |
+| `runner.cli_telemetry` |  | Runner |  | `false` | `false`: every CLI the runner starts gets `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` (18.2); `true` sets none of them |  |
 | `runner.cli_probe_timeout` |  | Runner |  | `30s` | time limit for `claude auth status` and `claude --version`; above zero |  |
 | `runner.poll_interval` |  | Runner |  | `200ms` | interval at which the runner checks the recording for new lines and a held lock again; above zero |  |
 | `runner.progress_patch_interval` |  | Runner |  | `2m` | `tool_progress` becomes a patch of `/metrics/progress_events` only when the last stored patch of the run is older than this; must stay below the server's `run.stall_after` (18.4, addendum of 2026-10-24) |  |

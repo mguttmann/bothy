@@ -57,7 +57,7 @@ Features that Bothy deliberately never offers. The complete list with a reason p
 - A marketplace for bots of third-party vendors.
 - Recording of terminal content, and a terminal session for agents or apps. An agent operates a
   desktop only as computer use on a desktop the owner enabled, in a run the owner started
-  ([27](spec/27-computer-use.md), [ADR 0078](adr/0078-agent-computer-use-on-a-paired-desktop.md));
+  ([27](spec/27-computer-use.md), [ADR 0079](adr/0079-agent-computer-use-on-a-paired-desktop.md));
   that exception exists for the owner only.
 
 ## 5. Anti-goals

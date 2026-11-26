@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The runner side of computer use (docs/spec/27-computer-use.md 10, ADR 0078).
+"""The runner side of computer use (docs/spec/27-computer-use.md 10, ADR 0079).
 
 With ``runner.computer_use`` every turn under tool class ``host`` loads the MCP server
 ``bothy-computer-mcp`` (C1 of chapter 27) through a per-turn MCP file, and the runner talks to the

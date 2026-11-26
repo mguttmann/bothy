@@ -12,7 +12,7 @@ After this ticket `bothy-host` conducts computer sessions: the frame types of `d
 - `docs/spec/24-terminal.md` 2.2 (host service, doctor, install), 3.5 (control connection), 5.2 to 5.4 (Noise, token checks, frames), 6.1 and 6.4 (opening, confirmation endpoint and its peer rule), 10.3 (close details).
 - `services/host/testdata/computer/channel-vectors.json`.
 - Code on the base branch: `services/host/internal/frame`, `internal/noise`, `internal/session` (`manager.go`, `verify.go`, `handshake.go`, `dataconn.go`), `internal/control` (`frames.go`, `sessions.go`, `data.go`), `internal/confirm` (`server.go`, the console-user rule), `internal/localchan` (peer credentials), `internal/doctor`, `internal/config`, `cmd/bothy-host`, `docs/api/asyncapi.yaml` (channels `hostControl` and `hostData`).
-- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
+- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0079; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
 
@@ -122,7 +122,7 @@ make check
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - An entry `changelog.d/CU-03.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/CU-03.md`, one row each with date, ruling and reason; every name that differs from chapter 27 is a ruling and a change of chapter 27 in the same commit.
-- An ADR only if you take an architecture decision beyond ADR 0078 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond ADR 0079 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green for the components you changed.
 - An independent review of your diff by a fresh reviewer (one follow-up round at most); record its verdict. The red team of the stage runs once over the whole stage diff before the pull request; it checks at least, for this ticket: no computer frame is accepted on a terminal session and the reverse; the checks of 5.3 cannot be passed with a terminal token, a replayed token or another run's token; only the trusted helper reaches the channel; every end releases every key; no image touches the disk.
 

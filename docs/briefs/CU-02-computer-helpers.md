@@ -12,7 +12,7 @@ After this ticket the "Bothy Computer Helper" exists for macOS (Swift) and Windo
 - `docs/spec/24-terminal.md` 2.2 (packages and install of the host service), 6.4 (the confirmation agent and its console-user rule, the model for the peer side); `docs/spec/18-release.md` 6.3 (the host package chain the helper packages reuse); `docs/decisions.d/CU-01.md` D-CU-01-29 (signing on the owner's machines).
 - `services/host/testdata/computer/channel-vectors.json` (the channel vectors every codec must read).
 - Code on the base branch: `services/host/Makefile` (targets `release-apple`, `release-windows`, `platform-test`), `tools/distribution/hostdist.py` (its package and signing steps, which the helper packages reuse), `.github/workflows/host-platform.yml`, `infra/host/` (package definitions), `services/host/internal/confirm` (dialog agent in the desktop session).
-- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
+- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0079; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
 
@@ -126,7 +126,7 @@ make check
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - An entry `changelog.d/CU-02.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/CU-02.md`, one row each with date, ruling and reason; every name that differs from chapter 27 is a ruling and a change of chapter 27 in the same commit.
-- An ADR only if you take an architecture decision beyond ADR 0078 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond ADR 0079 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green for the components you changed.
 - An independent review of your diff by a fresh reviewer (one follow-up round at most); record its verdict. The red team of the stage runs once over the whole stage diff before the pull request; it checks at least, for this ticket: the helper refuses nothing the operating system accepts; a real Esc and the stop button always end the session; an injected Esc never does; no key stays pressed after any end; the enablement cannot be switched on except by a click at the machine; the indicator is never in a screenshot; no image is written to disk.
 

@@ -2009,7 +2009,7 @@ The rules are in [07-permissions.md](07-permissions.md):
 - Agents and apps never open a terminal: the actions require a person in a session;
   an agent that is controlled by prompt injection reaches no host through a terminal. The only
   way an agent reaches a host is computer use on a desktop of the owner in a run the owner
-  started (SR13, [27-computer-use.md](27-computer-use.md), ADR 0078, T-CU-02).
+  started (SR13, [27-computer-use.md](27-computer-use.md), ADR 0079, T-CU-02).
 
 ### 8.3 Revocation
 
@@ -2353,7 +2353,11 @@ throughput between about 2.1 and 3.3 MiB/s in two runs for an unthrottled burst 
 chunk and a frame-to-paint p95 of 17 ms. Later on 2026-10-24 the chunks shrank to 8 KiB (512 chunks,
 the same 4 MiB): the host's send queue counts messages, one per PTY read, `fold` flushes each line,
 and a 64 KiB chunk could exceed the queue on a loaded runner; the throughput of this form includes
-512 round trips and is not comparable with the earlier values. `cryptography` 2.9.0 runs the handshake in the tab. OSV
+512 round trips and is not comparable with the earlier values. The web console has the same
+targets as the desktop apps, `client.perf.terminal_frame_to_paint_p95` and
+`client.perf.terminal_throughput_min`; the measured values above miss them, and reaching them
+(for example a rebuild of the view only on a change of the terminal model) and a gate on them
+follow after V1 (plan row V3-62, docs/decisions.d/AUD-PKG-R2-owner-ops.md). `cryptography` 2.9.0 runs the handshake in the tab. OSV
 (https://api.osv.dev, ecosystem `Pub`) listed no vulnerability for `xterm` or `cryptography` on
 2026-10-21 [verified].
 

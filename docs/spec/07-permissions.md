@@ -315,7 +315,7 @@ these values (R-AZ-37).
 ### 2.15 Computer use
 
 Normative together with [27-computer-use.md](27-computer-use.md) (stage CU, owner ruling OR-1 of
-2026-11-26, [ADR 0078](../adr/0078-agent-computer-use-on-a-paired-desktop.md)).
+2026-11-26, [ADR 0079](../adr/0079-agent-computer-use-on-a-paired-desktop.md)).
 
 1. Computer use has no grant and no capability: the target `host` keeps only `terminal` (R-TM-04),
    and no grant to a person, group, agent or app opens a desktop. It is the owner's alone (SR13).

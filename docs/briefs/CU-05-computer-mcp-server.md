@@ -12,7 +12,7 @@ After this ticket `bothy-computer-mcp` exists: a `stdio` MCP server named `bothy
 - `docs/spec/09-agents.md` 18.19.8 (the request folder pattern of `bothy-wake`).
 - Model Context Protocol specification of the version the pinned Claude Code speaks (https://modelcontextprotocol.io/specification, retrieve it and record the version and date in the README).
 - Code on the base branch after CU-03 and CU-04: `services/host/internal/noise`, `internal/frame` (computer types), the attach channel of the server (`computerAttach` in `docs/api/asyncapi.yaml`), `services/host/go.mod`.
-- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
+- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0079; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
 
@@ -110,7 +110,7 @@ make check
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - An entry `changelog.d/CU-05.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/CU-05.md`, one row each with date, ruling and reason; every name that differs from chapter 27 is a ruling and a change of chapter 27 in the same commit.
-- An ADR only if you take an architecture decision beyond ADR 0078 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond ADR 0079 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green for the components you changed.
 - An independent review of your diff by a fresh reviewer (one follow-up round at most); record its verdict. The red team of the stage runs once over the whole stage diff before the pull request; it checks at least, for this ticket: no credential other than the attach token reaches the process; a changed host key with the same generation refuses the session; nothing but pins and request files reaches the disk; `batch` cannot continue after a failure.
 

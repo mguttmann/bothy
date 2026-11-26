@@ -220,7 +220,7 @@ web console M6.
 ### 3.9 Computer use
 
 Normative: [27-computer-use.md](27-computer-use.md) (owner ruling OR-1 of 2026-11-26,
-[ADR 0078](../adr/0078-agent-computer-use-on-a-paired-desktop.md)). Stage CU: helpers and host
+[ADR 0079](../adr/0079-agent-computer-use-on-a-paired-desktop.md)). Stage CU: helpers and host
 service CU-02 and CU-03, server CU-04, MCP server CU-05, runner CU-06, clients CU-07.
 
 | Feature | Milestone | Where | Action(s) | Remark |

@@ -11,7 +11,7 @@ After this ticket the Claude Code runner offers computer use: with `runner.compu
 - `docs/spec/27-computer-use.md` sections 7, 10 (all), 13.2, 15 (CU-T21, CU-T22, CU-T24), 16, 18.
 - `docs/spec/09-agents.md` 18.2 (process contract, background mode, the stage CU paragraph), 18.6, 18.9, 18.19.8 (`bothy-wake`, the request folder pattern), 4.6 (run context), 9 (agent sessions).
 - Code on the base branch after CU-05: `plugins/claude-code-runner/src/claude_code_runner/` (`config.py`, `materialize.py`, `bgsession.py`, `heartbeat.py` with `PINNED_CLAUDE_CODE_VERSION`, the turn launch and the system prompt file), `plugins/claude-code-runner/tests/real_cli/` (the method against a local stand-in for the API), `services/host/cmd/bothy-computer-mcp`, `services/host/test/computer_backend`, `infra/compose/e2e.sh`, `tests/e2e/`.
-- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
+- Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0079; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
 
@@ -113,7 +113,7 @@ make check
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - An entry `changelog.d/CU-06.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/CU-06.md`, one row each with date, ruling and reason; every name that differs from chapter 27 is a ruling and a change of chapter 27 in the same commit.
-- An ADR only if you take an architecture decision beyond ADR 0078 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond ADR 0079 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green for the components you changed.
 - An independent review of your diff by a fresh reviewer (one follow-up round at most); record its verdict. The red team of the stage runs once over the whole stage diff before the pull request; it checks at least, for this ticket: no credential of the runner reaches the MCP server or the turn; the tool never loads below `host`; a request without the run's nonce is refused; no screenshot stays on the runner host after a computer run; the end-to-end test proves that the server stores no image byte.
 

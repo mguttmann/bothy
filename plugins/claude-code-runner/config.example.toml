@@ -18,6 +18,10 @@ default_model = "claude-opus-5-5[1m]"
 anthropic_api_key_ref = ""
 allow_personal = false
 forward_ssh_agent = false
+# false: every Claude Code CLI the runner starts gets DISABLE_TELEMETRY,
+# DISABLE_ERROR_REPORTING and CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC (no usage telemetry, no
+# error reports, no other non-essential traffic to the vendor); true sets none of them.
+cli_telemetry = false
 cli_probe_timeout = "30s"
 poll_interval = "200ms"
 claude_bin = "claude"

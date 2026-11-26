@@ -34,3 +34,7 @@ the deny-list job of CI scans this text. -->
 
 - [ ] No secrets, no real personal data, nothing instance-specific (names, hosts, IDs)
 - [ ] Every new route, event or delivery goes through `authorize` with a catalogued action
+
+<!-- The body becomes the squash commit on main: end it with your DCO sign-off line,
+outside this comment, for example "Signed-off-by: Your Name <you@example.com>". CI
+(make commitlint) fails without it. -->
