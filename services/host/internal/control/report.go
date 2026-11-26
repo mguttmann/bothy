@@ -61,6 +61,26 @@ func withPeer(r startup.Report, peerLocal bool) startup.Report {
 	return r
 }
 
+// reportFrame is the body of report: the report of startup and the object computer of the computer
+// manager (docs/spec/27-computer-use.md 12.3), which changes outside the doctor runs.
+type reportFrame struct {
+	startup.Report
+	Computer *ComputerReport `json:"computer,omitempty"`
+}
+
+// reportOf returns the report frame of r with the object computer of computers. A host without
+// host_service.computer_use (RefuseComputers) omits the object, so its report stays byte for byte
+// the report before computer use, which the server reads as helper absent (D-CU-03-6, brief rule
+// 11).
+func reportOf(r startup.Report, computers Computers) reportFrame {
+	f := reportFrame{Report: r}
+	if _, off := computers.(RefuseComputers); !off {
+		c := computers.Report()
+		f.Computer = &c
+	}
+	return f
+}
+
 // PeerIsLocal reports whether remote, the address of the server of the connection, is a loopback
 // address or one of own, the addresses of this machine (24 section 2.3).
 func PeerIsLocal(remote net.IP, own []net.IP) bool {

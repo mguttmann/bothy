@@ -69,6 +69,9 @@ type Config struct {
 	// wait for hello. A server, proxy or edge that accepts the connection and stays silent would
 	// otherwise hold the client offline without a new attempt. Zero means DefaultHandshakeTimeout.
 	HandshakeTimeout time.Duration
+	// Computers is the computer session manager (docs/spec/27-computer-use.md); nil means
+	// RefuseComputers, the host without host_service.computer_use.
+	Computers Computers
 }
 
 // DefaultHandshakeTimeout is the bound of HandshakeTimeout: a program constant of the dial, not a
@@ -78,14 +81,15 @@ const DefaultHandshakeTimeout = 30 * time.Second
 // Client is the control connection of the host service. It implements startup.Control. It is
 // safe for concurrent use.
 type Client struct {
-	cfg      Config
-	url      string
-	http     *http.Client
-	sessions Sessions
-	reports  ReportSource
-	keys     KeyStore
-	backoff  *BackoffTimer
-	log      *slog.Logger
+	cfg       Config
+	url       string
+	http      *http.Client
+	sessions  Sessions
+	computers Computers
+	reports   ReportSource
+	keys      KeyStore
+	backoff   *BackoffTimer
+	log       *slog.Logger
 
 	mu      gosync.Mutex
 	started bool
@@ -125,6 +129,9 @@ func New(cfg Config, sessions Sessions) (*Client, error) {
 	if sessions == nil {
 		sessions = RefuseSessions{}
 	}
+	if cfg.Computers == nil {
+		cfg.Computers = RefuseComputers{}
+	}
 	if cfg.Clock == nil {
 		cfg.Clock = clock.Real()
 	}
@@ -144,7 +151,7 @@ func New(cfg Config, sessions Sessions) (*Client, error) {
 		}
 	}
 	ws := url.URL{Scheme: "wss", Host: u.Host, Path: strings.TrimSuffix(u.Path, "/") + Path}
-	c := &Client{cfg: cfg, url: ws.String(), sessions: sessions, backoff: NewBackoff(cfg.BackoffBase, cfg.BackoffCap, cfg.Random),
+	c := &Client{cfg: cfg, url: ws.String(), sessions: sessions, computers: cfg.Computers, backoff: NewBackoff(cfg.BackoffBase, cfg.BackoffCap, cfg.Random),
 		log: cfg.Log, first: make(chan startup.Ready, 1), stopped: make(chan struct{}), loopDone: make(chan struct{})}
 	c.http = &http.Client{Transport: &http.Transport{ // nosemgrep: bothy-go-egress-only -- the host module has no egress package; the control connection dials only the https server of the pairing record (24 3.5)
 		TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
@@ -259,6 +266,19 @@ func (c *Client) Report(ctx context.Context, r startup.Report) error {
 	return k.sendReport(ctx)
 }
 
+// ComputerChanged sends the current report again because the object computer changed (the helper
+// connected, left, or changed its state, docs/spec/27-computer-use.md 4 item 2); without a
+// connection after ready it sends nothing, the next ready sends the report anyway.
+func (c *Client) ComputerChanged(ctx context.Context) error {
+	c.mu.Lock()
+	k := c.live
+	c.mu.Unlock()
+	if k == nil {
+		return nil
+	}
+	return k.sendReport(ctx)
+}
+
 // Close implements startup.Control: the connection closes with 1000 and the loop ends. The close
 // frame follows every frame sent before, so a refused start reports before it closes.
 func (c *Client) Close() error {
@@ -327,6 +347,7 @@ func (c *Client) run(ctx context.Context) {
 		switch r.Kind {
 		case Stop:
 			c.sessions.EndAll(ctx)
+			c.computers.EndAll(ctx)
 			if r.code == CodeHostVersionUnsupported {
 				c.logUpdate(ctx, r.reason)
 			}
@@ -338,6 +359,7 @@ func (c *Client) run(ctx context.Context) {
 			delay = r.Delay
 		case WaitEndPTYs:
 			c.sessions.EndAll(ctx)
+			c.computers.EndAll(ctx)
 			delay = r.Delay
 		case Backoff:
 			delay = c.backoff.Next()

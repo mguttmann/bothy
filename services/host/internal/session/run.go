@@ -151,7 +151,7 @@ func (s *session) run(dc *dataConn, tr *noise.Transport) {
 		pt, err := tr.Decrypt(msg)
 		var f frame.Frame
 		if err == nil {
-			f, err = frame.Decode(pt, frame.FromDevice)
+			f, err = frame.Decode(pt, frame.KindTerminal, frame.FromDevice)
 		}
 		if err != nil || f.Type == frame.TypeStart {
 			// A fault of the encrypted stream ends the session (Design note 7).
@@ -165,6 +165,7 @@ func (s *session) run(dc *dataConn, tr *noise.Transport) {
 		if f.IsInput() {
 			s.input()
 		}
+		//exhaustive:ignore // A terminal stream decodes with frame.KindTerminal: no computer type arrives.
 		switch f.Type {
 		case frame.TypeData:
 			s.link.data(s.idb, pt)
@@ -289,7 +290,7 @@ func (s *session) sendLocked(f frame.Frame) {
 
 // output takes one data frame of the helper: into the scrollback, and to the device when attached.
 func (s *session) output(f []byte) {
-	fr, err := frame.Decode(f, frame.FromHost)
+	fr, err := frame.Decode(f, frame.KindTerminal, frame.FromHost)
 	if err != nil || fr.Type != frame.TypeData {
 		return
 	}

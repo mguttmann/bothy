@@ -45,6 +45,9 @@ type Deps struct {
 	// Offered builds the profile list of report from a result (profiles.Offered, M2-45); nil
 	// reports the profiles after HD7 as they are.
 	Offered func(*doctor.Result) []doctor.Profile
+	// ComputerDoctor returns the section computer of the doctor output (docs/spec/27-computer-use.md
+	// 9.3), printed after the checks; nil prints none.
+	ComputerDoctor func() string
 }
 
 // PairRequest is the op pair.run of the admin endpoint: an administrator pairs the running
@@ -250,7 +253,15 @@ func (s *Service) RunDoctor(ctx context.Context) DoctorAnswer {
 		s.logCodes(ctx, res)
 		s.finish(ExitStartRefused)
 	}
-	return DoctorAnswer{Output: res.Format(), Exit: res.ExitCode(), Doctor: res.Report()}
+	return DoctorAnswer{Output: res.Format() + s.d.computerSection(), Exit: res.ExitCode(), Doctor: res.Report()}
+}
+
+// computerSection returns the section computer of the doctor output, or "".
+func (d Deps) computerSection() string {
+	if d.ComputerDoctor == nil {
+		return ""
+	}
+	return d.ComputerDoctor()
 }
 
 // Serve answers the admin endpoint until ctx ends or a doctor run ends the service; it returns the
@@ -345,7 +356,7 @@ func DoctorOnce(ctx context.Context, d Deps) int {
 	runner.RunFull(ctx)
 	runner.WaitScans()
 	res := runner.Last()
-	answer := DoctorAnswer{Output: res.Format(), Exit: res.ExitCode(), Doctor: res.Report()}
+	answer := DoctorAnswer{Output: res.Format() + d.computerSection(), Exit: res.ExitCode(), Doctor: res.Report()}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	served := make(chan struct{})

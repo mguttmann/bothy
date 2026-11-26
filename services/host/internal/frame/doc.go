@@ -11,4 +11,10 @@
 // at least one byte; close, replay_begin and replay_end carry no body; exit carries a signed
 // 32-bit exit code. Every decode error ends the session like an unknown type (close code 4104);
 // M2-45 maps the errors.
+//
+// A computer session (docs/spec/27-computer-use.md 6.3) uses the same framing with close and the
+// types 0x20 to 0x25: one JSON object without unknown members for cu_action, cu_result,
+// cu_image_begin and cu_state, raw image bytes for cu_image_data, no body for cu_image_end. Decode
+// takes the session kind, so a computer frame on a terminal session and a terminal frame on a
+// computer session are both an unknown type.
 package frame

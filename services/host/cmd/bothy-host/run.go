@@ -50,9 +50,10 @@ func cmdRun(ctx context.Context, args []string, _, stderr io.Writer) int {
 
 // controlFor returns the control connection of a paired host (M2-43): the client of
 // internal/control over the pairing record and the login key, with the session manager of M2-45
-// (sessions). An unpaired host, or one whose state cannot be read, gets
+// (sessions) and the computer manager (computers, nil without host_service.computer_use). An
+// unpaired host, or one whose state cannot be read, gets
 // startup.NoControl, so the stored declaration decides (24 2.2). It never logs a key.
-func controlFor(c *config.Config, st *state.Dir, log *slog.Logger, sessions control.Sessions) startup.Control {
+func controlFor(c *config.Config, st *state.Dir, log *slog.Logger, sessions control.Sessions, computers control.Computers) startup.Control {
 	p, err := st.ReadPairing()
 	if err != nil {
 		return startup.NoControl{}
@@ -68,7 +69,8 @@ func controlFor(c *config.Config, st *state.Dir, log *slog.Logger, sessions cont
 		return startup.NoControl{}
 	}
 	cl, err := control.New(control.Config{ServerURL: p.ServerURL, HostID: p.HostID, AuthKey: keys.AuthPrivate, HostVersion: buildinfo.Version,
-		UpdatePath: buildinfo.UpdatePath(buildinfo.PackageKind, c.Path), BackoffBase: c.ReconnectBackoffBase, BackoffCap: c.ReconnectBackoffCap, Log: log, Proxy: http.ProxyFromEnvironment, RootCAs: roots},
+		UpdatePath: buildinfo.UpdatePath(buildinfo.PackageKind, c.Path), BackoffBase: c.ReconnectBackoffBase, BackoffCap: c.ReconnectBackoffCap, Log: log, Proxy: http.ProxyFromEnvironment, RootCAs: roots,
+		Computers: computers},
 		sessions)
 	if err != nil {
 		log.Warn("control connection unavailable")
@@ -138,6 +140,7 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 		Platform: buildinfo.Platform(), HostVersion: buildinfo.Version, Offered: profiles.Offered}
 	if once {
 		d.Control = startup.NoControl{}
+		d.ComputerDoctor = computerDoctor(c, denv, nil)
 		return startup.DoctorOnce(ctx, d)
 	}
 	// The session manager of M2-45 for a paired host; without keys or pairing every session.open
@@ -149,13 +152,16 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 	} else if !errors.Is(err, state.ErrNotPaired) {
 		log.WarnContext(ctx, "terminal sessions unavailable")
 	}
-	d.Control = controlFor(c, st, log, sessions)
+	computers, cw := wireComputers(ctx, c, st, log, denv, w != nil)
+	d.ComputerDoctor = computerDoctor(c, denv, cw)
+	d.Control = controlFor(c, st, log, sessions, computers)
 	cl, ok := d.Control.(*control.Client)
 	switch {
 	case w != nil && !ok:
-		w = nil // no control connection: no session.open can arrive
+		w, cw = nil, nil // no control connection: no session.open can arrive
 	case w != nil:
 		w.bind(cl)
+		cw.bind(cl)
 	}
 	svc, code := startup.Start(ctx, d)
 	if svc == nil {
@@ -165,5 +171,6 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 		w.start(ctx, svc)
 		defer w.mgr.Shutdown()
 	}
+	defer cw.start(ctx)()
 	return svc.Serve(ctx)
 }
