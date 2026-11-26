@@ -182,6 +182,20 @@ func uninstall(t *testing.T, users []string) {
 		for _, l := range logFileTail(filepath.Join(stateDir(), "bothy-host.log")) {
 			t.Log(l)
 		}
+		if runtime.GOOS == "windows" {
+			// A helper service has no log of its own: the service control manager names why it
+			// stopped or did not start (state, exit codes and its event log entries).
+			for _, u := range users {
+				out, _ := try("sc.exe", "queryex", "bothy-host-helper-"+u)
+				t.Log(strings.Join(strings.Fields(out), " "))
+			}
+			out, _ := try("powershell", "-NoProfile", "-Command",
+				"Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'} -MaxEvents 40 | "+
+					"Where-Object { $_.Message -match 'bothy' } | Select-Object -First 8 | ForEach-Object { $_.TimeCreated.ToString('s') + ' ' + $_.Id + ' ' + ($_.Message -replace '\\s+', ' ') }")
+			for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+				t.Log(l)
+			}
+		}
 	}
 	_ = os.RemoveAll(stateDir())
 	_ = os.Remove(configPath())
