@@ -245,7 +245,7 @@ kind, and every other type, a wrong direction or a wrong content ends the sessio
 | `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click` | `coordinate` `[x, y]`, optional `modifiers` (`shift`, `ctrl`, `alt`, `cmd`, `win`) | press and release at the point |
 | `mouse_move` | `coordinate` | move the pointer |
 | `cursor_position` | none | `cursor` in the result |
-| `scroll` | `coordinate`, `direction` (`up`, `down`, `left`, `right`), `amount` (1 or more) | scroll at the point |
+| `scroll` | `coordinate`, `direction` (`up`, `down`, `left`, `right`), `amount` (1 up to `computer.scroll_amount_max`) | scroll at the point |
 | `type` | `text` | the text as Unicode input, whatever the keyboard layout |
 | `key` | `keys` (for example `cmd+shift+t`, `Return`, `F5`), optional `repeat` up to `computer.key_repeat_max` | press and release; every key and combination passes |
 | `wait` | `duration_ms` up to `computer.wait_max` | wait, then an image |
@@ -506,8 +506,12 @@ both run (D-CU-02-16):
    answers: `screen_locked` for a lock (the session stays), `invalid_action` after the `stop`
    frame for a real Esc (`local_escape`) or the stop button (`indicator_stop`), `invalid_action`
    for `hide` or `disable`, nothing on a broken channel.
-3. A `repeat` above the default of `computer.key_repeat_max` and a `text` longer than one frame of
+3. A `repeat` above the default of `computer.key_repeat_max`, an `amount` above the default of
+   `computer.scroll_amount_max` and a `text` longer than one frame of
    `host_service.computer_frame_max_bytes` are `invalid_action` before any step.
+5. The Esc tap of a session belongs to that session: every start of the tap raises a generation,
+   and a tap's callback or teardown acts only while its generation is the current one, checked and
+   done under one lock, so the end of an older tap never removes a newer one.
 4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts; a stop
    keeps only the rest of the Esc that is still held, so its auto-repeat and key up are swallowed
    and stop nothing more; one held Esc stops once; an injected Esc passes and stops nothing.
@@ -633,7 +637,7 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 | Op | Direction | Content |
 |---|---|---|
 | `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
-| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `audit_apps_max`, `status_interval_ms` |
+| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `scroll_amount_max`, `audit_apps_max`, `status_interval_ms` |
 | `computer.close` | server to host | `{session_id, reason}` |
 | `computer.disable` | server to host | `{generation}` |
 | `computer.started` | host to server | `{session_id, state}` with `active` or `paused` |
@@ -770,6 +774,7 @@ Claude Code runner; Host service = configuration of `bothy-host` on the host.
 | `computer.auto_screenshot` | Server | `true` | an image after every action that changes the screen (6.4) |
 | `computer.wait_max` | Server | `60s` | longest `wait` of one action (6.4) |
 | `computer.key_repeat_max` | Server | `50` | highest `repeat` of one `key` action (6.4) |
+| `computer.scroll_amount_max` | Server | `50` | highest `amount` of one `scroll` action (6.4) |
 | `computer.audit_apps_max` | Server | `32` | most app identities in the audit entry of an end (13.1) |
 | `computer.status_interval` | Server | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) |
 | `host_service.computer_frame_max_bytes` | Host service | `67108864` | longest frame on the helper channel, an image included (9.4); the host service closes a channel that sends a longer one |

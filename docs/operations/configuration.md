@@ -1088,6 +1088,7 @@ Source: [27-computer-use.md](../spec/27-computer-use.md), section 18.
 | `computer.auto_screenshot` | `BOTHY_COMPUTER__AUTO_SCREENSHOT` | Server |  | `true` | an image after every action that changes the screen (6.4) | planned (CU) |
 | `computer.wait_max` | `BOTHY_COMPUTER__WAIT_MAX` | Server |  | `60s` | longest `wait` of one action (6.4) | planned (CU) |
 | `computer.key_repeat_max` | `BOTHY_COMPUTER__KEY_REPEAT_MAX` | Server |  | `50` | highest `repeat` of one `key` action (6.4) | planned (CU) |
+| `computer.scroll_amount_max` | `BOTHY_COMPUTER__SCROLL_AMOUNT_MAX` | Server |  | `50` | highest `amount` of one `scroll` action (6.4) | planned (CU) |
 | `computer.audit_apps_max` | `BOTHY_COMPUTER__AUDIT_APPS_MAX` | Server |  | `32` | most app identities in the audit entry of an end (13.1) | planned (CU) |
 | `computer.status_interval` | `BOTHY_COMPUTER__STATUS_INTERVAL` | Server |  | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) | planned (CU) |
 | `host_service.computer_frame_max_bytes` |  | Host service |  | `67108864` | longest frame on the helper channel, an image included (9.4); the host service closes a channel that sends a longer one |  |
