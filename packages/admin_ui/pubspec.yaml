@@ -16,6 +16,8 @@ dependencies:
   bothy_viz: any
   # BuiltList of the metrics of getStatsTimeline (M6-16).
   built_collection: ^5.1.2
+  # JsonObject of the passkey credential of completePasskeyRegistration (V1-14).
+  built_value: ^8.13.0
   design_system: any
   dio: ^5.11.1
   # AppConfig of the views' viz.* values (M6-16); reached through design_system.
@@ -23,6 +25,8 @@ dependencies:
   flutter:
     sdk: flutter
   l10n: any
+  # The QR code of the one-time code setup (V1-14, docs/design/sign-in-methods.md item 4).
+  qr: ^4.0.1
   yaml: ^3.1.4
 
 dev_dependencies:

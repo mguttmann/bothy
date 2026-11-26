@@ -7322,7 +7322,7 @@ abstract class AppLocalizations {
   /// Web console step-up after login (08 section 7.5, brief M6-02): a session without step-up methods.
   ///
   /// In en, this message translates to:
-  /// **'No way to confirm is set up for you. Ask the owner to set up a passkey for you.'**
+  /// **'No way to confirm is set up for your account. In the app on your computer or phone, open Settings, Sign-in, and add a passkey or a password with a one-time code; then log in here again.'**
   String get consoleStepUpNoMethod;
 
   /// Web console E7 logged out (01 section 5.6, brief M6-02): title.
@@ -8153,10 +8153,10 @@ abstract class AppLocalizations {
   /// **'The connection broke the terminal protocol. No new attempt is made.'**
   String get terminalStateBlockedProtocol;
 
-  /// Banner of a terminal tab on a device without a step-up key (Windows, 08 6.3): the opening or attach needs the fresh step-up such a device cannot give.
+  /// Banner of a terminal tab on a device without a step-up key and without a passkey of the person (Windows, 08 6.3): the opening or attach needs the fresh step-up such a device gives only with a passkey (V1-14).
   ///
   /// In en, this message translates to:
-  /// **'This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.'**
+  /// **'This device cannot open the terminal yet: the terminal needs a fresh confirmation with the device key or a passkey, and this device has neither. On Windows, add a passkey with Windows Hello under Settings, Sign-in, then open the terminal again; or open it in the web console of this instance.'**
   String get terminalStepUpUnavailable;
 
   /// Banner of a refused opening with the problem text.
@@ -13633,7 +13633,7 @@ abstract class AppLocalizations {
   /// Web console terminal (ADR 0070 item 1, 08 section 6.3 item 3): the way to a passkey for a person without one; no other step-up opens a terminal in the console.
   ///
   /// In en, this message translates to:
-  /// **'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Set up a passkey for your account first, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.'**
+  /// **'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Add a passkey on the page Sign-in of the console, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.'**
   String get consoleTerminalPasskeySetup;
 
   /// Web console terminal: button that closes the passkey notice.
@@ -19063,6 +19063,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose what the app may use and which events it receives; required items stay on.'**
   String get adminAppChangeConsentBody;
+
+  /// Settings section Sign-in: the own sign-in methods (01 section 5.1 D8, V1-14).
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in'**
+  String get settingsSectionSignIn;
+
+  /// Console navigation entry Sign-in: the own sign-in methods (01 section 5.5, V1-14).
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in'**
+  String get consoleNavSignIn;
+
+  /// Heading of the password part of the sign-in area (08 section 2.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Password and one-time code'**
+  String get signInPasswordTitle;
+
+  /// Button of the sign-in area: set a first password with a one-time code.
+  ///
+  /// In en, this message translates to:
+  /// **'Set password'**
+  String get signInSetPassword;
+
+  /// Button of the sign-in area: change the password; the one-time code stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get signInChangePassword;
+
+  /// Button of the sign-in area: a new one-time code secret, for example after a lost phone; the old one stops working once the new one is confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a new one-time code'**
+  String get signInNewTotp;
+
+  /// Button of the sign-in area: the password is set but the one-time code was never confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish the one-time code'**
+  String get signInFinishTotp;
+
+  /// Title of the dialog that sets or changes the password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get signInPasswordDialogTitle;
+
+  /// Field label in the password dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get signInPasswordNew;
+
+  /// Field label in the password dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat the password'**
+  String get signInPasswordRepeat;
+
+  /// Error of the password dialog when the repeated password differs.
+  ///
+  /// In en, this message translates to:
+  /// **'The two passwords are not the same.'**
+  String get signInPasswordMismatch;
+
+  /// Error of the password dialog: the server's minimum length (auth.password_min_length) is not reached.
+  ///
+  /// In en, this message translates to:
+  /// **'The password is too short.'**
+  String get signInPasswordTooShort;
+
+  /// Error of the password dialog: the password is on the list of common passwords (08 section 2.5).
+  ///
+  /// In en, this message translates to:
+  /// **'This password is too common. Choose another one.'**
+  String get signInPasswordCommon;
+
+  /// Button of the password dialog that sends the password and shows the one-time code setup.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get signInNext;
+
+  /// Button of the password dialog that only changes the password.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get signInSave;
+
+  /// Title of the second step of the password dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up the one-time code'**
+  String get signInTotpTitle;
+
+  /// Hint of the one-time code step (08 section 2.5: two steps, the secret is shown once).
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code with your authenticator app or type the key into it. Then enter the six-digit code the app shows.'**
+  String get signInTotpHint;
+
+  /// Screen reader label of the QR code of the one-time code setup.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code of the one-time code setup'**
+  String get signInTotpQrLabel;
+
+  /// The TOTP secret as text, for typing it into the authenticator app.
+  ///
+  /// In en, this message translates to:
+  /// **'Key: {key}'**
+  String signInTotpKey(String key);
+
+  /// Field label of the one-time code step.
+  ///
+  /// In en, this message translates to:
+  /// **'Six-digit code'**
+  String get signInTotpCode;
+
+  /// Button of the one-time code step.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get signInTotpConfirm;
+
+  /// Error of the one-time code step: a wrong or used code (totp_invalid).
+  ///
+  /// In en, this message translates to:
+  /// **'The code was not accepted. Enter the code the app shows now.'**
+  String get signInTotpWrongCode;
+
+  /// Notice after the one-time code was confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password and the one-time code are set up.'**
+  String get signInPasswordDone;
+
+  /// Notice after a password change without a new one-time code.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password was changed.'**
+  String get signInPasswordChanged;
+
+  /// Button of the sign-in area that registers a passkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Add passkey'**
+  String get signInAddPasskey;
+
+  /// Title of the dialog that asks for the name of a new passkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Add passkey'**
+  String get signInPasskeyNameTitle;
+
+  /// Hint of the dialog that asks for the name of a new passkey.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the passkey a name you will recognize, for example the device or password manager it is stored in.'**
+  String get signInPasskeyNameHint;
+
+  /// Field label of the passkey name.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get signInPasskeyName;
+
+  /// Button of the passkey name dialog; the system's passkey prompt follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get signInPasskeyContinue;
+
+  /// Notice after a passkey was registered.
+  ///
+  /// In en, this message translates to:
+  /// **'The passkey {name} was added.'**
+  String signInPasskeyAdded(String name);
+
+  /// Notice when the system's passkey prompt was cancelled or no authenticator answered.
+  ///
+  /// In en, this message translates to:
+  /// **'No passkey was created.'**
+  String get signInPasskeyCancelled;
+
+  /// Hint of the sign-in area on a device without a passkey port (a Mac, a phone build without a public domain; D-M4-18-9).
+  ///
+  /// In en, this message translates to:
+  /// **'This app cannot create a passkey on this device. Add one in the web console of this instance.'**
+  String get signInPasskeyUnavailable;
+
+  /// Button of the sign-in area that links a further login service (08 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Link with {provider}'**
+  String signInLinkWith(String provider);
+
+  /// Notice after an identity was linked.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is now linked with {provider}.'**
+  String signInLinked(String provider);
+
+  /// Notice when the person cancelled at the login service.
+  ///
+  /// In en, this message translates to:
+  /// **'The link was cancelled at the login service.'**
+  String get signInLinkCancelled;
+
+  /// Notice when linking failed (refused by the login service, expired, or the identity belongs to someone else).
+  ///
+  /// In en, this message translates to:
+  /// **'The link was not made. Try again.'**
+  String get signInLinkFailed;
+
+  /// Second line of a linked identity.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked {when}'**
+  String signInLinkedAt(String when);
+
+  /// Purpose text of the step-up when the own password or one-time code is set (local_credential.set).
+  ///
+  /// In en, this message translates to:
+  /// **'Set the password of your account'**
+  String get stepUpPurposeSetPassword;
+
+  /// Purpose text of the step-up when a passkey is registered (passkey.register).
+  ///
+  /// In en, this message translates to:
+  /// **'Add a passkey to your account'**
+  String get stepUpPurposeAddPasskey;
+
+  /// Purpose text of the step-up when a further identity is linked (identity.link).
+  ///
+  /// In en, this message translates to:
+  /// **'Link your account with {provider}'**
+  String stepUpPurposeLinkIdentity(String provider);
 }
 
 class _AppLocalizationsDelegate

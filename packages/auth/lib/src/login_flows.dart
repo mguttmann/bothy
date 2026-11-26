@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:api_client/api_client.dart';
 import 'package:auth/src/auth_events.dart';
 import 'package:auth/src/errors.dart';
+import 'package:auth/src/interceptors.dart' show stepUpPurposeExtra;
 import 'package:auth/src/pkce.dart';
 import 'package:auth/src/ports.dart';
 import 'package:auth/src/redact.dart';
@@ -288,6 +289,74 @@ final class LoginService {
         ),
       ),
     );
+  }
+
+  /// Links a further identity at the OIDC provider [providerId] to the signed-in person (08
+  /// 3.3, `beginIdentityLink` and `completeIdentityLink`; V1-14): the same system browser,
+  /// redirect and PKCE as [beginOidc], over the signed-in session, so its step-up applies
+  /// (`identity.link` always needs one; [purposeText] is what the step-up prompt shows).
+  ///
+  /// Returns null when the identity is linked, else the reason: `cancelled` (the person
+  /// cancelled at the login service or in the app, [isCancelled]), `flow_expired` (no redirect
+  /// in time) or the `error` of the redirect (`login_failed` without one). An answer of the
+  /// server to either call throws its `DioException` (for example `409 conflict` when the
+  /// identity belongs to another person), a cancelled step-up `StepUpCancelled`.
+  ///
+  /// Throws a [StateError] when the session was built without browser or redirect port.
+  Future<String?> linkIdentity(
+    String providerId, {
+    required String purposeText,
+    bool Function()? isCancelled,
+  }) async {
+    final browser = _browser;
+    final redirects = _redirects;
+    if (browser == null || redirects == null) {
+      throw StateError(
+        'linking needs a BrowserLauncher and a RedirectReceiver',
+      );
+    }
+    final me = _core.api.getMeApi();
+    final pkce = PkcePair.generate(_random);
+    final redirectUri = await redirects.redirectUri();
+    final begun = (await me.beginIdentityLink(
+      identityLinkBegin: IdentityLinkBegin(
+        (b) => b
+          ..providerId = providerId
+          ..appRedirectUri = redirectUri.toString()
+          ..clientChallenge = pkce.challenge,
+      ),
+      extra: {stepUpPurposeExtra: purposeText},
+    )).data!;
+    await browser.open(Uri.parse(begun.authorizationUrl));
+    final Uri redirect;
+    try {
+      final left = begun.expiresAt.difference(_core.clock.now());
+      redirect = await redirects.waitForRedirect(
+        redirectUri,
+        left.isNegative ? Duration.zero : left,
+      );
+    } on TimeoutException {
+      return 'flow_expired';
+    }
+    if (isCancelled?.call() ?? false) return 'cancelled';
+    final query = redirect.queryParameters;
+    if (query['login_attempt_id'] != begun.loginAttemptId) {
+      return 'login_failed';
+    }
+    final error = query['error'];
+    final code = query['login_code'];
+    if (error == 'access_denied' || error == 'cancelled') return 'cancelled';
+    if (error != null || code == null) return error ?? 'login_failed';
+    await me.completeIdentityLink(
+      identityLinkComplete: IdentityLinkComplete(
+        (b) => b
+          ..loginCode = code
+          ..clientVerifier = pkce.verifier,
+      ),
+      extra: {stepUpPurposeExtra: purposeText},
+    );
+    _core.log('identity linked');
+    return null;
   }
 
   /// Password with TOTP for local accounts (08 2.5, `loginWithPassword`).

@@ -113,6 +113,7 @@ void main() {
       try {
         await signIn(app);
         await tap('phone.tab.me');
+        await app.showMeEntry('phone.me.builtinAgents');
         await tap('phone.me.builtinAgents');
         final notesCard = find.byKey(ValueKey('builtinAgents.${notes.id}'));
         await tap('builtinAgent.edit', within: notesCard);

@@ -237,5 +237,69 @@ class BrowserPasskeys implements PasskeyPort {
     );
   }
 
+  @override
+  Future<Map<String, Object?>> create(Map<String, Object?> options) async {
+    final o = PasskeyCreation.fromJson(options);
+    final rp = JSObject()..['name'] = o.rpName.toJS;
+    final rpId = o.rpId;
+    if (rpId != null) rp['id'] = rpId.toJS;
+    final selection = JSObject()..['userVerification'] = 'required'.toJS;
+    final residentKey = o.residentKey;
+    if (residentKey != null) selection['residentKey'] = residentKey.toJS;
+    final attachment = o.authenticatorAttachment;
+    if (attachment != null) {
+      selection['authenticatorAttachment'] = attachment.toJS;
+    }
+    final publicKey = JSObject()
+      ..['challenge'] = o.challenge.toJS
+      ..['rp'] = rp
+      ..['user'] = (JSObject()
+        ..['id'] = o.userId.toJS
+        ..['name'] = o.userName.toJS
+        ..['displayName'] = o.userDisplayName.toJS)
+      ..['pubKeyCredParams'] = [
+        for (final p in o.parameters)
+          JSObject()
+            ..['type'] = p.type.toJS
+            ..['alg'] = p.alg.toJS,
+      ].toJS
+      ..['excludeCredentials'] = [
+        for (final c in o.excludeCredentials)
+          JSObject()
+            ..['type'] = 'public-key'.toJS
+            ..['id'] = c.id.toJS
+            ..['transports'] = [for (final t in c.transports) t.toJS].toJS,
+      ].toJS
+      ..['authenticatorSelection'] = selection
+      ..['attestation'] = 'none'.toJS;
+    final timeout = o.timeoutMs;
+    if (timeout != null) publicKey['timeout'] = timeout.toJS;
+    final web.Credential? credential;
+    try {
+      credential = await credentials
+          .create(
+            web.CredentialCreationOptions(
+              publicKey: publicKey as web.PublicKeyCredentialCreationOptions,
+            ),
+          )
+          .toDart;
+    } on Object {
+      // NotAllowedError (cancelled, timed out), InvalidStateError (this authenticator holds a
+      // passkey of the person already) and SecurityError: no passkey was created.
+      throw const PasskeyCancelled();
+    }
+    if (credential == null) throw const PasskeyCancelled();
+    final pk = credential as web.PublicKeyCredential;
+    final response = pk.response as web.AuthenticatorAttestationResponse;
+    return attestationJson(
+      id: pk.id,
+      rawId: _bytes(pk.rawId),
+      clientDataJson: _bytes(response.clientDataJSON),
+      attestationObject: _bytes(response.attestationObject),
+      transports: [for (final t in response.getTransports().toDart) t.toDart],
+      authenticatorAttachment: pk.authenticatorAttachment,
+    );
+  }
+
   static Uint8List _bytes(JSArrayBuffer buffer) => buffer.toDart.asUint8List();
 }

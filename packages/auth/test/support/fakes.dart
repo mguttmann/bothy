@@ -339,11 +339,16 @@ class FakePasskeys implements PasskeyAuthenticator {
   /// Options received.
   final List<Map<String, Object?>> options = [];
 
+  /// When set, an assertion throws it (a cancelled Windows Hello prompt).
+  Object? assertionError;
+
   @override
   Future<Map<String, Object?>> getAssertion(
     Map<String, Object?> requestOptions,
   ) async {
     options.add(requestOptions);
+    final error = assertionError;
+    if (error != null) throw error;
     return {'id': 'cred-1', 'type': 'public-key'};
   }
 
@@ -422,10 +427,12 @@ Map<String, Object?> deviceBody(
 /// A complete test setup: fake server, store, clock, keys and the session.
 class Harness {
   /// Builds a session against a fresh fake server; [withStepUpKey] `false` builds the keys of a
-  /// device without a step-up key (Windows, D-M4-11-2).
+  /// device without a step-up key (Windows, D-M4-11-2), and [withPasskeys] `false` leaves the
+  /// passkey port out (an app without one, D-M4-18-9).
   Harness({
     DateTime? start,
     bool withStepUpKey = true,
+    bool withPasskeys = true,
     Duration refreshDeadline = refreshCallerDeadline,
   }) : clock = FakeClock(start ?? DateTime.utc(2026, 10, 15, 10)) {
     store = FakeSecretStore(log);
@@ -460,7 +467,7 @@ class Harness {
       stepUpPrompt: prompt,
       browser: browser,
       redirects: redirects,
-      passkeys: passkeys,
+      passkeys: withPasskeys ? passkeys : null,
       random: Random(7),
       refreshDeadline: refreshDeadline,
     );

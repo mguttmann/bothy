@@ -4501,7 +4501,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleStepUpNoMethod =>
-      'Für dich ist kein Weg zur Bestätigung eingerichtet. Bitte den Eigentümer, dir einen Passkey einzurichten.';
+      'Für dein Konto ist kein Weg zur Bestätigung eingerichtet. Öffne in der App auf deinem Computer oder Telefon Einstellungen, Anmeldung, und füge einen Passkey oder ein Passwort mit Einmalcode hinzu; melde dich danach hier erneut an.';
 
   @override
   String get consoleLoggedOutTitle => 'Du bist abgemeldet.';
@@ -5074,7 +5074,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get terminalStepUpUnavailable =>
-      'Dieses Gerät kann das Terminal nicht öffnen: Das Terminal braucht eine frische Bestätigung mit dem Geräteschlüssel, und dieses Gerät (Windows) hat noch keinen. Öffne das Terminal in der Web-Konsole dieser Instanz im Browser oder auf einem Mac, einem iPhone oder einem Android-Telefon.';
+      'Dieses Gerät kann das Terminal noch nicht öffnen: Das Terminal braucht eine frische Bestätigung mit dem Geräteschlüssel oder einem Passkey, und dieses Gerät hat keins von beiden. Füge unter Windows unter Einstellungen, Anmeldung einen Passkey mit Windows Hello hinzu und öffne das Terminal danach erneut, oder öffne es in der Web-Konsole dieser Instanz.';
 
   @override
   String terminalStateFailed(String problem) {
@@ -8542,7 +8542,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleTerminalPasskeySetup =>
-      'Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Richte zuerst einen Passkey für dein Konto ein und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
+      'Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Füge auf der Seite Anmeldung der Konsole einen Passkey hinzu und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
 
   @override
   String get consoleTerminalPasskeyClose => 'Schließen';
@@ -12030,4 +12030,146 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get adminAppChangeConsentBody =>
       'Wähle, was die App nutzen darf und welche Ereignisse sie erhält; erforderliche Punkte bleiben an.';
+
+  @override
+  String get settingsSectionSignIn => 'Anmeldung';
+
+  @override
+  String get consoleNavSignIn => 'Anmeldung';
+
+  @override
+  String get signInPasswordTitle => 'Passwort und Einmalcode';
+
+  @override
+  String get signInSetPassword => 'Passwort festlegen';
+
+  @override
+  String get signInChangePassword => 'Passwort ändern';
+
+  @override
+  String get signInNewTotp => 'Neuen Einmalcode einrichten';
+
+  @override
+  String get signInFinishTotp => 'Einmalcode abschließen';
+
+  @override
+  String get signInPasswordDialogTitle => 'Passwort';
+
+  @override
+  String get signInPasswordNew => 'Neues Passwort';
+
+  @override
+  String get signInPasswordRepeat => 'Passwort wiederholen';
+
+  @override
+  String get signInPasswordMismatch =>
+      'Die beiden Passwörter sind nicht gleich.';
+
+  @override
+  String get signInPasswordTooShort => 'Das Passwort ist zu kurz.';
+
+  @override
+  String get signInPasswordCommon =>
+      'Dieses Passwort ist zu verbreitet. Wähle ein anderes.';
+
+  @override
+  String get signInNext => 'Weiter';
+
+  @override
+  String get signInSave => 'Speichern';
+
+  @override
+  String get signInTotpTitle => 'Einmalcode einrichten';
+
+  @override
+  String get signInTotpHint =>
+      'Scanne den QR-Code mit deiner Authenticator-App oder tippe den Schlüssel dort ein. Gib danach den sechsstelligen Code ein, den die App zeigt.';
+
+  @override
+  String get signInTotpQrLabel => 'QR-Code der Einmalcode-Einrichtung';
+
+  @override
+  String signInTotpKey(String key) {
+    return 'Schlüssel: $key';
+  }
+
+  @override
+  String get signInTotpCode => 'Sechsstelliger Code';
+
+  @override
+  String get signInTotpConfirm => 'Bestätigen';
+
+  @override
+  String get signInTotpWrongCode =>
+      'Der Code wurde nicht angenommen. Gib den Code ein, den die App jetzt zeigt.';
+
+  @override
+  String get signInPasswordDone =>
+      'Dein Passwort und der Einmalcode sind eingerichtet.';
+
+  @override
+  String get signInPasswordChanged => 'Dein Passwort wurde geändert.';
+
+  @override
+  String get signInAddPasskey => 'Passkey hinzufügen';
+
+  @override
+  String get signInPasskeyNameTitle => 'Passkey hinzufügen';
+
+  @override
+  String get signInPasskeyNameHint =>
+      'Gib dem Passkey einen Namen, an dem du ihn erkennst, etwa das Gerät oder den Passwort-Manager, in dem er liegt.';
+
+  @override
+  String get signInPasskeyName => 'Name';
+
+  @override
+  String get signInPasskeyContinue => 'Weiter';
+
+  @override
+  String signInPasskeyAdded(String name) {
+    return 'Der Passkey $name wurde hinzugefügt.';
+  }
+
+  @override
+  String get signInPasskeyCancelled => 'Es wurde kein Passkey erstellt.';
+
+  @override
+  String get signInPasskeyUnavailable =>
+      'Diese App kann auf diesem Gerät keinen Passkey erstellen. Füge einen in der Web-Konsole dieser Instanz hinzu.';
+
+  @override
+  String signInLinkWith(String provider) {
+    return 'Mit $provider verknüpfen';
+  }
+
+  @override
+  String signInLinked(String provider) {
+    return 'Dein Konto ist jetzt mit $provider verknüpft.';
+  }
+
+  @override
+  String get signInLinkCancelled =>
+      'Die Verknüpfung wurde beim Anmeldedienst abgebrochen.';
+
+  @override
+  String get signInLinkFailed =>
+      'Die Verknüpfung kam nicht zustande. Versuche es erneut.';
+
+  @override
+  String signInLinkedAt(String when) {
+    return 'Verknüpft $when';
+  }
+
+  @override
+  String get stepUpPurposeSetPassword => 'Das Passwort deines Kontos festlegen';
+
+  @override
+  String get stepUpPurposeAddPasskey =>
+      'Einen Passkey zu deinem Konto hinzufügen';
+
+  @override
+  String stepUpPurposeLinkIdentity(String provider) {
+    return 'Dein Konto mit $provider verknüpfen';
+  }
 }

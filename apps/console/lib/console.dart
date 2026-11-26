@@ -25,6 +25,8 @@
 ///   while the tab is hidden ([PageVisibility]; brief M6-16).
 /// - [ConsoleGrafanaPage] with [ConsoleGrafanaFrame]: "Operations (Grafana)", the dashboard of
 ///   `console.grafana_embed_url` in a sandboxed iframe, for owners only (brief M6-17).
+/// - [ConsoleSignInPage]: "Sign-in", the own sign-in methods of `admin_ui` with passkeys through
+///   [PasskeyPort.create] and linking back on `/console/sign-in/callback` (V1-14).
 library;
 
 export 'admin/admin_page.dart';
@@ -32,6 +34,7 @@ export 'admin/console_admin.dart';
 export 'admin/console_route.dart';
 export 'admin/download_target.dart';
 export 'admin/manifest_target.dart';
+export 'admin/sign_in_page.dart';
 export 'admin/step_up.dart';
 export 'admin/step_up_dialog.dart';
 export 'app.dart';

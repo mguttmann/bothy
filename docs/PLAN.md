@@ -1318,6 +1318,7 @@ remaining placeholders `OWNER` (V1-03).
 | V1-11 | Showcase current | The showcase of M7-28 shows built-in agents: "New agent", the preview and a first answer, regenerated from the demo instance. | `tools/showcase/`, `docs/assets/showcase/`, demo data `infra/demo/` | `make showcase` regenerates the images the build host can produce and the manifest check is green; no deny list hit | A1-10 |
 | V1-12 | Public texts | README, roadmap and site texts describe what a visitor can try, starting with built-in agents, and no real installation. | `README.md` ("How it is used today" and "Try it today"), `docs/index.md`, `docs/roadmap.md` | the one-minute test of M7-28 with a fresh reader; `make docs` and `make denylist` green; no sentence about a real installation | A1-10 |
 | V1-13 | `host-platform` green | The platform suite of the host service passes on the hosted Linux, macOS and Windows runners of `host-platform.yml`, which M2 exit criterion 8 asks for on all three systems. | `services/host` (suite or product, as each cause demands), `.github/workflows/host-platform.yml`; the causes known so far are in [decisions.d/AUD-misc-misc-01.md](decisions.d/AUD-misc-misc-01.md) | one passing run of `host-platform.yml` per system on `main` with its result file kept; 24 section 14 and `services/host/README.md` name the recorded runs in the same change; no test skipped or weakened | none |
+| V1-14 | Own sign-in methods in the apps and the console | A "Sign-in" area in the app settings and in the console sets up the own sign-in methods the API already has (`setMyLocalCredential`, `getMyCredentials`, `beginPasskeyRegistration`, `beginIdentityLink`): password with TOTP (QR code and confirmation), passkey registration (the console with the browser, the Windows app with Windows Hello) and identity linking. A passkey with Windows Hello is the step-up of the Windows app, so its terminal opens (#677). The hints `consoleStepUpNoMethod` and `consoleTerminalPasskeySetup` point to this area. | `packages/admin_ui` (self), `packages/auth`, `apps/client/lib/settings`, `apps/client/windows/runner`, `apps/console`, `packages/l10n`, `services/server/internal/identity` (console link callback); 01 5.1, 5.5, 5.6, 08 2.5, 3.3, 6.2, 15 8, 24 12 | widget tests of every setup path and its errors in `admin_ui` and the console; tests of the step-up and of the terminal's fresh step-up with a passkey on a device without a step-up key in `auth`; the server test of the console link callback; the Windows runner builds in `apps (Windows)` | none |
 
 V1-07 to V1-12 come from the design note of the built-in agents ([builtin-agents.md](design/builtin-agents.md)
 section 10) and run as tasks from their rows here, without a brief (P-28): V1-07 waits for the
@@ -1326,7 +1327,8 @@ whose cause is read on the day; V1-10 to V1-12 depend on the state after A1-10. 
 starts one of them reads its row, the design note and `AGENTS.md`. V1-13 comes from the audit of
 2026-11-11 and runs from its row in the same way; it belongs to the maintainers of
 `services/host` (`.github/CODEOWNERS`), and a session that starts it reads the rulings of
-AUD-misc-misc-01 first.
+AUD-misc-misc-01 first. V1-14 comes from the owner decision of 2026-11-25 on issues #1426 and
+#677 and runs from its row with the design note [sign-in-methods.md](design/sign-in-methods.md).
 
 ## 16. V2 Multi-user dev environment
 

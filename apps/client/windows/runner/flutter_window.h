@@ -16,7 +16,8 @@
 
 // A window that hosts a Flutter view, forwards deep links to Dart over the channel
 // `bothy/deep_links` (deep_link.h) and serves the clipboard of block copies over the channel
-// `bothy/clipboard` (rich_clipboard.h).
+// `bothy/clipboard` (rich_clipboard.h) and passkeys over Windows Hello over the channel
+// `bothy/webauthn` (webauthn_bridge.h).
 class FlutterWindow : public Win32Window {
  public:
   // Creates a new FlutterWindow hosting a Flutter view running |project|; |link| is the deep
@@ -45,6 +46,9 @@ class FlutterWindow : public Win32Window {
 
   // The channel of the clipboard of block copies.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> clipboard_;
+
+  // The channel of passkeys over Windows Hello.
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> webauthn_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

@@ -4480,7 +4480,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consoleStepUpNoMethod =>
-      'No way to confirm is set up for you. Ask the owner to set up a passkey for you.';
+      'No way to confirm is set up for your account. In the app on your computer or phone, open Settings, Sign-in, and add a passkey or a password with a one-time code; then log in here again.';
 
   @override
   String get consoleLoggedOutTitle => 'You are logged out.';
@@ -5050,7 +5050,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get terminalStepUpUnavailable =>
-      'This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.';
+      'This device cannot open the terminal yet: the terminal needs a fresh confirmation with the device key or a passkey, and this device has neither. On Windows, add a passkey with Windows Hello under Settings, Sign-in, then open the terminal again; or open it in the web console of this instance.';
 
   @override
   String terminalStateFailed(String problem) {
@@ -8502,7 +8502,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consoleTerminalPasskeySetup =>
-      'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Set up a passkey for your account first, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.';
+      'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Add a passkey on the page Sign-in of the console, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.';
 
   @override
   String get consoleTerminalPasskeyClose => 'Close';
@@ -11963,4 +11963,143 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get adminAppChangeConsentBody =>
       'Choose what the app may use and which events it receives; required items stay on.';
+
+  @override
+  String get settingsSectionSignIn => 'Sign-in';
+
+  @override
+  String get consoleNavSignIn => 'Sign-in';
+
+  @override
+  String get signInPasswordTitle => 'Password and one-time code';
+
+  @override
+  String get signInSetPassword => 'Set password';
+
+  @override
+  String get signInChangePassword => 'Change password';
+
+  @override
+  String get signInNewTotp => 'Set up a new one-time code';
+
+  @override
+  String get signInFinishTotp => 'Finish the one-time code';
+
+  @override
+  String get signInPasswordDialogTitle => 'Password';
+
+  @override
+  String get signInPasswordNew => 'New password';
+
+  @override
+  String get signInPasswordRepeat => 'Repeat the password';
+
+  @override
+  String get signInPasswordMismatch => 'The two passwords are not the same.';
+
+  @override
+  String get signInPasswordTooShort => 'The password is too short.';
+
+  @override
+  String get signInPasswordCommon =>
+      'This password is too common. Choose another one.';
+
+  @override
+  String get signInNext => 'Next';
+
+  @override
+  String get signInSave => 'Save';
+
+  @override
+  String get signInTotpTitle => 'Set up the one-time code';
+
+  @override
+  String get signInTotpHint =>
+      'Scan the QR code with your authenticator app or type the key into it. Then enter the six-digit code the app shows.';
+
+  @override
+  String get signInTotpQrLabel => 'QR code of the one-time code setup';
+
+  @override
+  String signInTotpKey(String key) {
+    return 'Key: $key';
+  }
+
+  @override
+  String get signInTotpCode => 'Six-digit code';
+
+  @override
+  String get signInTotpConfirm => 'Confirm';
+
+  @override
+  String get signInTotpWrongCode =>
+      'The code was not accepted. Enter the code the app shows now.';
+
+  @override
+  String get signInPasswordDone =>
+      'Your password and the one-time code are set up.';
+
+  @override
+  String get signInPasswordChanged => 'Your password was changed.';
+
+  @override
+  String get signInAddPasskey => 'Add passkey';
+
+  @override
+  String get signInPasskeyNameTitle => 'Add passkey';
+
+  @override
+  String get signInPasskeyNameHint =>
+      'Give the passkey a name you will recognize, for example the device or password manager it is stored in.';
+
+  @override
+  String get signInPasskeyName => 'Name';
+
+  @override
+  String get signInPasskeyContinue => 'Continue';
+
+  @override
+  String signInPasskeyAdded(String name) {
+    return 'The passkey $name was added.';
+  }
+
+  @override
+  String get signInPasskeyCancelled => 'No passkey was created.';
+
+  @override
+  String get signInPasskeyUnavailable =>
+      'This app cannot create a passkey on this device. Add one in the web console of this instance.';
+
+  @override
+  String signInLinkWith(String provider) {
+    return 'Link with $provider';
+  }
+
+  @override
+  String signInLinked(String provider) {
+    return 'Your account is now linked with $provider.';
+  }
+
+  @override
+  String get signInLinkCancelled =>
+      'The link was cancelled at the login service.';
+
+  @override
+  String get signInLinkFailed => 'The link was not made. Try again.';
+
+  @override
+  String signInLinkedAt(String when) {
+    return 'Linked $when';
+  }
+
+  @override
+  String get stepUpPurposeSetPassword => 'Set the password of your account';
+
+  @override
+  String get stepUpPurposeAddPasskey => 'Add a passkey to your account';
+
+  @override
+  String stepUpPurposeLinkIdentity(String provider) {
+    return 'Link your account with $provider';
+  }
 }
