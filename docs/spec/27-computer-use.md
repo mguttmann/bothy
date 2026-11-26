@@ -512,6 +512,10 @@ both run (D-CU-02-16):
 5. The Esc tap of a session belongs to that session: every start of the tap raises a generation,
    and a tap's callback or teardown acts only while its generation is the current one, checked and
    done under one lock, so the end of an older tap never removes a newer one.
+6. A person's stop (a real Esc, the stop button) is never cleared by a new session: a `show` while
+   one is pending shows nothing and answers with `stop` for the new session and the person's detail.
+   Only the weaker interrupts (`hide`, `disable`, a broken channel, a lock that has ended) are cleared
+   by a `show`.
 4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts; a stop
    keeps only the rest of the Esc that is still held, so its auto-repeat and key up are swallowed
    and stop nothing more; one held Esc stops once; an injected Esc passes and stops nothing.

@@ -8,6 +8,10 @@ public enum Limits {
     /// value; the helper never sees the server's configuration and holds the default as an
     /// outer bound.
     public static let keyRepeatMax = 50
+
+    /// The highest `amount` of `scroll`: the default of `computer.scroll_amount_max`
+    /// (docs/spec/27-computer-use.md section 18), held as an outer bound like `keyRepeatMax`.
+    public static let scrollAmountMax = 50
 }
 
 /// A flag that a running action checks between its steps, set from any thread.

@@ -40,7 +40,10 @@ What it does:
   ends (27 9.6). One held Esc stops once; its auto-repeat and key up are swallowed; the Esc
   state (`EscFilter`) starts fresh with every show. `StopVectorTests` runs the shared vectors
   `services/host/testdata/computer/stop-vectors.json`.
-  `repeat` above the default of `computer.key_repeat_max` and a `text` longer than one frame of
+  Every start of the Esc tap is a new generation (`TapGeneration`); a late callback or
+  teardown of an older tap never acts on a newer one.
+  `repeat` above the default of `computer.key_repeat_max`, `amount` above the default of
+  `computer.scroll_amount_max` and a `text` longer than one frame of
   `host_service.computer_frame_max_bytes` are `invalid_action` before anything is injected.
 - **Lock.** Lock, screen saver, user switch and display sleep count as locked: the helper
   reports `state` with `locked`, and every `capture` and `do` answers `screen_locked` and

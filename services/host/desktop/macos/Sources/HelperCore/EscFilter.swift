@@ -37,6 +37,11 @@ public final class EscFilter: @unchecked Sendable {
         lock.withLock { active = false }
     }
 
+    /// Whether the tap runs for a session (between `start()` and `stop()`).
+    public var isActive: Bool {
+        lock.withLock { active }
+    }
+
     /// Whether the tap must keep running because a held Esc still has events to swallow.
     public var draining: Bool {
         lock.withLock { !active && held }
