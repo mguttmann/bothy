@@ -112,6 +112,12 @@ button, hides the indicator, sends `cu_state` `stopped` and exactly one `compute
 `computer.close`). The Linux test backend of the helper is
 [test/computer_backend](test/computer_backend/README.md).
 
+The other end of the stream is `bothy-computer-mcp` (CU-05), the stdio MCP server next to the
+Claude Code runner: tools, request folder, key pinning, Noise initiator and image reassembly in
+`internal/computermcp`, the command in [cmd/bothy-computer-mcp](cmd/bothy-computer-mcp/README.md).
+It is built from this module and shipped with the host release, but it never runs inside the host
+service.
+
 ## Session ops of the local channel
 
 Kind `0x00` carries JSON ops `{"op","id","d"}`:
@@ -243,7 +249,8 @@ definition restarts it, only `bothy-host restart` does.
 
 `make release-build VERSION=<x.y.z> OUT=<dir>` (tools/distribution/hostdist.py) writes the
 release binaries `bothy-host_<v>_<os>_<arch>[.exe]` for darwin/arm64, darwin/amd64, linux/amd64,
-linux/arm64 and windows/amd64 and the packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` of
+linux/arm64 and windows/amd64, the binaries `bothy-computer-mcp_<v>_<os>_<arch>[.exe]` for the same
+platforms (CU-05, not in the packages) and the packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` of
 [infra/host](../../infra/host/README.md); `release-apple` (macOS) the signed and notarized
 `.pkg` per architecture, `release-windows` the signed MSI. The packages carry the service
 definitions of `install` only as references in `share/`; `install` writes the live ones. Builds are without cgo, with
@@ -379,9 +386,12 @@ with its generation, and the two permissions.
 | `desktop/` | the computer helpers for macOS (Swift) and Windows (C++), [README](desktop/README.md) (CU-02) |
 | `testdata/computer/` | the channel vectors of the helper channel (27 9.4) |
 | `internal/computer/` | computer sessions (CU-03): manager, session, helper channel, peer rule, scale map, chunking, attach token check |
+| `internal/computermcp/` | `bothy-computer-mcp` (CU-05): MCP over stdio, tools, request folder client, pin store, attach client and Noise initiator |
+| `cmd/bothy-computer-mcp/` | the command of the MCP server of computer use ([README](cmd/bothy-computer-mcp/README.md)) |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
 | `test/platform/` | the platform suite (build tag `platform`), its marker guard (`guard.go`, untagged) and the accounts it creates (`accounts.go`, untagged) |
 | `test/computer_backend/` | Linux test backend of the computer helper (Python, python-xlib and XTEST) and the fixture app ([README](test/computer_backend/README.md)) |
+| `test/computermcp/` | end-to-end test of `bothy-computer-mcp` (build tag `computere2e`) and `run.sh`, its throwaway container (`make computer-mcp-e2e`) |
 | `test/noisedevice/` | the Noise sidecar of the Go test device of the terminal suite in `services/server/test/terminal` (M2-48): JSON lines on stdin and stdout, `internal/noise` and `internal/frame` unchanged |
 | `.go-arch-lint.yml` | architecture rules, maintained by hand, one component per package |
 

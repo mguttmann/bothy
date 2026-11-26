@@ -50,7 +50,8 @@ For `grafana-bothy-live` (the Grafana panel plugin, brief M7-26) the trial needs
 
 For `host` (the host service bothy-host, brief M7-23) the trial needs no registry either:
 
-1. `make -C services/host release-build` writes the five release binaries and the .deb and .rpm
+1. `make -C services/host release-build` writes the five release binaries of bothy-host, the five of
+   bothy-computer-mcp and the .deb and .rpm
    packages (tools/distribution/hostdist.py); a missing file stops the trial;
 2. the binary of the build host prints exactly `services/host/VERSION` (`bothy-host version`);
 3. each package of the architecture of the Docker host is installed in throwaway containers of
@@ -671,10 +672,17 @@ class PluginTrial:
 
 def host_release_files(version: str) -> list[str]:
     """Return the files `make -C services/host release-build` writes for `version`."""
-    return [hostdist.binary_name(version, goos, goarch) for goos, goarch in hostdist.PLATFORMS] + [
-        hostdist.package_name(version, "linux", arch, kind)
-        for kind, arch in hostdist.LINUX_PACKAGES
-    ]
+    return (
+        [hostdist.binary_name(version, goos, goarch) for goos, goarch in hostdist.PLATFORMS]
+        + [
+            hostdist.binary_name(version, goos, goarch, hostdist.MCP_PROGRAM)
+            for goos, goarch in hostdist.PLATFORMS
+        ]
+        + [
+            hostdist.package_name(version, "linux", arch, kind)
+            for kind, arch in hostdist.LINUX_PACKAGES
+        ]
+    )
 
 
 def build_host() -> tuple[str, str]:

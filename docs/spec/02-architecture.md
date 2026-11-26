@@ -449,15 +449,17 @@ services/host/                host service bothy-host (own Go module, own versio
   cmd/bothy-host/             main: subcommands install, pair, doctor, run, restart, session-user,
                               pty-helper (24 section 2.2, 16 section 4.4; M2-42), confirm-agent (M2-45),
                               version (M7-23)
+  cmd/bothy-computer-mcp/     main of the stdio MCP server of computer use (27-computer-use.md C1, CU-05)
   internal/                   noise, frame, fingerprint (M2-38); buildinfo, clock (+ clocktest), config, state,
                               hostos (+ hostostest: the fake operating system), doctor (HD1 to HD11), localchan
                               (local channel, admin endpoint), helper (pty-helper), install (plans, units/),
                               startup (run, the Control port), pairing (M2-42); control (+ controltest, M2-43);
                               session (+ sessiontest: fake server and Go test device), pty, profiles, confirm
-                              (M2-45)
+                              (M2-45); computer (CU-03); computermcp (CU-05)
   test/platform/              platform suite (build tag platform), only on disposable machines (M2-42);
                               the marker guard (M2-48)
   test/noisedevice/           Noise sidecar of the Go test device of the terminal suite (M2-48)
+  test/computermcp/           end-to-end test of bothy-computer-mcp (build tag computere2e, CU-05)
   testdata/fakeclaude/        stand-in for claude auth status in the tests of HD6 (M2-42)
   testdata/noise/             test vectors, Go and Dart recordings, fingerprint vectors (24, 5.2, 14)
   .go-arch-lint.yml           maintained by hand, one component per package (no module register)
