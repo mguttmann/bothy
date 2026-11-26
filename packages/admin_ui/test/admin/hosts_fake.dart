@@ -44,6 +44,8 @@ AdminHost fakeHost(
   bool connected = true,
   bool ownerDisabled = false,
   int version = 1,
+  AdminHostComputer? computer,
+  int? computerDisabledGeneration,
 }) => AdminHost(
   id: id,
   name: name ?? id,
@@ -70,6 +72,8 @@ AdminHost fakeHost(
   lastSeenAt: DateTime.utc(2026, 10, 17, 7, 58),
   createdAt: DateTime.utc(2026, 10, 1),
   version: version,
+  computer: computer,
+  computerDisabledGeneration: computerDisabledGeneration,
 );
 
 /// [h] with the given parts changed and the version raised.
@@ -90,6 +94,7 @@ AdminHost changedHost(
   List<HostReportedName>? reported,
   List<HostDoctorEntry>? doctor,
   bool? connected,
+  int? computerDisabledGeneration,
 }) => AdminHost(
   id: h.id,
   name: h.name,
@@ -115,6 +120,9 @@ AdminHost changedHost(
   lastSeenAt: h.lastSeenAt,
   createdAt: h.createdAt,
   version: h.version + 1,
+  computer: h.computer,
+  computerDisabledGeneration:
+      computerDisabledGeneration ?? h.computerDisabledGeneration,
 );
 
 /// The host calls of the fake; [change] is the step-up of the admin fake and [grantList] its
@@ -541,5 +549,38 @@ mixin FakeHosts {
   Future<int> openSessions(String hostId) async {
     refused('openSessions');
     return sessionCounts[hostId] ?? 0;
+  }
+
+  /// The signed-in owner's live computer session per host (CU-07).
+  final Map<String, AdminComputerSession> liveComputer = {};
+
+  /// The computer calls in order: `live <host>`, `stop <session>`, `disable <host>`.
+  final List<String> computerCalls = [];
+
+  /// The live computer session of [hostId].
+  Future<AdminComputerSession?> liveComputerSession(String hostId) async {
+    computerCalls.add('live $hostId');
+    refused('liveComputerSession');
+    return liveComputer[hostId];
+  }
+
+  /// Stops [sessionId] (no step-up, 07 2.15 item 4).
+  Future<void> stopComputerSession(String sessionId) async {
+    computerCalls.add('stop $sessionId');
+    refused('stopComputerSession');
+    liveComputer.removeWhere((_, s) => s.id == sessionId);
+  }
+
+  /// Switches the enablement of [hostId] off: the reported generation becomes the disabled
+  /// one, and the host's live session ends.
+  Future<AdminHost> disableComputer(String hostId) async {
+    computerCalls.add('disable $hostId');
+    refused('disableComputer');
+    final h = _hostOf(hostId);
+    liveComputer.remove(hostId);
+    return hostsById[hostId] = changedHost(
+      h,
+      computerDisabledGeneration: h.computer?.generation,
+    );
   }
 }
