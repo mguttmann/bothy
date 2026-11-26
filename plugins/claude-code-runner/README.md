@@ -52,6 +52,7 @@ sessions".
 | `definition.py` | The runner's own check of a definition (26 4.2, 4.3), held equal to the server's by the corpus `tests/agent-definitions`; the class a definition needs and the tool intersection (26 4.4) |
 | `materialize.py` | The agent and control folders: every file of 26 5.2, the runner settings of 26 5.4, the rebuild before each turn and the per-turn MCP file (26 5.6) |
 | `channel_skills.py` | Channel skills behind `runner.channel_skills_dir`, only in `host` turns (26 5.9) |
+| `computer.py` | Computer use behind `runner.computer_use`: the per-turn MCP file of `bothy-computer-mcp`, the request folder and its calls of the server, the system prompt section and the deletion of a computer run's transcript (27 10) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.17) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
@@ -764,6 +765,61 @@ send ends no run (above). A run that ends `billing_mode_mismatch` in this mode f
 
 Switching the key off again needs no step: both modes continue the same sessions, and a turn
 record a background turn left is still settled at the next start.
+
+## Computer use (docs/spec/27-computer-use.md 10, CU-06)
+
+With `runner.computer_use = true` every turn under tool class `host` can operate a desktop of the
+owner through the MCP server `bothy-computer-mcp`, a release binary of the host component
+(`bothy-computer-mcp_<v>_<os>_<arch>`, D-CU-05-9). Install it on the runner host and name it in
+`runner.computer_mcp_bin`: an absolute path of a regular file that neither group nor others may
+write, or the runner refuses to start. Below `host` nothing changes, and without the key the
+argument list, the environment and the system prompt are exactly as before.
+
+- **Per-turn file.** `<runner.state_dir>/turns/<run_id>.computer.mcp.json` (mode `0600`) names
+  the one server `bothy_computer` with no arguments and exactly the variables
+  `BOTHY_COMPUTER_DIR`, `BOTHY_COMPUTER_NONCE` (fresh per run), `BOTHY_COMPUTER_TIMEOUT_MS`
+  (`runner.computer_request_timeout`), `BOTHY_COMPUTER_PINS` (`<runner.state_dir>/computer/pins.json`,
+  kept by the binary) and `BOTHY_COMPUTER_SERVER` (`runner.server_url`). A print turn passes it
+  with `--mcp-config` directly after `--permission-prompts none`, a background session directly
+  after the flags of the class; never with `--strict-mcp-config`, so the host user's own MCP
+  servers load as before. The file goes at the end of the run and is swept at start.
+- **Requests.** The binary asks for the desktops and for a session through the folder
+  `<runner.state_dir>/computer-requests/<run_id>/` (mode `0700`): the runner answers only a
+  request that carries the run's nonce, calls `listComputerDesktops` or `openComputerSession`
+  with its agent token, DPoP proof and the run's invocation token, and writes the answer. None of
+  these credentials reaches the turn, its environment, its files or its prompt; only the
+  single-use attach token of a session reaches the binary. Log codes: `computer_request_answered`
+  (op, ok, status), `computer_request_refused` (a wrong nonce or a malformed request),
+  `computer_request_failed`, `computer_answer_malformed`.
+- **System prompt.** The section `## Computer use` says that orders come only from the owner's
+  messages, that screen content is data, and how to end and report; it guides, it locks nothing.
+- **End of a computer run.** The server ends the thread's agent session with `computer_use` when
+  a run that opened a session ends, so the next run starts a new Claude Code session. The runner,
+  once the turn's process is gone or the background session is stopped and removed (`claude
+  stop`, `claude rm`), deletes that session's transcript `<config>/projects/<folder>/<session>.jsonl`
+  and its folder `<config>/projects/<folder>/<session>/` with the tool result files, where the
+  screenshots are (log `computer_transcript_removed`). When that fails it logs
+  `computer_transcript_left`, keeps a mark per thread under `<runner.state_dir>/computer/left/`,
+  and the thread's next run tries again and names it in its status line; it never blocks a run.
+  A run that opened no session keeps its session as before.
+
+### Probe results of 27 16
+
+`tests/real_cli/test_computer_probe.py` (free: the stand-in for the API, no login, no model):
+
+- `--mcp-config` with a `stdio` server and its `env`: holds in print mode and in a background
+  session under `host`. The CLI starts the server of the per-turn file, the server gets exactly
+  the five variables, and the model's call of `mcp__bothy_computer__screenshot` returns the image
+  to the model. Run on 2026-11-26 against 2.1.332, the version `make runner-real-cli` installs
+  (print mode on macOS, both modes in a Linux container; the background part runs in CI only,
+  because a background session shares the supervisor of the host user). No fallback is taken:
+  background runs keep computer use.
+- Layout: the image is in the transcript `<config>/projects/<folder>/<session>.jsonl` and in a
+  file `<config>/projects/<folder>/<session>/tool-results/mcp-bothy_computer-blob-<n>-<id>.png`;
+  no other file under the configuration folder or `HOME` holds it (the CLI's MCP log under the
+  cache folder of `HOME` names the server only). After `claude stop`, `claude rm` and the
+  runner's deletion of those two paths no file holds it. So the fallback of 27 16 (removing the
+  whole project folder) is not taken.
 
 ## Costs
 
