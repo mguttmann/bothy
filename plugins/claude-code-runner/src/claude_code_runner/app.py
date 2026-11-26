@@ -708,6 +708,11 @@ class RunnerHandler(AgentHandler):
             poll=self.config.poll_interval,
             timeout=self.config.cli_probe_timeout,
         )
+        # A run whose record the start removed ends its computer use here: the sweep deletes
+        # the screenshots of a session it opened (27 10.5, D-CU-06-4).
+        adopted = {str(r) for r in self.adopted}
+        for state_dir in (self.config.state_dir, *sorted(self.config.state_dir.glob("hosted/*"))):
+            sweep_computer(state_dir, adopted | recorded_runs(state_dir))
 
     async def _adopt(
         self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID

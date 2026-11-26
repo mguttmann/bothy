@@ -502,3 +502,59 @@ async def test_a_failed_call_is_answered_request_failed(tmp_path: Path) -> None:
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+
+
+def test_sweep_ends_the_session_of_a_left_run_that_opened_one(tmp_path: Path) -> None:
+    """A run whose record a start removed still loses its screenshots (D-CU-06-4)."""
+    state = tmp_path / "state"
+    state.mkdir(mode=0o700)
+    config = tmp_path / "config"
+    transcript, image = _layout(config)
+    paths = ComputerPaths(state, RUN)
+    write_turn_file(paths, mcp_document(MCP_BIN, paths, NONCE, 30.0, SERVER))
+    mark = {"config_dir": str(config), "session": SESSION, "thread_id": str(THREAD)}
+    (paths.request_dir / "opened").write_text(json.dumps(mark))
+    assert sweep_computer(state, {str(RUN)}) == 0  # an active run keeps everything
+    assert transcript.exists()
+    assert sweep_computer(state, set()) == 2
+    assert not transcript.exists()
+    assert not image.exists()
+    assert take_left(state, THREAD) is None
+
+
+def test_sweep_marks_a_session_it_cannot_end(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    state.mkdir(mode=0o700)
+    config = tmp_path / "config"
+    transcript, _ = _layout(config)
+    paths = ComputerPaths(state, RUN)
+    write_turn_file(paths, mcp_document(MCP_BIN, paths, NONCE, 30.0, SERVER))
+    mark = {"config_dir": str(config), "session": SESSION, "thread_id": str(THREAD)}
+    (paths.request_dir / "opened").write_text(json.dumps(mark))
+    os.chmod(transcript.parent, 0o500)  # noqa: PTH101 - nothing in it can be removed
+    try:
+        sweep_computer(state, set())
+    finally:
+        os.chmod(transcript.parent, 0o700)  # noqa: PTH101
+    assert take_left(state, THREAD) == (config, SESSION)
+    assert not paths.request_dir.exists()
+
+
+@pytest.mark.anyio
+async def test_the_mark_of_an_open_names_the_session(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    write_turn_file(paths, mcp_document(MCP_BIN, paths, NONCE, 30.0, SERVER))
+    server = _Server({"open": {"v": 1, "ok": True, "result": {}}})
+    mark = {"config_dir": "/c", "session": SESSION, "thread_id": str(THREAD)}
+    folder = RequestFolder(paths, NONCE, server, poll=0.01, mark=lambda: mark)
+    task = asyncio.ensure_future(folder.serve())
+    try:
+        request_id = str(uuid.uuid4())
+        raw = _request(op="open", host_id=HOST, client_ephemeral_key_hash="h", pin_changed=False)
+        _write_request(paths.request_dir, request_id, raw)
+        await _answer(paths.request_dir, request_id)
+        assert json.loads((paths.request_dir / "opened").read_text()) == mark
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task

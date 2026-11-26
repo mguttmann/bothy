@@ -95,7 +95,9 @@ REQUEST_SUFFIX = ".request.json"
 ANSWER_SUFFIX = ".answer.json"
 TMP_SUFFIX = ".tmp"
 OPENED_MARK = "opened"
-"""The file in the request folder that says the run opened a session; C1 never reads it."""
+"""The file in the request folder that says the run opened a session; C1 never reads it. It
+holds the session's configuration folder, session id and thread (`RequestFolder` ``mark``), so
+the sweep can delete a session's files when no runner ended the run (D-CU-06-4)."""
 
 REFUSED_ANSWER: dict[str, Any] = {
     "v": 1,
@@ -283,12 +285,39 @@ def sweep_computer(state_dir: Path, active: Collection[str]) -> int:
             if folder.name in keep:
                 continue
             if folder.is_dir() and not folder.is_symlink():
+                _end_left_session(state_dir, folder)
                 shutil.rmtree(folder, ignore_errors=True)
             else:
                 with contextlib.suppress(OSError):
                     folder.unlink()
             removed += 1
     return removed
+
+
+def _end_left_session(state_dir: Path, folder: Path) -> None:
+    """Delete the session files of a run that opened a session and that no runner ended.
+
+    A run whose record a start removed (a turn left or stopped at the start, a handover record
+    of another runner) never reached `claude_code_runner.runturn.RunTurn` again; its mark says
+    which session's files hold the screenshots (27 10.5 item 2, D-CU-06-4).
+    """
+    try:
+        value = json.loads((folder / OPENED_MARK).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not isinstance(value, dict):
+        return
+    config, session, thread = value.get("config_dir"), value.get("session"), value.get("thread_id")
+    if not (isinstance(config, str) and isinstance(session, str) and isinstance(thread, str)):
+        return
+    if not (config and session and thread):
+        return
+    if remove_session_files(Path(config), session):
+        _log("computer_transcript_removed", run_id=folder.name)
+        return
+    _warn("computer_transcript_left", run_id=folder.name)
+    with contextlib.suppress(OSError, ValueError):
+        mark_left(state_dir, UUID(thread), Path(config), session)
 
 
 @dataclass(frozen=True)
@@ -474,9 +503,11 @@ class RequestFolder:
         call: Calls the server for a checked request (`server_call`).
         poll: ``runner.poll_interval``.
         ids: IDs for log lines.
+        mark: Returns ``config_dir``, ``session`` and ``thread_id`` of the run now, written into
+            the mark of an open; ``None`` writes an empty mark.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - the parts of one served folder
         self,
         paths: ComputerPaths,
         nonce: str,
@@ -484,8 +515,10 @@ class RequestFolder:
         *,
         poll: float,
         ids: Mapping[str, object] | None = None,
+        mark: Callable[[], Mapping[str, str]] | None = None,
     ) -> None:
         """Create the service; nothing runs before `serve`."""
+        self.mark = mark
         self.paths = paths
         self.nonce = nonce
         self.call = call
@@ -551,7 +584,11 @@ class RequestFolder:
                 )
                 answer = dict(FAILED_ANSWER)
             if request.op == "open" and answer.get("ok") is True:
-                write_private(folder / OPENED_MARK, b"", atomic=True)
+                content = dict(self.mark()) if self.mark is not None else {}
+                try:
+                    write_private(folder / OPENED_MARK, json.dumps(content), atomic=True)
+                except OSError:
+                    _warn("computer_mark_failed", **self.ids)
             _log(
                 "computer_request_answered",
                 op=request.op,
