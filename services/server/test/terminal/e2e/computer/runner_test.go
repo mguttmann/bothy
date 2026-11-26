@@ -40,7 +40,7 @@ const (
 	callsFile   = workDir + "/computer.jsonl"
 	captureFile = workDir + "/capture.jsonl"
 	// apiKey is the key of the organization billing the turn receives; Fake-Claude calls no API.
-	apiKey = "sk-ant-cu-t24-0123456789"
+	apiKey = "sk-ant-cu-t24-0123456789" //nolint:gosec // G101: a fake key; Fake-Claude calls no API
 )
 
 // runnerMachine is the container of the runner.
@@ -49,7 +49,7 @@ type runnerMachine struct {
 }
 
 // newRunnerMachine creates the runner's account and folders.
-func newRunnerMachine(t *testing.T, _ *suite.Env, h *stack.Host) *runnerMachine {
+func newRunnerMachine(t *testing.T, h *stack.Host) *runnerMachine {
 	t.Helper()
 	shell(t, h, "useradd --create-home --shell /bin/bash "+runnerUser+
 		" && install -d -o "+runnerUser+" -g "+runnerUser+" -m 0700 "+workDir+" "+stateDir+" "+secretsDir+" "+runnerHome+"/projects "+
@@ -247,6 +247,7 @@ func (r *runnerMachine) checkTurn(t *testing.T, runID string) {
 			}
 		}
 	}
+	t.Logf("runner: %d turn with --mcp-config after --permission-prompts none, %d computer server with the five variables", turns, servers)
 	if turns != 1 || servers != 1 {
 		t.Errorf("%d turns and %d computer servers, want one each", turns, servers)
 	}

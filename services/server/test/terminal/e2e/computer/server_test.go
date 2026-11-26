@@ -38,7 +38,7 @@ const tokenTTL = 24 * time.Hour
 // newAgent creates the agent through the case's Owner: createAgent (adapter kind code_runner),
 // the tool class host, a space and a text channel it operates, and an API token bound to a fresh
 // P-256 key (createToken with dpop_jkt).
-func newAgent(t *testing.T, env *suite.Env, owner *harness.Client) agent {
+func newAgent(t *testing.T, owner *harness.Client) agent {
 	t.Helper()
 	var a agent
 	var created struct {
@@ -176,7 +176,7 @@ func uuidOnly(t *testing.T, s string) string {
 	}
 	for i, c := range s {
 		dash := i == 8 || i == 13 || i == 18 || i == 23
-		if dash != (c == '-') || (!dash && !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f')) {
+		if dash != (c == '-') || (!dash && (c < '0' || c > '9') && (c < 'a' || c > 'f')) {
 			t.Fatal("not a UUID")
 		}
 	}

@@ -91,8 +91,8 @@ func TestComputerUseEndToEnd(t *testing.T) {
 	})
 
 	// The agent, its channel and its credentials; the runner on its own machine.
-	ag := newAgent(t, env, live.Owner())
-	run := newRunnerMachine(t, env, live.Host(runnerName))
+	ag := newAgent(t, live.Owner())
+	run := newRunnerMachine(t, live.Host(runnerName))
 	run.install(t, env, ag, script(hostID, run))
 	run.start(t)
 	waitHeartbeat(t, live.Owner(), ag.id)
@@ -106,23 +106,28 @@ func TestComputerUseEndToEnd(t *testing.T) {
 	desk.waitEvent(t, `{"event": "click", "button": "Alpha"}`)
 	desk.waitEvent(t, `{"event": "text", "value": "`+typed+`"}`)
 	session := waitSession(t, alex, runID, "active")
+	t.Logf("run %s: computer session active, Alpha clicked and %q typed in the fixture app", runID, typed)
 
 	// A simulated lock pauses the session; actions answer screen_locked; the unlock resumes it.
 	desk.signalHelper(t, "SIGUSR1")
 	run.waitMark(t, "paused.seen")
 	waitSession(t, alex, runID, "paused")
+	t.Log("lock: the session is paused with locked and the agent got screen_locked")
 	desk.signalHelper(t, "SIGUSR2")
 	run.openGate(t, "unlock")
 	run.waitMark(t, "resumed")
 	waitSession(t, alex, runID, "active")
+	t.Log("unlock: the session is active again and the next screenshot ran")
 
 	// The owner stops the session from the API.
 	stopped := stop(t, alex, session)
 	if stopped.State != "closed" || stopped.CloseReason != "stopped_by_user" || stopped.CloseDetail != "client_stop" {
 		t.Fatalf("stopComputerSession: state %s, reason %s, detail %s", stopped.State, stopped.CloseReason, stopped.CloseDetail)
 	}
+	t.Log("stopComputerSession: closed, stopped_by_user, client_stop")
 	run.openGate(t, "stop")
 	waitRunState(t, env, runID, "completed")
+	t.Log("the run completed")
 
 	calls := run.calls(t)
 	checkCalls(t, calls)
@@ -155,16 +160,18 @@ func script(hostID string, r *runnerMachine) []map[string]any {
 
 // call is one line of kind call of the scripted agent's output.
 type call struct {
-	Kind    string   `json:"kind"`
-	Step    int      `json:"step"`
-	Tool    string   `json:"tool"`
-	IsError bool     `json:"is_error"`
-	Text    string   `json:"text"`
-	Error   string   `json:"error"`
-	Detail  string   `json:"detail"`
-	Exit    *int     `json:"exit"`
-	Names   []string `json:"names"`
-	Images  []struct {
+	Kind    string `json:"kind"`
+	Step    int    `json:"step"`
+	Tool    string `json:"tool"`
+	IsError bool   `json:"is_error"`
+	Text    string `json:"text"`
+	Error   string `json:"error"`
+	Detail  string `json:"detail"`
+	Exit    *int   `json:"exit"`
+	// Attempts counts the calls of a repeated step.
+	Attempts int      `json:"attempts"`
+	Names    []string `json:"names"`
+	Images   []struct {
 		Mime string `json:"mime"`
 		Data string `json:"data"`
 	} `json:"images"`
@@ -239,6 +246,9 @@ func checkCalls(t *testing.T, lines []call) {
 	if c := byStep[14]; !strings.HasPrefix(c.Text, "stopped") {
 		t.Errorf("screenshot after the stop: %q", firstLine(c.Text))
 	}
+	t.Logf("agent: %d tools; screenshot %dx%d JPEG with the red square; zoom %dx%d PNG red; locked %q after %d calls; after the stop %q",
+		len(tools), img.Bounds().Dx(), img.Bounds().Dy(), zoom.Bounds().Dx(), zoom.Bounds().Dy(), firstLine(byStep[8].Text), byStep[8].Attempts,
+		firstLine(byStep[14].Text))
 }
 
 // screenWidth and screenHeight are the size of the Xvfb screen of the desktop.

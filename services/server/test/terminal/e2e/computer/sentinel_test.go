@@ -110,6 +110,7 @@ func checkNoImageOnServer(t *testing.T, env *suite.Env, d *desktop, r *runnerMac
 	}
 	sources["desktop host service journal"] = journal
 	for where, b := range sources {
+		t.Logf("sentinel scan: %s, %d bytes, %d windows in 4 forms", where, len(b), len(ss))
 		for _, s := range ss {
 			for _, f := range s.forms {
 				if bytes.Contains(b, f) {

@@ -118,9 +118,11 @@ func (d *desktop) checkNothingPressed(t *testing.T) {
 	if err != nil || r.Code != 0 {
 		t.Fatalf("the probe of the pressed keys failed: %v %d", err, r.Code)
 	}
-	if got := strings.TrimSpace(string(r.Stdout)); got != "0 0" {
+	got := strings.TrimSpace(string(r.Stdout))
+	if got != "0 0" {
 		t.Errorf("after the stop the X server holds keys and buttons %q, want 0 0", got)
 	}
+	t.Logf("X server after the stop: keys and buttons pressed %q", got)
 }
 
 // shell runs script as root in h and fails the test unless it exits 0.
