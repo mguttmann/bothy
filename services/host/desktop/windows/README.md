@@ -34,7 +34,7 @@ Every platform call sits behind one interface of `platform.hpp` (brief CU-02 ite
 | `EscTap` | `WH_KEYBOARD_LL` hook on its own thread; a real Esc (no `LLKHF_INJECTED`, no marker) is swallowed and ends the session; the hook carries the tap generation (27 9.6 item 5) |
 | `Indicator` | click-through topmost border in `#FF6A00` and a stop button, both with `WDA_EXCLUDEFROMCAPTURE` and on their own thread; tray icon with the menu "Allow computer control" |
 | `EnablementStore` | `%LOCALAPPDATA%\bothy-computer-helper\state.json`, written atomically |
-| `HostChannel` | named pipe client of `\\.\pipe\bothy-host-computer` with reconnect and the server check of D-CU-02-5; it asks only for the rights the pipe grants interactive users (`kPipeClientAccess`) and writes each change of the channel (connected, closed, an open error, a refused server) to `%LOCALAPPDATA%\bothy-computer-helper\channel.log` |
+| `HostChannel` | named pipe client of `\\.\pipe\bothy-host-computer` with reconnect and the server check of D-CU-02-5; it asks only for the rights the pipe grants interactive users (`kPipeClientAccess`), grants `NT SERVICE\bothy-host` query access to its own process (the host service binds the connection to it) and writes each change of the channel (connected, closed, an open error, a refused server) to `%LOCALAPPDATA%\bothy-computer-helper\channel.log` |
 
 The pipe server must run in session 0, and its account must be exactly LocalSystem or
 `NT SERVICE\bothy-host` and never the helper's own user (`trust.hpp`). The account comes from the

@@ -115,6 +115,44 @@ constexpr DWORD kServerRefused = 0xFFFFFFFF;
 // why: computer_peer_refused with a reason); repeats of it are not logged.
 constexpr ULONGLONG kShortMs = 5000;
 
+// Grants the host service's account PROCESS_QUERY_LIMITED_INFORMATION and SYNCHRONIZE on this
+// process. The host service binds every helper connection to a handle of the client process
+// (D-CU-03-12) and reads its executable through it; the default DACL of a person's process admits
+// only that person, the logon session and SYSTEM, so the service account NT SERVICE\bothy-host
+// got "access denied" and refused every helper (a Windows 11 test machine, computer_peer_refused reason no_binding).
+// Returns 0 or the Win32 error.
+DWORD grant_service_query() {
+  DWORD size = 0, domain_size = 0;
+  SID_NAME_USE use{};
+  LookupAccountNameW(nullptr, L"NT SERVICE\\bothy-host", nullptr, &size, nullptr, &domain_size, &use);
+  if (size == 0) return GetLastError();
+  std::unique_ptr<BYTE[]> sid(new BYTE[size]);
+  std::wstring domain(domain_size + 1, L'\0');
+  if (!LookupAccountNameW(nullptr, L"NT SERVICE\\bothy-host", sid.get(), &size, domain.data(), &domain_size, &use))
+    return GetLastError();
+  PACL old_acl = nullptr;
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  DWORD e = GetSecurityInfo(GetCurrentProcess(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr,
+                            &old_acl, nullptr, &sd);
+  if (e != ERROR_SUCCESS) return e;
+  EXPLICIT_ACCESSW ea{};
+  ea.grfAccessPermissions = PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE;
+  ea.grfAccessMode = GRANT_ACCESS;
+  ea.grfInheritance = NO_INHERITANCE;
+  ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+  ea.Trustee.TrusteeType = TRUSTEE_IS_USER;
+  ea.Trustee.ptstrName = reinterpret_cast<LPWSTR>(sid.get());
+  PACL acl = nullptr;
+  e = SetEntriesInAclW(1, &ea, old_acl, &acl);
+  if (e == ERROR_SUCCESS) {
+    e = SetSecurityInfo(GetCurrentProcess(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, acl,
+                        nullptr);
+    LocalFree(acl);
+  }
+  LocalFree(sd);
+  return e;
+}
+
 }  // namespace
 
 bool pipe_server_trusted(HANDLE pipe) {
@@ -219,6 +257,11 @@ void PipeChannel::run() {
   DWORD wait = kRetryFirstMs;
   DWORD logged = kNoError;  // the last failure written to the channel log
   bool quiet = false;       // short connections are repeating; not logged until a long one
+  if (check_server_) {
+    // Only toward the real host service; a development pipe has no such account.
+    DWORD e = grant_service_query();
+    if (e != ERROR_SUCCESS) note(L"process access for the host service not granted: error " + std::to_wstring(e));
+  }
   std::vector<std::uint8_t> buf(kReadChunk);
   while (!quit_) {
     // SECURITY_IDENTIFICATION: the server may learn who connected but cannot act as the helper.
@@ -252,7 +295,6 @@ void PipeChannel::run() {
       id = ++connection_;
     }
     wait = kRetryFirstMs;
-    logged = kNoError;
     if (!quiet) note(L"channel connected");
     ULONGLONG opened = GetTickCount64();
     push(Event{Event::Kind::Connected, Frame{}, id});
@@ -300,6 +342,7 @@ void PipeChannel::run() {
     if (GetTickCount64() - opened >= kShortMs) {
       note(L"channel closed");
       quiet = false;
+      logged = kNoError;
     } else if (!quiet) {
       note(L"channel closed at once (refused by the host service? see its log); repeats are not logged");
       quiet = true;

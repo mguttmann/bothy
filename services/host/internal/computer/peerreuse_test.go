@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -81,4 +82,17 @@ func TestRecheckRefusalReportsRefused(t *testing.T) {
 		t.Fatalf("recheck %v", err)
 	}
 	r.waitState(func(s HelperState) bool { return !s.Connected && s.Refused })
+}
+
+// TestBindRefusalLogsNoBinding: a client process the service may not open (Windows: the service
+// account against a person's process) is refused with the reason no_binding, so the log tells it
+// apart from an unreadable peer (seen on a Windows 11 test machine).
+func TestBindRefusalLogsNoBinding(t *testing.T) {
+	r := newRig(t)
+	r.h.o.Bind = func(net.Conn, confirm.Peer, time.Time) (Process, error) { return nil, errors.New("access denied") }
+	r.connect(hello())
+	r.waitState(func(s HelperState) bool { return s.Refused })
+	if !strings.Contains(r.logText(), "reason="+ReasonNoBinding) {
+		t.Fatalf("log %s", r.logText())
+	}
 }

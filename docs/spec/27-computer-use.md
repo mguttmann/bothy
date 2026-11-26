@@ -481,7 +481,7 @@ start is not refused, and the host gives no terminal session.
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
   Otherwise the connection is closed and logged with `computer_peer_refused` and the key `reason`,
-  the step that refused it (`no_peer`, `console_user`, `process_changed`, `exe_unavailable`,
+  the step that refused it (`no_peer`, `no_binding`, `console_user`, `process_changed`, `exe_unavailable`,
   `path_mismatch`, `path_untrusted`, `signature`, `test_peer`, or `no_hello` for a peer without a
   valid `hello`); it names no user, path or process. The executable is read for a process of
   another user (macOS `proc_pidpath`, not `kern.procargs2`, which only root and the process's own
@@ -490,6 +490,9 @@ start is not refused, and the host gives no terminal session.
 - The helper opens the Windows pipe with exactly the rights its DACL grants interactive users
   (`FILE_GENERIC_READ` plus `FILE_WRITE_DATA`), never `GENERIC_WRITE`, which adds
   `FILE_CREATE_PIPE_INSTANCE` and is refused.
+  Before it connects, it grants `NT SERVICE\bothy-host` `PROCESS_QUERY_LIMITED_INFORMATION` and
+  `SYNCHRONIZE` on its own process, so the service account can open the handle that binds the
+  connection (D-CU-03-12); a person's process admits no other account by default.
 - Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the expected peer is
   pinned to the service user `bothy-host` (looked up by name; missing or equal to the helper's own
   user trusts nobody) or root; the socket's peer (`getpeereid`) must be one of them and never the

@@ -188,8 +188,12 @@ func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	var err error
 	if h.o.PeerOf == nil {
 		err = refuse(ReasonNoPeer)
-	} else if peer, err = h.o.PeerOf(c); err == nil && h.o.Bind != nil {
-		proc, err = h.o.Bind(c, peer, accepted)
+	} else if peer, err = h.o.PeerOf(c); err != nil {
+		err = refuse(ReasonNoPeer)
+	} else if h.o.Bind != nil {
+		if proc, err = h.o.Bind(c, peer, accepted); err != nil {
+			err = refuse(ReasonNoBinding)
+		}
 	}
 	if err == nil {
 		err = h.o.Rule.Check(ctx, peer, proc)

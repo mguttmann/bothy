@@ -31,8 +31,11 @@ const (
 // The reasons of a refused helper peer, logged with LogPeerRefused under the key reason, so a
 // refusal on a machine can be told apart without naming a user, path or process.
 const (
-	// ReasonNoPeer: the user, process ID or process binding of the connection could not be read.
+	// ReasonNoPeer: the user or process ID of the connection could not be read.
 	ReasonNoPeer = "no_peer"
+	// ReasonNoBinding: the peer process could not be bound to the connection (Windows: the
+	// service account may not open the client process; the helper grants it, D-CU-03-12).
+	ReasonNoBinding = "no_binding"
 	// ReasonConsoleUser: the peer is not the user of the active console session (or is the service
 	// user or a session user).
 	ReasonConsoleUser = "console_user"
