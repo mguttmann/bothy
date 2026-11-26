@@ -40,6 +40,8 @@ What it does:
   ends (27 9.6). One held Esc stops once; its auto-repeat and key up are swallowed; the Esc
   state (`EscFilter`) starts fresh with every show. `StopVectorTests` runs the shared vectors
   `services/host/testdata/computer/stop-vectors.json`.
+  A stop of the person that is still pending when the next `show` arrives refuses that session
+  with a `stop` for it; a pending `hide`, `disable` or break is cleared by the `show`.
   Every start of the Esc tap is a new generation (`TapGeneration`); a late callback or
   teardown of an older tap never acts on a newer one.
   `repeat` above the default of `computer.key_repeat_max`, `amount` above the default of

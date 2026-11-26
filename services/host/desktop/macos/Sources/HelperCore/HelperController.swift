@@ -240,9 +240,15 @@ public final class HelperController {
         }
         if let current = session, current.id == sessionID { return }
         if session != nil { endLocally() }
+        if let detail = interrupt.begin(sessionID: sessionID) {
+            // The person stopped while this show was on its way: the new session never shows
+            // and is answered with the person's stop (27 9.6 item 6).
+            endLocally()
+            send(["op": "stop", "session_id": .string(sessionID), "detail": .string(detail.rawValue)])
+            return
+        }
         injector.releaseAll()
         session = (sessionID, agent)
-        interrupt.begin(sessionID: sessionID)
         indicator.show(agentName: agent) { [weak self] in self?.indicatorStopClicked() }
         do {
             try escTap.start { [weak self] injected in

@@ -20,7 +20,7 @@ final class StopVectorTests: XCTestCase {
 
     func testEveryCase() throws {
         let cases = try XCTUnwrap(Self.load()["cases"]?.arrayValue)
-        XCTAssertGreaterThanOrEqual(cases.count, 14)
+        XCTAssertGreaterThanOrEqual(cases.count, 20)
         for item in cases {
             try run(item)
         }
@@ -47,6 +47,9 @@ final class StopVectorTests: XCTestCase {
                     rig.injector.onUnit = nil
                     Self.raise(kind, on: rig)
                 }
+            } else if let kind = event["raise"]?.stringValue {
+                // Another thread sets the flag before the controller handles the next event.
+                Self.raise(kind, on: rig)
             } else if let which = event["tap_teardown"]?.stringValue {
                 XCTAssertEqual(which, "previous", name)
                 rig.tap.lateTeardownOfPrevious()
@@ -61,6 +64,9 @@ final class StopVectorTests: XCTestCase {
         }
         let expect = try XCTUnwrap(item["expect"], name)
         XCTAssertEqual(rig.injector.units, Int(expect["units"]?.intValue ?? -1), "\(name): units")
+        if let shown = expect["shown"]?.boolValue {
+            XCTAssertEqual(rig.indicator.shownAgent != nil, shown, "\(name): shown")
+        }
         if expect["released_after"]?.boolValue == true {
             XCTAssertTrue(rig.injector.pressedKeys.isEmpty, "\(name): keys held")
             XCTAssertTrue(rig.injector.pressedButtons.isEmpty, "\(name): buttons held")

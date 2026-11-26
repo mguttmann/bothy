@@ -88,11 +88,22 @@ public final class ActionInterrupt: @unchecked Sendable {
         }
     }
 
-    /// A new session starts: earlier stop requests no longer apply. Called by the controller.
-    func begin(sessionID: String) {
+    /// A new session wants to start (27 9.6 item 6), checked and done under one lock.
+    ///
+    /// A pending stop of the person (Esc, stop button) is never cleared by a new session: it is
+    /// consumed and returned, and the session must not start. Weaker reasons (`hide`,
+    /// `disable`, a broken channel) belonged to the session before and are cleared.
+    /// Called by the controller.
+    /// - Returns: the person's pending stop, or nil when the session may start.
+    func begin(sessionID: String) -> StopDetail? {
         lock.withLock {
+            if case .person(let detail) = stop {
+                stop = nil
+                return detail
+            }
             stop = nil
             self.sessionID = sessionID
+            return nil
         }
     }
 
