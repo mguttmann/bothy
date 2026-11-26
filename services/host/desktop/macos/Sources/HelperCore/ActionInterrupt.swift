@@ -26,8 +26,10 @@ public final class ActionInterrupt: @unchecked Sendable {
     public enum Reason: Equatable, Sendable {
         /// The person stopped the session (Esc or stop button); the session ends with `stop`.
         case person(StopDetail)
-        /// The session ends by the host or the channel (`hide`, `disable`, broken channel).
+        /// The session ends by the host (`hide`, `disable`); the action is answered.
         case ended
+        /// The channel broke; nothing can be answered (27 9.6 item 2).
+        case channelBroken
         /// The screen locked; the session pauses (27 8.2).
         case locked
     }
@@ -50,9 +52,16 @@ public final class ActionInterrupt: @unchecked Sendable {
         lock.withLock { if stop == nil { stop = .person(detail) } }
     }
 
-    /// The session ends by the host or the channel. Any thread.
+    /// The session ends by the host (`hide`, `disable`). Any thread.
     public func requestEnd() {
         lock.withLock { if stop == nil { stop = .ended } }
+    }
+
+    /// The channel broke. Any thread. It wins over an earlier end, because no answer can go out.
+    public func requestChannelBroken() {
+        lock.withLock {
+            if stop == nil || stop == .ended { stop = .channelBroken }
+        }
     }
 
     /// Sets the lock state. Any thread.

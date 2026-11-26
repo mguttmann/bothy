@@ -90,7 +90,7 @@ final class InterruptTests: XCTestCase {
             channel: other.channel, controller: other.controller,
             frameMaxBytes: HostConfig.defaultFrameMaxBytes, perform: { $0() }
         ).runOnce()
-        XCTAssertEqual(other.controller.interrupt.reason, .ended)
+        XCTAssertEqual(other.controller.interrupt.reason, .channelBroken)
     }
 
     func testEndedDuringAnActionAbortsWithoutStopFrame() {

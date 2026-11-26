@@ -391,7 +391,7 @@ public final class HelperController {
         }
     }
 
-    /// The steps of one `do`, checked completely before the first event, so an invalid request
+    /// The events of one `do`, checked completely before the first event, so an invalid request
     /// injects nothing.
     private enum Step {
         case move(Point)
@@ -403,8 +403,17 @@ public final class HelperController {
         case text(String)
     }
 
+    /// The units of one `do` (27 9.6 item 1): a press and release of the combination per
+    /// `repeat`, a character of `type` (a line break included), a line of `scroll`, a click of a
+    /// click action, a move. Units are made one at a time, so a long action allocates nothing
+    /// in advance.
+    private struct Plan {
+        let count: Int
+        let unit: (Int) -> [Step]
+    }
+
     private func perform(seq: Int64, message: JSONValue) {
-        guard let steps = plan(message) else {
+        guard let plan = plan(message) else {
             answer(seq: seq, code: .invalidAction)
             return
         }
@@ -413,25 +422,28 @@ public final class HelperController {
             return
         }
         do {
-            for step in steps {
-                // Checked before every step, so a stop, an end or a lock that arrives on
-                // another thread takes effect within one event, however long the action.
+            for index in 0..<plan.count {
+                injector.willStartUnit(index)
+                // Checked before every unit, so a stop, an end or a lock that arrives on another
+                // thread takes effect within one unit, however long the action.
                 if let reason = interrupt.reason {
                     injector.releaseAll()
                     abort(seq: seq, reason: reason)
                     return
                 }
-                switch step {
-                case .move(let point): try injector.move(to: point)
-                case .down(let key): try injector.keyDown(key)
-                case .up(let key): try injector.keyUp(key)
-                case .mouseDown(let button, let point, let count):
-                    try injector.mouseDown(button, at: point, clickCount: count)
-                case .mouseUp(let button, let point, let count):
-                    try injector.mouseUp(button, at: point, clickCount: count)
-                case .scroll(let point, let direction, let lines):
-                    try injector.scroll(at: point, direction: direction, lines: lines)
-                case .text(let text): try injector.typeText(text)
+                for step in plan.unit(index) {
+                    switch step {
+                    case .move(let point): try injector.move(to: point)
+                    case .down(let key): try injector.keyDown(key)
+                    case .up(let key): try injector.keyUp(key)
+                    case .mouseDown(let button, let point, let count):
+                        try injector.mouseDown(button, at: point, clickCount: count)
+                    case .mouseUp(let button, let point, let count):
+                        try injector.mouseUp(button, at: point, clickCount: count)
+                    case .scroll(let point, let direction, let lines):
+                        try injector.scroll(at: point, direction: direction, lines: lines)
+                    case .text(let text): try injector.typeText(text)
+                    }
                 }
             }
         } catch {
@@ -443,11 +455,10 @@ public final class HelperController {
         answer(seq: seq, code: .ok)
     }
 
-    /// Ends an action that an interrupt stopped: a lock answers `screen_locked` and keeps the
-    /// session; the person's stop ends the session with its `stop` frame first; an end by the
-    /// host or the channel leaves the session to the queued `hide`, `disable` or break. The
-    /// action is answered `invalid_action` when the session is gone, because nothing more of it
-    /// runs and none of it is retried.
+    /// Ends an action that an interrupt stopped (27 9.6 item 2): a lock answers `screen_locked`
+    /// and keeps the session; the person's stop ends the session with its `stop` frame first
+    /// and answers `invalid_action`; a `hide` or `disable` answers `invalid_action` and leaves
+    /// the session to the queued message; a broken channel answers nothing.
     private func abort(seq: Int64, reason: ActionInterrupt.Reason) {
         switch reason {
         case .locked:
@@ -457,10 +468,12 @@ public final class HelperController {
             answer(seq: seq, code: .invalidAction)
         case .ended:
             answer(seq: seq, code: .invalidAction)
+        case .channelBroken:
+            break
         }
     }
 
-    private func plan(_ message: JSONValue) -> [Step]? {
+    private func plan(_ message: JSONValue) -> Plan? {
         guard let action = message["action"]?.stringValue else { return nil }
         switch action {
         case "left_click", "right_click", "middle_click", "double_click", "triple_click":
@@ -470,25 +483,38 @@ public final class HelperController {
             let count = action == "double_click" ? 2 : action == "triple_click" ? 3 : 1
             let keys = modifiers.map(Key.modifier)
             guard keys.allSatisfy(injector.supports) else { return nil }
-            var steps: [Step] = [.move(point)] + keys.map(Step.down)
-            for press in 1...count {
-                steps += [.mouseDown(button, point, press), .mouseUp(button, point, press)]
+            // Unit 0 is the move, then one unit per click; the modifiers go down with the first
+            // click and up with the last (an interrupt in between releases them).
+            return Plan(count: count + 1) { index in
+                if index == 0 { return [.move(point)] }
+                var steps: [Step] = index == 1 ? keys.map(Step.down) : []
+                steps += [.mouseDown(button, point, index), .mouseUp(button, point, index)]
+                if index == count { steps += keys.reversed().map(Step.up) }
+                return steps
             }
-            return steps + keys.reversed().map(Step.up)
         case "mouse_move":
-            return point(message).map { [.move($0)] }
+            return point(message).map { point in Plan(count: 1) { _ in [.move(point)] } }
         case "scroll":
             guard let point = point(message),
                 let direction = message["direction"]?.stringValue.flatMap(ScrollDirection.init),
                 let amount = message["amount"]?.intValue, amount >= 1, amount <= Int64(Int32.max)
             else { return nil }
-            return [.move(point), .scroll(point, direction, Int(amount))]
+            return Plan(count: Int(amount) + 1) { index in
+                index == 0 ? [.move(point)] : [.scroll(point, direction, 1)]
+            }
         case "type":
-            // A text longer than one frame of host_service.computer_frame_max_bytes cannot have
-            // come from the host service; it is refused before anything is typed.
-            guard let text = message["text"]?.stringValue, text.utf8.count <= codec.maxFrameBytes
+            // A text that does not fit one frame of host_service.computer_frame_max_bytes (with
+            // its type byte) cannot have come from the host service; it is refused before
+            // anything is typed.
+            guard let text = message["text"]?.stringValue, text.utf8.count + 1 <= codec.maxFrameBytes
             else { return nil }
-            return typeSteps(text)
+            let characters = Array(
+                text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n"))
+            return Plan(count: characters.count) { index in
+                // A line break is Return (D-CU-02-7); every other character is Unicode input.
+                characters[index] == "\n"
+                    ? [.down(.named(.return)), .up(.named(.return))] : [.text(String(characters[index]))]
+            }
         case "key":
             guard let keys = message["keys"]?.stringValue,
                 let combo = try? KeyCombo.parse(keys),
@@ -499,22 +525,10 @@ public final class HelperController {
             // as an outer bound, so no request builds an unbounded action.
             guard repeatCount >= 1, repeatCount <= Int64(Limits.keyRepeatMax) else { return nil }
             let once = combo.keys.map(Step.down) + combo.keys.reversed().map(Step.up)
-            return Array(repeating: once, count: Int(repeatCount)).flatMap { $0 }
+            return Plan(count: Int(repeatCount)) { _ in once }
         default:
             return nil
         }
-    }
-
-    /// Text as Unicode input with every line break as `Return` (D-CU-02-7).
-    private func typeSteps(_ text: String) -> [Step] {
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-        var steps: [Step] = []
-        for (index, line) in normalized.components(separatedBy: "\n").enumerated() {
-            if index > 0 { steps += [.down(.named(.return)), .up(.named(.return))] }
-            if !line.isEmpty { steps.append(.text(line)) }
-        }
-        return steps
     }
 
     private func point(_ message: JSONValue) -> Point? {
