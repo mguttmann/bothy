@@ -18,6 +18,7 @@ variables; without any of them it exits `2` and names the variable.
 | `BOTHY_COMPUTER_TIMEOUT_MS` | `runner.computer_request_timeout` in milliseconds |
 | `BOTHY_COMPUTER_PINS` | the pin file (27 10.4), absolute |
 | `BOTHY_COMPUTER_SERVER` | `runner.server_url`; `attach_path` is relative to it (D-CU-05-2) |
+| `BOTHY_COMPUTER_CA_FILE` | optional: the runner's CA file (absolute PEM), trusted next to the system roots (D-CU-06-12) |
 
 `--version` prints the version, `--help` the usage. Exit codes: `0` stdin ended or a signal
 stopped it, `1` stdin or stdout failed, `2` usage or configuration.

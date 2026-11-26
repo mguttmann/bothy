@@ -157,6 +157,7 @@ from claude_code_runner.computer import (
     new_nonce,
     read_turn_nonce,
     remove_session_files,
+    runner_ca_file,
     server_call,
     take_left,
     write_turn_file,
@@ -953,6 +954,7 @@ class RunTurn:
                 nonce,
                 self.cfg.computer_request_timeout,
                 self.cfg.server_url,
+                ca_file=runner_ca_file(os.environ),
             )
             write_turn_file(paths, document)
         else:

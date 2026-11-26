@@ -3,19 +3,22 @@
 package computermcp
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 )
 
 // Environment variables of the per-turn MCP file (docs/spec/27-computer-use.md 10.1). The runner
-// sets exactly these; nothing else reaches the process (D-CU-05-2 adds EnvServer).
+// sets these; nothing else reaches the process (D-CU-05-2 adds EnvServer, D-CU-06-12 the optional
+// EnvCAFile).
 const (
 	// EnvDir is the request folder of the run (27 10.2 item 1).
 	EnvDir = "BOTHY_COMPUTER_DIR"
@@ -27,6 +30,9 @@ const (
 	EnvPins = "BOTHY_COMPUTER_PINS"
 	// EnvServer is runner.server_url, the origin attach_path is relative to (D-CU-05-2).
 	EnvServer = "BOTHY_COMPUTER_SERVER"
+	// EnvCAFile is optional: the absolute path of a PEM bundle whose certificates the attach
+	// connection trusts next to the system roots, the CA file of the runner (D-CU-06-12).
+	EnvCAFile = "BOTHY_COMPUTER_CA_FILE"
 )
 
 // Config is the configuration of one server process.
@@ -45,15 +51,19 @@ type Config struct {
 	Log *slog.Logger
 	// Random is the source of the ephemeral keys and request IDs; nil means crypto/rand.
 	Random io.Reader
-	// HTTPClient dials the attach connection; nil means http.DefaultClient.
+	// HTTPClient dials the attach connection; nil means a client with RootCAs.
 	HTTPClient *http.Client
+	// RootCAs are the system roots plus the certificates of EnvCAFile; nil means the system
+	// roots only.
+	RootCAs *x509.CertPool
 }
 
 // errConfig marks a configuration error; main exits with the usage code for it.
 var errConfig = errors.New("computermcp: configuration")
 
-// ConfigFromEnv reads the five variables through getenv (os.Getenv in production). Every
-// variable is required: the folders and the pin file as absolute paths, the timeout as a
+// ConfigFromEnv reads the variables through getenv (os.Getenv in production). EnvCAFile is
+// optional: when set it must be an absolute path of a readable PEM file with at least one
+// certificate, which joins the system roots. Every other variable is required: the folders and the pin file as absolute paths, the timeout as a
 // positive number of milliseconds, the server as an https origin without path, query or user
 // (http only for the host 127.0.0.1, like runner.server_url). The error names the variable and
 // wraps errConfig; it never quotes the nonce.
@@ -94,7 +104,33 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	}
 	u.Path = ""
 	cfg.Server = u
+	if ca := getenv(EnvCAFile); ca != "" {
+		if !filepath.IsAbs(ca) {
+			return bad(EnvCAFile, "must be an absolute path")
+		}
+		pool, err := rootsWith(filepath.Clean(ca))
+		if err != nil {
+			return bad(EnvCAFile, err.Error())
+		}
+		cfg.RootCAs = pool
+	}
 	return cfg, nil
+}
+
+// rootsWith returns the system roots plus the certificates of the PEM file path.
+func rootsWith(path string) (*x509.CertPool, error) {
+	pem, err := os.ReadFile(path) // #nosec G304 -- the runner names its own CA file (D-CU-06-12)
+	if err != nil {
+		return nil, errors.New("cannot be read")
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
+	if !pool.AppendCertsFromPEM(pem) {
+		return nil, errors.New("holds no PEM certificate")
+	}
+	return pool, nil
 }
 
 // IsConfigError reports whether err is a configuration error of ConfigFromEnv or New.

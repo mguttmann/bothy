@@ -590,9 +590,13 @@ absolute path of `runner.computer_mcp_bin`, no arguments, and in `env` exactly
 `BOTHY_COMPUTER_DIR` (the request folder of 10.2), `BOTHY_COMPUTER_NONCE` (the run's nonce),
 `BOTHY_COMPUTER_TIMEOUT_MS` (`runner.computer_request_timeout` in milliseconds),
 `BOTHY_COMPUTER_PINS` (the absolute path of the pin file of 10.4) and `BOTHY_COMPUTER_SERVER` (the
-value of `runner.server_url`, the origin that `attach_path` is relative to; D-CU-05-2). C1 refuses
-to start without any of them, and it refuses an `attach_path` that is not an absolute path of that
-origin.
+value of `runner.server_url`, the origin that `attach_path` is relative to; D-CU-05-2), and
+optionally `BOTHY_COMPUTER_CA_FILE` (D-CU-06-12): the absolute path of the CA file the runner
+itself trusts (`SSL_CERT_FILE` of the runner's environment, set only when that is an existing
+file), whose certificates C1 adds to the system roots for the attach connection; without it C1
+trusts the system roots only. C1 refuses to start without any of the five, with a CA file that is
+not absolute, cannot be read or holds no PEM certificate, and it refuses an `attach_path` that is
+not an absolute path of that origin.
 
 ### 10.2 Requests through the runner
 

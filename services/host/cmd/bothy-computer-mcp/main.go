@@ -4,7 +4,8 @@
 // (docs/spec/27-computer-use.md building block C1, package internal/computermcp). The Claude Code
 // runner starts it through the per-turn MCP file of a host turn (27 10.1) with exactly the
 // environment variables BOTHY_COMPUTER_DIR, BOTHY_COMPUTER_NONCE, BOTHY_COMPUTER_TIMEOUT_MS,
-// BOTHY_COMPUTER_PINS and BOTHY_COMPUTER_SERVER; it reads JSON-RPC lines on stdin, answers on
+// BOTHY_COMPUTER_PINS and BOTHY_COMPUTER_SERVER, and optionally BOTHY_COMPUTER_CA_FILE (the
+// runner's CA file, added to the system roots; D-CU-06-12); it reads JSON-RPC lines on stdin, answers on
 // stdout and logs only tool names, codes and durations as JSON lines on stderr.
 //
 // Flags: --version prints the version and exits; --help prints the usage. Any other argument is

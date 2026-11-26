@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from claude_code_runner.computer import (
+    CA_FILE_ENV,
     COMPUTER_PROMPT,
     ENV_NAMES,
     SERVER_NAME,
@@ -29,6 +30,7 @@ from claude_code_runner.computer import (
     read_turn_nonce,
     remove_run_files,
     remove_session_files,
+    runner_ca_file,
     session_files,
     sweep_computer,
     take_left,
@@ -77,6 +79,22 @@ def test_document_has_one_server_with_exactly_the_five_variables(tmp_path: Path)
         "BOTHY_COMPUTER_SERVER": SERVER,
     }
     assert set(server["env"]) == set(ENV_NAMES)
+
+
+def test_runner_ca_file_becomes_the_sixth_variable(tmp_path: Path) -> None:
+    """D-CU-06-12: the runner's SSL_CERT_FILE reaches bothy-computer-mcp, nothing else does."""
+    bundle = tmp_path / "ca-bundle.pem"
+    bundle.write_text("pem\n", encoding="utf-8")
+    assert runner_ca_file({"SSL_CERT_FILE": str(bundle)}) == str(bundle)
+    assert runner_ca_file({}) is None
+    assert runner_ca_file({"SSL_CERT_FILE": "ca-bundle.pem"}) is None
+    assert runner_ca_file({"SSL_CERT_FILE": str(tmp_path / "missing.pem")}) is None
+    env = mcp_document(MCP_BIN, _paths(tmp_path), NONCE, 30.0, SERVER, ca_file=str(bundle))[
+        "mcpServers"
+    ]["bothy_computer"]["env"]
+    assert env[CA_FILE_ENV] == str(bundle)
+    assert CA_FILE_ENV == "BOTHY_COMPUTER_CA_FILE"
+    assert set(env) == {*ENV_NAMES, CA_FILE_ENV}
 
 
 def test_turn_file_is_private_and_removed_with_the_request_folder(tmp_path: Path) -> None:

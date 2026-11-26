@@ -3,6 +3,11 @@
 package computermcp
 
 import (
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -50,5 +55,52 @@ func TestConfigFromEnv(t *testing.T) {
 	m[EnvServer] = "http://127.0.0.1:8443"
 	if _, err := ConfigFromEnv(get(m)); err != nil {
 		t.Errorf("http on 127.0.0.1: %v", err)
+	}
+}
+
+// TestCAFileJoinsTheSystemRoots holds D-CU-06-12: without BOTHY_COMPUTER_CA_FILE the attach client
+// knows only the system roots and refuses a server of a private CA; with the CA file it connects.
+func TestCAFileJoinsTheSystemRoots(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	defer srv.Close()
+	dir := t.TempDir()
+	caFile := filepath.Join(dir, "ca-bundle.pem")
+	if err := os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{
+		EnvDir: dir, EnvNonce: tNonce, EnvTimeoutMS: "30000", EnvPins: dir + "/pins.json", EnvServer: "https://bothy.example.com",
+	}
+	get := func(k string) string { return env[k] }
+
+	cfg, err := ConfigFromEnv(get)
+	if err != nil || cfg.RootCAs != nil {
+		t.Fatalf("without the variable: %v %v", cfg.RootCAs, err)
+	}
+	resp, err := newHTTPClient(cfg.RootCAs).Get(srv.URL)
+	if err == nil {
+		_ = resp.Body.Close()
+		t.Fatal("the system roots trusted the test CA")
+	}
+
+	env[EnvCAFile] = caFile
+	if cfg, err = ConfigFromEnv(get); err != nil || cfg.RootCAs == nil {
+		t.Fatalf("with the variable: %v", err)
+	}
+	resp, err = newHTTPClient(cfg.RootCAs).Get(srv.URL)
+	if err != nil {
+		t.Fatalf("with the CA file: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	empty := filepath.Join(dir, "empty.pem")
+	if err := os.WriteFile(empty, []byte("no certificate\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, v := range map[string]string{"relative": "ca-bundle.pem", "missing": filepath.Join(dir, "none.pem"), "no PEM": empty} {
+		env[EnvCAFile] = v
+		if _, err := ConfigFromEnv(get); err == nil || !IsConfigError(err) || !strings.Contains(err.Error(), EnvCAFile) {
+			t.Errorf("%s: %v", name, err)
+		}
 	}
 }

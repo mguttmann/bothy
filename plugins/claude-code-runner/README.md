@@ -791,7 +791,9 @@ argument list, the environment and the system prompt are exactly as before.
   the one server `bothy_computer` with no arguments and exactly the variables
   `BOTHY_COMPUTER_DIR`, `BOTHY_COMPUTER_NONCE` (fresh per run), `BOTHY_COMPUTER_TIMEOUT_MS`
   (`runner.computer_request_timeout`), `BOTHY_COMPUTER_PINS` (`<runner.state_dir>/computer/pins.json`,
-  kept by the binary) and `BOTHY_COMPUTER_SERVER` (`runner.server_url`). A print turn passes it
+  kept by the binary) and `BOTHY_COMPUTER_SERVER` (`runner.server_url`), plus
+  `BOTHY_COMPUTER_CA_FILE` when the runner's own `SSL_CERT_FILE` names an existing file
+  (D-CU-06-12). A print turn passes it
   with `--mcp-config` directly after `--permission-prompts none`, a background session directly
   after the flags of the class; never with `--strict-mcp-config`, so the host user's own MCP
   servers load as before. The file goes at the end of the run and is swept at start.

@@ -53,6 +53,7 @@ from uuid import UUID
 from claude_code_runner.statedir import ensure_private_dir, write_private
 
 __all__ = [
+    "CA_FILE_ENV",
     "COMPUTER_PROMPT",
     "ENV_NAMES",
     "FAILED_ANSWER",
@@ -70,6 +71,7 @@ __all__ = [
     "read_turn_nonce",
     "remove_run_files",
     "remove_session_files",
+    "runner_ca_file",
     "server_call",
     "session_files",
     "sweep_computer",
@@ -90,6 +92,23 @@ ENV_NAMES = (
     "BOTHY_COMPUTER_SERVER",
 )
 """The five variables of the server's ``env`` (27 10.1, D-CU-05-2), in this order."""
+
+CA_FILE_ENV = "BOTHY_COMPUTER_CA_FILE"
+"""The optional sixth variable (27 10.1, D-CU-06-12): the runner's CA file, trusted by the attach
+connection of ``bothy-computer-mcp`` next to the system roots."""
+
+
+def runner_ca_file(environ: Mapping[str, str]) -> str | None:
+    """Return the CA file the runner itself trusts, ``SSL_CERT_FILE`` of its environment.
+
+    Only an absolute path of an existing file counts; anything else gives ``None`` and the MCP
+    server keeps the system roots (D-CU-06-12).
+    """
+    value = environ.get("SSL_CERT_FILE", "")
+    if not value or not Path(value).is_absolute() or not Path(value).is_file():
+        return None
+    return value
+
 
 REQUEST_SUFFIX = ".request.json"
 ANSWER_SUFFIX = ".answer.json"
@@ -183,8 +202,14 @@ def new_nonce() -> str:
     return secrets.token_urlsafe(32)
 
 
-def mcp_document(
-    mcp_bin: Path, paths: ComputerPaths, nonce: str, timeout: float, server_url: str
+def mcp_document(  # noqa: PLR0913 - the five values of 10.1 and the optional CA file
+    mcp_bin: Path,
+    paths: ComputerPaths,
+    nonce: str,
+    timeout: float,
+    server_url: str,
+    *,
+    ca_file: str | None = None,
 ) -> dict[str, Any]:
     """Return the per-turn MCP file of 27 10.1.
 
@@ -194,10 +219,11 @@ def mcp_document(
         nonce: The run's nonce.
         timeout: ``runner.computer_request_timeout`` in seconds.
         server_url: ``runner.server_url``, the origin ``attach_path`` is relative to.
+        ca_file: The runner's CA file (`runner_ca_file`) or ``None``.
 
     Returns:
-        ``{"mcpServers": {"bothy_computer": {...}}}`` with ``type`` ``stdio``, no arguments and
-        exactly the five variables of `ENV_NAMES`.
+        ``{"mcpServers": {"bothy_computer": {...}}}`` with ``type`` ``stdio``, no arguments, the
+        five variables of `ENV_NAMES` and `CA_FILE_ENV` when ``ca_file`` is given.
     """
     env = {
         "BOTHY_COMPUTER_DIR": str(paths.request_dir),
@@ -206,6 +232,8 @@ def mcp_document(
         "BOTHY_COMPUTER_PINS": str(paths.pin_file),
         "BOTHY_COMPUTER_SERVER": server_url,
     }
+    if ca_file:
+        env[CA_FILE_ENV] = ca_file
     server = {"type": "stdio", "command": str(mcp_bin), "args": [], "env": env}
     return {"mcpServers": {SERVER_NAME: server}}
 

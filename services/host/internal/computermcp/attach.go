@@ -4,6 +4,8 @@ package computermcp
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -152,7 +154,7 @@ func dialAttach(ctx context.Context, p attachParams) (*websocket.Conn, error) {
 	}
 	hc := p.cfg.HTTPClient
 	if hc == nil {
-		hc = newHTTPClient()
+		hc = newHTTPClient(p.cfg.RootCAs)
 	}
 	ws, resp, err := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPClient: hc, CompressionMode: websocket.CompressionDisabled})
 	if resp != nil && resp.Body != nil {
@@ -175,9 +177,10 @@ func dialAttach(ctx context.Context, p attachParams) (*websocket.Conn, error) {
 }
 
 // newHTTPClient returns the client of the attach connection: no proxy from the environment, the
-// system's roots. C1 dials only attach_path on the origin of runner.server_url (D-CU-05-2).
-func newHTTPClient() *http.Client {
-	return &http.Client{Transport: &http.Transport{}} // nosemgrep: bothy-go-egress-only -- the host module has no egress package; C1 dials only attach_path on the origin of runner.server_url (D-CU-05-2)
+// system's roots, or roots when the runner named a CA file (D-CU-06-12). C1 dials only
+// attach_path on the origin of runner.server_url (D-CU-05-2).
+func newHTTPClient(roots *x509.CertPool) *http.Client {
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}} // nosemgrep: bothy-go-egress-only -- the host module has no egress package; C1 dials only attach_path on the origin of runner.server_url (D-CU-05-2)
 }
 
 // handshake sends message 1 with the token and reads message 2 (27 5.1 step 9); it returns the
