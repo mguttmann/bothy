@@ -42,10 +42,11 @@ const pipeSDDL = "D:P(A;;GA;;;SY)(A;;0x4;;;OW)(A;;0x12008b;;;IU)"
 // Listen fail instead of sharing the name.
 func Listen(endpoint string) (net.Listener, error) {
 	sddl := pipeSDDL
-	// The account of the service creates the further instances by name as well, not only through
-	// OWNER RIGHTS (as localchan.WithCreator, AUD-PKG-R2-06/8).
+	// The account of the service needs read and write besides FILE_CREATE_PIPE_INSTANCE to create
+	// a further instance of a duplex pipe; OWNER RIGHTS grants only the latter (as
+	// localchan.WithCreator, AUD-PKG-R2-06/8).
 	if u, err := windows.GetCurrentProcessToken().GetTokenUser(); err == nil {
-		sddl += "(A;;0x4;;;" + u.User.Sid.String() + ")"
+		sddl += "(A;;0x12019f;;;" + u.User.Sid.String() + ")"
 	}
 	sd, err := windows.SecurityDescriptorFromString(sddl)
 	if err != nil {

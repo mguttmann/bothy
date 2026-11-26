@@ -22,7 +22,9 @@ func testPipe(t *testing.T) (string, string, string) {
 		t.Fatal(err)
 	}
 	sid := u.User.Sid.String()
-	return fmt.Sprintf(`\\.\pipe\bothy-localchan-test-%d-%d`, os.Getpid(), time.Now().UnixNano()), HelperPipeSDDL(sid), sid
+	// The DACL grants the account of the test nothing itself: like a helper, whose pipe grants
+	// only the service account, it gets its rights from ListenPipe (WithCreator).
+	return fmt.Sprintf(`\\.\pipe\bothy-localchan-test-%d-%d`, os.Getpid(), time.Now().UnixNano()), "D:P(A;;GA;;;SY)" + ownerCreatesInstances, sid
 }
 
 // TestPipeRoundTripChecksTheClientAfterItsFirstMessage: the server checks the token of the client
