@@ -84,13 +84,14 @@ refusal; run the steps below on the server. `<dir>` is the folder of the install
    `docker compose up -d --force-recreate --no-deps otel-collector`, with the profile `scan` also
    `clamav`, and with the profile `observability` also `prometheus alertmanager loki tempo
    grafana`. Name a service of a profile only when that profile is enabled: Compose starts a
-   service that is named on the command line even when its profile is off.
+   service that is named on the command line even when its profile is off. Run the checks of
+   section 2 again after the recreation: the first run saw the old containers of these services.
 
 The way back to `<old>` (section 3 item 1) puts the files of the copy back before
 `docker compose up -d`: every file of `<dir>.before-<new>` except `infra/compose/secrets/`, which
 keeps its newer state; then recreate the same services as in step 7, under the same profile
-conditions. Remove the copy once the
-new version runs and the way back is no longer needed; it holds secrets.
+conditions, and run the checks again. Remove the copy once the new version runs and the way back
+is no longer needed; it holds secrets.
 
 ## 3. Rollback
 
