@@ -30,6 +30,8 @@ func computerConfigKeys() []config.Key {
 			Doc: "Longest wait of one action of a computer session."},
 		{Name: "computer.key_repeat_max", Kind: config.KindInt, Default: "50", Min: "1", Chapter: chapter27,
 			Doc: "Highest repeat of one key action of a computer session."},
+		{Name: "computer.scroll_amount_max", Kind: config.KindInt, Default: "50", Min: "1", Chapter: chapter27,
+			Doc: "Highest amount of one scroll action of a computer session."},
 		{Name: "computer.audit_apps_max", Kind: config.KindInt, Default: "32", Min: "0", Chapter: chapter27,
 			Doc: "Most app identities in the audit entry of the end of a computer session."},
 		{Name: "computer.status_interval", Kind: config.KindDuration, Default: "2s", Min: "1s", Chapter: chapter27,

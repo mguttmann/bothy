@@ -20,6 +20,8 @@ class _$HostComputerSettings extends HostComputerSettings {
   @override
   final int keyRepeatMax;
   @override
+  final int scrollAmountMax;
+  @override
   final int auditAppsMax;
   @override
   final int statusIntervalMs;
@@ -35,6 +37,7 @@ class _$HostComputerSettings extends HostComputerSettings {
     required this.autoScreenshot,
     required this.waitMaxMs,
     required this.keyRepeatMax,
+    required this.scrollAmountMax,
     required this.auditAppsMax,
     required this.statusIntervalMs,
   }) : super._();
@@ -57,6 +60,7 @@ class _$HostComputerSettings extends HostComputerSettings {
         autoScreenshot == other.autoScreenshot &&
         waitMaxMs == other.waitMaxMs &&
         keyRepeatMax == other.keyRepeatMax &&
+        scrollAmountMax == other.scrollAmountMax &&
         auditAppsMax == other.auditAppsMax &&
         statusIntervalMs == other.statusIntervalMs;
   }
@@ -70,6 +74,7 @@ class _$HostComputerSettings extends HostComputerSettings {
     _$hash = $jc(_$hash, autoScreenshot.hashCode);
     _$hash = $jc(_$hash, waitMaxMs.hashCode);
     _$hash = $jc(_$hash, keyRepeatMax.hashCode);
+    _$hash = $jc(_$hash, scrollAmountMax.hashCode);
     _$hash = $jc(_$hash, auditAppsMax.hashCode);
     _$hash = $jc(_$hash, statusIntervalMs.hashCode);
     _$hash = $jf(_$hash);
@@ -85,6 +90,7 @@ class _$HostComputerSettings extends HostComputerSettings {
           ..add('autoScreenshot', autoScreenshot)
           ..add('waitMaxMs', waitMaxMs)
           ..add('keyRepeatMax', keyRepeatMax)
+          ..add('scrollAmountMax', scrollAmountMax)
           ..add('auditAppsMax', auditAppsMax)
           ..add('statusIntervalMs', statusIntervalMs))
         .toString();
@@ -120,6 +126,11 @@ class HostComputerSettingsBuilder
   int? get keyRepeatMax => _$this._keyRepeatMax;
   set keyRepeatMax(int? keyRepeatMax) => _$this._keyRepeatMax = keyRepeatMax;
 
+  int? _scrollAmountMax;
+  int? get scrollAmountMax => _$this._scrollAmountMax;
+  set scrollAmountMax(int? scrollAmountMax) =>
+      _$this._scrollAmountMax = scrollAmountMax;
+
   int? _auditAppsMax;
   int? get auditAppsMax => _$this._auditAppsMax;
   set auditAppsMax(int? auditAppsMax) => _$this._auditAppsMax = auditAppsMax;
@@ -142,6 +153,7 @@ class HostComputerSettingsBuilder
       _autoScreenshot = $v.autoScreenshot;
       _waitMaxMs = $v.waitMaxMs;
       _keyRepeatMax = $v.keyRepeatMax;
+      _scrollAmountMax = $v.scrollAmountMax;
       _auditAppsMax = $v.auditAppsMax;
       _statusIntervalMs = $v.statusIntervalMs;
       _$v = null;
@@ -195,6 +207,11 @@ class HostComputerSettingsBuilder
             keyRepeatMax,
             r'HostComputerSettings',
             'keyRepeatMax',
+          ),
+          scrollAmountMax: BuiltValueNullFieldError.checkNotNull(
+            scrollAmountMax,
+            r'HostComputerSettings',
+            'scrollAmountMax',
           ),
           auditAppsMax: BuiltValueNullFieldError.checkNotNull(
             auditAppsMax,

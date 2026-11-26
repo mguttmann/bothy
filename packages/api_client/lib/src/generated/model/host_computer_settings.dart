@@ -17,6 +17,7 @@ part 'host_computer_settings.g.dart';
 /// * [autoScreenshot]
 /// * [waitMaxMs]
 /// * [keyRepeatMax]
+/// * [scrollAmountMax]
 /// * [auditAppsMax]
 /// * [statusIntervalMs]
 @BuiltValue()
@@ -39,6 +40,9 @@ abstract class HostComputerSettings
 
   @BuiltValueField(wireName: r'key_repeat_max')
   int get keyRepeatMax;
+
+  @BuiltValueField(wireName: r'scroll_amount_max')
+  int get scrollAmountMax;
 
   @BuiltValueField(wireName: r'audit_apps_max')
   int get auditAppsMax;
@@ -103,6 +107,11 @@ class _$HostComputerSettingsSerializer
     yield r'key_repeat_max';
     yield serializers.serialize(
       object.keyRepeatMax,
+      specifiedType: const FullType(int),
+    );
+    yield r'scroll_amount_max';
+    yield serializers.serialize(
+      object.scrollAmountMax,
       specifiedType: const FullType(int),
     );
     yield r'audit_apps_max';
@@ -183,6 +192,13 @@ class _$HostComputerSettingsSerializer
             specifiedType: const FullType(int),
           ) as int;
           result.keyRepeatMax = valueDes;
+          break;
+        case r'scroll_amount_max':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.scrollAmountMax = valueDes;
           break;
         case r'audit_apps_max':
           final valueDes = serializers.deserialize(

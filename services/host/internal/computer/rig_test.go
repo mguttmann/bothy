@@ -392,7 +392,7 @@ func openOp(sid string) control.ComputerOpen {
 	return control.ComputerOpen{SessionID: sid, RunID: tRun, AgentID: tAgent, AgentName: "Builder", UserID: tOwner,
 		DataPath: control.ComputerDataPathPrefix + sid + "/stream", ExpiresAt: time.Now().Add(20 * time.Second).Format(time.RFC3339Nano),
 		Settings: control.ComputerSettings{ImageMaxEdge: 1280, JPEGQuality: 80, SettleMs: 0, AutoScreenshot: true, WaitMaxMs: 60000,
-			KeyRepeatMax: 50, AuditAppsMax: 32, StatusIntervalMs: 2000}}
+			KeyRepeatMax: 50, ScrollAmountMax: 50, AuditAppsMax: 32, StatusIntervalMs: 2000}}
 }
 
 // device is bothy-computer-mcp of the tests: the Noise initiator and the frames.

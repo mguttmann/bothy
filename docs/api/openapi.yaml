@@ -36447,7 +36447,7 @@ components:
     HostComputerSettings:
       type: object
       description: The server values of a computer session (27 18), sent with `computer.open`.
-      required: [image_max_edge, jpeg_quality, settle_ms, auto_screenshot, wait_max_ms, key_repeat_max, audit_apps_max, status_interval_ms]
+      required: [image_max_edge, jpeg_quality, settle_ms, auto_screenshot, wait_max_ms, key_repeat_max, scroll_amount_max, audit_apps_max, status_interval_ms]
       properties:
         image_max_edge:
           type: integer
@@ -36462,6 +36462,8 @@ components:
           type: integer
           format: int64
         key_repeat_max:
+          type: integer
+        scroll_amount_max:
           type: integer
         audit_apps_max:
           type: integer

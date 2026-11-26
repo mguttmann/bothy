@@ -274,7 +274,8 @@ func computerOpenFrame(c app.ComputerOpenOp) []byte {
 		AgentName: c.AgentName, UserId: rest.Uuid(c.UserID), DataPath: c.DataPath, ExpiresAt: stamp(c.ExpiresAt),
 		Settings: rest.HostComputerSettings{ImageMaxEdge: st.ImageMaxEdge, JpegQuality: st.JPEGQuality, SettleMs: st.Settle.Milliseconds(),
 			AutoScreenshot: st.AutoScreenshot, WaitMaxMs: st.WaitMax.Milliseconds(), KeyRepeatMax: st.KeyRepeatMax,
-			AuditAppsMax: st.AuditAppsMax, StatusIntervalMs: st.StatusInterval.Milliseconds()}})
+			ScrollAmountMax: st.ScrollAmountMax,
+			AuditAppsMax:    st.AuditAppsMax, StatusIntervalMs: st.StatusInterval.Milliseconds()}})
 }
 
 // computerStateOf converts the body of computer.state: the frontmost app is its id (bundle ID or

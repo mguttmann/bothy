@@ -20,6 +20,7 @@ class HostComputerSettings:
         auto_screenshot (bool):
         wait_max_ms (int):
         key_repeat_max (int):
+        scroll_amount_max (int):
         audit_apps_max (int):
         status_interval_ms (int):
     """
@@ -30,6 +31,7 @@ class HostComputerSettings:
     auto_screenshot: bool
     wait_max_ms: int
     key_repeat_max: int
+    scroll_amount_max: int
     audit_apps_max: int
     status_interval_ms: int
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -47,6 +49,8 @@ class HostComputerSettings:
 
         key_repeat_max = self.key_repeat_max
 
+        scroll_amount_max = self.scroll_amount_max
+
         audit_apps_max = self.audit_apps_max
 
         status_interval_ms = self.status_interval_ms
@@ -61,6 +65,7 @@ class HostComputerSettings:
                 "auto_screenshot": auto_screenshot,
                 "wait_max_ms": wait_max_ms,
                 "key_repeat_max": key_repeat_max,
+                "scroll_amount_max": scroll_amount_max,
                 "audit_apps_max": audit_apps_max,
                 "status_interval_ms": status_interval_ms,
             }
@@ -83,6 +88,8 @@ class HostComputerSettings:
 
         key_repeat_max = d.pop("key_repeat_max")
 
+        scroll_amount_max = d.pop("scroll_amount_max")
+
         audit_apps_max = d.pop("audit_apps_max")
 
         status_interval_ms = d.pop("status_interval_ms")
@@ -94,6 +101,7 @@ class HostComputerSettings:
             auto_screenshot=auto_screenshot,
             wait_max_ms=wait_max_ms,
             key_repeat_max=key_repeat_max,
+            scroll_amount_max=scroll_amount_max,
             audit_apps_max=audit_apps_max,
             status_interval_ms=status_interval_ms,
         )

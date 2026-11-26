@@ -83,6 +83,7 @@ func TestSessionActions(t *testing.T) {
 		{actLeftClick, `{"coordinate":[1,1],"scale_id":99}`},
 		{actLeftClick, `{"coordinate":[1,1]}`},
 		{actKey, `{"keys":"a","repeat":51}`},
+		{actScroll, `{"coordinate":[1,1],"scale_id":1,"direction":"down","amount":51}`},
 		{"drag", `{}`},
 		{actType, `{"text":"x","extra":1}`},
 		{actWait, `{"duration_ms":60001}`},

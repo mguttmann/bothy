@@ -12490,6 +12490,7 @@ type HostComputerSettings struct {
 	ImageMaxEdge     int   `json:"image_max_edge"`
 	JpegQuality      int   `json:"jpeg_quality"`
 	KeyRepeatMax     int   `json:"key_repeat_max"`
+	ScrollAmountMax  int   `json:"scroll_amount_max"`
 	SettleMs         int64 `json:"settle_ms"`
 	StatusIntervalMs int64 `json:"status_interval_ms"`
 	WaitMaxMs        int64 `json:"wait_max_ms"`

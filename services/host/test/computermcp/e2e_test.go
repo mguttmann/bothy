@@ -331,7 +331,7 @@ func runRunner(ctx context.Context, t *testing.T, dir string, cc *sessiontest.Co
 					open := control.ComputerOpen{SessionID: sid, RunID: tRun, AgentID: tAgent, AgentName: "Builder", UserID: tOwner,
 						DataPath: control.ComputerDataPathPrefix + sid + "/stream", ExpiresAt: now.Add(20 * time.Second).Format(time.RFC3339Nano),
 						Settings: control.ComputerSettings{ImageMaxEdge: 1280, JPEGQuality: 80, SettleMs: 200, AutoScreenshot: true, WaitMaxMs: 60000,
-							KeyRepeatMax: 50, AuditAppsMax: 32, StatusIntervalMs: 2000}}
+							KeyRepeatMax: 50, ScrollAmountMax: 50, AuditAppsMax: 32, StatusIntervalMs: 2000}}
 					if err := cc.Send(ctx, "computer.open", open); err != nil {
 						t.Errorf("computer.open: %v", err)
 					}

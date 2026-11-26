@@ -13510,6 +13510,7 @@ export interface components {
             /** Format: int64 */
             wait_max_ms: number;
             key_repeat_max: number;
+            scroll_amount_max: number;
             audit_apps_max: number;
             /** Format: int64 */
             status_interval_ms: number;

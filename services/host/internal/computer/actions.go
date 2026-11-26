@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/frame"
 )
 
@@ -105,7 +106,7 @@ func (s *csession) parseArgs(action string, raw json.RawMessage) (args, bool) {
 	if hasCoord && len(a.Coordinate) != 2 || hasRegion && len(a.Region) != 4 {
 		return args{}, false
 	}
-	return a, validArgs(action, a, s.o.Settings.KeyRepeatMax, s.o.Settings.WaitMaxMs)
+	return a, validArgs(action, a, s.o.Settings)
 }
 
 // argMembers returns the members of raw when action is known, every member is allowed for it,
@@ -129,22 +130,22 @@ func argMembers(action string, raw json.RawMessage) (map[string]json.RawMessage,
 	return m, true
 }
 
-// validArgs applies the value rules of 27 6.4: known modifiers, a direction and an amount of at
-// least 1 for scroll, a text for type, keys and a repeat up to computer.key_repeat_max for key,
-// and a duration up to computer.wait_max for wait.
-func validArgs(action string, a args, repeatMax, waitMax int64) bool {
+// validArgs applies the value rules of 27 6.4: known modifiers, a direction and an amount from 1
+// up to computer.scroll_amount_max for scroll, a text for type, keys and a repeat up to
+// computer.key_repeat_max for key, and a duration up to computer.wait_max for wait.
+func validArgs(action string, a args, s control.ComputerSettings) bool {
 	if slices.ContainsFunc(a.Modifiers, func(x string) bool { return !slices.Contains(modifierNames, x) }) {
 		return false
 	}
 	switch action {
 	case actScroll:
-		return slices.Contains(directions, a.Direction) && a.Amount >= 1
+		return slices.Contains(directions, a.Direction) && a.Amount >= 1 && a.Amount <= s.ScrollAmountMax
 	case actType:
 		return a.Text != ""
 	case actKey:
-		return a.Keys != "" && (a.Repeat == nil || (*a.Repeat >= 1 && *a.Repeat <= repeatMax))
+		return a.Keys != "" && (a.Repeat == nil || (*a.Repeat >= 1 && *a.Repeat <= s.KeyRepeatMax))
 	case actWait:
-		return a.DurationMs >= 0 && a.DurationMs <= waitMax
+		return a.DurationMs >= 0 && a.DurationMs <= s.WaitMaxMs
 	}
 	return true
 }

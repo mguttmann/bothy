@@ -1172,7 +1172,8 @@ func (s *Service) onComputerOpen(ctx context.Context, sig domain.Signal) {
 // computerSettings are the server values computer.open carries (27 12.3).
 func (s *Service) computerSettings() ComputerSettings {
 	return ComputerSettings{ImageMaxEdge: s.cfg.ComputerImageMaxEdge, JPEGQuality: s.cfg.ComputerJPEGQuality, KeyRepeatMax: s.cfg.ComputerKeyRepeatMax,
-		AuditAppsMax: s.cfg.ComputerAuditAppsMax, Settle: s.cfg.ComputerSettle, WaitMax: s.cfg.ComputerWaitMax,
+		ScrollAmountMax: s.cfg.ComputerScrollAmountMax,
+		AuditAppsMax:    s.cfg.ComputerAuditAppsMax, Settle: s.cfg.ComputerSettle, WaitMax: s.cfg.ComputerWaitMax,
 		StatusInterval: s.cfg.ComputerStatusInterval, AutoScreenshot: s.cfg.ComputerAutoScreenshot}
 }
 

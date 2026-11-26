@@ -81,16 +81,17 @@ type Config struct {
 	// attach token, the deadline of the pairing, and the server values computer.open carries to
 	// the host service. Zero values make every computer use case fail closed
 	// (computerReady), so a hand-built configuration without them keeps every terminal use case.
-	ComputerAttachTokenTTL time.Duration `config:"computer.attach_token_ttl"`
-	ComputerOpenTimeout    time.Duration `config:"computer.open_timeout"`
-	ComputerImageMaxEdge   int           `config:"computer.image_max_edge"`
-	ComputerJPEGQuality    int           `config:"computer.jpeg_quality"`
-	ComputerSettle         time.Duration `config:"computer.settle"`
-	ComputerAutoScreenshot bool          `config:"computer.auto_screenshot"`
-	ComputerWaitMax        time.Duration `config:"computer.wait_max"`
-	ComputerKeyRepeatMax   int           `config:"computer.key_repeat_max"`
-	ComputerAuditAppsMax   int           `config:"computer.audit_apps_max"`
-	ComputerStatusInterval time.Duration `config:"computer.status_interval"`
+	ComputerAttachTokenTTL  time.Duration `config:"computer.attach_token_ttl"`
+	ComputerOpenTimeout     time.Duration `config:"computer.open_timeout"`
+	ComputerImageMaxEdge    int           `config:"computer.image_max_edge"`
+	ComputerJPEGQuality     int           `config:"computer.jpeg_quality"`
+	ComputerSettle          time.Duration `config:"computer.settle"`
+	ComputerAutoScreenshot  bool          `config:"computer.auto_screenshot"`
+	ComputerWaitMax         time.Duration `config:"computer.wait_max"`
+	ComputerKeyRepeatMax    int           `config:"computer.key_repeat_max"`
+	ComputerScrollAmountMax int           `config:"computer.scroll_amount_max"`
+	ComputerAuditAppsMax    int           `config:"computer.audit_apps_max"`
+	ComputerStatusInterval  time.Duration `config:"computer.status_interval"`
 }
 
 // Deps are the collaborators of the host use cases.

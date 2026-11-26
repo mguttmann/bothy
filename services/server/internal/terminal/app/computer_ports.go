@@ -118,9 +118,9 @@ type ComputerOpenOp struct {
 
 // ComputerSettings are the server values of a session (schema HostComputerSettings, 27 18).
 type ComputerSettings struct {
-	ImageMaxEdge, JPEGQuality, KeyRepeatMax, AuditAppsMax int
-	Settle, WaitMax, StatusInterval                       time.Duration
-	AutoScreenshot                                        bool
+	ImageMaxEdge, JPEGQuality, KeyRepeatMax, ScrollAmountMax, AuditAppsMax int
+	Settle, WaitMax, StatusInterval                                        time.Duration
+	AutoScreenshot                                                         bool
 }
 
 // ComputerControl sends the computer ops of the server on the control connection of a host on

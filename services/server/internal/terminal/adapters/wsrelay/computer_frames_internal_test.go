@@ -86,7 +86,7 @@ func TestComputerServerFramesContract(t *testing.T) {
 	id := ids.MustParse("0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f")
 	frames := [][]byte{
 		computerOpenFrame(app.ComputerOpenOp{SessionID: id, RunID: id, AgentID: id, UserID: id, AgentName: "helper", DataPath: app.ComputerDataPath(id),
-			ExpiresAt: recordingTime, Settings: app.ComputerSettings{ImageMaxEdge: 1280, JPEGQuality: 80, KeyRepeatMax: 50, AuditAppsMax: 32,
+			ExpiresAt: recordingTime, Settings: app.ComputerSettings{ImageMaxEdge: 1280, JPEGQuality: 80, KeyRepeatMax: 50, ScrollAmountMax: 50, AuditAppsMax: 32,
 				Settle: 500 * time.Millisecond, WaitMax: time.Minute, StatusInterval: 2 * time.Second, AutoScreenshot: true}}),
 		computerCloseFrame(id, domain.ComputerRunEnded),
 		computerDisableFrame(4),

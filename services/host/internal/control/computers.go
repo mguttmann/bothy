@@ -26,6 +26,7 @@ type ComputerSettings struct {
 	AutoScreenshot   bool  `json:"auto_screenshot"`
 	WaitMaxMs        int64 `json:"wait_max_ms"`
 	KeyRepeatMax     int64 `json:"key_repeat_max"`
+	ScrollAmountMax  int64 `json:"scroll_amount_max"`
 	AuditAppsMax     int64 `json:"audit_apps_max"`
 	StatusIntervalMs int64 `json:"status_interval_ms"`
 }

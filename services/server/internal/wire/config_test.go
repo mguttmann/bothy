@@ -61,6 +61,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"computer.auto_screenshot":                    {Kind: config.KindBool, Default: "true", Chapter: "27-computer-use.md"},
 		"computer.wait_max":                           {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "27-computer-use.md"},
 		"computer.key_repeat_max":                     {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "27-computer-use.md"},
+		"computer.scroll_amount_max":                  {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "27-computer-use.md"},
 		"computer.audit_apps_max":                     {Kind: config.KindInt, Default: "32", Min: "0", Chapter: "27-computer-use.md"},
 		"computer.status_interval":                    {Kind: config.KindDuration, Default: "2s", Min: "1s", Chapter: "27-computer-use.md"},
 		"audit.reason_max_chars":                      {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "19-security.md"},

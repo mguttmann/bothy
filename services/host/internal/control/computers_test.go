@@ -80,7 +80,7 @@ func computerOpen(id string) map[string]any {
 	return map[string]any{"session_id": id, "run_id": "0192f3a4-5b6c-7d8e-9f01-0000000000b1", "agent_id": "0192f3a4-5b6c-7d8e-9f01-0000000000c1",
 		"agent_name": "Builder", "user_id": "0192f3a4-5b6c-7d8e-9f01-0000000000d1", "data_path": control.ComputerDataPathPrefix + id + "/stream",
 		"expires_at": "2026-11-26T10:00:00Z", "settings": map[string]any{"image_max_edge": 1280, "jpeg_quality": 80, "settle_ms": 500,
-			"auto_screenshot": true, "wait_max_ms": 60000, "key_repeat_max": 50, "audit_apps_max": 32, "status_interval_ms": 2000}}
+			"auto_screenshot": true, "wait_max_ms": 60000, "key_repeat_max": 50, "scroll_amount_max": 50, "audit_apps_max": 32, "status_interval_ms": 2000}}
 }
 
 // fakeComputers records the ops it got.

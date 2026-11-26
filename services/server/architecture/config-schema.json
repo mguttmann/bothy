@@ -1709,6 +1709,18 @@
       "doc": "Deadline until both sides of a computer session are paired and the handshake is done."
     },
     {
+      "name": "computer.scroll_amount_max",
+      "env": "BOTHY_COMPUTER__SCROLL_AMOUNT_MAX",
+      "kind": "int",
+      "default": "50",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "27-computer-use.md",
+      "doc": "Highest amount of one scroll action of a computer session."
+    },
+    {
       "name": "computer.settle",
       "env": "BOTHY_COMPUTER__SETTLE",
       "kind": "duration",

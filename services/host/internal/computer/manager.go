@@ -210,7 +210,7 @@ func (m *Manager) admit(ctx context.Context, id string, gen int64) string {
 // validSettings checks the server values of computer.open.
 func validSettings(s control.ComputerSettings) bool {
 	return s.ImageMaxEdge > 0 && s.JPEGQuality >= 1 && s.JPEGQuality <= 100 && s.SettleMs >= 0 && s.WaitMaxMs >= 0 &&
-		s.KeyRepeatMax >= 1 && s.AuditAppsMax >= 0 && s.StatusIntervalMs > 0
+		s.KeyRepeatMax >= 1 && s.ScrollAmountMax >= 1 && s.AuditAppsMax >= 0 && s.StatusIntervalMs > 0
 }
 
 // Close implements control.Computers: the server ended the session (27 8.4 item 1); the host

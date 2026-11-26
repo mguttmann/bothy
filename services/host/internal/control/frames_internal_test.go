@@ -41,7 +41,7 @@ func TestComputerServerFramesDecodeStrictly(t *testing.T) {
 	t.Parallel()
 	open := `{"op":"computer.open","d":{"session_id":"s","run_id":"r","agent_id":"a","agent_name":"Builder","user_id":"u",` +
 		`"data_path":"/api/v1/hosts/computer-sessions/s/stream","expires_at":"2026-11-26T10:00:00Z","settings":{"image_max_edge":1280,` +
-		`"jpeg_quality":80,"settle_ms":500,"auto_screenshot":true,"wait_max_ms":60000,"key_repeat_max":50,"audit_apps_max":32,"status_interval_ms":2000}}}`
+		`"jpeg_quality":80,"settle_ms":500,"auto_screenshot":true,"wait_max_ms":60000,"key_repeat_max":50,"scroll_amount_max":50,"audit_apps_max":32,"status_interval_ms":2000}}}`
 	op, body, err := decodeServerFrame([]byte(open))
 	if o, ok := body.(*ComputerOpen); err != nil || op != opComputerOpen || !ok || o.Settings.ImageMaxEdge != 1280 || !o.Settings.AutoScreenshot {
 		t.Fatalf("computer.open: %q %+v %v", op, body, err)
