@@ -36516,10 +36516,26 @@ components:
         state:
           type: string
           enum: [active, paused]
+    HostComputerApp:
+      type: object
+      additionalProperties: false
+      description: Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path.
+      required: [id, name, signer]
+      properties:
+        id:
+          type: string
+          description: Bundle ID or executable name.
+          examples: [com.example.editor]
+        name:
+          type: string
+          description: Display name.
+        signer:
+          type: string
+          description: Team ID or subject of the signer.
     HostComputerState:
       type: object
       additionalProperties: false
-      required: [session_id, state, action_count]
+      required: [session_id, state, reason, action_count, front_app]
       properties:
         session_id:
           $ref: '#/components/schemas/Uuid'
@@ -36528,18 +36544,17 @@ components:
           enum: [active, paused]
         reason:
           type: string
-          enum: [locked]
-          description: Present exactly with `paused`.
+          enum: ['', locked]
+          description: '`locked` exactly with `paused`, empty otherwise.'
         action_count:
           type: integer
           minimum: 0
         front_app:
-          type: string
-          description: Identity of the frontmost app (bundle ID or executable name).
+          $ref: '#/components/schemas/HostComputerApp'
     HostComputerEnded:
       type: object
       additionalProperties: false
-      required: [session_id, close_reason]
+      required: [session_id, close_reason, action_counts, apps, paused_ms]
       properties:
         session_id:
           $ref: '#/components/schemas/Uuid'
@@ -36557,9 +36572,9 @@ components:
             minimum: 0
         apps:
           type: array
-          description: Identities of the frontmost apps (bundle ID or executable name with the signer's team ID or subject); the server keeps at most `computer.audit_apps_max`.
+          description: Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry.
           items:
-            type: string
+            $ref: '#/components/schemas/HostComputerApp'
         paused_ms:
           type: integer
           format: int64

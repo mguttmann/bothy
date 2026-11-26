@@ -277,33 +277,31 @@ func computerOpenFrame(c app.ComputerOpenOp) []byte {
 			AuditAppsMax: st.AuditAppsMax, StatusIntervalMs: st.StatusInterval.Milliseconds()}})
 }
 
-// computerStateOf converts the body of computer.state.
+// computerStateOf converts the body of computer.state: the frontmost app is its id (bundle ID or
+// executable name), "" before the helper named one.
 func computerStateOf(f *rest.HostComputerState) app.ComputerStateReport {
-	r := app.ComputerStateReport{SessionID: ids.ID(f.SessionId), State: string(f.State), Locked: f.Reason != nil && *f.Reason == "locked",
-		ActionCount: int64(f.ActionCount)}
-	if f.FrontApp != nil {
-		r.FrontApp = *f.FrontApp
-	}
-	return r
+	return app.ComputerStateReport{SessionID: ids.ID(f.SessionId), State: string(f.State), Locked: f.Reason == "locked",
+		ActionCount: int64(f.ActionCount), FrontApp: f.FrontApp.Id}
 }
 
-// computerEndOf converts the body of computer.ended.
+// computerEndOf converts the body of computer.ended: an app is its id with the signer's team ID or
+// subject ("id:signer"; the audit keeps codes, D-CU-04-9).
 func computerEndOf(f *rest.HostComputerEnded) domain.ComputerEnd {
-	e := domain.ComputerEnd{Reason: domain.ComputerCloseReason(f.CloseReason)}
+	e := domain.ComputerEnd{Reason: domain.ComputerCloseReason(f.CloseReason), PausedMS: f.PausedMs, ActionCounts: map[string]int64{}}
 	if f.CloseDetail != nil {
 		e.Detail = domain.ComputerCloseDetail(*f.CloseDetail)
 	}
-	if f.ActionCounts != nil {
-		e.ActionCounts = map[string]int64{}
-		for k, v := range *f.ActionCounts {
-			e.ActionCounts[k] = int64(v)
+	for k, v := range f.ActionCounts {
+		e.ActionCounts[k] = int64(v)
+	}
+	for _, a := range f.Apps {
+		id := a.Id
+		if a.Signer != "" {
+			id += ":" + a.Signer
 		}
-	}
-	if f.Apps != nil {
-		e.Apps = *f.Apps
-	}
-	if f.PausedMs != nil {
-		e.PausedMS = *f.PausedMs
+		if id != "" {
+			e.Apps = append(e.Apps, id)
+		}
 	}
 	return e
 }

@@ -115,10 +115,11 @@ func TestComputerSessions(t *testing.T) {
 	t.Run("host ops started, state and pause", func(t *testing.T) {
 		w.hostA.send("computer.started", map[string]any{"session_id": first.SessionID, "state": "active"})
 		w.eventually("active", func() bool { st, _, _ := w.state(first.SessionID); return st == "active" })
-		w.hostA.send("computer.state", map[string]any{"session_id": first.SessionID, "state": "paused", "reason": "locked", "action_count": 3})
+		w.hostA.send("computer.state", map[string]any{"session_id": first.SessionID, "state": "paused", "reason": "locked", "action_count": 3,
+			"front_app": map[string]any{"id": "", "name": "", "signer": ""}})
 		w.eventually("paused", func() bool { st, _, _ := w.state(first.SessionID); return st == "paused" })
 		w.hostA.send("computer.state", map[string]any{"session_id": first.SessionID, "state": "active", "action_count": 5,
-			"front_app": "com.example.editor"})
+			"reason": "", "front_app": map[string]any{"id": "com.example.editor", "name": "Editor", "signer": "ABCDE12345"}})
 		w.eventually("active again", func() bool {
 			return w.text(`SELECT state || ':' || action_count || ':' || front_app FROM computer_sessions WHERE id = $1`, first.SessionID) ==
 				"active:5:com.example.editor"
@@ -288,10 +289,10 @@ func TestComputerSessions(t *testing.T) {
 		r := w.newRun(w.owner, w.runner, w.desk, "do S")
 		g := w.open(r, w.hostA)
 		w.hostA.send("computer.ended", map[string]any{"session_id": g.SessionID, "close_reason": "stopped_by_user", "close_detail": "local_escape",
-			"action_counts": map[string]any{"left_click": 2, "type": 1}, "apps": []any{"com.example.Editor", "ABCDE12345"}, "paused_ms": 0})
+			"action_counts": map[string]any{"left_click": 2, "type": 1}, "apps": []any{map[string]any{"id": "com.example.Editor", "name": "Editor", "signer": "ABCDE12345"}}, "paused_ms": 0})
 		w.waitClosed(g.SessionID, "stopped_by_user", "local_escape")
 		d := w.terminateAudit(g.SessionID)
-		if !strings.Contains(asJSON(d["action_counts"]), "left_click:2") || !strings.Contains(asJSON(d["apps"]), "com.example.editor") {
+		if !strings.Contains(asJSON(d["action_counts"]), "left_click:2") || !strings.Contains(asJSON(d["apps"]), "com.example.editor:abcde12345") {
 			t.Fatalf("computer.terminate %v", d)
 		}
 		g2 := w.open(r, w.hostA)

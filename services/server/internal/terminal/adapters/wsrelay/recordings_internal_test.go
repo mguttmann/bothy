@@ -56,6 +56,13 @@ func recordedServerFrames() [][]byte {
 			ExpiresAt: recordingTime.Add(20 * time.Second)}),
 		sessionCloseFrame(domain.SessionClose{SessionID: session, Reason: domain.CloseAccessRevoked}),
 		errorFrame(opReport, codeInvalid),
+		// The computer ops of the server (CU-04, 27 12.3).
+		computerOpenFrame(app.ComputerOpenOp{SessionID: session, RunID: recordingHost, AgentID: recordingHost, UserID: recordingHost,
+			AgentName: "runner", DataPath: app.ComputerDataPath(session), ExpiresAt: recordingTime.Add(20 * time.Second),
+			Settings: app.ComputerSettings{ImageMaxEdge: 1280, JPEGQuality: 80, KeyRepeatMax: 50, AuditAppsMax: 32, Settle: 500 * time.Millisecond,
+				WaitMax: time.Minute, StatusInterval: 2 * time.Second, AutoScreenshot: true}}),
+		computerCloseFrame(session, domain.ComputerRunEnded),
+		computerDisableFrame(3),
 	}
 }
 
@@ -151,11 +158,8 @@ func TestHostClientFramesValid(t *testing.T) {
 		}
 	}
 	for op := range hostOps {
-		switch {
-		case !ops[op] && !hostOpsRecordedLater[op]:
+		if !ops[op] {
 			t.Errorf("the recording has no %s", op)
-		case ops[op] && hostOpsRecordedLater[op]:
-			t.Errorf("the recording holds %s now; remove it from hostOpsRecordedLater", op)
 		}
 	}
 	k, err := jose.ParseJWK(rec.PublicJWK)

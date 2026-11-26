@@ -2805,12 +2805,15 @@ func (e HostComputerStartedState) Valid() bool {
 
 // Defines values for HostComputerStateReason.
 const (
+	HostComputerStateReasonEmpty  HostComputerStateReason = ""
 	HostComputerStateReasonLocked HostComputerStateReason = "locked"
 )
 
 // Valid indicates whether the value is a known member of the HostComputerStateReason enum.
 func (e HostComputerStateReason) Valid() bool {
 	switch e {
+	case HostComputerStateReasonEmpty:
+		return true
 	case HostComputerStateReasonLocked:
 		return true
 	default:
@@ -12393,6 +12396,20 @@ type HostComputerHelper string
 // HostComputerSignature defines model for HostComputer.Signature.
 type HostComputerSignature string
 
+// HostComputerApp Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path.
+type HostComputerApp struct {
+	// Id Bundle ID or executable name.
+	//
+	// Examples: com.example.editor
+	Id string `json:"id"`
+
+	// Name Display name.
+	Name string `json:"name"`
+
+	// Signer Team ID or subject of the signer.
+	Signer string `json:"signer"`
+}
+
 // HostComputerClose defines model for HostComputerClose.
 type HostComputerClose struct {
 	// Reason Why a computer session ended (docs/spec/27-computer-use.md 8.3).
@@ -12410,17 +12427,17 @@ type HostComputerDisable struct {
 // HostComputerEnded defines model for HostComputerEnded.
 type HostComputerEnded struct {
 	// ActionCounts A count per action kind of 27 6.4.
-	ActionCounts *map[string]int `json:"action_counts,omitempty"`
+	ActionCounts map[string]int `json:"action_counts"`
 
-	// Apps Identities of the frontmost apps (bundle ID or executable name with the signer's team ID or subject); the server keeps at most `computer.audit_apps_max`.
-	Apps *[]string `json:"apps,omitempty"`
+	// Apps Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry.
+	Apps []HostComputerApp `json:"apps"`
 
 	// CloseDetail Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).
 	CloseDetail *ComputerCloseDetail `json:"close_detail,omitempty"`
 
 	// CloseReason The host service sends only these reasons (27 12.3).
 	CloseReason HostComputerEndedCloseReason `json:"close_reason"`
-	PausedMs    *int64                       `json:"paused_ms,omitempty"`
+	PausedMs    int64                        `json:"paused_ms"`
 
 	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
 	SessionId Uuid `json:"session_id"`
@@ -12492,18 +12509,18 @@ type HostComputerStartedState string
 type HostComputerState struct {
 	ActionCount int `json:"action_count"`
 
-	// FrontApp Identity of the frontmost app (bundle ID or executable name).
-	FrontApp *string `json:"front_app,omitempty"`
+	// FrontApp Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path.
+	FrontApp HostComputerApp `json:"front_app"`
 
-	// Reason Present exactly with `paused`.
-	Reason *HostComputerStateReason `json:"reason,omitempty"`
+	// Reason `locked` exactly with `paused`, empty otherwise.
+	Reason HostComputerStateReason `json:"reason"`
 
 	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
 	SessionId Uuid                   `json:"session_id"`
 	State     HostComputerStateState `json:"state"`
 }
 
-// HostComputerStateReason Present exactly with `paused`.
+// HostComputerStateReason `locked` exactly with `paused`, empty otherwise.
 type HostComputerStateReason string
 
 // HostComputerStateState defines model for HostComputerState.State.

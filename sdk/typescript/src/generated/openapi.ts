@@ -13539,18 +13539,29 @@ export interface components {
             /** @enum {string} */
             state: "active" | "paused";
         };
+        /** @description Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path. */
+        HostComputerApp: {
+            /**
+             * @description Bundle ID or executable name.
+             * @example com.example.editor
+             */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /** @description Team ID or subject of the signer. */
+            signer: string;
+        };
         HostComputerState: {
             session_id: components["schemas"]["Uuid"];
             /** @enum {string} */
             state: "active" | "paused";
             /**
-             * @description Present exactly with `paused`.
+             * @description `locked` exactly with `paused`, empty otherwise.
              * @enum {string}
              */
-            reason?: "locked";
+            reason: "" | "locked";
             action_count: number;
-            /** @description Identity of the frontmost app (bundle ID or executable name). */
-            front_app?: string;
+            front_app: components["schemas"]["HostComputerApp"];
         };
         HostComputerEnded: {
             session_id: components["schemas"]["Uuid"];
@@ -13561,13 +13572,13 @@ export interface components {
             close_reason: "done" | "stopped_by_user" | "device_disabled" | "connection_lost" | "open_failed" | "error";
             close_detail?: components["schemas"]["ComputerCloseDetail"];
             /** @description A count per action kind of 27 6.4. */
-            action_counts?: {
+            action_counts: {
                 [key: string]: number;
             };
-            /** @description Identities of the frontmost apps (bundle ID or executable name with the signer's team ID or subject); the server keeps at most `computer.audit_apps_max`. */
-            apps?: string[];
+            /** @description Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry. */
+            apps: components["schemas"]["HostComputerApp"][];
             /** Format: int64 */
-            paused_ms?: number;
+            paused_ms: number;
         };
         /** @description First text frame of the computer attach connection; `identify` follows, then binary Noise frames only. */
         ComputerAttachHello: {

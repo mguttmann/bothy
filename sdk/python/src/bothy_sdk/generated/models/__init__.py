@@ -396,6 +396,7 @@ from .heartbeat_state import HeartbeatState
 from .host import Host
 from .host_channel_hello import HostChannelHello
 from .host_computer import HostComputer
+from .host_computer_app import HostComputerApp
 from .host_computer_close import HostComputerClose
 from .host_computer_disable import HostComputerDisable
 from .host_computer_ended import HostComputerEnded
@@ -1343,6 +1344,7 @@ __all__ = (
     "Host",
     "HostChannelHello",
     "HostComputer",
+    "HostComputerApp",
     "HostComputerClose",
     "HostComputerDisable",
     "HostComputerEnded",

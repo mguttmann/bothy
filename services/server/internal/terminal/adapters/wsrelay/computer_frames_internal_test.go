@@ -14,21 +14,18 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
-// hostOpsRecordedLater are the host ops whose frames the host service records with CU-03 (the
-// computer ops of 27 12.3, built in parallel with CU-04, Design note 4 of CU-04); until its
-// recording holds them, each is held to the contract by computerHostFrames below. An op of this
-// list that the recording holds fails TestHostClientFramesValid, so the list empties when the
-// host's recording carries them.
-var hostOpsRecordedLater = map[string]bool{opComputerStarted: true, opComputerState: true, opComputerEnded: true}
+// computerOps are the computer ops a host service sends (27 12.3).
+var computerOps = []string{opComputerStarted, opComputerState, opComputerEnded}
 
 // computerHostFrames are one frame per computer op a host service sends, with the JSON member
-// names of 27 12.3 (the contract with CU-03).
+// names of 27 12.3 (the contract with CU-03; the host recording holds the frames of its code).
 var computerHostFrames = []string{
 	`{"op":"computer.started","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","state":"active"}}`,
 	`{"op":"computer.state","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","state":"paused","reason":"locked","action_count":7,` +
-		`"front_app":"com.example.editor"}}`,
+		`"front_app":{"id":"com.example.editor","name":"Editor","signer":"ABCDE12345"}}}`,
 	`{"op":"computer.ended","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","close_reason":"stopped_by_user",` +
-		`"close_detail":"local_escape","action_counts":{"left_click":3,"type":2},"apps":["com.example.editor"],"paused_ms":1500}}`,
+		`"close_detail":"local_escape","action_counts":{"left_click":3,"type":2},` +
+		`"apps":[{"id":"com.example.editor","name":"Editor","signer":"ABCDE12345"}],"paused_ms":1500}}`,
 }
 
 // TestComputerHostFramesContract (CU-04 Design note 4): every computer op of the host service
@@ -55,7 +52,7 @@ func TestComputerHostFramesContract(t *testing.T) {
 		}
 		seen[fr.op] = true
 	}
-	for op := range hostOpsRecordedLater {
+	for _, op := range computerOps {
 		if !seen[op] {
 			t.Errorf("no frame of %s", op)
 		}
@@ -63,7 +60,8 @@ func TestComputerHostFramesContract(t *testing.T) {
 	for _, bad := range []string{
 		`{"op":"computer.started","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","state":"active","image":"x"}}`,
 		`{"op":"computer.ended","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","close_reason":"run_ended"}}`,
-		`{"op":"computer.state","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","state":"closed","action_count":1}}`,
+		`{"op":"computer.state","d":{"session_id":"0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f","state":"closed","reason":"","action_count":1,` +
+			`"front_app":{"id":"","name":"","signer":""}}}`,
 	} {
 		if _, err := decodeFrame([]byte(bad), 32, check); err == nil {
 			t.Errorf("frame %s decoded", bad)
@@ -72,7 +70,7 @@ func TestComputerHostFramesContract(t *testing.T) {
 	ended, _ := decodeFrame([]byte(computerHostFrames[2]), 32, check)
 	end := computerEndOf(ended.d.(*rest.HostComputerEnded))
 	if end.Reason != domain.ComputerStoppedByUser || end.Detail != domain.ComputerLocalEscape || end.ActionCounts["left_click"] != 3 ||
-		len(end.Apps) != 1 || end.PausedMS != 1500 {
+		len(end.Apps) != 1 || end.Apps[0] != "com.example.editor:ABCDE12345" || end.PausedMS != 1500 {
 		t.Fatalf("computer.ended decoded as %+v", end)
 	}
 }
