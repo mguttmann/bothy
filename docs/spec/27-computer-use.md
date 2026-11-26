@@ -493,6 +493,11 @@ start is not refused, and the host gives no terminal session.
   Before it connects, it grants `NT SERVICE\bothy-host` `PROCESS_QUERY_LIMITED_INFORMATION` and
   `SYNCHRONIZE` on its own process, so the service account can open the handle that binds the
   connection (D-CU-03-12); a person's process admits no other account by default.
+  On Windows the service account may not query the console session (`WTSQuerySessionInformationW`
+  answers "access denied" to `NT SERVICE\bothy-host`); the console user then comes from the value
+  `LoggedOnUserSID` of `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI\SessionData\<session>`,
+  which users may read and only administrators and SYSTEM may write. A helper refused at once
+  waits before it connects again, with the same doubling as for a missing endpoint.
 - Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the expected peer is
   pinned to the service user `bothy-host` (looked up by name; missing or equal to the helper's own
   user trusts nobody) or root; the socket's peer (`getpeereid`) must be one of them and never the

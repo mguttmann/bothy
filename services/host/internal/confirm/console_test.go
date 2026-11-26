@@ -59,3 +59,26 @@ func TestLoginctlConsoleOwner(t *testing.T) {
 		}
 	}
 }
+
+// TestFirstOwner: the console owner comes from the first source that names a SID; the session
+// query that a virtual service account may not make (a Windows 11 test machine: access denied) falls through to the
+// LogonUI session data, and a value that is no SID never counts.
+func TestFirstOwner(t *testing.T) {
+	const sid = "S-1-5-21-3458425980-4001700-720649186-1001"
+	denied := func() (string, error) { return "", errors.New("access denied") }
+	ok := func() (string, error) { return sid, nil }
+	if got, err := firstOwner(denied, ok); err != nil || got != sid {
+		t.Errorf("fallback: %q %v", got, err)
+	}
+	other := func() (string, error) { return "S-1-5-21-1-2-3-1002", nil }
+	if got, _ := firstOwner(ok, other); got != sid {
+		t.Errorf("the first source must win: %q", got)
+	}
+	garbage := func() (string, error) { return "Alex", nil }
+	if _, err := firstOwner(garbage, denied); !errors.Is(err, errNoConsole) {
+		t.Errorf("no SID: %v", err)
+	}
+	if _, err := firstOwner(); !errors.Is(err, errNoConsole) {
+		t.Errorf("no source: %v", err)
+	}
+}
