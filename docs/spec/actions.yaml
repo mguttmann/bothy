@@ -3497,6 +3497,9 @@ channel_ops:
   - error
   - session.open
   - session.close
+  - computer.open
+  - computer.close
+  - computer.disable
   direction: server_to_host
   action: host.connect
 - channel: host_control
@@ -3506,6 +3509,9 @@ channel_ops:
   - report
   - session.started
   - session.ended
+  - computer.started
+  - computer.state
+  - computer.ended
   direction: host_to_server
   action: host.connect
 - channel: host_data
@@ -3518,6 +3524,37 @@ channel_ops:
   action: host.connect
   action_text: '`host.connect` (the session belongs to the host)'
 - channel: host_data
+  ops:
+  - error
+  direction: server_to_host
+  action: host.connect
+- channel: computer_attach
+  channel_text: computer attach `/computer/sessions/{session_id}/attach`
+  ops:
+  - hello
+  direction: server_to_agent
+  action: computer.attach
+- channel: computer_attach
+  ops:
+  - identify
+  direction: agent_to_server
+  action: computer.attach
+- channel: computer_attach
+  ops:
+  - noise_frame
+  direction: both
+  action: computer.attach
+  action_text: '`computer.attach` (once per session, the run active)'
+- channel: host_computer_data
+  channel_text: computer data `/hosts/computer-sessions/{session_id}/stream`
+  ops:
+  - hello
+  - identify
+  - noise_frame
+  direction: both
+  action: host.connect
+  action_text: '`host.connect` (the computer session belongs to the host)'
+- channel: host_computer_data
   ops:
   - error
   direction: server_to_host

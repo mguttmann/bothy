@@ -3578,9 +3578,11 @@ const List<String> _actionsGzip = <String>[
   'm5L2l04B9i6fbt0Yl3juMdTz7wSzVL/2wtcYRnA5lPPVcy1zX9tv1LPUwNoj0BqBbZnpx+mWMRUt',
   'kmLfMqK/fHRN8qYIoHnS1DAlq4mU+fPfmOffmCI3b/6PKb8Zhf/3DT9HjWoykb/33oI2jDdoleww',
   'RQn3LtXO0a3FSExtp5R30jRJGhV6usiDtqqDLdf2jL4lZbQe2KdykAjeZ3F7z8gxeEZ771SK927R',
-  'gynq67+hCt1vnJOxteMjK12Mtnhjvd6RDVCX4mL1F6auYCdIYq1uWKlrfXIXNF0kM2ponqO6una9',
-  'ktqfUX9H+cPN1dFkXfS2d3VYEXn74GGZZIPlow9bC76+hNsq8dyiWvfXFsnOdJwmS5vgjE82CdcF',
-  'tB/J7tvf/weh+rWRpHQBAA==',
+  'gynq67+hCt1vnJOxteMjK12Mtnhjvd6RDVCX4mL1F6au4GirAJnzTcdDdQmdTmSInbth36410V14',
+  '6CK2UUNnHdV1uWsYak9I/R1lHjeX7D7mflm2QDOvOoDROruIfC9gWIZ5+7RjbWaztUef8BZq+p6W',
+  'Vl3p1lFxf22dk5mO02Rps6rxyeZpcQHtd056kob18dkybe1TIgWFpOyZ/8Z8swOr/Fx/vmnsW44+',
+  '16gbt3etB9jmboX0tFn60sF27bsWKbQe8DEzVmqF2GoJpuYdR/Z2kINdaOcBsBvXOAnWG3qxR2K7',
+  'glWvs9FGxtMPyf8DZMZj5D54AQA=',
 ];
 
 const List<String> _permissionsGzip = <String>[

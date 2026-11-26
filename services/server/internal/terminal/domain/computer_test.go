@@ -115,7 +115,7 @@ func TestReportedComputer(t *testing.T) {
 		t.Fatalf("valid report: %v", f)
 	}
 	bad := domain.ReportedComputer{Helper: "maybe", Capture: "yes", Input: "", Signature: "unsigned", Generation: -1,
-		OSAccount: "../root", HelperVersion: "1.0‮"}
+		OSAccount: "../root", HelperVersion: "1.0\u202e"}
 	if f := domain.ValidateComputer(bad, lim); len(f) != 7 {
 		t.Fatalf("findings %d: %v", len(f), f)
 	}
@@ -171,7 +171,7 @@ func TestAppCodeAndFrontApp(t *testing.T) {
 	t.Parallel()
 	for in, want := range map[string]string{
 		"com.example.Editor": "com.example.editor", "ABCDE12345": "abcde12345", "Example App.exe": "example_app.exe",
-		"..hidden": "hidden", "": "", "‮": "",
+		"..hidden": "hidden", "": "", "\u202e": "",
 	} {
 		if got := domain.AppCode(in); got != want {
 			t.Errorf("AppCode(%q) = %q, want %q", in, got, want)
@@ -183,7 +183,7 @@ func TestAppCodeAndFrontApp(t *testing.T) {
 	if domain.CheckFrontApp("com.example.editor", 100) != nil {
 		t.Error("a bundle id refused")
 	}
-	for _, bad := range []string{"", " lead", "a‮b", "x\ny"} {
+	for _, bad := range []string{"", " lead", "a\u202eb", "x\ny"} {
 		if domain.CheckFrontApp(bad, 100) == nil {
 			t.Errorf("front app %q accepted", bad)
 		}

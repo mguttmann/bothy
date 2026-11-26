@@ -674,10 +674,10 @@ var (
 		Name: "bothy.terminal.hosts.connected", Kind: KindUpDownCounter, Unit: "{host}",
 		Description: "Control connections of host services in this process that are usable for sessions.",
 	}
-	// TerminalComputerRelayBytes is bothy.terminal.computer.relay.bytes (4.3a, CU-04): the lengths
+	// TerminalComputerRelayBytes is bothy.terminal.computer.relay.size (4.3a, CU-04): the lengths
 	// of the messages the relay of a computer session forwarded, by direction; never content.
 	TerminalComputerRelayBytes = Spec{
-		Name: "bothy.terminal.computer.relay.bytes", Kind: KindCounter, Unit: "By",
+		Name: "bothy.terminal.computer.relay.size", Kind: KindCounter, Unit: "By",
 		Description: "Bytes of Noise messages the relay of computer sessions forwarded, by direction.",
 		Attrs:       []Attr{{Key: keyComputerDirection, Values: []string{"to_host", "to_agent"}}},
 	}

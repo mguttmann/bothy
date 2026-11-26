@@ -868,9 +868,14 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | | `identify` | device to server | `terminal.stream` |
 | | binary frames (Noise) | both | `terminal.stream` (the session must be valid) |
 | | `error` | server to device | `terminal.stream` |
-| control `/hosts/connect` | `hello`, `ready`, `heartbeat_ack`, `error`, `session.open`, `session.close` | server to host | `host.connect` |
-| | `identify`, `heartbeat`, `report`, `session.started`, `session.ended` | host to server | `host.connect` |
+| control `/hosts/connect` | `hello`, `ready`, `heartbeat_ack`, `error`, `session.open`, `session.close`, `computer.open`, `computer.close`, `computer.disable` | server to host | `host.connect` |
+| | `identify`, `heartbeat`, `report`, `session.started`, `session.ended`, `computer.started`, `computer.state`, `computer.ended` | host to server | `host.connect` |
 | data `/hosts/sessions/{session_id}/stream` | `hello`, `identify`, binary frames (Noise) | both | `host.connect` (the session belongs to the host) |
+| | `error` | server to host | `host.connect` |
+| computer attach `/computer/sessions/{session_id}/attach` | `hello` | server to agent tool | `computer.attach` |
+| | `identify` | agent tool to server | `computer.attach` |
+| | binary frames (Noise) | both | `computer.attach` (once per session, the run active) |
+| computer data `/hosts/computer-sessions/{session_id}/stream` | `hello`, `identify`, binary frames (Noise) | both | `host.connect` (the computer session belongs to the host) |
 | | `error` | server to host | `host.connect` |
 <!-- END GENERATED: channel_ops -->
 

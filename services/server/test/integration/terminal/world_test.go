@@ -236,13 +236,7 @@ func (w *world) count(q string, args ...any) int {
 // eventually polls cond until it holds, bounded by testkit.Patience.
 func (w *world) eventually(what string, cond func() bool) {
 	w.t.Helper()
-	deadline := time.Now().Add(testkit.Patience)
-	for !cond() {
-		if time.Now().After(deadline) {
-			w.t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	testkit.Until(w.t, what, cond)
 }
 
 // eventPage is the body of pollAgentEvents.
@@ -489,14 +483,14 @@ func (w *world) pairHost(name, holder string) *host {
 }
 
 // connect opens the control connection with a report of computer c and reads the server's frames.
-func (h *host) connect(c map[string]any, live ...ids.ID) {
+func (h *host) connect(c map[string]any) {
 	w := h.w
 	w.t.Helper()
 	w.syncClock()
 	ctx, cancel := context.WithCancel(context.Background())
 	h.stop = cancel
 	h.ctl = hosttest.Dial(w.t, ctx, w.s.PublicURL)
-	h.ctl.Login(ctx, hosttest.IdentifyParams{HostID: h.id, Key: h.key, LiveSessions: live})
+	h.ctl.Login(ctx, hosttest.IdentifyParams{HostID: h.id, Key: h.key})
 	if err := h.ctl.Send(ctx, "report", report(c)); err != nil {
 		w.t.Fatal(err)
 	}

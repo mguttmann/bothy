@@ -95,6 +95,7 @@ export const KNOWN_EVENT_TYPES = [
   "agent.hosting_changed",
   "host.updated",
   "terminal_session.changed",
+  "computer_session.changed",
 ] as const satisfies readonly EventType[];
 
 // Compile-time check: every event type of the spec is listed above. If one is missing, the

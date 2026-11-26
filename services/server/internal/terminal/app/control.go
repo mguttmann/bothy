@@ -255,16 +255,8 @@ func (s *Service) reconcileComputer(ctx context.Context, hostID ids.ID, live []i
 	if s.d.Computer == nil {
 		return live, nil, nil
 	}
-	open, err := s.d.Computer.LockOpenComputerSessionsOfHost(ctx, hostID)
-	if err != nil {
+	if err := s.endUnnamedComputer(ctx, hostID, live); err != nil {
 		return nil, nil, err
-	}
-	for _, ses := range open {
-		if (ses.State == domain.ComputerActive || ses.State == domain.ComputerPaused) && !slices.Contains(live, ses.ID) {
-			if _, err := s.endComputer(ctx, ses, domain.ComputerServerEnd(domain.ComputerHostRestarted)); err != nil {
-				return nil, nil, err
-			}
-		}
 	}
 	named, err := s.d.Computer.ComputerSessionsByIDs(ctx, live)
 	if err != nil {
@@ -287,6 +279,23 @@ func (s *Service) reconcileComputer(ctx context.Context, hostID ids.ID, live []i
 		}
 	}
 	return rest, closes, nil
+}
+
+// endUnnamedComputer ends every active or paused computer session of the host that live does not
+// name with host_restarted (27 8.4 item 1).
+func (s *Service) endUnnamedComputer(ctx context.Context, hostID ids.ID, live []ids.ID) error {
+	open, err := s.d.Computer.LockOpenComputerSessionsOfHost(ctx, hostID)
+	if err != nil {
+		return err
+	}
+	for _, ses := range open {
+		if (ses.State == domain.ComputerActive || ses.State == domain.ComputerPaused) && !slices.Contains(live, ses.ID) {
+			if _, err := s.endComputer(ctx, ses, domain.ComputerServerEnd(domain.ComputerHostRestarted)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // reconcileTerminal is the reconciliation of the terminal sessions (M2-43).

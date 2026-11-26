@@ -53,7 +53,7 @@ RULE_CHANNEL_OP = "channel-op"
 RULE_APP_SCOPE = "app-scope"
 RULE_EFFECT = "effect"
 RULE_BLOCK = "generated-block"
-CHANNELS = ("terminal_stream", "host_control", "host_data")
+CHANNELS = ("terminal_stream", "host_control", "host_data", "computer_attach", "host_computer_data")
 _MD_NAME = r"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*"
 _MD_BEGIN = re.compile(rf"^<!-- BEGIN GENERATED: (?P<name>{_MD_NAME}) -->$")
 _MD_END = re.compile(rf"^<!-- END GENERATED: (?P<name>{_MD_NAME}) -->$")
@@ -380,12 +380,14 @@ class ChannelOp:
     """One row of the table "Terminal channels" of 05 section 7 (not the gateway).
 
     Attributes:
-        channel: `"terminal_stream"`, `"host_control"` or `"host_data"` (asyncapi channels
+        channel: `"terminal_stream"`, `"host_control"`, `"host_data"`, `"computer_attach"` or
+            `"host_computer_data"` (asyncapi channels
             `terminalStream`, `hostControl`, `hostData`).
         channel_text: Verbatim cell "Channel" on the first row of a channel, else `None`.
         ops: Op names of the row; `noise_frame` stands for binary Noise frames.
         direction: `"server_to_device"`, `"device_to_server"`, `"server_to_host"`,
-            `"host_to_server"` or `"both"`.
+            `"host_to_server"`, `"server_to_agent"`, `"agent_to_server"` (the attach connection of
+            bothy-computer-mcp, CU-04) or `"both"`.
         action: Non-system action (`x-authz-action` of the matching asyncapi operations).
         action_text: Verbatim action cell when it says more than the action.
     """
@@ -1447,6 +1449,8 @@ CHANNEL_DIRECTION_TEXT: Mapping[str, str] = {
     "device_to_server": "device to server",
     "server_to_host": "server to host",
     "host_to_server": "host to server",
+    "server_to_agent": "server to agent tool",
+    "agent_to_server": "agent tool to server",
     "both": "both",
 }
 NOISE_FRAME = "noise_frame"

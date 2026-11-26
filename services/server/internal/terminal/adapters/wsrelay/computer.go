@@ -46,7 +46,7 @@ type ComputerUseCases interface {
 var _ ComputerUseCases = (*app.Service)(nil)
 
 // ComputerMetrics records the relay counts of computer sessions: lengths only (the instruments
-// bothy.terminal.computer.relay.bytes and .messages of docs/observability/signals.md 4.3a); never
+// bothy.terminal.computer.relay.size and .messages of docs/observability/signals.md 4.3a); never
 // content.
 type ComputerMetrics interface {
 	// ComputerRelayed counts one forwarded message of n bytes in direction ("to_host" or
@@ -171,7 +171,10 @@ func (r *ComputerRelay) slotLocked(id, host ids.ID, deadline time.Time) *cslot {
 }
 
 // deadline ends a slot that did not pair in time: both lone sides close with 4102 and the session
-// ends open_failed with open_timeout (27 5.1 step 9).
+// ends open_failed with open_timeout (27 5.1 step 9). A slot without any side is only dropped:
+// with several nodes every node expects the session, and only the node the proxy routes it to
+// pairs it, so the others must not end it; an opening that paired nowhere ends by terminal.sweep
+// (D-CU-04-12). The end itself changes only a session still in opening (EndComputerSession).
 func (r *ComputerRelay) deadline(id ids.ID) {
 	r.mu.Lock()
 	s := r.slots[id]
@@ -183,6 +186,9 @@ func (r *ComputerRelay) deadline(id ids.ID) {
 	delete(r.slots, id)
 	sides := []*cside{s.agent, s.hst}
 	r.mu.Unlock()
+	if s.agent == nil && s.hst == nil {
+		return
+	}
 	for _, sd := range sides {
 		if sd != nil {
 			sd.close(int(domain.StreamHostUnavailable), domain.StreamHostUnavailable.Name())

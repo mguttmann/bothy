@@ -1871,12 +1871,17 @@ func TestRealTable_Enabled(t *testing.T) {
 		"restoreThread":      {"POST /api/v1/threads/{thread_id}/restore", "thread.restore", "rl.write"},
 		"getThreadDeletion":  {"GET /api/v1/threads/{thread_id}/deletion", "thread.read", "rl.read"},
 		// FEAT-TEAM-CHANNEL-SERVER
-		"getChannelTeam":     {"GET /api/v1/channels/{channel_id}/team", "team.read", "rl.read"},
-		"enableChannelTeam":  {"PUT /api/v1/channels/{channel_id}/team", "team.update", "rl.write"},
-		"disableChannelTeam": {"DELETE /api/v1/channels/{channel_id}/team", "team.update", "rl.write"},
-		"addTeamMember":      {"POST /api/v1/channels/{channel_id}/team/members", "team.update", "rl.write"},
-		"removeTeamMember":   {"DELETE /api/v1/channels/{channel_id}/team/members/{member_id}", "team.update", "rl.write"},
-		"stopChannelTeam":    {"POST /api/v1/channels/{channel_id}/team/stop", "team.stop", "rl.write"},
+		"getChannelTeam":        {"GET /api/v1/channels/{channel_id}/team", "team.read", "rl.read"},
+		"enableChannelTeam":     {"PUT /api/v1/channels/{channel_id}/team", "team.update", "rl.write"},
+		"disableChannelTeam":    {"DELETE /api/v1/channels/{channel_id}/team", "team.update", "rl.write"},
+		"addTeamMember":         {"POST /api/v1/channels/{channel_id}/team/members", "team.update", "rl.write"},
+		"removeTeamMember":      {"DELETE /api/v1/channels/{channel_id}/team/members/{member_id}", "team.update", "rl.write"},
+		"stopChannelTeam":       {"POST /api/v1/channels/{channel_id}/team/stop", "team.stop", "rl.write"},
+		"listComputerDesktops":  {"GET /api/v1/computer/desktops", "computer.desktops.list", "rl.agent_runtime"},
+		"openComputerSession":   {"POST /api/v1/computer/sessions", "computer.open", "rl.agent_runtime"},
+		"listComputerSessions":  {"GET /api/v1/computer/sessions", "computer.session.read", "rl.read"},
+		"stopComputerSession":   {"POST /api/v1/computer/sessions/{session_id}/stop", "computer.stop", "rl.write"},
+		"disableComputerDevice": {"POST /api/v1/hosts/{host_id}/computer/disable", "computer.device.disable", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

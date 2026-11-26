@@ -468,6 +468,19 @@ func pauseNote(reason, from, to string) string {
 	return "Team paused (" + reason + "). An owner message resumes the team."
 }
 
+// teamFollowUp stores the team input message as a follow-up of the member's active run, held
+// while the run holds a computer session and the authority is not its triggering person (07 SR13).
+func (s *Service) teamFollowUp(ctx context.Context, message ids.ID, active RunRow, authority ids.ID) error {
+	if s.fu == nil {
+		return errs.New(errs.CodeInternalError, "runs: a team input into a running run needs the follow-ups")
+	}
+	held, err := s.heldForComputer(ctx, active, authority)
+	if err != nil {
+		return err
+	}
+	return s.fu.store(ctx, message, active, held)
+}
+
 // teamDeliver checks one input for the member (09 3.9.5) and delivers it: the authority is an
 // active owner, the readers rule holds, agent.invoke for the work thread allows for the authority;
 // then the copy goes into the work thread, the input is recorded and becomes a follow-up of the
@@ -504,17 +517,11 @@ func (s *Service) teamDeliver(ctx context.Context, b *teamBox, team TeamRow, mem
 		return false, err
 	}
 	if active != nil {
-		if s.fu == nil {
-			return false, errs.New(errs.CodeInternalError, "runs: a team input into a running run needs the follow-ups")
-		}
-		held, err := s.heldForComputer(ctx, *active, src.authority)
-		if err != nil {
-			return false, err
-		}
-		if err := s.fu.store(ctx, copied.ID, *active, held); err != nil {
-			return false, err
-		}
-	} else if err := s.openTeamRun(ctx, member, members, in, src); err != nil {
+		err = s.teamFollowUp(ctx, copied.ID, *active, src.authority)
+	} else {
+		err = s.openTeamRun(ctx, member, members, in, src)
+	}
+	if err != nil {
 		return false, err
 	}
 	return true, s.auditTeamInput(ctx, team, member, src, "", "")

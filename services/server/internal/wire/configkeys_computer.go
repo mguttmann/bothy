@@ -4,6 +4,9 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
+// computerWaitMaxDefault is the default of computer.wait_max (27 18).
+const computerWaitMaxDefault = "60s"
+
 // computerConfigKeys returns the server keys of computer use (CU-04, docs/spec/27-computer-use.md
 // section 18): the validity of an attach token, the deadline of the pairing, and the values the
 // server sends to the host service with computer.open. Their defaults are only in chapter 27.
@@ -23,7 +26,7 @@ func computerConfigKeys() []config.Key {
 			Doc: "Wait after an action before its automatic image."},
 		{Name: "computer.auto_screenshot", Kind: config.KindBool, Default: defaultTrue, Chapter: chapter27,
 			Doc: "An image after every action that changes the screen."},
-		{Name: "computer.wait_max", Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: chapter27,
+		{Name: "computer.wait_max", Kind: config.KindDuration, Default: computerWaitMaxDefault, Min: "1s", Chapter: chapter27,
 			Doc: "Longest wait of one action of a computer session."},
 		{Name: "computer.key_repeat_max", Kind: config.KindInt, Default: "50", Min: "1", Chapter: chapter27,
 			Doc: "Highest repeat of one key action of a computer session."},

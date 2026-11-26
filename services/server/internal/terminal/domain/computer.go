@@ -174,19 +174,20 @@ func ComputerServerEnd(r ComputerCloseReason) ComputerEnd { return ComputerEnd{R
 // session_revoked, device_revoked, logout and i6_violation become access_revoked, and every other
 // reason (not a revocation of the person) is connection_lost.
 func ComputerEndForHost(r CloseReason) ComputerCloseReason {
-	switch r {
-	case CloseHostDisabled:
-		return ComputerHostDisabled
-	case CloseHostRetired:
-		return ComputerHostRetired
-	case CloseHostRekeyed:
-		return ComputerHostRekeyed
-	case CloseHostRestarted:
-		return ComputerHostRestarted
-	case CloseAccessRevoked, CloseUserDisabled:
-		return ComputerAccessRevoked
+	if c, ok := computerEndOfClose[r]; ok {
+		return c
 	}
 	return ComputerConnectionLost
+}
+
+// computerEndOfClose holds the close reasons of terminal that keep a meaning for a computer session.
+var computerEndOfClose = map[CloseReason]ComputerCloseReason{
+	CloseHostDisabled:  ComputerHostDisabled,
+	CloseHostRetired:   ComputerHostRetired,
+	CloseHostRekeyed:   ComputerHostRekeyed,
+	CloseHostRestarted: ComputerHostRestarted,
+	CloseAccessRevoked: ComputerAccessRevoked,
+	CloseUserDisabled:  ComputerAccessRevoked,
 }
 
 // The values of the reported computer object (schema host_computer.v1, 27 12.3).
@@ -332,7 +333,7 @@ func DesktopEnabled(h Host) bool {
 	return h.ComputerDisabledGeneration == nil || c.Generation > *h.ComputerDisabledGeneration
 }
 
-// The protected header of an attach token (27 5.2).
+// ComputerTokenTyp is the protected header typ of an attach token (27 5.2).
 const ComputerTokenTyp = "computer-session+jwt"
 
 // ComputerGrant is what one opening puts into an attach token (27 5.2).

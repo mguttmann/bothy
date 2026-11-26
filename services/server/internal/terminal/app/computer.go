@@ -109,16 +109,16 @@ func (s *Service) computerReady() error {
 // computerFacts gathers the facts of a computer agent action (CU-04 Design note 3): the run of the
 // acting-for binding of a (none without a binding), read by runs; with hostID the host, its
 // connection and whether it is a listed desktop of the triggering person (27 4 item 3). It
-// returns the run facts, the descriptor facts and the host (found false for none).
-func (s *Service) computerFacts(ctx context.Context, a actor.Actor, hostID ids.ID) (ComputerRunFacts, *authorize.ComputerFacts, domain.Host, bool, error) {
+// returns the run facts, the descriptor facts and the host (the zero host for none).
+func (s *Service) computerFacts(ctx context.Context, a actor.Actor, hostID ids.ID) (ComputerRunFacts, *authorize.ComputerFacts, domain.Host, error) {
 	cf := &authorize.ComputerFacts{}
 	runID := a.ActingFor.RunID
 	if a.ActingFor.Status != actor.ActingForBound && a.ActingFor.Status != actor.ActingForRunInactive || runID.IsZero() {
-		return ComputerRunFacts{}, cf, domain.Host{}, false, nil
+		return ComputerRunFacts{}, cf, domain.Host{}, nil
 	}
 	f, found, err := s.computerRuns().ComputerRun(ctx, runID)
 	if err != nil {
-		return ComputerRunFacts{}, nil, domain.Host{}, false, err
+		return ComputerRunFacts{}, nil, domain.Host{}, err
 	}
 	if found {
 		*cf = authorize.ComputerFacts{RunFound: true, RunID: f.RunID, RunAgentID: f.AgentID, TriggeredBy: f.TriggeredBy, RunActive: f.Active,
@@ -126,17 +126,17 @@ func (s *Service) computerFacts(ctx context.Context, a actor.Actor, hostID ids.I
 			TriggeringCommand: f.TriggeringCommand, Feeders: f.Feeders}
 	}
 	if hostID.IsZero() {
-		return f, cf, domain.Host{}, false, nil
+		return f, cf, domain.Host{}, nil
 	}
 	h, hfound, err := s.d.Store.Host(ctx, hostID)
 	if err != nil {
-		return ComputerRunFacts{}, nil, domain.Host{}, false, err
+		return ComputerRunFacts{}, nil, domain.Host{}, err
 	}
 	if hfound {
 		connected := s.connected(ctx, h.ID)
 		cf.HostState, cf.HostConnected, cf.HostListed = string(h.State), connected, domain.DesktopListed(h, connected, f.TriggeredBy)
 	}
-	return f, cf, h, hfound, nil
+	return f, cf, h, nil
 }
 
 // listDesktops implements Computers.Desktops (27 7 list_desktops, 12.2 listComputerDesktops):
@@ -151,7 +151,7 @@ func (s *Service) listDesktops(ctx context.Context, a actor.Actor) ([]terminal.D
 	if err := s.computerReady(); err != nil {
 		return nil, err
 	}
-	f, cf, _, _, err := s.computerFacts(ctx, a, ids.ID{})
+	f, cf, _, err := s.computerFacts(ctx, a, ids.ID{})
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (s *Service) openComputer(ctx context.Context, a actor.Actor, cmd terminal.
 	if err := s.computerReady(); err != nil {
 		return terminal.ComputerGrant{}, err
 	}
-	f, cf, h, _, err := s.computerFacts(ctx, a, cmd.HostID)
+	f, cf, h, err := s.computerFacts(ctx, a, cmd.HostID)
 	if err != nil {
 		return terminal.ComputerGrant{}, err
 	}
@@ -330,7 +330,7 @@ func (s *Service) issueComputerToken(ctx context.Context, g domain.ComputerGrant
 // between the decision and the commit ends the new session with the mapped reason in its own
 // unit, and the answer is the refusal.
 func (s *Service) recheckComputer(ctx context.Context, a actor.Actor, ses domain.ComputerSession) error {
-	_, cf, _, _, err := s.computerFacts(ctx, a, ses.HostID)
+	_, cf, _, err := s.computerFacts(ctx, a, ses.HostID)
 	if err != nil {
 		return err
 	}
@@ -406,6 +406,14 @@ func (s *Service) AttachComputer(ctx context.Context, sessionID ids.ID, token st
 		return attachClosed, s.denyAttach(ctx, sessionID, "session_closed")
 	}
 	claims, ok := s.verifyAttachToken(ctx, token)
+	if ok {
+		// iss names this installation (27 5.2); the signature of the own key covers it as well.
+		instanceID, err := s.d.Instance.InstanceID(ctx)
+		if err != nil {
+			return AttachOutcome{}, err
+		}
+		ok = claims.Iss == instanceID.String()
+	}
 	if !ok {
 		return attachRefused(string(domain.AttachTokenInvalid)), s.denyAttach(ctx, sessionID, string(domain.AttachTokenInvalid))
 	}
@@ -477,7 +485,7 @@ func (s *Service) attachPrincipal(ctx context.Context, ses domain.ComputerSessio
 	}
 	p := actor.Actor{ID: ses.AgentID, Kind: actor.KindAgent,
 		ActingFor: actor.ActingFor{Status: status, UserID: ses.UserID, RunID: ses.RunID, ThreadID: f.ThreadID, JTI: c.Jti}}
-	_, cf, _, _, err := s.computerFacts(ctx, p, ses.HostID)
+	_, cf, _, err := s.computerFacts(ctx, p, ses.HostID)
 	return p, cf, err
 }
 
@@ -633,47 +641,9 @@ func (s *Service) disableComputer(ctx context.Context, a actor.Actor, hostID ids
 	var st hostState
 	staged := false
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		h, found, err := s.d.Store.LockHost(ctx, hostID)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return invisible()
-		}
-		gen := int64(-1)
-		if c := h.ReportedComputer; c != nil && (h.ComputerDisabledGeneration == nil || *h.ComputerDisabledGeneration < c.Generation) {
-			gen = c.Generation
-		}
-		attrs := auditing.Attrs{attrHostID: auditing.ID(h.ID)}
-		if gen >= 0 {
-			attrs[attrGeneration] = auditing.Int(gen)
-			h.Version++
-			h.ComputerDisabledGeneration = &gen
-			if err := s.d.Computer.SetComputerDisabledGeneration(ctx, h.ID, gen, h.Version); err != nil {
-				return err
-			}
-			if err := s.endComputerOfHost(ctx, h.ID, domain.ComputerServerEnd(domain.ComputerDeviceDisabled)); err != nil {
-				return err
-			}
-			staged = true
-			if err := s.stage(ctx, domain.Signal{Kind: domain.SignalComputerDisable, HostID: h.ID}); err != nil {
-				return err
-			}
-		} else {
-			attrs[attrNoChange] = auditing.Bool(true)
-		}
-		if err := s.d.Audit.Record(ctx, auditing.Entry{Action: string(authorize.ActionComputerDeviceDisable), Decision: auditing.DecisionAllow,
-			ResourceKind: resourceHost, ResourceID: h.ID, Attrs: attrs}); err != nil {
-			return err
-		}
-		st, _, err = s.withUsers(ctx, h)
-		if err != nil {
-			return err
-		}
-		if gen < 0 {
-			return nil
-		}
-		return s.emitUpdated(ctx, s.view(ctx, st))
+		var err error
+		st, staged, err = s.disableComputerUnit(ctx, hostID)
+		return err
 	})
 	if err != nil {
 		return terminal.HostView{}, err
@@ -682,6 +652,54 @@ func (s *Service) disableComputer(ctx context.Context, a actor.Actor, hostID ids
 		s.committed(ctx, domain.Signal{Kind: domain.SignalComputerDisable, HostID: hostID})
 	}
 	return s.ownerView(ctx, st, true), nil
+}
+
+// disableComputerUnit is the unit of disableComputer: it reports whether it staged
+// terminal.computer_disable (a generation was disabled).
+func (s *Service) disableComputerUnit(ctx context.Context, hostID ids.ID) (hostState, bool, error) {
+	h, found, err := s.d.Store.LockHost(ctx, hostID)
+	if err != nil {
+		return hostState{}, false, err
+	}
+	if !found {
+		return hostState{}, false, invisible()
+	}
+	gen := int64(-1)
+	if c := h.ReportedComputer; c != nil && (h.ComputerDisabledGeneration == nil || *h.ComputerDisabledGeneration < c.Generation) {
+		gen = c.Generation
+	}
+	attrs := auditing.Attrs{attrHostID: auditing.ID(h.ID)}
+	if gen >= 0 {
+		attrs[attrGeneration] = auditing.Int(gen)
+		if err := s.applyComputerDisable(ctx, &h, gen); err != nil {
+			return hostState{}, false, err
+		}
+	} else {
+		attrs[attrNoChange] = auditing.Bool(true)
+	}
+	if err := s.d.Audit.Record(ctx, auditing.Entry{Action: string(authorize.ActionComputerDeviceDisable), Decision: auditing.DecisionAllow,
+		ResourceKind: resourceHost, ResourceID: h.ID, Attrs: attrs}); err != nil {
+		return hostState{}, false, err
+	}
+	st, _, err := s.withUsers(ctx, h)
+	if err != nil || gen < 0 {
+		return st, false, err
+	}
+	return st, true, s.emitUpdated(ctx, s.view(ctx, st))
+}
+
+// applyComputerDisable stores gen as the disabled generation of h with the next version, ends the
+// host's open computer session with device_disabled and stages terminal.computer_disable.
+func (s *Service) applyComputerDisable(ctx context.Context, h *domain.Host, gen int64) error {
+	h.Version++
+	h.ComputerDisabledGeneration = &gen
+	if err := s.d.Computer.SetComputerDisabledGeneration(ctx, h.ID, gen, h.Version); err != nil {
+		return err
+	}
+	if err := s.endComputerOfHost(ctx, h.ID, domain.ComputerServerEnd(domain.ComputerDeviceDisabled)); err != nil {
+		return err
+	}
+	return s.stage(ctx, domain.Signal{Kind: domain.SignalComputerDisable, HostID: h.ID})
 }
 
 // ownerView returns the view of st with the computer members for an active owner (07 2.15 item 5):
@@ -1083,13 +1101,23 @@ func (s *Service) sweepComputer(ctx context.Context) (int, error) {
 
 // EndComputerSession ends the computer session id with end in its own unit of work as the system:
 // the relay ends a session at its deadline (open_failed with open_timeout) or when a side closes
-// (connection_lost, or error with stream_fault) through it. A closed session stays.
+// (connection_lost, or error with stream_fault) through it. A closed session stays, and an end
+// with open_timeout changes only a session still in opening (a session that paired and started on
+// another node is no failed opening).
 func (s *Service) EndComputerSession(ctx context.Context, id ids.ID, end domain.ComputerEnd) error {
 	if s.d.Computer == nil {
 		return nil
 	}
 	return s.d.UoW.Do(system(ctx), func(ctx context.Context) error {
-		return s.endComputerByID(ctx, id, end)
+		ses, found, err := s.d.Computer.LockComputerSession(ctx, id)
+		if err != nil || !found || ses.State == domain.ComputerClosed {
+			return err
+		}
+		if end.Detail == domain.ComputerOpenTimeout && ses.State != domain.ComputerOpening {
+			return nil
+		}
+		_, err = s.endComputer(ctx, ses, end)
+		return err
 	})
 }
 

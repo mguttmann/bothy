@@ -105,11 +105,11 @@ func (s *Service) endComputerForHostState(ctx context.Context, sel SessionSelect
 	if sel.HostID.IsZero() || !sel.UserID.IsZero() || !sel.ExceptUserID.IsZero() || !sel.SessionID.IsZero() {
 		return nil
 	}
-	switch end.Reason {
-	case domain.CloseHostDisabled, domain.CloseHostRetired, domain.CloseHostRekeyed:
-		return s.endComputerOfHost(ctx, sel.HostID, domain.ComputerServerEnd(domain.ComputerEndForHost(end.Reason)))
+	if end.Reason != domain.CloseHostDisabled && end.Reason != domain.CloseHostRetired &&
+		end.Reason != domain.CloseHostRekeyed {
+		return nil
 	}
-	return nil
+	return s.endComputerOfHost(ctx, sel.HostID, domain.ComputerServerEnd(domain.ComputerEndForHost(end.Reason)))
 }
 
 // lockSelected locks the open sessions the most specific member of sel names, in ascending id.
