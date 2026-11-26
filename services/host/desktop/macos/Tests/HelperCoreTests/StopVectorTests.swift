@@ -13,8 +13,9 @@ final class StopVectorTests: XCTestCase {
         return try JSONValue.parse(Data(contentsOf: url))
     }
 
-    func testKeyRepeatMaxMatchesTheHelper() throws {
+    func testLimitsMatchTheHelper() throws {
         XCTAssertEqual(try Self.load()["key_repeat_max"]?.intValue, Int64(Limits.keyRepeatMax))
+        XCTAssertEqual(try Self.load()["scroll_amount_max"]?.intValue, Int64(Limits.scrollAmountMax))
     }
 
     func testEveryCase() throws {
@@ -46,6 +47,9 @@ final class StopVectorTests: XCTestCase {
                     rig.injector.onUnit = nil
                     Self.raise(kind, on: rig)
                 }
+            } else if let which = event["tap_teardown"]?.stringValue {
+                XCTAssertEqual(which, "previous", name)
+                rig.tap.lateTeardownOfPrevious()
             } else if let direction = event["esc"]?.stringValue {
                 let decision = rig.tap.key(
                     down: direction == "down", injected: event["injected"]?.boolValue ?? false)
