@@ -16,7 +16,7 @@ Installation packages of the host service `bothy-host` (brief M7-23,
 | `macos/com.example.bothy-computer-helper.plist`, `macos/helper-postinstall` | the LaunchAgent of the computer helper and the postinstall of its package choice (CU-02) |
 | `set-computer-use.sh`, `windows/set-computer-use.ps1` | set `host_service.computer_use: true` in the configuration file when the helper component is selected (CU-02) |
 | `windows/start-computer-helper.ps1` | starts the computer helper in the session of the person at the console right after the MSI installed it (the macOS postinstall does the same with `macos/start-computer-helper.sh`) |
-| `macos/start-computer-helper.sh` | (re)starts the helper's LaunchAgent in `gui/<uid>`: waits until `launchctl bootout` has removed the old helper, then `bootstrap`, else `kickstart -k` |
+| `macos/start-computer-helper.sh` | (re)starts the helper's LaunchAgent in `gui/<uid>`: waits until `launchctl bootout` has removed the old helper, ends every other process of the user that runs the helper's path (one started outside launchd), then `bootstrap`, else `kickstart -k`; exit 1 unless exactly one helper runs |
 
 What every package does: it installs the binary into the program folder of
 `bothy-host install` (Linux `/opt/bothy-host/bin`, macOS `/Library/Application

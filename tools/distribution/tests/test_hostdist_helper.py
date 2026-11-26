@@ -308,12 +308,24 @@ def test_the_postinstall_sets_the_key_and_loads_the_agent() -> None:
 
 # A fake launchctl for start-computer-helper.sh: `linger` is how many more `print` calls still see
 # the service after a bootout (launchd removes it asynchronously); a bootstrap while the service
-# is still there fails with 5, as on the Mac on 26.11.
+# is still there fails with 5, as on the Mac on 26.11. The helper processes are real detached
+# sleeps, listed with their uid and executable path in $FAKE_DIR/procs, which the fake ps reads:
+# a bootstrap or kickstart starts one for launchd, a bootout ends launchd's one.
 _FAKE_LAUNCHCTL = r"""#!/bin/sh
 d=$FAKE_DIR
 echo "$*" >> $d/calls
+spawn() {
+  /bin/sleep 600 >/dev/null 2>&1 &
+  echo $! > $d/lpid
+  echo "$! 501 $HELPER_EXE" >> $d/procs
+}
 case $1 in
-  bootout) [ -e $d/loaded ] && { rm -f $d/loaded; echo $LINGER > $d/linger; }; exit 0 ;;
+  bootout)
+    if [ -e $d/loaded ]; then
+      rm -f $d/loaded; echo $LINGER > $d/linger
+      [ -e $d/lpid ] && /bin/kill -TERM $(cat $d/lpid) 2>/dev/null
+    fi
+    exit 0 ;;
   print)
     n=$(cat $d/linger 2>/dev/null || echo 0)
     if [ "$n" -gt 0 ]; then echo $((n - 1)) > $d/linger; exit 0; fi
@@ -323,11 +335,76 @@ case $1 in
     if [ "$n" -gt 0 ] || [ -e $d/stuck ]; then
       echo "Bootstrap failed: 5: Input/output error" >&2; exit 5
     fi
-    touch $d/loaded; exit 0 ;;
-  kickstart) exit 0 ;;
+    touch $d/loaded; spawn; exit 0 ;;
+  kickstart)
+    [ -e $d/lpid ] && /bin/kill -TERM $(cat $d/lpid) 2>/dev/null
+    spawn; exit 0 ;;
 esac
 exit 64
 """
+
+# ps -axo pid=,uid=,comm= over the processes in $FAKE_DIR/procs that are still alive.
+_FAKE_PS = r"""#!/bin/sh
+[ "$*" = "-axo pid=,uid=,comm=" ] || exit 64
+[ -e $FAKE_DIR/procs ] || exit 0
+while read -r pid uid comm; do
+  /bin/kill -0 "$pid" 2>/dev/null && printf '%5d %5d %s\n' "$pid" "$uid" "$comm"
+done < $FAKE_DIR/procs
+exit 0
+"""
+
+HELPER_EXE = str(
+    hostdist.DARWIN_HELPER_DIR
+    / hostdist.HELPER_APP
+    / "Contents"
+    / "MacOS"
+    / hostdist.HELPER_EXE_MACOS
+)
+
+
+def _spawn(tmp_path: Path, uid: int, exe: str, *, ignore_term: bool = False) -> int:
+    """Starts a detached process (reaped by launchd, not by the test) listed as uid running exe."""
+    body = "trap '' TERM; exec /bin/sleep 600" if ignore_term else "exec /bin/sleep 600"
+    done = subprocess.run(
+        ["/bin/sh", "-c", f'/bin/sh -c "{body}" >/dev/null 2>&1 & echo $!'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    pid = int(done.stdout.strip())
+    with (tmp_path / "procs").open("a", encoding="utf-8") as f:
+        f.write(f"{pid} {uid} {exe}\n")
+    return pid
+
+
+def _alive(pid: int) -> bool:
+    return (
+        subprocess.run(["/bin/kill", "-0", str(pid)], capture_output=True, check=False).returncode
+        == 0
+    )
+
+
+def _helpers(tmp_path: Path, uid: int = 501) -> list[int]:
+    procs = tmp_path / "procs"
+    if not procs.exists():
+        return []
+    out = []
+    for line in procs.read_text(encoding="utf-8").splitlines():
+        pid, puid, exe = line.split(" ", 2)
+        if int(puid) == uid and exe == HELPER_EXE and _alive(int(pid)):
+            out.append(int(pid))
+    return out
+
+
+@pytest.fixture
+def procs_dir(tmp_path: Path) -> Any:
+    yield tmp_path
+    procs = tmp_path / "procs"
+    if procs.exists():
+        for line in procs.read_text(encoding="utf-8").splitlines():
+            subprocess.run(
+                ["/bin/kill", "-KILL", line.split(" ", 1)[0]], capture_output=True, check=False
+            )
 
 
 def _run_start(
@@ -335,19 +412,23 @@ def _run_start(
 ) -> tuple[int, str, list[str]]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "launchctl").write_text(_FAKE_LAUNCHCTL, encoding="utf-8")
-    (bin_dir / "launchctl").chmod(0o755)
-    (bin_dir / "sleep").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    (bin_dir / "sleep").chmod(0o755)
-    if loaded:
+    for name, text in (
+        ("launchctl", _FAKE_LAUNCHCTL),
+        ("ps", _FAKE_PS),
+        ("sleep", "#!/bin/sh\nexit 0\n"),
+    ):
+        (bin_dir / name).write_text(text, encoding="utf-8")
+        (bin_dir / name).chmod(0o755)
+    if loaded or stuck:
         (tmp_path / "loaded").touch()
+        (tmp_path / "lpid").write_text(str(_spawn(tmp_path, 501, HELPER_EXE)), encoding="utf-8")
     if stuck:
-        (tmp_path / "loaded").touch()
         (tmp_path / "stuck").touch()
     env = {
         "PATH": f"{bin_dir}:/usr/bin:/bin",
         "FAKE_DIR": str(tmp_path),
         "LINGER": str(10**6 if stuck else linger),
+        "HELPER_EXE": HELPER_EXE,
     }
     done = subprocess.run(
         ["/bin/sh", str(START_SCRIPT_SH), "501", "/Library/LaunchAgents/x.plist"],
@@ -361,8 +442,8 @@ def _run_start(
     return done.returncode, done.stdout, calls
 
 
-def test_start_helper_waits_until_the_old_helper_is_gone(tmp_path: Path) -> None:
-    code, out, calls = _run_start(tmp_path, loaded=True, linger=3)
+def test_start_helper_waits_until_the_old_helper_is_gone(procs_dir: Path) -> None:
+    code, out, calls = _run_start(procs_dir, loaded=True, linger=3)
     assert code == 0, out
     assert "started in gui/501" in out
     assert calls[0] == "bootout gui/501/com.example.bothy-computer-helper"
@@ -371,19 +452,81 @@ def test_start_helper_waits_until_the_old_helper_is_gone(tmp_path: Path) -> None
         "bootstrap gui/501 /Library/LaunchAgents/x.plist"
     ]
     assert calls.index("bootstrap gui/501 /Library/LaunchAgents/x.plist") > 3
+    assert _helpers(procs_dir) == [int((procs_dir / "lpid").read_text(encoding="utf-8"))]
 
 
-def test_start_helper_starts_a_helper_that_was_not_loaded(tmp_path: Path) -> None:
-    code, out, _ = _run_start(tmp_path, loaded=False, linger=0)
+def test_start_helper_starts_a_helper_that_was_not_loaded(procs_dir: Path) -> None:
+    code, out, _ = _run_start(procs_dir, loaded=False, linger=0)
     assert code == 0, out
-    assert (tmp_path / "loaded").exists()
+    assert (procs_dir / "loaded").exists()
+    assert len(_helpers(procs_dir)) == 1
 
 
-def test_start_helper_restarts_a_service_that_never_goes_away(tmp_path: Path) -> None:
-    code, out, calls = _run_start(tmp_path, loaded=True, linger=0, stuck=True)
+def test_start_helper_restarts_a_service_that_never_goes_away(procs_dir: Path) -> None:
+    code, out, calls = _run_start(procs_dir, loaded=True, linger=0, stuck=True)
     assert code == 0, out
     assert "restarted in gui/501" in out
     assert calls[-1] == "kickstart -k gui/501/com.example.bothy-computer-helper"
+    assert _helpers(procs_dir) == [int((procs_dir / "lpid").read_text(encoding="utf-8"))]
+
+
+def test_start_helper_ends_helpers_started_outside_launchd(procs_dir: Path) -> None:
+    # The Mac on 26.11.: a helper started by hand with `open` (not by launchd) kept running
+    # next to the one the update started; the two took the host's channel from each other and
+    # every computer session ended at once. Only the new launchd helper may be left, and only
+    # processes of the console user that run the helper's exact path are ended.
+    by_open = _spawn(procs_dir, 501, HELPER_EXE)
+    stubborn = _spawn(procs_dir, 501, HELPER_EXE, ignore_term=True)
+    other_user = _spawn(procs_dir, 502, HELPER_EXE)
+    other_path = _spawn(procs_dir, 501, HELPER_EXE + ".old")
+    code, out, _ = _run_start(procs_dir, loaded=True, linger=1)
+    assert code == 0, out
+    assert "started in gui/501" in out
+    assert not _alive(by_open)
+    assert not _alive(stubborn)
+    assert _alive(other_user)
+    assert _alive(other_path)
+    assert _helpers(procs_dir) == [int((procs_dir / "lpid").read_text(encoding="utf-8"))]
+
+
+def test_start_helper_fails_when_not_exactly_one_helper_runs(procs_dir: Path) -> None:
+    # A helper that launchd does not start (here: bootstrap succeeds, but no process appears)
+    # must not count as started.
+    bin_dir = procs_dir / "bin"
+    _run_start(procs_dir, loaded=False, linger=0)
+    subprocess.run(
+        ["/bin/kill", "-KILL", (procs_dir / "lpid").read_text(encoding="utf-8").strip()],
+        check=False,
+    )
+    (procs_dir / "calls").unlink()
+    (procs_dir / "loaded").unlink()
+    (bin_dir / "launchctl").write_text(
+        _FAKE_LAUNCHCTL.replace("touch $d/loaded; spawn; exit 0", "touch $d/loaded; exit 0"),
+        encoding="utf-8",
+    )
+    done = subprocess.run(
+        ["/bin/sh", str(START_SCRIPT_SH), "501", "/Library/LaunchAgents/x.plist"],
+        env={
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "FAKE_DIR": str(procs_dir),
+            "LINGER": "0",
+            "HELPER_EXE": HELPER_EXE,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert done.returncode == 1, done.stdout
+    assert "0 helpers run in gui/501" in done.stdout
+
+
+def test_start_helper_names_the_path_of_the_launch_agent() -> None:
+    agent = plistlib.loads(
+        (hostdist.INFRA / "macos" / hostdist.HELPER_LAUNCH_AGENT.name).read_bytes()
+    )
+    assert f'exe="{agent["ProgramArguments"][0]}"' in START_SCRIPT_SH.read_text(encoding="utf-8")
+    assert agent["ProgramArguments"][0] == HELPER_EXE
 
 
 # ---- Windows --------------------------------------------------------------------------------
