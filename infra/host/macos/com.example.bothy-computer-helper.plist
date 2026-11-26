@@ -11,7 +11,7 @@
 	<string>com.example.bothy-computer-helper</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Library/Application Support/bothy-host/desktop/Bothy Computer Helper.app/Contents/MacOS/bothy-computer-helper</string>
+		<string>/Library/Application Support/bothy-host/desktop/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper</string>
 	</array>
 	<key>LimitLoadToSessionType</key>
 	<string>Aqua</string>

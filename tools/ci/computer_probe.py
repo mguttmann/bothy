@@ -411,7 +411,7 @@ def state_file() -> Path:
         base = Path(os.environ["LOCALAPPDATA"])
     else:
         base = Path.home() / "Library" / "Application Support"
-    return base / "Bothy Computer Helper" / "state.json"
+    return base / "bothy-computer-helper" / "state.json"
 
 
 def enable_helper() -> None:

@@ -29,7 +29,7 @@ The computer helper (brief CU-02, D-CU-01-29, docs/decisions.d/CU-02.md D-CU-02-
 published: no release step above carries it. On the owner's own machines these steps sign it and
 build a host package with the helper as an optional component:
 
-* `helper-sign-macos`: signs `Bothy Computer Helper.app` with a Developer ID Application identity of
+* `helper-sign-macos`: signs `bothy-computer-helper.app` with a Developer ID Application identity of
   the login keychain and the hardened runtime (no notarization), verifies it and compares its
   designated requirement with the one recorded for the previous signed build.
 * `helper-package-macos`: one `.pkg` for one architecture with the choices `host` (always) and
@@ -136,14 +136,14 @@ APPLE_SECRETS = (
 WINDOWS_SECRETS = windows.WINDOWS_SECRETS
 TRIAL_SUBJECT = "CN=bothy-host test publisher"
 # The computer helper (docs/decisions.d/CU-02.md D-CU-02-3); white label like PKG_IDENTIFIER.
-HELPER_APP = "Bothy Computer Helper.app"
+HELPER_APP = "bothy-computer-helper.app"
 HELPER_EXE_MACOS = "bothy-computer-helper"
 HELPER_EXE_WINDOWS = "bothy-computer-helper.exe"
 HELPER_BUNDLE_ID = "com.example.bothy-computer-helper"
 HELPER_PKG_IDENTIFIER = HELPER_BUNDLE_ID
 DARWIN_HELPER_DIR = Path("/Library/Application Support/bothy-host/desktop")
 HELPER_LAUNCH_AGENT = Path(f"/Library/LaunchAgents/{HELPER_BUNDLE_ID}.plist")
-HELPER_CERT_SUBJECT = "CN=Bothy Computer Helper (local)"
+HELPER_CERT_SUBJECT = "CN=bothy-computer-helper (local)"
 _THUMBPRINT = re.compile(r"^[0-9A-Fa-f]{40}$")
 _SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
@@ -892,7 +892,7 @@ def helper_sign_macos(
 
     Args:
         run: the command runner.
-        app: `Bothy Computer Helper.app` as `bundle.sh` assembled it.
+        app: `bothy-computer-helper.app` as `bundle.sh` assembled it.
         identity: name or SHA-1 of a Developer ID Application identity in the keychains of the
             session (on the owner's Mac a job in the GUI session, where the login keychain is
             open).
@@ -906,7 +906,7 @@ def helper_sign_macos(
             ID, or its designated requirement differs from the recorded one.
 
     Example:
-        helper_sign_macos(Runner(), app=Path("out/Bothy Computer Helper.app"),
+        helper_sign_macos(Runner(), app=Path("out/bothy-computer-helper.app"),
                           identity="Developer ID Application: Example (TEAM123456)",
                           requirement_file=Path("signing/requirement.txt"))
     """

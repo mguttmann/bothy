@@ -9,7 +9,7 @@ channel of 27 9.4; the helper itself never talks to the server.
 
 | Folder | Content |
 |---|---|
-| [`macos/`](macos/README.md) | Swift package: `HelperCore` (logic behind interfaces), `HelperMac` (ScreenCaptureKit, `CGEvent`, event tap, indicator), the app bundle `Bothy Computer Helper.app` |
+| [`macos/`](macos/README.md) | Swift package: `HelperCore` (logic behind interfaces), `HelperMac` (ScreenCaptureKit, `CGEvent`, event tap, indicator), the app bundle `bothy-computer-helper.app` |
 | [`windows/`](windows/README.md) | CMake project (C++20): `helper_core` (portable logic), the Win32 layer (DXGI, `SendInput`, keyboard hook, indicator, tray) and `bothy-computer-helper.exe` with `uiAccess` |
 
 Both share the logic of 27: the enablement switch with its generation (a click at the machine is
@@ -40,9 +40,9 @@ macOS, on the owner's Mac, with the owner's Developer ID Application identity:
 
 ```sh
 make -C services/host helper-macos OUT=<folder>
-make -C services/host helper-sign-macos APP="<folder>/Bothy Computer Helper.app" \
+make -C services/host helper-sign-macos APP="<folder>/bothy-computer-helper.app" \
   SIGN_IDENTITY="Developer ID Application: <name> (<team>)" REQUIREMENT_FILE=<file kept between builds>
-make -C services/host helper-package-macos APP="<folder>/Bothy Computer Helper.app" OUT=<folder>
+make -C services/host helper-package-macos APP="<folder>/bothy-computer-helper.app" OUT=<folder>
 sudo installer -pkg <folder>/bothy-host-computer_<version>_darwin_<arch>.pkg -target /
 ```
 

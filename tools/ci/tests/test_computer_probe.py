@@ -191,11 +191,11 @@ def test_main_reports_a_passing_run(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_the_state_file_is_the_one_of_the_helper(monkeypatch: pytest.MonkeyPatch) -> None:
     path = cp.state_file()
     assert path.name == "state.json"
-    assert path.parent.name == "Bothy Computer Helper"
+    assert path.parent.name == "bothy-computer-helper"
 
 
 def test_the_helper_starts_with_the_endpoint() -> None:
-    app = Path("/x/Bothy Computer Helper.app")
+    app = Path("/x/bothy-computer-helper.app")
     assert cp.helper_command(app, "/tmp/c.sock") == [
         "open",
         "-n",

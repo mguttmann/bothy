@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         log.flush()
 
     root = tk.Tk()
-    root.title("Bothy probe fixture")
+    root.title("computer probe fixture")
     root.geometry(SIZE)
     root.configure(background=COLOR)
     root.attributes("-topmost", True)

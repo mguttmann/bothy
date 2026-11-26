@@ -295,7 +295,7 @@ def test_the_postinstall_sets_the_key_and_loads_the_agent() -> None:
 
 def test_helper_cert_windows_creates_a_machine_certificate(monkeypatch: pytest.MonkeyPatch) -> None:
     run = FakeRun({"powershell.exe": lambda a, o: ok("ABCDEF0123456789ABCDEF0123456789ABCDEF01\n")})
-    thumb = hostdist.helper_cert_windows(run, subject="CN=Bothy Computer Helper (local)")
+    thumb = hostdist.helper_cert_windows(run, subject="CN=bothy-computer-helper (local)")
     assert thumb == "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
     script = run.calls[0][-1]
     for part in (
@@ -372,7 +372,7 @@ def test_the_msi_has_the_helper_only_with_its_define() -> None:
         assert part not in outside
     assert 'Level="1000"' in block
     assert "CurrentVersion\\Run" in block
-    assert 'Name="BothyComputerHelper"' in block
+    assert 'Name="bothy-computer-helper"' in block
     assert 'Impersonate="no"' in block
     assert "&amp;ComputerHelper=3" in block
 

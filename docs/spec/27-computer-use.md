@@ -410,10 +410,10 @@ when the person installing selects the helper component. `bothy-host
 doctor` prints a section `computer` (no HD check: the doctor list of 24 3.5 stays HD1 to HD11 and the
 server refuses another): helper installed and trusted (9.4), connected, enabled, the permissions of
 9.1 granted, signed or a development build; the same state goes to the server in the `report` object
-`computer` (12.3). Places (D-CU-02-3): macOS `Bothy Computer Helper.app` in
+`computer` (12.3). Places (D-CU-02-3): macOS `bothy-computer-helper.app` in
 `/Library/Application Support/bothy-host/desktop/` with the LaunchAgent
 `/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
-`%ProgramFiles%\bothy-host\desktop\bothy-computer-helper.exe` with the value `BothyComputerHelper` of the
+`%ProgramFiles%\bothy-host\desktop\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
 machine's `Run` key; the enablement's state file in the user's account (D-CU-02-4). A build
 without a signature that verifies is for development only and says so in the doctor and in the
 report (D-CU-01-29).

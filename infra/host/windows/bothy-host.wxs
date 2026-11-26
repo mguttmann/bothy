@@ -58,7 +58,7 @@
         </Component>
         <Component Id="HelperStartEntry" Bitness="always64">
           <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run"
-                         Name="BothyComputerHelper" Type="string"
+                         Name="bothy-computer-helper" Type="string"
                          Value="&quot;[HelperFolder]bothy-computer-helper.exe&quot;" KeyPath="yes" />
         </Component>
       </Directory>
