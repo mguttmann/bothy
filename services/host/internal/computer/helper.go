@@ -476,7 +476,7 @@ func (h *Helper) forget(seq int64) {
 // macOS inside the app bundle in the program folder of the host package, Windows next to the host
 // service under Program Files (a condition of uiAccess). Linux has no helper.
 const (
-	darwinHelperPath  = "/Library/Application Support/bothy-host/bin/Bothy Computer Helper.app/Contents/MacOS/Bothy Computer Helper"
+	darwinHelperPath  = "/Library/Application Support/bothy-host/bin/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper"
 	windowsHelperName = `\bothy-host\bothy-computer-helper.exe`
 )
 

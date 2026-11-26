@@ -432,7 +432,7 @@ the normal mode with a service user (D-CU-01-26).
 - Peer rule (D-CU-01-24), at the connection and again before every session: the peer is the user of
   the active console session (the rule of the confirmation agent, 24 6.4), not the service user and
   not a session user of `host_service.session_users`; its executable is the installed helper path
-  (macOS `/Library/Application Support/bothy-host/bin/Bothy Computer Helper.app/Contents/MacOS/Bothy Computer Helper`,
+  (macOS `/Library/Application Support/bothy-host/bin/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper`,
   Windows `%ProgramFiles%\bothy-host\bothy-computer-helper.exe`, D-CU-03-7),
   whose file and folder chain belong to a trusted owner (the rule of HD10); and when the host
   service's build carries a code signing requirement, the executable satisfies it (macOS: the

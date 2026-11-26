@@ -13,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/frame"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 const (
@@ -286,7 +287,7 @@ func TestHandshakeFailed(t *testing.T) {
 	r.waitState(func(s HelperState) bool { return s.Connected })
 	r.m.Open(context.Background(), openOp(sidA), r.n)
 	r.stream(sidA).in <- []byte("not a noise message, long enough to look like one ......")
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if _, _, ok := r.stream(sidA).closed(); ok {
 			break
@@ -495,7 +496,7 @@ func TestEndedPendingWhileOffline(t *testing.T) {
 	r.n.fail = true
 	r.n.mu.Unlock()
 	d.sendFrame(frame.Close())
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) && len(r.m.Live()) == 0 {
 		time.Sleep(5 * time.Millisecond)
 	}

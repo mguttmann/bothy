@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // childMarker as the first argument makes the test binary act as a peer that connects to the
@@ -91,7 +92,7 @@ func TestDefaultBindExecAfterConnect(t *testing.T) {
 		t.Fatalf("exe %q %v, want %q", exe, err, self)
 	}
 	_, _ = stdin.Write([]byte{1}) // the child execs /bin/sleep now, the socket stays open
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) && proc.Current() == nil {
 		time.Sleep(10 * time.Millisecond)
 	}

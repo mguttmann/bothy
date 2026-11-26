@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/frame"
 	"github.com/OWNER/bothy/services/host/internal/hostos"
 	"github.com/OWNER/bothy/services/host/internal/noise"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 	"github.com/OWNER/bothy/services/host/internal/startup"
@@ -34,8 +35,7 @@ import (
 // temporary folder (admitted as the test peer of this user), a screenshot with its image chunks,
 // done, and computer.ended on the control connection.
 func TestIntegration(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	signer := sessiontest.NewSigner("terminal-key-1")
 	srv := sessiontest.NewServer(t, func() map[string]any {
 		return sessiontest.Hello([]map[string]any{signer.JWK()}, sessiontest.DefaultValues)
@@ -83,7 +83,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	fh := startFakeHelper(t, hc, hello())
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for !h.State().Connected && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}

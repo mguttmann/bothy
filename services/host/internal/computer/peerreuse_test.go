@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // TestPeerExecAfterConnectAndPIDReuse: the peer rule checks the process the connection captured;
@@ -57,7 +58,7 @@ func TestHelperRecheckAfterHello(t *testing.T) {
 	cp := &changingProc{after: 3} // the checks before hello pass, the one after it fails
 	r.h.o.Bind = func(net.Conn, confirm.Peer, time.Time) (Process, error) { return cp, nil }
 	r.connect(hello())
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) && cp.calls.Load() <= cp.after {
 		time.Sleep(5 * time.Millisecond)
 	}

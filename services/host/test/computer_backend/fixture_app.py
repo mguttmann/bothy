@@ -34,8 +34,8 @@ def main(argv: list[str]) -> int:
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
-    root = tk.Tk(className="BothyFixture")
-    root.title("Bothy fixture")
+    root = tk.Tk(className="ComputerFixture")
+    root.title("Computer fixture")
     root.geometry(GEOMETRY)
     root.configure(background="white")
     for name, (x, y, w, h) in (("Alpha", ALPHA), ("Beta", BETA)):

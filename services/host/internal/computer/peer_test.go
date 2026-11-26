@@ -16,7 +16,7 @@ const (
 	uidAlex    = "501" // the console user
 	uidSam     = "502" // a session user
 	uidRobin   = "503" // another user
-	helperPath = "/Applications/Bothy Computer Helper.app/Contents/MacOS/bothy-computer-helper"
+	helperPath = "/Applications/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper"
 	copyPath   = "/tmp/bothy-computer-helper"
 )
 

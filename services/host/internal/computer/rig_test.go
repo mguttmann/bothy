@@ -22,11 +22,12 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/frame"
 	"github.com/OWNER/bothy/services/host/internal/hostos"
 	"github.com/OWNER/bothy/services/host/internal/noise"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 )
 
-// wait bounds every wait of the rig.
-const wait = 5 * time.Second
+// wait bounds every wait of the rig: the patience of the host tests (quality.test.patience).
+const wait = testkit.Patience
 
 // pipeListener hands net.Pipe ends to Helper.Serve.
 type pipeListener struct {
@@ -165,7 +166,7 @@ func (f *fakeHelper) opsOf(op string) []any {
 // waitOp waits until the helper got op.
 func (f *fakeHelper) waitOp(op string) {
 	f.t.Helper()
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if len(f.opsOf(op)) > 0 {
 			return
@@ -278,7 +279,7 @@ func (n *notifier) endedOf(id string) []control.ComputerEnded {
 // waitEnded waits for the computer.ended of id.
 func (n *notifier) waitEnded(t *testing.T, id string) control.ComputerEnded {
 	t.Helper()
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if e := n.endedOf(id); len(e) > 0 {
 			return e[0]
@@ -376,7 +377,7 @@ func hello() Hello {
 // waitState waits until the helper mirror satisfies cond.
 func (r *rig) waitState(cond func(HelperState) bool) {
 	r.t.Helper()
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if cond(r.h.State()) {
 			return

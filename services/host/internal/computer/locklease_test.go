@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/confirm"
 	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/frame"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // gateProc is a captured process whose checks block while hold is set.
@@ -48,7 +49,7 @@ func TestEndDuringHandshakeFreesLock(t *testing.T) {
 		_, ok := r.handshake(sidA, nil)
 		done <- ok
 	}()
-	deadline := time.Now().Add(wait)
+	deadline := testkit.Deadline()
 	for !g.waiting.Load() && time.Now().Before(deadline) {
 		time.Sleep(2 * time.Millisecond)
 	}
