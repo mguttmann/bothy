@@ -12,6 +12,7 @@ add_executable(${BINARY_NAME} WIN32
   "main.cpp"
   "rich_clipboard.cpp"
   "utils.cpp"
+  "webauthn_bridge.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
@@ -36,6 +37,8 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+# The Win32 WebAuthn API of the passkeys over Windows Hello (webauthn_bridge.h).
+target_link_libraries(${BINARY_NAME} PRIVATE "webauthn.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

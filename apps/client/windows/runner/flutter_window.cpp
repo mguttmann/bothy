@@ -5,11 +5,13 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 
 #include "deep_link.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "rich_clipboard.h"
+#include "webauthn_bridge.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project,
                              std::optional<std::string> link)
@@ -88,6 +90,14 @@ bool FlutterWindow::OnCreate() {
         }
         result->Success();
       });
+  webauthn_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "bothy/webauthn",
+      &flutter::StandardMethodCodec::GetInstance());
+  webauthn_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        webauthn_bridge::Handle(GetHandle(), call, std::move(result));
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -105,6 +115,7 @@ bool FlutterWindow::OnCreate() {
 void FlutterWindow::OnDestroy() {
   deep_links_ = nullptr;
   clipboard_ = nullptr;
+  webauthn_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -130,6 +141,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case webauthn_bridge::kDoneMessage:
+      // A finished passkey ceremony from its worker thread (webauthn_bridge.h).
+      webauthn_bridge::Complete(lparam);
+      return 0;
     case WM_COPYDATA: {
       // A link from a second start of the app (deep_link.h).
       const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
