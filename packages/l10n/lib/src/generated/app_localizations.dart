@@ -19063,6 +19063,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose what the app may use and which events it receives; required items stay on.'**
   String get adminAppChangeConsentBody;
+
+  /// Status chip in a thread while the computer session of a run is opening (27 11 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {desktop}'**
+  String computerChipOpening(String desktop);
+
+  /// Status chip while an agent controls a desktop: the desktop, the frontmost app and the action count (27 11 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Controls {desktop} · {app} · {count, plural, =1{1 action} other{{count} actions}}'**
+  String computerChipActive(String desktop, String app, int count);
+
+  /// Status chip while an agent controls a desktop and no frontmost app is known yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Controls {desktop} · {count, plural, =1{1 action} other{{count} actions}}'**
+  String computerChipActiveNoApp(String desktop, int count);
+
+  /// Status chip while the screen of the controlled desktop is locked (27 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'{desktop} locked, waiting'**
+  String computerChipLocked(String desktop);
+
+  /// Status chip once after the computer session closed, with the reason from computerCloseReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer control of {desktop} ended: {reason}'**
+  String computerChipEnded(String desktop, String reason);
+
+  /// The close reason of a computer session (27 8.3) in the status chip.
+  ///
+  /// In en, this message translates to:
+  /// **'{reason, select, done{Done} stopped_by_user{Stopped} device_disabled{Enablement switched off} run_ended{Run ended} access_revoked{Access revoked} host_disabled{Host disabled} host_retired{Host retired} host_rekeyed{Host paired again} host_restarted{Host service restarted} connection_lost{Connection lost} open_failed{Could not start} error{Error} other{Ended}}'**
+  String computerCloseReason(String reason);
+
+  /// Button on the computer status chip and the desktop entry that stops the computer session.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get computerStop;
+
+  /// Accessibility label of the stop button of a computer session.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the computer control of {desktop}'**
+  String computerStopLabel(String desktop);
+
+  /// Shown when the server refused or failed to stop a computer session.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not stop the computer control: {problem}'**
+  String computerStopFailed(String problem);
+
+  /// Button that hides the ended state of a computer session.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get computerDismiss;
+
+  /// Title of the computer use section of a host (27 11 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Computer control'**
+  String get computerDesktopTitle;
+
+  /// The helper's switch Allow computer control is on and every permission is granted.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed on this desktop'**
+  String get computerEnabled;
+
+  /// The helper's switch Allow computer control is off.
+  ///
+  /// In en, this message translates to:
+  /// **'Not allowed'**
+  String get computerNotEnabled;
+
+  /// The enablement was switched off with Switch enablement off and not switched on again at the machine.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched off from a client'**
+  String get computerDisabledRemotely;
+
+  /// State of the computer helper of a host (27 12.3).
+  ///
+  /// In en, this message translates to:
+  /// **'{state, select, absent{No computer helper connected} refused{The computer helper was refused} other{Computer helper connected}}'**
+  String computerHelperState(String state);
+
+  /// The operating system account the computer helper runs in.
+  ///
+  /// In en, this message translates to:
+  /// **'Account: {account}'**
+  String computerOsAccount(String account);
+
+  /// The operating system permissions of the computer helper; the values come from computerPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen recording: {capture}, input: {input}'**
+  String computerPermissions(String capture, String input);
+
+  /// One permission state of the computer helper.
+  ///
+  /// In en, this message translates to:
+  /// **'{state, select, granted{granted} denied{denied} other{unknown}}'**
+  String computerPermission(String state);
+
+  /// The desktop reports a locked screen.
+  ///
+  /// In en, this message translates to:
+  /// **'The screen is locked'**
+  String get computerLocked;
+
+  /// Shown in the desktop entry while a computer session of the owner is not closed.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent controls this desktop'**
+  String get computerLiveSession;
+
+  /// Button that switches the enablement of a desktop off from any client (27 4 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch enablement off'**
+  String get computerDisable;
+
+  /// Accessibility label of the button that switches the enablement of a desktop off.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch the computer control of {desktop} off'**
+  String computerDisableLabel(String desktop);
+
+  /// Explanation next to Switch enablement off: no client switches computer control on (27 4 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Switching it on again is only possible at the machine itself, with \"Allow computer control\" of the computer helper.'**
+  String get computerOnlyLocal;
+
+  /// Shown when the server refused or failed to switch the enablement off.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not switch the enablement off: {problem}'**
+  String computerDisableFailed(String problem);
+
+  /// Confirmation after the enablement of a desktop was switched off.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer control of {desktop} is switched off.'**
+  String computerDisabledDone(String desktop);
+
+  /// Entry of the tray menu of the desktop app while a computer session of the owner is live (27 11 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Stop computer control ({desktops})'**
+  String trayComputerStop(String desktops);
 }
 
 class _AppLocalizationsDelegate

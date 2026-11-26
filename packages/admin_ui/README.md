@@ -190,7 +190,7 @@ Further rules checked by `make arch`:
 | `lib/src/audit/` | the audit log of M4-29 |
 | `lib/src/step_up/` | the step-up dialog |
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
-| `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37 |
+| `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37; computer control of a host (`HostComputerSection`, CU-07) |
 | `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
 | `lib/src/agents/new_agent/` | "New agent" of A1-08: draft, port, flow with resume, interview, preview, steps, dialog; the edit, restore, view and setup modes and the changed parts of A1-09 |
 | `lib/src/agents/builtin/` | editing built-in agents of A1-09: the section of the agent card, the versions, Change runner, the phone list |
@@ -203,7 +203,7 @@ Further rules checked by `make arch`:
 | `test/instance/` | settings, branding, accent picker, providers, flags, the step-up of every write and the REST source over the instance fake (`test/admin/instance_fake.dart`) |
 | `test/hints/` | both lists, "Extend" with one step-up, "Explain", the navigation entries and the REST source of the two lists |
 | `test/agents/` | agent page, switches, switch of all agents, tokens, guided flow and the REST source over the agent fake (`test/admin/agents_fake.dart`) |
-| `test/hosts/` | pairing, I6, session users, check results, grants on a host and the host page over the host fake (`test/admin/hosts_fake.dart`) |
+| `test/hosts/` | pairing, I6, session users, check results, grants on a host, computer control and the host page over the host fake (`test/admin/hosts_fake.dart`) |
 | `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time; `api_app_grant_test.dart` creates the grant of an installed app from "Access grants" over the API repository and the generated client |
 | `test/common/` | a fault of the app in a load and in a change: the report, the text and the correlation ID of a server error |
 | `test/self/`, `test/admin/`, `test/audit/` | widget tests over fake repositories that behave like the server behind the step-up interceptor |

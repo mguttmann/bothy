@@ -60,20 +60,72 @@ final class WindowBehaviorProvider
 
 String _$windowBehaviorHash() => r'433d3bdc5bfa7a7b25e2a6d9adbc30bf98353452';
 
-/// Starts the window behavior and, on Windows, the tray icon with Open and Quit; the app
-/// widget watches it once.
+/// The tray of the desktop app, or null where the app has none: on Windows the icon with Open
+/// and Quit stays (15 10.3); on macOS the icon shows only while a computer session of the owner
+/// is live (D-CU-07-4, which narrows D-M4-30-5).
+
+@ProviderFor(desktopTray)
+final desktopTrayProvider = DesktopTrayProvider._();
+
+/// The tray of the desktop app, or null where the app has none: on Windows the icon with Open
+/// and Quit stays (15 10.3); on macOS the icon shows only while a computer session of the owner
+/// is live (D-CU-07-4, which narrows D-M4-30-5).
+
+final class DesktopTrayProvider
+    extends $FunctionalProvider<DesktopTray?, DesktopTray?, DesktopTray?>
+    with $Provider<DesktopTray?> {
+  /// The tray of the desktop app, or null where the app has none: on Windows the icon with Open
+  /// and Quit stays (15 10.3); on macOS the icon shows only while a computer session of the owner
+  /// is live (D-CU-07-4, which narrows D-M4-30-5).
+  DesktopTrayProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'desktopTrayProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$desktopTrayHash();
+
+  @$internal
+  @override
+  $ProviderElement<DesktopTray?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  DesktopTray? create(Ref ref) {
+    return desktopTray(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DesktopTray? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DesktopTray?>(value),
+    );
+  }
+}
+
+String _$desktopTrayHash() => r'f829886b1424e63085a16225a04557e60e578326';
+
+/// Starts the window behavior and the tray: on Windows the tray icon with Open and Quit, on
+/// macOS the texts of the icon that shows during computer use; the app widget watches it once.
 
 @ProviderFor(desktopShell)
 final desktopShellProvider = DesktopShellProvider._();
 
-/// Starts the window behavior and, on Windows, the tray icon with Open and Quit; the app
-/// widget watches it once.
+/// Starts the window behavior and the tray: on Windows the tray icon with Open and Quit, on
+/// macOS the texts of the icon that shows during computer use; the app widget watches it once.
 
 final class DesktopShellProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
-  /// Starts the window behavior and, on Windows, the tray icon with Open and Quit; the app
-  /// widget watches it once.
+  /// Starts the window behavior and the tray: on Windows the tray icon with Open and Quit, on
+  /// macOS the texts of the icon that shows during computer use; the app widget watches it once.
   DesktopShellProvider._()
     : super(
         from: null,
@@ -99,7 +151,56 @@ final class DesktopShellProvider
   }
 }
 
-String _$desktopShellHash() => r'c6021e9357968ff5d96dcd6384941289cd78dbbd';
+String _$desktopShellHash() => r'dfc3a95a05d3023c72a177f3621d40e1e23f27ae';
+
+/// The computer entry of the tray (27 11 item 4; brief CU-07): follows the owner's live
+/// computer sessions; null where the app has no tray.
+
+@ProviderFor(computerTray)
+final computerTrayProvider = ComputerTrayProvider._();
+
+/// The computer entry of the tray (27 11 item 4; brief CU-07): follows the owner's live
+/// computer sessions; null where the app has no tray.
+
+final class ComputerTrayProvider
+    extends $FunctionalProvider<ComputerTray?, ComputerTray?, ComputerTray?>
+    with $Provider<ComputerTray?> {
+  /// The computer entry of the tray (27 11 item 4; brief CU-07): follows the owner's live
+  /// computer sessions; null where the app has no tray.
+  ComputerTrayProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'computerTrayProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$computerTrayHash();
+
+  @$internal
+  @override
+  $ProviderElement<ComputerTray?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ComputerTray? create(Ref ref) {
+    return computerTray(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ComputerTray? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ComputerTray?>(value),
+    );
+  }
+}
+
+String _$computerTrayHash() => r'5ba86fa2db4d0630c8213db60db222ef9ab4f6aa';
 
 /// "Start at login", read from and written to the system (D-M4-30-4); off until the person
 /// turns it on.

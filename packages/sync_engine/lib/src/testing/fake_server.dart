@@ -20,6 +20,7 @@ import 'rest/agent_ui_handlers.dart';
 import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
 import 'rest/builtin_agent_handlers.dart';
+import 'rest/computer_handlers.dart';
 import 'rest/deletion_handlers.dart';
 import 'rest/file_handlers.dart';
 import 'rest/hint_handlers.dart';
@@ -183,6 +184,7 @@ final class FakeServer {
     registerAuditHandlers(rest, actions, audit);
     registerHostHandlers(rest, actions, audit);
     registerTerminalHandlers(rest);
+    registerComputerHandlers(rest);
     registerThreadViewHandlers(rest);
     registerAgentHandlers(rest, actions, audit);
     registerBuiltinAgentHandlers(rest, actions, audit);

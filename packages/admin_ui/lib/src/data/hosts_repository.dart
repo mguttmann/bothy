@@ -159,6 +159,74 @@ final class HostProfileInfo {
   final String displayName;
 }
 
+/// The reported state of the computer helper of a host (`HostComputer`, docs/spec/
+/// 27-computer-use.md 12.3; brief CU-07); the server sends it to active owners only.
+final class AdminHostComputer {
+  /// Creates the state.
+  const AdminHostComputer({
+    required this.helper,
+    required this.enabled,
+    required this.generation,
+    required this.osAccount,
+    required this.capture,
+    required this.input,
+    required this.locked,
+  });
+
+  /// `connected`, `absent` or `refused`.
+  final String helper;
+
+  /// Whether the helper's switch "Allow computer control" is on.
+  final bool enabled;
+
+  /// The enablement generation; it rises with every switch-on at the machine.
+  final int generation;
+
+  /// The operating system account of the helper.
+  final String osAccount;
+
+  /// The screen recording permission: `granted`, `denied` or `unknown`.
+  final String capture;
+
+  /// The input permission: `granted`, `denied` or `unknown`.
+  final String input;
+
+  /// Whether the screen is locked.
+  final bool locked;
+}
+
+/// A computer session of the signed-in owner that is not closed (`ComputerSession`, 27 8);
+/// metadata only, never an image.
+final class AdminComputerSession {
+  /// Creates the session.
+  const AdminComputerSession({
+    required this.id,
+    required this.hostId,
+    required this.desktop,
+    required this.state,
+    required this.actionCount,
+    this.frontApp,
+  });
+
+  /// The session ID.
+  final String id;
+
+  /// The host.
+  final String hostId;
+
+  /// The host's name.
+  final String desktop;
+
+  /// `opening`, `active` or `paused`.
+  final String state;
+
+  /// The count of actions so far.
+  final int actionCount;
+
+  /// The identity of the frontmost app, or null.
+  final String? frontApp;
+}
+
 /// A host as the administration shows it (`Host`).
 final class AdminHost {
   /// Creates the host.
@@ -185,6 +253,8 @@ final class AdminHost {
     this.hostVersion,
     this.osVersion,
     this.lastSeenAt,
+    this.computer,
+    this.computerDisabledGeneration,
   });
 
   /// The host ID.
@@ -253,6 +323,21 @@ final class AdminHost {
 
   /// The version for `If-Match`.
   final int version;
+
+  /// The reported computer helper (27 12.3), or null: no helper reported, or a reader who is
+  /// no active owner (07 2.15 item 5).
+  final AdminHostComputer? computer;
+
+  /// The generation `computer.device.disable` switched off (27 4 item 4), or null.
+  final int? computerDisabledGeneration;
+
+  /// Whether a remote switch-off holds the reported generation off until the next switch-on
+  /// at the machine.
+  bool get computerDisabledRemotely {
+    final c = computer;
+    final d = computerDisabledGeneration;
+    return c != null && d != null && c.generation <= d;
+  }
 
   /// The target of a grant on this host.
   AdminTarget get target =>
@@ -438,6 +523,19 @@ abstract interface class HostsRepository {
 
   /// The number of terminal sessions on [hostId] that are not closed (`listTerminalSessions`).
   Future<int> openSessions(String hostId);
+
+  /// The signed-in owner's computer session on [hostId] that is not closed, or null
+  /// (`listComputerSessions`, 27 12.2; one controller per host, 27 8.5).
+  Future<AdminComputerSession?> liveComputerSession(String hostId);
+
+  /// Stops the computer session [sessionId] (`stopComputerSession`, `computer.stop`, no
+  /// step-up, 07 2.15 item 4).
+  Future<void> stopComputerSession(String sessionId);
+
+  /// Switches the enablement of [hostId] off (`disableComputerDevice`,
+  /// `computer.device.disable`, no step-up) and returns the host. Switching on has no
+  /// operation: it happens only at the machine (27 4 item 1).
+  Future<AdminHost> disableComputer(String hostId);
 }
 
 /// [HostsRepository] over the generated client of `api_client`.
@@ -679,6 +777,61 @@ final class ApiHostsRepository implements HostsRepository {
     return count;
   });
 
+  @override
+  Future<AdminComputerSession?> liveComputerSession(String hostId) =>
+      _call(() async {
+        final items =
+            (await _api.getTerminalApi().listComputerSessions()).data!.items;
+        for (final s in items) {
+          if (s.hostId != hostId || s.state == ComputerSessionState.closed) {
+            continue;
+          }
+          return AdminComputerSession(
+            id: s.id,
+            hostId: s.hostId,
+            desktop: s.desktop,
+            state: s.state.name,
+            actionCount: s.actionCount,
+            frontApp: (s.frontApp?.isEmpty ?? true) ? null : s.frontApp,
+          );
+        }
+        return null;
+      });
+
+  @override
+  Future<void> stopComputerSession(String sessionId) => _call(() async {
+    await _api.getTerminalApi().stopComputerSession(
+      sessionId: sessionId,
+      idempotencyKey: _newKey(),
+    );
+  });
+
+  @override
+  Future<AdminHost> disableComputer(String hostId) => _call(
+    () async => _host(
+      (await _api.getTerminalApi().disableComputerDevice(
+        hostId: hostId,
+        idempotencyKey: _newKey(),
+      )).data!,
+    ),
+  );
+
+  static AdminHostComputer? _computer(HostComputer? c) => c == null
+      ? null
+      : AdminHostComputer(
+          helper: switch (c.helper) {
+            HostComputerHelperEnum.connected => 'connected',
+            HostComputerHelperEnum.refused => 'refused',
+            _ => 'absent',
+          },
+          enabled: c.enabled,
+          generation: c.generation,
+          osAccount: c.osAccount,
+          capture: c.permissions.capture.name,
+          input: c.permissions.input.name,
+          locked: c.locked,
+        );
+
   static HostSessionUserAssign _assign(HostAssignment a) =>
       HostSessionUserAssign(
         (b) => b
@@ -780,6 +933,8 @@ final class ApiHostsRepository implements HostsRepository {
     lastSeenAt: h.lastSeenAt,
     createdAt: h.createdAt,
     version: h.version,
+    computer: _computer(h.computer),
+    computerDisabledGeneration: h.computerDisabledGeneration,
   );
 
   /// Runs [call] and turns its errors into [SelfActionFailed] or [FingerprintMismatch]; an

@@ -11963,4 +11963,152 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get adminAppChangeConsentBody =>
       'Choose what the app may use and which events it receives; required items stay on.';
+
+  @override
+  String computerChipOpening(String desktop) {
+    return 'Connecting to $desktop';
+  }
+
+  @override
+  String computerChipActive(String desktop, String app, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count actions',
+      one: '1 action',
+    );
+    return 'Controls $desktop · $app · $_temp0';
+  }
+
+  @override
+  String computerChipActiveNoApp(String desktop, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count actions',
+      one: '1 action',
+    );
+    return 'Controls $desktop · $_temp0';
+  }
+
+  @override
+  String computerChipLocked(String desktop) {
+    return '$desktop locked, waiting';
+  }
+
+  @override
+  String computerChipEnded(String desktop, String reason) {
+    return 'Computer control of $desktop ended: $reason';
+  }
+
+  @override
+  String computerCloseReason(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'done': 'Done',
+      'stopped_by_user': 'Stopped',
+      'device_disabled': 'Enablement switched off',
+      'run_ended': 'Run ended',
+      'access_revoked': 'Access revoked',
+      'host_disabled': 'Host disabled',
+      'host_retired': 'Host retired',
+      'host_rekeyed': 'Host paired again',
+      'host_restarted': 'Host service restarted',
+      'connection_lost': 'Connection lost',
+      'open_failed': 'Could not start',
+      'error': 'Error',
+      'other': 'Ended',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get computerStop => 'Stop';
+
+  @override
+  String computerStopLabel(String desktop) {
+    return 'Stop the computer control of $desktop';
+  }
+
+  @override
+  String computerStopFailed(String problem) {
+    return 'Could not stop the computer control: $problem';
+  }
+
+  @override
+  String get computerDismiss => 'Dismiss';
+
+  @override
+  String get computerDesktopTitle => 'Computer control';
+
+  @override
+  String get computerEnabled => 'Allowed on this desktop';
+
+  @override
+  String get computerNotEnabled => 'Not allowed';
+
+  @override
+  String get computerDisabledRemotely => 'Switched off from a client';
+
+  @override
+  String computerHelperState(String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'absent': 'No computer helper connected',
+      'refused': 'The computer helper was refused',
+      'other': 'Computer helper connected',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String computerOsAccount(String account) {
+    return 'Account: $account';
+  }
+
+  @override
+  String computerPermissions(String capture, String input) {
+    return 'Screen recording: $capture, input: $input';
+  }
+
+  @override
+  String computerPermission(String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'granted': 'granted',
+      'denied': 'denied',
+      'other': 'unknown',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get computerLocked => 'The screen is locked';
+
+  @override
+  String get computerLiveSession => 'An agent controls this desktop';
+
+  @override
+  String get computerDisable => 'Switch enablement off';
+
+  @override
+  String computerDisableLabel(String desktop) {
+    return 'Switch the computer control of $desktop off';
+  }
+
+  @override
+  String get computerOnlyLocal =>
+      'Switching it on again is only possible at the machine itself, with \"Allow computer control\" of the computer helper.';
+
+  @override
+  String computerDisableFailed(String problem) {
+    return 'Could not switch the enablement off: $problem';
+  }
+
+  @override
+  String computerDisabledDone(String desktop) {
+    return 'Computer control of $desktop is switched off.';
+  }
+
+  @override
+  String trayComputerStop(String desktops) {
+    return 'Stop computer control ($desktops)';
+  }
 }

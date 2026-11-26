@@ -1054,6 +1054,21 @@ void main() {
       reasonBody: ReasonBody((b) => b..reason = 'Not needed'),
     );
 
+    // CU-07: the owner's computer sessions, a stop and the switch-off (27 12.2).
+    final desk = h.server.world.addTerminalHost(
+      name: 'Desk',
+      noisePublicKey: 'Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI',
+    );
+    h.server.world.reportComputer(desk.id, enabled: true, generation: 1);
+    final computerSession = h.server.world.openComputerSession(
+      hostId: desk.id,
+      userId: h.seed.alex.id,
+    );
+    final computer = api.getTerminalApi();
+    await computer.listComputerSessions();
+    await computer.stopComputerSession(sessionId: computerSession.id);
+    await computer.disableComputerDevice(hostId: desk.id);
+
     // M5-06: the child session of the Share Extension (08 7.4).
     await api.getDevicesApi().createExtensionSession(
       extensionSessionCreate: ExtensionSessionCreate(

@@ -34,6 +34,7 @@ import '../agents/wakes/wake_notes.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../composer/thread_composer.dart';
+import '../computer/computer_chip.dart' show ComputerChipSlot;
 import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../files/upload_executor.dart';
@@ -875,6 +876,8 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                 channelId: thread.channelId,
                 keyboardPriority: main ? 0 : 1,
               ),
+              // CU-07: the chip of a run's computer session, under its live box (27 11).
+              ComputerChipSlot(threadId: widget.threadId),
               Expanded(
                 child: items.isEmpty
                     ? Center(

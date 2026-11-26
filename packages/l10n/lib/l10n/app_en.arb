@@ -17804,5 +17804,225 @@
   "adminAppChangeConsentBody": "Choose what the app may use and which events it receives; required items stay on.",
   "@adminAppChangeConsentBody": {
     "description": "Body of the dialog that changes the granted scopes and events of an installed app."
+  },
+  "computerChipOpening": "Connecting to {desktop}",
+  "@computerChipOpening": {
+    "description": "Status chip in a thread while the computer session of a run is opening (27 11 item 1).",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      }
+    }
+  },
+  "computerChipActive": "Controls {desktop} · {app} · {count, plural, =1{1 action} other{{count} actions}}",
+  "@computerChipActive": {
+    "description": "Status chip while an agent controls a desktop: the desktop, the frontmost app and the action count (27 11 item 1).",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      },
+      "app": {
+        "type": "String",
+        "example": "com.example.editor"
+      },
+      "count": {
+        "type": "int",
+        "example": "4"
+      }
+    }
+  },
+  "computerChipActiveNoApp": "Controls {desktop} · {count, plural, =1{1 action} other{{count} actions}}",
+  "@computerChipActiveNoApp": {
+    "description": "Status chip while an agent controls a desktop and no frontmost app is known yet.",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      },
+      "count": {
+        "type": "int",
+        "example": "0"
+      }
+    }
+  },
+  "computerChipLocked": "{desktop} locked, waiting",
+  "@computerChipLocked": {
+    "description": "Status chip while the screen of the controlled desktop is locked (27 8.2).",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      }
+    }
+  },
+  "computerChipEnded": "Computer control of {desktop} ended: {reason}",
+  "@computerChipEnded": {
+    "description": "Status chip once after the computer session closed, with the reason from computerCloseReason.",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      },
+      "reason": {
+        "type": "String",
+        "example": "Stopped"
+      }
+    }
+  },
+  "computerCloseReason": "{reason, select, done{Done} stopped_by_user{Stopped} device_disabled{Enablement switched off} run_ended{Run ended} access_revoked{Access revoked} host_disabled{Host disabled} host_retired{Host retired} host_rekeyed{Host paired again} host_restarted{Host service restarted} connection_lost{Connection lost} open_failed{Could not start} error{Error} other{Ended}}",
+  "@computerCloseReason": {
+    "description": "The close reason of a computer session (27 8.3) in the status chip.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "stopped_by_user"
+      }
+    }
+  },
+  "computerStop": "Stop",
+  "@computerStop": {
+    "description": "Button on the computer status chip and the desktop entry that stops the computer session."
+  },
+  "computerStopLabel": "Stop the computer control of {desktop}",
+  "@computerStopLabel": {
+    "description": "Accessibility label of the stop button of a computer session.",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      }
+    }
+  },
+  "computerStopFailed": "Could not stop the computer control: {problem}",
+  "@computerStopFailed": {
+    "description": "Shown when the server refused or failed to stop a computer session.",
+    "placeholders": {
+      "problem": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "computerDismiss": "Dismiss",
+  "@computerDismiss": {
+    "description": "Button that hides the ended state of a computer session."
+  },
+  "computerDesktopTitle": "Computer control",
+  "@computerDesktopTitle": {
+    "description": "Title of the computer use section of a host (27 11 item 3)."
+  },
+  "computerEnabled": "Allowed on this desktop",
+  "@computerEnabled": {
+    "description": "The helper's switch Allow computer control is on and every permission is granted."
+  },
+  "computerNotEnabled": "Not allowed",
+  "@computerNotEnabled": {
+    "description": "The helper's switch Allow computer control is off."
+  },
+  "computerDisabledRemotely": "Switched off from a client",
+  "@computerDisabledRemotely": {
+    "description": "The enablement was switched off with Switch enablement off and not switched on again at the machine."
+  },
+  "computerHelperState": "{state, select, absent{No computer helper connected} refused{The computer helper was refused} other{Computer helper connected}}",
+  "@computerHelperState": {
+    "description": "State of the computer helper of a host (27 12.3).",
+    "placeholders": {
+      "state": {
+        "type": "String",
+        "example": "absent"
+      }
+    }
+  },
+  "computerOsAccount": "Account: {account}",
+  "@computerOsAccount": {
+    "description": "The operating system account the computer helper runs in.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "example": "alex"
+      }
+    }
+  },
+  "computerPermissions": "Screen recording: {capture}, input: {input}",
+  "@computerPermissions": {
+    "description": "The operating system permissions of the computer helper; the values come from computerPermission.",
+    "placeholders": {
+      "capture": {
+        "type": "String",
+        "example": "granted"
+      },
+      "input": {
+        "type": "String",
+        "example": "granted"
+      }
+    }
+  },
+  "computerPermission": "{state, select, granted{granted} denied{denied} other{unknown}}",
+  "@computerPermission": {
+    "description": "One permission state of the computer helper.",
+    "placeholders": {
+      "state": {
+        "type": "String",
+        "example": "granted"
+      }
+    }
+  },
+  "computerLocked": "The screen is locked",
+  "@computerLocked": {
+    "description": "The desktop reports a locked screen."
+  },
+  "computerLiveSession": "An agent controls this desktop",
+  "@computerLiveSession": {
+    "description": "Shown in the desktop entry while a computer session of the owner is not closed."
+  },
+  "computerDisable": "Switch enablement off",
+  "@computerDisable": {
+    "description": "Button that switches the enablement of a desktop off from any client (27 4 item 4)."
+  },
+  "computerDisableLabel": "Switch the computer control of {desktop} off",
+  "@computerDisableLabel": {
+    "description": "Accessibility label of the button that switches the enablement of a desktop off.",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      }
+    }
+  },
+  "computerOnlyLocal": "Switching it on again is only possible at the machine itself, with \"Allow computer control\" of the computer helper.",
+  "@computerOnlyLocal": {
+    "description": "Explanation next to Switch enablement off: no client switches computer control on (27 4 item 1)."
+  },
+  "computerDisableFailed": "Could not switch the enablement off: {problem}",
+  "@computerDisableFailed": {
+    "description": "Shown when the server refused or failed to switch the enablement off.",
+    "placeholders": {
+      "problem": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "computerDisabledDone": "Computer control of {desktop} is switched off.",
+  "@computerDisabledDone": {
+    "description": "Confirmation after the enablement of a desktop was switched off.",
+    "placeholders": {
+      "desktop": {
+        "type": "String",
+        "example": "Desk"
+      }
+    }
+  },
+  "trayComputerStop": "Stop computer control ({desktops})",
+  "@trayComputerStop": {
+    "description": "Entry of the tray menu of the desktop app while a computer session of the owner is live (27 11 item 4).",
+    "placeholders": {
+      "desktops": {
+        "type": "String",
+        "example": "Desk"
+      }
+    }
   }
 }

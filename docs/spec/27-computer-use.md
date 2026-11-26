@@ -670,6 +670,14 @@ action kinds, codes and durations.
 5. The views keep no screen content, because there is none: the rule of R-CL-17 applies to the
    status data (no crash report or metric with app names).
 
+Build details of CU-07 (rulings in [decisions.d/CU-07.md](../decisions.d/CU-07.md)): the chip
+sits under the live box of the thread on every device and names the frontmost app by its identity
+(`front_app`); an end shows once on a device that knew the session live, until dismissed; the
+host page of the administration (console and desktop app) and the hosts screen of the phone carry
+the desktop entry; on macOS the tray is a menu bar icon that shows only while a session of the
+owner is live, on Windows the entry joins the existing tray menu and stops every live session of
+the owner.
+
 ## 12. Contract
 
 The rows below enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml`, `docs/api/asyncapi.yaml`

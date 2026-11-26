@@ -88,6 +88,40 @@ final class FakeHost {
   /// ruling T13); a name without an entry has none.
   final Map<String, List<String>> workdirs = {};
 
+  /// The reported `computer` object (`HostComputer`, 27 12.3), or null while the host service
+  /// reports no helper (CU-07).
+  HostJson? computer;
+
+  /// The generation `computer.device.disable` switched off (27 4 item 4), or null.
+  int? computerDisabledGeneration;
+
+  /// Whether the host is a desktop of [personId] (27 4 item 3): active and connected, a
+  /// connected helper that is enabled with every permission granted, a generation above the
+  /// disabled one, and no assignee or [personId] as the assignee.
+  bool listedFor(String personId) {
+    final c = computer;
+    if (c == null || state != 'active' || !connected) return false;
+    final permissions = c['permissions']! as Map;
+    final generation = c['generation']! as int;
+    final disabled = computerDisabledGeneration;
+    return c['helper'] == 'connected' &&
+        c['enabled'] == true &&
+        permissions['capture'] == 'granted' &&
+        permissions['input'] == 'granted' &&
+        (disabled == null || generation > disabled) &&
+        (assignedUserId == null || assignedUserId == personId);
+  }
+
+  /// The host as an active owner [personId] reads it (`getHost`, `listHosts`, 07 2.15 item 5):
+  /// [json] with `computer`, `computer_listed` and `computer_disabled_generation`. Every other
+  /// reader and `host.updated` get [json] alone (D-CU-04-6).
+  HostJson ownerJson(String personId) => {
+    ...json,
+    'computer': ?computer,
+    if (computer != null) 'computer_listed': listedFor(personId),
+    'computer_disabled_generation': ?computerDisabledGeneration,
+  };
+
   /// The host as the API returns it (`Host`).
   HostJson get json => {
     'id': id,

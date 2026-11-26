@@ -1139,6 +1139,18 @@ final class ApiAdminRepository implements AdminRepository {
   Future<int> openSessions(String hostId) => _hosts.openSessions(hostId);
 
   @override
+  Future<AdminComputerSession?> liveComputerSession(String hostId) =>
+      _hosts.liveComputerSession(hostId);
+
+  @override
+  Future<void> stopComputerSession(String sessionId) =>
+      _hosts.stopComputerSession(sessionId);
+
+  @override
+  Future<AdminHost> disableComputer(String hostId) =>
+      _hosts.disableComputer(hostId);
+
+  @override
   Future<List<AdminTarget>> targets() => _access.targets();
 
   @override
