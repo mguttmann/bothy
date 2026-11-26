@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bothy Computer Helper</string>
+	<string>Computer Helper</string>
 	<key>CFBundleExecutable</key>
 	<string>bothy-computer-helper</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Bothy Computer Helper</string>
+	<string>Computer Helper</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,8 +25,8 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>Bothy Computer Helper takes screenshots for an agent that you allowed to control this computer. Images stay in memory and go only to your own Bothy host service.</string>
+	<string>Computer Helper takes screenshots for an agent that you allowed to control this computer. Images stay in memory and go only to your own host service.</string>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>Bothy Computer Helper sends clicks and keys for an agent that you allowed to control this computer, and watches the Esc key so you can stop the agent at any time.</string>
+	<string>Computer Helper sends clicks and keys for an agent that you allowed to control this computer, and watches the Esc key so you can stop the agent at any time.</string>
 </dict>
 </plist>

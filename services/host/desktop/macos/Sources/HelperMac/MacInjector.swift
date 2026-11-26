@@ -12,7 +12,7 @@ import HelperCore
 /// state reports as held, because a crashed earlier run may have left a key down.
 public final class MacInjector: Injector {
     /// The value in `eventSourceUserData` of every event the helper posts. Any value works; this
-    /// one spells "BOTHYCU" in ASCII so it is recognizable in an event trace.
+    /// one spells a short ASCII tag so it is recognizable in an event trace.
     public static let marker: Int64 = 0x0042_4F54_4859_4355
 
     private let source: CGEventSource?

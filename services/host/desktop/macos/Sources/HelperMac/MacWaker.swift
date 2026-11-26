@@ -16,7 +16,7 @@ public final class MacWaker: Waker {
         let result = IOPMAssertionCreateWithName(
             kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
             IOPMAssertionLevel(kIOPMAssertionLevelOn),
-            "A Bothy agent controls this computer" as CFString, &id)
+            "An agent controls this computer" as CFString, &id)
         guard result == kIOReturnSuccess else { throw WakerError.refused(result) }
         assertion = id
     }

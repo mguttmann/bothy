@@ -80,7 +80,7 @@ final class EnablementTests: XCTestCase {
         let base = FileManager.default.temporaryDirectory
             .appendingPathComponent("helper-store-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: base) }
-        let folder = base.appendingPathComponent("Bothy Computer Helper")
+        let folder = base.appendingPathComponent("bothy-computer-helper")
         let store = FileEnablementStore(folder: folder)
         XCTAssertEqual(store.load(), EnablementState(enabled: false, generation: 0))
         try store.save(EnablementState(enabled: true, generation: 7))

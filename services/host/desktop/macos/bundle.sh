@@ -1,5 +1,5 @@
 #!/bin/sh
-# Assembles "Bothy Computer Helper.app" from the release build of this package
+# Assembles bothy-computer-helper.app from the release build of this package
 # (docs/decisions.d/CU-02.md D-CU-02-1, D-CU-02-10).
 #
 # Usage: bundle.sh <out_dir> <version>
@@ -28,7 +28,7 @@ swift build -c release --package-path "$here" --product bothy-computer-helper
 bin_dir=$(swift build -c release --package-path "$here" --show-bin-path)
 
 mkdir -p "$out_dir"
-app="$(cd "$out_dir" && pwd)/Bothy Computer Helper.app"
+app="$(cd "$out_dir" && pwd)/bothy-computer-helper.app"
 # Replace an earlier bundle completely, so no file of an older build stays inside.
 if [ -e "$app" ]; then
   rm -rf -- "$app"

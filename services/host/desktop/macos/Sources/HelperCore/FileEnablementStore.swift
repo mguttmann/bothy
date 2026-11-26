@@ -23,13 +23,13 @@ public final class FileEnablementStore: EnablementStore {
         self.folder = folder
     }
 
-    /// `~/Library/Application Support/Bothy Computer Helper` of the account the helper runs as.
+    /// `~/Library/Application Support/bothy-computer-helper` of the account the helper runs as.
     public static func defaultFolder() -> URL {
         let support =
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support")
-        return support.appendingPathComponent("Bothy Computer Helper", isDirectory: true)
+        return support.appendingPathComponent("bothy-computer-helper", isDirectory: true)
     }
 
     /// Reads the state.
