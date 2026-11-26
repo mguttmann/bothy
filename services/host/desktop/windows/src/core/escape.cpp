@@ -54,3 +54,18 @@ bool TapGeneration::run_if_current(std::uint64_t generation, const std::function
 }
 
 }  // namespace bothy::helper
+
+namespace bothy::helper {
+
+TapDecision tap_decide(TapGeneration& generations, std::uint64_t generation, EscFilter& filter,
+                       const TapEvent& event, bool active, const std::function<void()>& on_stop) {
+  TapDecision d = TapDecision::Pass;
+  // A stale tap never reaches the filter: its event passes and the held state stays as it was.
+  generations.run_if_current(generation, [&] {
+    d = filter.decide(event, active);
+    if (d == TapDecision::SwallowAndStop && on_stop) on_stop();
+  });
+  return d;
+}
+
+}  // namespace bothy::helper

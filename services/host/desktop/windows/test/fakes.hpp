@@ -139,9 +139,22 @@ struct FakeTap : EscTap {
   void start() override {
     generation = generations.begin();
     started = true;
+    removal_pending = false;
     if (filter != nullptr) filter->reset();
   }
-  void stop() override { teardown(generation); }
+  bool removal_pending = false;   ///< the stop waits for a held Esc's release, as the Win32 hook does
+  void stop() override {
+    started = false;
+    if (filter != nullptr && filter->holding()) removal_pending = true;
+    else teardown(generation);
+  }
+  /// Called after every key event at the tap: ends the tap once the held Esc is released.
+  void after_event() {
+    if (removal_pending && filter != nullptr && !filter->holding()) {
+      removal_pending = false;
+      teardown(generation);
+    }
+  }
   /// The teardown of tap generation `g`; only the current generation may remove the tap.
   /// @param g the generation whose teardown runs.
   void teardown(std::uint64_t g) {

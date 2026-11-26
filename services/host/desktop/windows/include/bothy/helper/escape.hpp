@@ -101,4 +101,19 @@ class TapGeneration {
   bool live_ = false;
 };
 
+/// The decision of a tap callback of generation `generation` (27 9.6 items 4 and 5). Under the
+/// generation lock: a callback of a tap that is not the current one passes the event and leaves
+/// `filter` untouched, so a stale hook can neither stop nor swallow nor leave a held state behind
+/// that would make the next real Esc look like auto-repeat; a current one decides with `filter`.
+/// @param generations the tap generations.
+/// @param generation the generation of the tap whose callback runs.
+/// @param filter the Esc filter of the current tap.
+/// @param event the keyboard event.
+/// @param active true while a session is shown.
+/// @param on_stop run under the lock when the decision is SwallowAndStop (raise the interrupt,
+///        post the stop); may be empty.
+/// @return the decision.
+TapDecision tap_decide(TapGeneration& generations, std::uint64_t generation, EscFilter& filter,
+                       const TapEvent& event, bool active, const std::function<void()>& on_stop = {});
+
 }  // namespace bothy::helper

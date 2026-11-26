@@ -82,18 +82,16 @@ LRESULT CALLBACK Win32EscTap::hook_proc(int code, WPARAM wp, LPARAM lp) {
     e.down = wp == WM_KEYDOWN || wp == WM_SYSKEYDOWN;
     e.injected = (k->flags & LLKHF_INJECTED) != 0;
     e.extra_info = static_cast<std::uintptr_t>(k->dwExtraInfo);
-    TapDecision d = g_tap->filter_.decide(e, g_tap->active_.load());
-    if (d == TapDecision::SwallowAndStop) {
-      // Only the tap of the current session stops it; the hook raises the flag and returns at
-      // once, and the UI thread ends the session.
-      Win32EscTap* tap = g_tap;
-      bool fired = tap->generations_.run_if_current(tap->hook_generation_, [tap] {
-        tap->active_ = false;
-        if (tap->interrupt_ != nullptr) tap->interrupt_->raise_escape();
-        PostMessageW(tap->window_, kMsgEscape, 0, 0);
-      });
-      if (!fired) d = TapDecision::Pass;  // a stale hook decides nothing
-    }
+    // Only the tap of the current session decides and stops; a stale one passes the event and
+    // leaves the filter alone (27 9.6 item 5). The hook raises the flag and returns at once; the UI
+    // thread ends the session.
+    Win32EscTap* tap = g_tap;
+    TapDecision d = tap_decide(tap->generations_, tap->hook_generation_, tap->filter_, e,
+                               tap->active_.load(), [tap] {
+                                 tap->active_ = false;
+                                 if (tap->interrupt_ != nullptr) tap->interrupt_->raise_escape();
+                                 PostMessageW(tap->window_, kMsgEscape, 0, 0);
+                               });
     if (g_tap->remove_pending_ != 0 && !g_tap->filter_.holding())
       PostThreadMessageW(g_tap->thread_id_.load(), kRemove, static_cast<WPARAM>(g_tap->remove_pending_), 0);
     if (d != TapDecision::Pass) return 1;
