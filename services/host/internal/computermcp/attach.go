@@ -36,6 +36,9 @@ const (
 // data does not sum to its bytes. The session ends locally (27 6.1).
 var errStream = errors.New("computermcp: stream fault")
 
+// errActionTooLong is an action whose frame would pass frame.MaxLen; nothing was sent.
+var errActionTooLong = errors.New("computermcp: the action does not fit one frame")
+
 // endedError is a session that ended; reason is the close reason of 8.3 or a local cause.
 type endedError struct{ reason string }
 
@@ -273,31 +276,36 @@ func refusalOf(err error) error {
 func (s *session) read(ctx context.Context) {
 	defer close(s.in)
 	for {
-		typ, msg, err := s.ws.Read(ctx)
-		if err != nil {
-			s.in <- inbound{err: err}
-			return
-		}
-		if typ != websocket.MessageBinary {
-			s.in <- inbound{err: errStream}
-			return
-		}
-		pt, err := s.tr.Decrypt(msg)
-		if err != nil {
-			s.in <- inbound{err: errStream}
-			return
-		}
-		f, err := frame.Decode(pt, frame.KindComputer, frame.FromHost)
-		if err != nil {
-			s.in <- inbound{err: errStream}
-			return
-		}
+		item := s.readOne(ctx)
 		select {
-		case s.in <- inbound{f: f}:
+		case s.in <- item:
 		case <-ctx.Done():
 			return
 		}
+		if item.err != nil {
+			return
+		}
 	}
+}
+
+// readOne reads, decrypts and decodes one message of the host.
+func (s *session) readOne(ctx context.Context) inbound {
+	typ, msg, err := s.ws.Read(ctx)
+	if err != nil {
+		return inbound{err: err}
+	}
+	if typ != websocket.MessageBinary {
+		return inbound{err: errStream}
+	}
+	pt, err := s.tr.Decrypt(msg)
+	if err != nil {
+		return inbound{err: errStream}
+	}
+	f, err := frame.Decode(pt, frame.KindComputer, frame.FromHost)
+	if err != nil {
+		return inbound{err: errStream}
+	}
+	return inbound{f: f}
 }
 
 // next returns the next frame of the host, waiting at most ctx.
@@ -398,11 +406,16 @@ func (s *session) do(ctx context.Context, action string, args json.RawMessage) (
 	if err := s.drainStates(); err != nil {
 		return result{}, err
 	}
-	s.seq++
-	f, err := frame.NewAction(frame.Action{Seq: s.seq, Action: action, Args: args})
-	if err != nil {
-		return result{}, err
+	// The frame is built and its length checked before the seq is taken, so an action that does
+	// not fit one frame leaves the session and the order of seq untouched (27 6.3).
+	f, err := frame.NewAction(frame.Action{Seq: s.seq + 1, Action: action, Args: args})
+	if err == nil {
+		_, err = frame.Encode(f)
 	}
+	if err != nil {
+		return result{}, errActionTooLong
+	}
+	s.seq++
 	if err := s.send(ctx, f); err != nil {
 		return result{}, err
 	}

@@ -333,6 +333,9 @@ func (s *Server) run(ctx context.Context, sess *session, st step) (result, error
 
 // sessionFailure maps an error of a running session: an end is stopped with its reason.
 func (s *Server) sessionFailure(err error) callResult {
+	if errors.Is(err, errActionTooLong) {
+		return failure(CodeInvalidAction, "the action does not fit one frame")
+	}
 	var ended *endedError
 	if errors.As(err, &ended) {
 		return failure(CodeStopped, ended.reason)

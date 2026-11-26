@@ -191,3 +191,21 @@ func TestNewRefusesAnIncompleteConfig(t *testing.T) {
 		t.Errorf("New(Config{}): %v", err)
 	}
 }
+
+// TestActionTooLongForOneFrame: an action whose frame would pass the limit answers
+// invalid_action, sends nothing, and the next action keeps the order of seq.
+func TestActionTooLongForOneFrame(t *testing.T) {
+	r := newRig(t)
+	r.initialize()
+	r.open()
+	if res := r.call("key", map[string]any{"keys": strings.Repeat("a", frame.MaxLen)}); !res.IsError || !strings.HasPrefix(res.text(), "invalid_action") {
+		t.Errorf("a key action over the frame limit: %q", res.text())
+	}
+	if res := r.call("screenshot", map[string]any{}); res.IsError {
+		t.Errorf("the next action: %q", res.text())
+	}
+	if got := r.host.received(); len(got) != 1 || got[0].Seq != 1 {
+		t.Errorf("host got %+v", got)
+	}
+	r.stop()
+}
