@@ -137,6 +137,8 @@ void Controller::send(const Value& object) {
 }
 
 void Controller::on_connected() {
+  // A break raised for the previous connection belongs to it; it must not silence this one.
+  if (interrupt_ != nullptr) interrupt_->clear(Interrupt::Kind::ChannelBroken);
   connected_ = true;
   lock_ = p_.lock.current();
   send(Value::object({{"op", "hello"},
@@ -333,12 +335,29 @@ bool Controller::handle_show(const Value& o) {
     send(Value::object({{"op", "state"}, {"enabled", false}}));
     return true;
   }
+  if (interrupt_ != nullptr) {
+    Interrupt::Kind pending = interrupt_->peek();
+    if (pending == Interrupt::Kind::Escape || pending == Interrupt::Kind::StopButton) {
+      // The person stopped just before this show (27 9.6 item 6): their stop is never cleared by a
+      // new session; it refuses this one, which the host learns by a stop with the person's detail.
+      interrupt_->take();
+      if (session_) end_session();
+      send(Value::object({{"op", "stop"},
+                          {"session_id", *id},
+                          {"detail", pending == Interrupt::Kind::Escape ? "local_escape" : "indicator_stop"}}));
+      return true;
+    }
+  }
   if (session_ && session_->id == *id && session_->agent_name == *name) return true;
   if (session_ && session_->id != *id) release_pressed();  // the old session's input ends here
   session_ = Session{*id, *name};
   if (interrupt_ != nullptr) {
-    // A new session starts with no stop pending from an earlier one.
-    interrupt_->clear();
+    // Only weaker kinds belong to the earlier session (hide, disable, a broken channel, an ended
+    // lock). Each is cleared only if it is still the pending kind, so an Esc raised on the hook
+    // thread a moment ago survives (27 9.6 item 6).
+    for (Interrupt::Kind k : {Interrupt::Kind::Lock, Interrupt::Kind::Hide, Interrupt::Kind::Disable,
+                              Interrupt::Kind::ChannelBroken})
+      interrupt_->clear(k);
     interrupt_->set_shown(*id);
   }
   p_.indicator.show(*name);

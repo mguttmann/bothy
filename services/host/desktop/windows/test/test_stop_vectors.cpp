@@ -105,6 +105,8 @@ void run_case(const Value& c, std::int64_t key_repeat_max, std::int64_t scroll_a
       rig.injector.after_send = nullptr;
     } else if (const Value* kind = ev.find("interrupt")) {
       armed = std::make_pair(kind->as_string(), ev.find("before_unit")->as_integer());
+    } else if (const Value* r = ev.find("raise")) {
+      raise(rig, r->as_string());  // another thread, before the next event (27 9.6 item 6)
     } else if (const Value* td = ev.find("tap_teardown")) {
       // The late teardown of the tap generation before the current one (27 9.6 item 5).
       if (td->as_string() != "previous") check::fail(__FILE__, __LINE__, name + ": unknown teardown");
@@ -132,6 +134,8 @@ void run_case(const Value& c, std::int64_t key_repeat_max, std::int64_t scroll_a
     if (is_unit(rig.injector.batches[i])) ++units;
   if (units != expect.find("units")->as_integer())
     check::fail(__FILE__, __LINE__, name + ": units " + std::to_string(units));
+  if (const Value* shown = expect.find("shown"); shown != nullptr && shown->as_bool() != rig.indicator.shown)
+    check::fail(__FILE__, __LINE__, name + ": indicator shown differs");
   if (expect.find("released_after")->as_bool() != rig.injector.nothing_held())
     check::fail(__FILE__, __LINE__, name + ": something stays pressed");
 

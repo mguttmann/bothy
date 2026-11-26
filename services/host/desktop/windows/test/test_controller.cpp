@@ -710,3 +710,16 @@ CHECK_TEST(scroll_amount_over_its_cap_is_invalid) {
   CHECK_EQ(code_of(rig.channel.last()), std::string("invalid_action"));
   CHECK(rig.injector.events.empty());
 }
+
+CHECK_TEST(a_new_connection_drops_a_stale_broken_channel) {
+  // A break of the previous connection must not silence the next one.
+  Rig rig;
+  rig.interrupt.raise(Interrupt::Kind::ChannelBroken);
+  rig.controller.on_connected();
+  rig.channel.objects.clear();
+  rig.show();
+  rig.interrupt.raise(Interrupt::Kind::ChannelBroken);
+  rig.controller.on_connected();
+  CHECK(rig.host(do_frame(1, "key", {{"keys", "Return"}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
+}
