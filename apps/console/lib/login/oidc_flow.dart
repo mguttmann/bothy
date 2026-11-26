@@ -3,13 +3,17 @@
 /// Keys of the OIDC flows in the tab's sessionStorage (brief M6-02 Design note 2).
 library;
 
-/// The two OIDC flows of the console.
+/// The OIDC flows of the console.
 enum OidcFlowKind {
   /// The login (E2), back on `/console/login/callback`.
   login('login'),
 
   /// The re-login of the step-up, back on `/console/step-up/callback`.
-  stepUp('step_up');
+  stepUp('step_up'),
+
+  /// A further identity linked from the page "Sign-in", back on `/console/sign-in/callback`
+  /// (V1-14).
+  link('link');
 
   const OidcFlowKind(this.tag);
 

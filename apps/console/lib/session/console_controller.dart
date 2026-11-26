@@ -8,7 +8,8 @@ library;
 import 'dart:async';
 import 'dart:math';
 
-import 'package:admin_ui/admin_ui.dart' show AdminLocation;
+import 'package:admin_ui/admin_ui.dart'
+    show AdminLocation, IdentityLinkOutcome, SelfActionFailed, SignInProvider;
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:built_collection/built_collection.dart';
@@ -223,6 +224,10 @@ class ConsoleController extends ChangeNotifier {
   /// The message of the current screen, or null.
   ConsoleNotice? notice;
 
+  /// How the last link from the page "Sign-in" ended when it came back by redirect, with the
+  /// name of its login service; the page shows it once ([takeLinkResult], V1-14).
+  ({IdentityLinkOutcome outcome, String provider})? _linkResult;
+
   /// Whether a request of the current screen is running.
   bool busy = false;
 
@@ -347,6 +352,81 @@ class ConsoleController extends ChangeNotifier {
     if (requested == ConsolePage.stepUpCallback) {
       await _completeStepUpOidc(query);
     }
+    if (requested == ConsolePage.signInCallback) {
+      await _completeLink(query);
+    }
+  }
+
+  /// Takes the result of the last link that came back by redirect, once; null without one.
+  ({IdentityLinkOutcome outcome, String provider})? takeLinkResult() {
+    final r = _linkResult;
+    _linkResult = null;
+    return r;
+  }
+
+  /// Links a further identity at [provider] (`beginIdentityLink`, 08 3.3; V1-14): the tab goes
+  /// to the login service and comes back on `/console/sign-in/callback`, where [start]
+  /// completes the link. The step-up of `identity.link` is the action step-up. An answer of the
+  /// server throws [SelfActionFailed]; a cancelled step-up throws its own error.
+  Future<IdentityLinkOutcome> linkIdentity(SignInProvider provider) async {
+    final pkce = PkcePair.generate(_random);
+    final OidcBeginResponse begun;
+    try {
+      begun = (await api.getMeApi().beginIdentityLink(
+        identityLinkBegin: IdentityLinkBegin(
+          (b) => b
+            ..providerId = provider.id
+            ..appRedirectUri = _redirect(ConsolePage.signInCallback)
+            ..clientChallenge = pkce.challenge,
+        ),
+      )).data!;
+    } on DioException catch (e) {
+      final cause = e.error;
+      if (cause is AuthException) throw cause;
+      final response = e.response;
+      throw SelfActionFailed(
+        ApiProblem.of(e) ??
+            (response == null ? null : ApiProblem.fromResponse(response)),
+      );
+    }
+    environment.flowStore.write(
+      '${oidcFlowKey(OidcFlowKind.link, begun.loginAttemptId)}.provider',
+      provider.name,
+    );
+    _redirectTo(OidcFlowKind.link, begun, pkce);
+    return IdentityLinkOutcome.redirected;
+  }
+
+  /// Completes the link of the callback [query] and shows the page "Sign-in" with its result.
+  Future<void> _completeLink(Map<String, String> query) async {
+    final attempt = query['login_attempt_id'] ?? '';
+    final nameKey = '${oidcFlowKey(OidcFlowKind.link, attempt)}.provider';
+    final provider = environment.flowStore.read(nameKey) ?? '';
+    environment.flowStore.delete(nameKey);
+    final verifier = _takeVerifier(OidcFlowKind.link, query);
+    if (_state is! ConsoleSignedIn) return;
+    _route = ConsoleRoute.ofPage(ConsolePage.signIn);
+    final code = query['login_code'];
+    final error = query['error'];
+    var outcome = IdentityLinkOutcome.failed;
+    if (error == 'access_denied') {
+      outcome = IdentityLinkOutcome.cancelled;
+    } else if (error == null && verifier != null && code != null) {
+      try {
+        await api.getMeApi().completeIdentityLink(
+          identityLinkComplete: IdentityLinkComplete(
+            (b) => b
+              ..loginCode = code
+              ..clientVerifier = verifier,
+          ),
+        );
+        outcome = IdentityLinkOutcome.linked;
+      } on DioException {
+        // A refused, expired or foreign identity: the page says the link was not made.
+      }
+    }
+    _linkResult = (outcome: outcome, provider: provider);
+    notifyListeners();
   }
 
   /// Reads discovery again, so the branding the console shows (product name, accent) follows a

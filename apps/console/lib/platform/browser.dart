@@ -39,7 +39,7 @@ abstract interface class BrowserNavigation {
   void setDocumentLanguage(String tag);
 }
 
-/// The browser's WebAuthn API (`navigator.credentials.get`).
+/// The browser's WebAuthn API (`navigator.credentials.get` and `.create`).
 abstract interface class PasskeyPort {
   /// Asks the browser for an assertion over [options], the `PublicKeyCredentialRequestOptions`
   /// in JSON form of the server (binary members as base64url), always with
@@ -47,6 +47,15 @@ abstract interface class PasskeyPort {
   ///
   /// Throws [PasskeyCancelled] when the person cancels or no passkey answers.
   Future<Map<String, Object?>> get(Map<String, Object?> options);
+
+  /// Asks the browser to create a passkey over [options], the
+  /// `PublicKeyCredentialCreationOptions` in JSON form of the server (`beginPasskeyRegistration`,
+  /// V1-14), always with `userVerification: required` and attestation `none`. Returns the new
+  /// `PublicKeyCredential` in JSON form.
+  ///
+  /// Throws [PasskeyCancelled] when the person cancels, no authenticator answers or the
+  /// authenticator already holds a passkey of the person (`excludeCredentials`).
+  Future<Map<String, Object?>> create(Map<String, Object?> options);
 }
 
 /// The browser's download of a file the console made itself (the audit export of A6, brief

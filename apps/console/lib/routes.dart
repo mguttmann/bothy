@@ -24,6 +24,10 @@ enum ConsolePage {
   /// Target of the OIDC re-login of the step-up.
   stepUpCallback('/step-up/callback'),
 
+  /// Target of the OIDC login that links a further identity from the page "Sign-in" (V1-14);
+  /// the console shows "Sign-in" once the link is complete.
+  signInCallback('/sign-in/callback'),
+
   /// E7, logged out.
   loggedOut('/logged-out'),
 
@@ -68,6 +72,10 @@ enum ConsolePage {
   /// Status.
   status('/status'),
 
+  /// The own sign-in methods: password with one-time code, passkeys, linked login services
+  /// (V1-14, design note docs/design/sign-in-methods.md).
+  signIn('/sign-in'),
+
   /// Operations (Grafana): the dashboard of `console.grafana_embed_url` in an iframe, only for
   /// owners and only when the key is set (docs/spec/25-visualization.md 9.2, brief M6-17).
   grafana('/grafana');
@@ -106,6 +114,7 @@ const List<ConsolePage> consoleNavigation = [
   ConsolePage.dataImport,
   ConsolePage.instance,
   ConsolePage.status,
+  ConsolePage.signIn,
 ];
 
 /// The navigation entries of a console: [consoleNavigation], followed by
@@ -131,6 +140,7 @@ String navigationLabel(AppLocalizations l, ConsolePage page) => switch (page) {
   ConsolePage.dataImport => l.consoleNavImport,
   ConsolePage.instance => l.consoleNavInstance,
   ConsolePage.status => l.consoleNavStatus,
+  ConsolePage.signIn => l.consoleNavSignIn,
   ConsolePage.grafana => l.consoleNavGrafana,
   _ => throw ArgumentError.value(page, 'page', 'not a navigation entry'),
 };

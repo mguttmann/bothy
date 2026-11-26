@@ -47,6 +47,10 @@ class _NoPasskeys implements PasskeyPort {
   @override
   Future<Map<String, Object?>> get(Map<String, Object?> options) =>
       Future.error(const PasskeyCancelled());
+
+  @override
+  Future<Map<String, Object?>> create(Map<String, Object?> options) =>
+      Future.error(const PasskeyCancelled());
 }
 
 class _NoNetwork implements HttpClientAdapter {

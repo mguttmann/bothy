@@ -56,4 +56,75 @@ void main() {
     });
     expect(base64UrlBytes('e30'), '{}'.codeUnits);
   });
+
+  test('creation options of the server in binary form (V1-14)', () {
+    final o = PasskeyCreation.fromJson({
+      'challenge': 'Zm9v',
+      'rp': {'id': 'chat.example.com', 'name': 'Team Chat'},
+      'user': {'id': 'dTE', 'name': 'alex', 'displayName': 'Alex'},
+      'pubKeyCredParams': [
+        {'type': 'public-key', 'alg': -7},
+        {'type': 'public-key', 'alg': -257},
+        {'type': 'public-key'},
+      ],
+      'excludeCredentials': [
+        {
+          'type': 'public-key',
+          'id': 'Y3JlZA',
+          'transports': ['internal'],
+        },
+      ],
+      'authenticatorSelection': {
+        'residentKey': 'preferred',
+        'userVerification': 'discouraged',
+      },
+      'timeout': 300000,
+    });
+    expect(o.challenge, 'foo'.codeUnits);
+    expect(o.rpId, 'chat.example.com');
+    expect(o.rpName, 'Team Chat');
+    expect(o.userId, 'u1'.codeUnits);
+    expect(o.userName, 'alex');
+    expect(o.userDisplayName, 'Alex');
+    expect(o.parameters.map((p) => p.alg), [-7, -257]);
+    expect(o.excludeCredentials.single.id, 'cred'.codeUnits);
+    expect(o.excludeCredentials.single.transports, ['internal']);
+    expect(o.residentKey, 'preferred');
+    expect(o.timeoutMs, 300000);
+    expect(
+      () => PasskeyCreation.fromJson({'challenge': 'Zm9v'}),
+      throwsFormatException,
+    );
+    expect(
+      () => PasskeyCreation.fromJson({
+        'user': {'id': 'dTE'},
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test('a new passkey in the JSON form of completePasskeyRegistration', () {
+    expect(
+      attestationJson(
+        id: 'bmV3',
+        rawId: 'new'.codeUnits,
+        clientDataJson: '{}'.codeUnits,
+        attestationObject: 'att'.codeUnits,
+        transports: ['internal', 'hybrid'],
+        authenticatorAttachment: 'platform',
+      ),
+      {
+        'id': 'bmV3',
+        'rawId': 'bmV3',
+        'type': 'public-key',
+        'authenticatorAttachment': 'platform',
+        'response': {
+          'clientDataJSON': 'e30',
+          'attestationObject': 'YXR0',
+          'transports': ['internal', 'hybrid'],
+        },
+        'clientExtensionResults': <String, Object?>{},
+      },
+    );
+  });
 }

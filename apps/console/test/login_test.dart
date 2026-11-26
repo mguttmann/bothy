@@ -658,7 +658,7 @@ void main() {
       await pumpConsole(tester, b);
       expect(
         find.text(
-          'No way to confirm is set up for you. Ask the owner to set up a passkey for you.',
+          'No way to confirm is set up for your account. In the app on your computer or phone, open Settings, Sign-in, and add a passkey or a password with a one-time code; then log in here again.',
         ),
         findsOneWidget,
       );

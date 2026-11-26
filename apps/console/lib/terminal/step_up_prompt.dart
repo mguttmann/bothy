@@ -120,6 +120,10 @@ final class _UserVerificationRequired implements PasskeyPort {
   @override
   Future<Map<String, Object?>> get(Map<String, Object?> options) =>
       _port.get({...options, 'userVerification': 'required'});
+
+  @override
+  Future<Map<String, Object?>> create(Map<String, Object?> options) =>
+      _port.create(options);
 }
 
 /// The notice for a person without a passkey: the terminal in the console opens only with a

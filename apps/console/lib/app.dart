@@ -12,6 +12,7 @@ import 'package:l10n/l10n.dart';
 import 'admin/admin_page.dart';
 import 'admin/console_admin.dart';
 import 'admin/console_route.dart';
+import 'admin/sign_in_page.dart';
 import 'admin/step_up_dialog.dart';
 import 'login/logged_out_view.dart';
 import 'login/login_view.dart';
@@ -273,7 +274,8 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
       ConsoleStarting() => StatusView(
         working:
             c.page == ConsolePage.loginCallback ||
-                c.page == ConsolePage.stepUpCallback
+                c.page == ConsolePage.stepUpCallback ||
+                c.page == ConsolePage.signInCallback
             ? l.consoleCallbackWorking
             : null,
       ),
@@ -339,6 +341,8 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
             route: c.route,
           ),
           // D12 and D13 (brief M6-16): the views with the frame polled from getStatsLive.
+          // The own sign-in methods (V1-14).
+          ConsolePage.signIn => ConsoleSignInPage(controller: c, admin: admin),
           ConsolePage.live => ConsoleLivePage(
             controller: c,
             admin: admin,

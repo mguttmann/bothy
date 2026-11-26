@@ -30,6 +30,8 @@ void main() {
       '/console/login/callback',
       '/console/step-up',
       '/console/step-up/callback',
+      // The return of a link from the page Sign-in (V1-14), no administration page.
+      '/console/sign-in/callback',
       '/console/logged-out',
       // The public status page without login (M7-21), no administration page.
       '/console/public-status',
@@ -45,6 +47,7 @@ void main() {
       '/console/import',
       '/console/instance',
       '/console/status',
+      '/console/sign-in',
       '/console/grafana',
     ]);
   });
@@ -52,7 +55,7 @@ void main() {
   test(
     'every navigation entry has a route and a text in both languages',
     () async {
-      expect(consoleNavigation, hasLength(12));
+      expect(consoleNavigation, hasLength(13));
       for (final locale in AppLocalizations.supportedLocales) {
         final l = await AppLocalizations.delegate.load(locale);
         final labels = {

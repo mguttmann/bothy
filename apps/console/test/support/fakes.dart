@@ -247,6 +247,23 @@ class FakePasskeys implements PasskeyPort {
   /// The options of every call.
   final List<Map<String, Object?>> calls = [];
 
+  /// The options of every `create`.
+  final List<Map<String, Object?>> created = [];
+
+  @override
+  Future<Map<String, Object?>> create(Map<String, Object?> options) async {
+    created.add(options);
+    final failure = failWith;
+    if (failure != null) throw failure;
+    return {
+      'id': 'bmV3',
+      'rawId': 'bmV3',
+      'type': 'public-key',
+      'response': {'clientDataJSON': 'e30', 'attestationObject': 'YXR0'},
+      'clientExtensionResults': <String, Object?>{},
+    };
+  }
+
   /// When set, the call fails with it.
   Object? failWith;
 
