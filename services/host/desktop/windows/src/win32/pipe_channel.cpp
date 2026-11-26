@@ -346,12 +346,15 @@ void PipeChannel::run() {
     } else {
       if (!quiet) note(L"channel closed at once (refused by the host service? see its log); repeats are not logged");
       quiet = true;
+    }
+    // The stop of 27 9.6 item 1 comes first; only then the pause.
+    if (interrupt_ != nullptr) interrupt_->raise(Interrupt::Kind::ChannelBroken);
+    push(Event{Event::Kind::Broken, Frame{}, id});
+    if (quiet) {
       // A refused helper must not reconnect in a tight loop: back off like a missing endpoint.
       WaitForSingleObject(quit_event_, wait);
       wait = std::min(wait * 2, kRetryCapMs);
     }
-    if (interrupt_ != nullptr) interrupt_->raise(Interrupt::Kind::ChannelBroken);
-    push(Event{Event::Kind::Broken, Frame{}, id});
   }
 }
 
