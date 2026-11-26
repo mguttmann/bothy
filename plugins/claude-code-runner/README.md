@@ -53,6 +53,7 @@ sessions".
 | `materialize.py` | The agent and control folders: every file of 26 5.2, the runner settings of 26 5.4, the rebuild before each turn and the per-turn MCP file (26 5.6) |
 | `channel_skills.py` | Channel skills behind `runner.channel_skills_dir`, only in `host` turns (26 5.9) |
 | `computer.py` | Computer use behind `runner.computer_use`: the per-turn MCP file of `bothy-computer-mcp`, the request folder and its calls of the server, the system prompt section and the deletion of a computer run's transcript (27 10) |
+| `tests/fake_claude/fake_computer.py`, `tests/computer_mcp/` | The scripted agent of computer use (scenario key `computer`): starts the server of the per-turn file of `--mcp-config` and calls the tools of a script with marks and gates; its test against the `bothy-computer-mcp` of the tree and the end-to-end test CU-T24 run with `make computer-e2e` |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.17) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |

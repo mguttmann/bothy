@@ -755,7 +755,7 @@ the thread (the agent reports it).
 | CU-T21 | Runner: the computer MCP file only under `host` with `runner.computer_use`, mode `0600`, removed at turn end; the request folder refuses a wrong nonce; no token in the turn's environment or files | as described |
 | CU-T22 | Runner: end of a computer run against the recorded layout of the pinned CLI | transcript and tool result files of the session removed, the next run in a new session |
 | CU-T23 | Peer rule of 9.4: the service user, a session user, a process of another user, a copy of the helper outside the installed path, an unsigned helper when a requirement is set | refused with `computer_peer_refused` |
-| CU-T24 | End to end in Compose with the Linux test backend (Xvfb, XTest) and a fixture app: open, click, type, zoom, pixel check, a simulated lock with pause and resume, stop | green without a model, scripted agent |
+| CU-T24 | End to end in Compose with the Linux test backend (Xvfb, XTest) and a fixture app: open, click, type, zoom, pixel check, a simulated lock with pause and resume, stop | green without a model, scripted agent; built in `services/server/test/terminal/e2e/computer` (build tag `computere2e`), run by `make computer-e2e` in the CI job `test-adapters-e2e` (D-CU-06-8) |
 | CU-T25 | A follow-up of another person into a run before it opens a session, and while it holds one (`followups = steer`); an interaction of another person while it holds one; a message of another person only in the run's context | open refused with `computer_not_owner_run`; the follow-up is not delivered and stays `deferred`; the interaction is refused; the context message refuses nothing |
 
 ## 16. Points the build probes
