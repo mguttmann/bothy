@@ -749,7 +749,7 @@ the server; the form covers REST requests and durable events, not gateway frames
   with `faults.onRequest`.
 - Computer use (CU-07, `rest/computer_handlers.dart`, `world_terminal.dart`):
   `listComputerSessions`, `stopComputerSession` and `disableComputerDevice` for owners only
-  (`403 owner_only` otherwise); `getHost` and `listHosts` add `computer`, `computer_listed` and
+  (`403 forbidden` with `reason` `owner_only` otherwise); `getHost` and `listHosts` add `computer`, `computer_listed` and
   `computer_disabled_generation` for owners, `host.updated` never; tests open a session with
   `FakeWorld.openComputerSession` and report the helper with `reportComputer`. The engine turns
   `computer_session.changed` into `ComputerSessionChanged` on the host event hub, without a

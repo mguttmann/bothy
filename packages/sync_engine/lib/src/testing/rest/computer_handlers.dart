@@ -4,12 +4,13 @@
 /// Scope): `listComputerSessions`, `stopComputerSession` and `disableComputerDevice` over the
 /// computer sessions of the [FakeTerminal].
 ///
-/// A small model of the server: every operation is for owners only (`403 owner_only`
-/// otherwise, 07 2.15 items 4 and 5), the list holds the caller's own sessions newest first, a
-/// stop ends the session with `stopped_by_user` and `client_stop` (a closed one answers
-/// unchanged), and the switch-off follows [FakeWorldComputer.disableComputer]. The agent's
-/// operations (`listComputerDesktops`, `openComputerSession`) are not served: the tests open a
-/// session with [FakeWorldComputer.openComputerSession] as the runner would.
+/// A small model of the server: every operation is for owners only (`403 forbidden` with
+/// `reason` `owner_only` otherwise, 07 2.15 items 4 and 5), the list holds the caller's own
+/// sessions newest first, a stop ends the session with `stopped_by_user` and `client_stop` (a
+/// closed one answers unchanged), and the switch-off follows
+/// [FakeWorldComputer.disableComputer]. The agent's operations (`listComputerDesktops`,
+/// `openComputerSession`) are not served: the tests open a session with
+/// [FakeWorldComputer.openComputerSession] as the runner would.
 library;
 
 import '../rest_fake.dart';

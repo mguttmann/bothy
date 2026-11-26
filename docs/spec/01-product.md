@@ -228,8 +228,8 @@ service CU-02 and CU-03, server CU-04, MCP server CU-05, runner CU-06, clients C
 | An agent operates a desktop of the owner (macOS, Windows) completely: any app, the terminal, the browser, the system settings | core | | `computer.desktops.list`, `computer.open`, `computer.attach` | stage CU; only in a run the owner started with an own message, only on a desktop the owner enabled on that machine (SR13); no app tiers, no confirmation per session or action |
 | Order work on a named desktop from any client, the phone included | core | D, M | | the owner's message in the thread is the order; the agent opens the session |
 | Enable a desktop: operating system permissions and the helper's switch "Allow computer control" | core | | | only at the machine; off after installation |
-| Switch the enablement of a desktop off | core | API | `computer.device.disable` (`disableComputerDevice`) | from any client of the owner once CU-07 builds the views (D, M, W); switching on again only at the machine |
-| Status chip while an agent controls, with stop; tray entry on the desktop | core | API | `computer.session.read` (`listComputerSessions`), `computer.stop` (`stopComputerSession`) | the apps show it once CU-07 builds the views (D, M); metadata only (desktop, frontmost app, action count, locked); never a screenshot |
+| Switch the enablement of a desktop off | core | D, M, W | `computer.device.disable` (`disableComputerDevice`) | from any client of the owner (CU-07); switching on again only at the machine |
+| Status chip while an agent controls, with stop; tray entry on the desktop | core | D, M | `computer.session.read` (`listComputerSessions`), `computer.stop` (`stopComputerSession`) | the apps show it (CU-07); metadata only (desktop, frontmost app, action count, locked); never a screenshot |
 | Stop with Esc or the indicator at the machine; pause while the screen is locked | core | | | the helper; the agent reports a locked machine in the thread |
 | Screenshots in the thread | later | | | F3 of the design note; not in stage CU |
 | Live view of what the agent sees | later | D, M | | CU-10; owner only, unstored |
