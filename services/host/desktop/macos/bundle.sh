@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
 # Assembles bothy-computer-helper.app from the release build of this package
 # (docs/decisions.d/CU-02.md D-CU-02-1, D-CU-02-10).
 #
