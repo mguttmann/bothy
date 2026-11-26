@@ -701,3 +701,56 @@ def test_wait_keys_are_refused_at_zero(tmp_path: Path, key: str) -> None:
     """A zero ``poll_interval`` makes every wait loop spin, a zero probe time fails every probe."""
     with pytest.raises(ConfigError, match=key):
         load_config(write(tmp_path, f'{key} = "0s"\n'))
+
+
+def test_computer_use_keys(tmp_path: Path) -> None:
+    """``runner.computer_use`` and its two keys (docs/spec/27-computer-use.md 10.1, 18)."""
+    cfg = load_config(write(tmp_path))
+    assert cfg.computer_use is False
+    assert cfg.computer_mcp_bin is None
+    assert cfg.computer_request_timeout == 30.0
+    binary = tmp_path / "bothy-computer-mcp"
+    binary.write_bytes(b"#!/bin/sh\n")
+    binary.chmod(0o755)
+    cfg = load_config(
+        write(
+            tmp_path,
+            f'computer_use = true\ncomputer_mcp_bin = "{binary}"\n'
+            'computer_request_timeout = "45s"\n',
+        )
+    )
+    assert (cfg.computer_use, cfg.computer_mcp_bin) == (True, binary)
+    assert cfg.computer_request_timeout == 45.0
+    # Without the switch the path is not checked (an installation without the key is unchanged).
+    assert load_config(write(tmp_path, 'computer_mcp_bin = "/missing"\n')).computer_use is False
+
+
+def test_computer_mcp_bin_refusals(tmp_path: Path) -> None:
+    """The runner refuses to start with a bad ``runner.computer_mcp_bin`` (brief item 13)."""
+    binary = tmp_path / "bothy-computer-mcp"
+    binary.write_bytes(b"#!/bin/sh\n")
+    binary.chmod(0o755)
+    folder = tmp_path / "folder"
+    folder.mkdir()
+    for runner in (
+        "computer_use = true\n",
+        'computer_use = true\ncomputer_mcp_bin = ""\n',
+        'computer_use = true\ncomputer_mcp_bin = "bothy-computer-mcp"\n',
+        f'computer_use = true\ncomputer_mcp_bin = "{tmp_path / "missing"}"\n',
+        f'computer_use = true\ncomputer_mcp_bin = "{folder}"\n',
+    ):
+        with pytest.raises(ConfigError, match="computer_mcp_bin"):
+            load_config(write(tmp_path, runner))
+    for mode in (0o775, 0o757):
+        binary.chmod(mode)
+        with pytest.raises(ConfigError, match="computer_mcp_bin"):
+            load_config(write(tmp_path, f'computer_use = true\ncomputer_mcp_bin = "{binary}"\n'))
+    binary.chmod(0o755)
+    with pytest.raises(ConfigError, match="computer_request_timeout"):
+        load_config(
+            write(
+                tmp_path,
+                f'computer_use = true\ncomputer_mcp_bin = "{binary}"\n'
+                'computer_request_timeout = "0s"\n',
+            )
+        )

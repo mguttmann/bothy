@@ -260,3 +260,18 @@ def test_the_records_of_a_handover_are_listed_by_the_same_reader(tmp_path: Path)
     _record_file(turns, {**without, "run_id": fourth}, fourth)  # written without the key
     os.mkfifo(turns / "0192f4a0-7b1c-7d07-84b0-000000000006.json")  # would hold up the start
     assert handover_records(tmp_path) == listed
+
+
+def test_the_computer_mcp_file_is_no_turn_record(tmp_path: Path) -> None:
+    """``turns/<run_id>.computer.mcp.json`` (27 10.1) lies beside the records and is none."""
+    from claude_code_runner.adoption import record_paths
+
+    turns = tmp_path / "turns"
+    turns.mkdir()
+    record = {"run_id": RUN, "thread_id": THREAD, "session_ref": REF, "phase": "process"}
+    listed = _record_file(turns, record)
+    (turns / f"{RUN}.computer.mcp.json").write_text('{"mcpServers": {}}')
+    (turns / f"{RUN}.mcp.json").write_text("{}")
+    assert record_paths(turns) == [listed]
+    assert record_paths(tmp_path / "missing") == []
+    assert handover_records(tmp_path) == [listed]

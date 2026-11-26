@@ -435,6 +435,7 @@ class World:
         hosted: HostedArgs | None = None,
         plugin_dirs: Sequence[Path] = (),
         drop_settings: Sequence[str] = (),
+        computer_mcp: Path | None = None,
     ) -> LaunchOutput:
         """Launch one session with the runner's own argument list and settings file.
 
@@ -443,7 +444,8 @@ class World:
         ``env`` block of the settings file carries anything to the session. ``without`` names
         arguments to leave out of the runner's list, for a session that shows what one of
         them changes; ``drop_settings`` names members of the runner's settings file to leave
-        out in the same way.
+        out in the same way. ``computer_mcp`` is the per-turn MCP file of computer use
+        (docs/spec/27-computer-use.md 10.1).
         """
         prompt_file = self.root / f"{name}.prompt.md"
         prompt_file.write_text(system, encoding="utf-8")
@@ -472,6 +474,7 @@ class World:
             settings_file=settings,
             hosted=hosted,
             plugin_dirs=plugin_dirs,
+            computer_mcp=computer_mcp,
         )
         out = await launch(
             [*(a for a in argv if a not in without), *extra],

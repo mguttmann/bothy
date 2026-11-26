@@ -956,3 +956,26 @@ def test_every_settings_file_refuses_what_would_wait_for_a_person() -> None:
     # A false of the hosted settings does not switch it off: a run can never answer.
     hosted = settings_document({}, {"permissions": {NO_PROMPT_SETTING: False}})
     assert hosted["permissions"] == {NO_PROMPT_SETTING: True}
+
+
+def test_computer_mcp_directly_after_the_class_flags() -> None:
+    """27 10.1: in background mode ``--mcp-config`` follows the flags of the class, without
+    ``--strict-mcp-config``, and only under ``host`` (CU-T21)."""
+    computer = Path("/s/turns/r.computer.mcp.json")
+    got = argv("host", [], computer_mcp=computer, add_dir=Path("/s/files/t"))
+    assert got == [
+        *HEAD,
+        "--permission-mode",
+        "bypassPermissions",
+        "--disallowedTools",
+        *DENIED,
+        "--mcp-config",
+        str(computer),
+        "--add-dir",
+        "/s/files/t",
+        *TAIL,
+    ]
+    assert "--strict-mcp-config" not in got
+    for tool_class in ("chat", "scoped"):
+        with pytest.raises(ArgumentError):
+            argv(tool_class, [], computer_mcp=computer)
