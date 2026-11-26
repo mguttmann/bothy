@@ -56,32 +56,45 @@ var b64url = base64.RawURLEncoding
 // least 0 when present, att open or attach; a JSON null anywhere, a missing or mistyped claim or
 // trailing data fails; unknown claims are ignored.
 func ParseToken(tok string, keys []map[string]any) (Header, Claims, error) {
-	parts := strings.Split(tok, ".")
-	if len(parts) != 3 {
-		return Header{}, Claims{}, ErrToken
-	}
-	hb, err1 := b64url.DecodeString(parts[0])
-	pb, err2 := b64url.DecodeString(parts[1])
-	sig, err3 := b64url.DecodeString(parts[2])
-	if err1 != nil || err2 != nil || err3 != nil {
-		return Header{}, Claims{}, ErrToken
-	}
-	h, err := parseHeader(hb)
+	h, pb, err := ParseJWS(tok, keys)
 	if err != nil {
 		return Header{}, Claims{}, err
-	}
-	pub, err := keyOf(keys, h.Kid)
-	if err != nil {
-		return Header{}, Claims{}, err
-	}
-	if !ed25519.Verify(pub, []byte(parts[0]+"."+parts[1]), sig) {
-		return Header{}, Claims{}, ErrToken
 	}
 	c, err := parseClaims(pb)
 	if err != nil {
 		return Header{}, Claims{}, err
 	}
 	return h, c, nil
+}
+
+// ParseJWS checks the compact JWS tok with the profile of ADR 0067 (the header rules of
+// ParseToken) and verifies its EdDSA signature with the key of keys whose kid equals the header
+// kid; it returns the header and the decoded payload, which the caller parses with the claims of
+// its token type. Computer attach tokens (docs/spec/27-computer-use.md 5.2) share this step with
+// terminal session tokens. Any failure wraps ErrToken.
+func ParseJWS(tok string, keys []map[string]any) (Header, []byte, error) {
+	parts := strings.Split(tok, ".")
+	if len(parts) != 3 {
+		return Header{}, nil, ErrToken
+	}
+	hb, err1 := b64url.DecodeString(parts[0])
+	pb, err2 := b64url.DecodeString(parts[1])
+	sig, err3 := b64url.DecodeString(parts[2])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return Header{}, nil, ErrToken
+	}
+	h, err := parseHeader(hb)
+	if err != nil {
+		return Header{}, nil, err
+	}
+	pub, err := keyOf(keys, h.Kid)
+	if err != nil {
+		return Header{}, nil, err
+	}
+	if !ed25519.Verify(pub, []byte(parts[0]+"."+parts[1]), sig) {
+		return Header{}, nil, ErrToken
+	}
+	return h, pb, nil
 }
 
 // objectOf decodes b as one JSON object without null values and without trailing data.

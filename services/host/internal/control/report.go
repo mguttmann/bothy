@@ -61,6 +61,13 @@ func withPeer(r startup.Report, peerLocal bool) startup.Report {
 	return r
 }
 
+// reportFrame is the body of report: the report of startup and the object computer of the computer
+// manager (docs/spec/27-computer-use.md 12.3), which changes outside the doctor runs.
+type reportFrame struct {
+	startup.Report
+	Computer ComputerReport `json:"computer"`
+}
+
 // PeerIsLocal reports whether remote, the address of the server of the connection, is a loopback
 // address or one of own, the addresses of this machine (24 section 2.3).
 func PeerIsLocal(remote net.IP, own []net.IP) bool {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -36,6 +37,8 @@ type dataConn struct {
 	code   int
 	reason string
 	closed bool
+	// written counts the messages the writer wrote (Stream.Drain compares it with the queued ones).
+	written atomic.Int64
 }
 
 // identifyData is identify on a data connection (schema HostIdentify with session_id).
@@ -132,6 +135,7 @@ func (dc *dataConn) write(ctx context.Context) {
 				dc.close(CodeNormal, "")
 				return
 			}
+			dc.written.Add(1)
 		case <-dc.done:
 			return
 		}

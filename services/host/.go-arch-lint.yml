@@ -39,6 +39,7 @@ components:
   pty:         { in: internal/pty }
   profiles:    { in: internal/profiles }
   confirm:     { in: internal/confirm }
+  computer:    { in: internal/computer }
   platformtest: { in: test/** }
   testdata:    { in: testdata/** }
 # M2-42 and M2-43: cmd may use every internal package; doctor, install, helper, startup and pairing use
@@ -72,3 +73,7 @@ deps:
   platformtest: { anyProjectDeps: true, anyVendorDeps: true }
   profiles:    { mayDependOn: [config, doctor, hostos, state], canUse: [v-sys] }
   confirm:     { mayDependOn: [hostos], canUse: [v-sys] }
+  # CU-03: computer sessions reuse the data connection and the JWS step of session, the control
+  # ops, Noise, the frames and the console-user rule of confirm; the peer's executable and
+  # signature are read through golang.org/x/sys.
+  computer:    { mayDependOn: [clock, confirm, control, frame, hostos, noise, session], canUse: [v-sys] }

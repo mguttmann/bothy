@@ -20,6 +20,9 @@ import (
 const (
 	ControlPath = "/api/v1/hosts/connect"
 	DataPrefix  = "/api/v1/hosts/sessions/"
+	// ComputerDataPrefix is the start of the data path of a computer session (channel
+	// hostComputerData, docs/spec/27-computer-use.md 12.2); it behaves like DataPrefix.
+	ComputerDataPrefix = "/api/v1/hosts/computer-sessions/"
 )
 
 // Values are the server values of hello (24 17): heartbeat and the three values of M2-45.
@@ -54,6 +57,7 @@ func NewServer(t testing.TB, hello func() map[string]any) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+ControlPath, s.serveControl)
 	mux.HandleFunc("GET "+DataPrefix+"{id}/stream", s.serveData)
+	mux.HandleFunc("GET "+ComputerDataPrefix+"{id}/stream", s.serveData)
 	s.srv = httptest.NewTLSServer(mux)
 	s.URL = s.srv.URL
 	s.Pool = x509.NewCertPool()

@@ -43,11 +43,13 @@ func DecodeHello(b []byte) (*Hello, error) {
 // both connections trust exactly the same server.
 func (c *Client) HTTPClient() *http.Client { return c.http }
 
-// DataURL returns the wss URL of the data connection with path, the data_path of session.open, on
-// the server of the pairing record. Errors: ErrDataPath for a path outside the channel hostData,
-// so a server can never make the host service dial another host or path.
+// DataURL returns the wss URL of the data connection with path, the data_path of session.open or
+// computer.open, on the server of the pairing record. Errors: ErrDataPath for a path outside the
+// channels hostData and hostComputerData, so a server can never make the host service dial another
+// host or path.
 func (c *Client) DataURL(path string) (string, error) {
-	if !strings.HasPrefix(path, DataPathPrefix) || strings.ContainsAny(path, "?#") || strings.Contains(path, "..") {
+	inChannel := strings.HasPrefix(path, DataPathPrefix) || strings.HasPrefix(path, ComputerDataPathPrefix)
+	if !inChannel || strings.ContainsAny(path, "?#") || strings.Contains(path, "..") {
 		return "", ErrDataPath
 	}
 	u, err := url.Parse(c.url)

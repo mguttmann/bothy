@@ -147,7 +147,7 @@ func (k *conn) sendReport(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := k.writeFrame(ctx, opReport, withPeer(r, k.peerLocal), true); err != nil {
+	if err := k.writeFrame(ctx, opReport, reportFrame{Report: withPeer(r, k.peerLocal), Computer: k.c.computers.Report()}, true); err != nil {
 		return err
 	}
 	if k.c.reportWritten != nil {
@@ -171,6 +171,27 @@ func (k *conn) Started(ctx context.Context, sessionID string) error {
 // Ended implements Notifier.
 func (k *conn) Ended(ctx context.Context, e SessionEnded) error {
 	return k.write(ctx, opSessionEnded, e)
+}
+
+// ComputerStarted implements ComputerNotifier.
+func (k *conn) ComputerStarted(ctx context.Context, s ComputerStarted) error {
+	return k.write(ctx, opComputerStarted, s)
+}
+
+// ComputerState implements ComputerNotifier.
+func (k *conn) ComputerState(ctx context.Context, s ComputerState) error {
+	return k.write(ctx, opComputerState, s)
+}
+
+// ComputerEnded implements ComputerNotifier; the lists are never null on the wire (ADR 0053).
+func (k *conn) ComputerEnded(ctx context.Context, e ComputerEnded) error {
+	if e.ActionCounts == nil {
+		e.ActionCounts = map[string]int64{}
+	}
+	if e.Apps == nil {
+		e.Apps = []AppIdentity{}
+	}
+	return k.write(ctx, opComputerEnded, e)
 }
 
 // end turns the end of the reader into the reaction of the close policy.
@@ -221,7 +242,7 @@ func (k *conn) serve(ctx context.Context) outcome {
 	}
 	k.writeTimeout = interval
 	c.keys.Set(hello.JWKS)
-	live := c.sessions.Live()
+	live := append(c.sessions.Live(), c.computers.Live()...)
 	if live == nil {
 		live = []string{}
 	}
@@ -290,6 +311,7 @@ func (k *conn) handle(ctx context.Context, f frameOrEnd, ready *bool) (outcome, 
 		if r, ok := c.sessions.(Resender); ok {
 			r.Resend(ctx, k)
 		}
+		c.computers.Resend(ctx, k)
 	case *HeartbeatAck:
 		if b.JWKS != nil {
 			c.keys.Set(*b.JWKS)
@@ -303,6 +325,17 @@ func (k *conn) handle(ctx context.Context, f frameOrEnd, ready *bool) (outcome, 
 		c.sessions.Open(ctx, *b, k)
 	case *SessionClose:
 		c.sessions.Close(ctx, *b)
+	case *ComputerOpen:
+		if !*ready || !k.hasReported() {
+			// computer.open before the own report breaks the order of 24 section 2.2 point 5.
+			k.close(CodeDecodeError)
+			return outcome{Reaction: Reaction{Kind: Backoff}, code: CodeDecodeError}, true
+		}
+		c.computers.Open(ctx, *b, k)
+	case *ComputerClose:
+		c.computers.Close(ctx, *b)
+	case *ComputerDisable:
+		c.computers.Disable(ctx, *b)
 	case *ErrorFrame:
 		c.log.LogAttrs(ctx, slog.LevelWarn, msgServerError, slog.String(logOp, b.Op), slog.String(logCode, b.Code))
 	default:

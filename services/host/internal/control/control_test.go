@@ -274,7 +274,7 @@ func TestReportIsFirstFrameAfterReady(t *testing.T) {
 	if len(id.LiveSessions) != 0 {
 		t.Errorf("live_sessions %v", id.LiveSessions)
 	}
-	var r startup.Report
+	var r wireReport
 	if err := controltest.Strict(conn2.Expect(t, ctx(t), "report"), &r); err != nil || r.OSVersion != "Debian 13" {
 		t.Fatalf("first frame after ready: %+v %v", r, err)
 	}
@@ -296,7 +296,7 @@ func TestReportResentOnChange(t *testing.T) {
 		if err := c.Report(ctx(t), sampleReport(v)); err != nil {
 			t.Fatal(err)
 		}
-		var r startup.Report
+		var r wireReport
 		if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.OSVersion != v {
 			t.Fatalf("report %+v %v, want %s", r, err, v)
 		}
@@ -327,7 +327,7 @@ func TestServerHostFlagFromPeer(t *testing.T) {
 	if err := c.Report(ctx(t), sampleReport("Debian 13")); err != nil {
 		t.Fatal(err)
 	}
-	var r startup.Report
+	var r wireReport
 	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || !r.IsServerHost {
 		t.Fatalf("is_server_host %+v %v", r, err)
 	}
@@ -756,7 +756,7 @@ func TestServerHostFlagNotFromProxy(t *testing.T) {
 	if err := c.Report(ctx(t), sampleReport("Debian 13")); err != nil {
 		t.Fatal(err)
 	}
-	var r startup.Report
+	var r wireReport
 	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.IsServerHost {
 		t.Fatalf("is_server_host through a loopback proxy %+v %v", r, err)
 	}

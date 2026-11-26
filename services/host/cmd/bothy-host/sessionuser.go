@@ -49,6 +49,7 @@ func cmdSessionUser(ctx context.Context, args []string, stdout, stderr io.Writer
 		_, _ = fmt.Fprintf(stderr, "bothy-host session-user: %v\n", err)
 		return exitFailed
 	}
+	tg.ComputerUse = c.ComputerUse
 	name := fl.Arg(1)
 	if fl.Arg(0) == "remove" {
 		steps, err := install.SessionUserRemove(tg, name, c.SessionUsers)
