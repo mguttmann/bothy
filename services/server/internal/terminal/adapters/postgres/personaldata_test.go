@@ -24,9 +24,11 @@ import (
 
 // pdFixture holds Alex and Sam with a device and a login session each, Alex's host (assigned to
 // Alex, created by Sam, with Alex's LLM login), Sam's host, a session user and a closed terminal
-// session of each person.
+// session of each person, and a computer session of each person on its host, each in a run of the
+// person.
 type pdFixture struct {
 	alex, sam, alexDev, alexHost, alexHSU, alexTS ids.ID
+	agent, alexRun, alexCS                        ids.ID
 	created, closed                               time.Time
 }
 
@@ -69,7 +71,42 @@ func newPDFixture(t *testing.T, super *pgx.Conn) pdFixture {
 	exec(`INSERT INTO terminal_sessions (id, host_id, user_id, host_session_user_id, opened_by_device_id, device_id, auth_session_id,
 		profile, state, token_jti, key_generation) VALUES ($1, $2, $3, $4, $5, $5, $6, 'shell', 'active', $7, 1)`,
 		ids.New(), samHost, f.sam, samHSU, samDev, sess[f.sam], ids.New())
+	f.computerSessions(t, exec, samHost)
 	return f
+}
+
+// computerSessions adds an agent, a run of each person and a computer session in each run: Alex's
+// closed on Alex's host, Sam's open on Sam's host. Alex's row carries the columns the export
+// leaves out (token ID, generations, close detail, stopped_by).
+func (f *pdFixture) computerSessions(t *testing.T, exec func(string, ...any), samHost ids.ID) {
+	t.Helper()
+	f.agent, f.alexRun, f.alexCS = ids.New(), ids.New(), ids.New()
+	space, channel, thread, samRun := ids.New(), ids.New(), ids.New(), ids.New()
+	exec(`INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'agent', 'runner', 'Runner')`, f.agent)
+	exec(`INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'custom')`, f.agent)
+	exec(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, 'Support', 'a0', $2)`, space, f.alex)
+	exec(`INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
+		VALUES ($1, $2, 'text', 'general', 'a0', 20, $3)`, channel, space, f.alex)
+	exec(`INSERT INTO threads (id, channel_id, kind, created_by) VALUES ($1, $2, 'main', $3)`, thread, channel, f.alex)
+	for i, r := range []struct {
+		run, by ids.ID
+		state   string
+	}{{f.alexRun, f.alex, "completed"}, {samRun, f.sam, "running"}} {
+		msg := ids.New()
+		exec(`INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id,
+			client_payload_sha256, origin, content_md) VALUES ($1, $2, $3, $4, $5, $1, '\x00', 'human', 'hello')`,
+			msg, thread, channel, i+1, r.by)
+		exec(`INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggered_by, state,
+			billing_mode_expected, invocation_jti, queued_at, started_at, finished_at)
+			VALUES ($1, $2, $3, 'message', $4, $5, $6, 'organization', $7, $8, $8, CASE WHEN $6 = 'completed' THEN $9::timestamptz END)`,
+			r.run, thread, f.agent, msg, r.by, r.state, ids.New(), f.created, f.closed)
+	}
+	exec(`INSERT INTO computer_sessions (id, host_id, user_id, agent_id, run_id, state, token_jti, generation, key_generation,
+		opened_at, started_at, paused_ms, closed_at, stopped_by, close_reason, close_detail, action_count, front_app)
+		VALUES ($1, $2, $3, $4, $5, 'closed', $6, 7, 1, $7, $7, 1500, $8, $3, 'stopped_by_user', 'detail text', 12, 'com.example.editor')`,
+		f.alexCS, f.alexHost, f.alex, f.agent, f.alexRun, ids.New(), f.created, f.closed)
+	exec(`INSERT INTO computer_sessions (id, host_id, user_id, agent_id, run_id, token_jti, generation, key_generation)
+		VALUES ($1, $2, $3, $4, $5, $6, 1, 1)`, ids.New(), samHost, f.sam, f.agent, samRun, ids.New())
 }
 
 // validateSection validates raw against the section schema name of the export package.
@@ -95,8 +132,9 @@ func validateSection(t *testing.T, name string, raw json.RawMessage) {
 }
 
 // TestPersonalDataExport (M7-06, 20 section 5.2): devices.json gets the sections hosts,
-// host_session_users and terminal_sessions with Alex's rows only, each with exactly the documented
-// members: no key, hash, fingerprint, reported data, token ID or close detail, and nothing of Sam.
+// host_session_users, terminal_sessions and computer_sessions (CU-04) with Alex's rows only, each
+// with exactly the documented members: no key, hash, fingerprint, reported data, token ID,
+// generation or close detail, and nothing of Sam.
 func TestPersonalDataExport(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
@@ -107,8 +145,8 @@ func TestPersonalDataExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	sec := w.Sections[personaldata.FileDevices]
-	if len(w.Sections) != 1 || len(sec) != 3 || len(w.Lines) != 0 {
-		t.Fatalf("sections %v, lines %v; want the three sections of devices.json", w.Sections, w.Lines)
+	if len(w.Sections) != 1 || len(sec) != 4 || len(w.Lines) != 0 {
+		t.Fatalf("sections %v, lines %v; want the four sections of devices.json", w.Sections, w.Lines)
 	}
 	ts := func(tm time.Time) string { return tm.Format(time.RFC3339) }
 	want := map[string]string{
@@ -118,6 +156,10 @@ func TestPersonalDataExport(t *testing.T) {
 		"terminal_sessions": `[{"id":"` + f.alexTS.String() + `","host_id":"` + f.alexHost.String() + `","device_id":"` + f.alexDev.String() +
 			`","profile":"shell","state":"closed","opened_at":"` + ts(f.created) + `","closed_at":"` + ts(f.closed) +
 			`","close_reason":"client_closed","bytes_in":10,"bytes_out":2000}]`,
+		"computer_sessions": `[{"id":"` + f.alexCS.String() + `","host_id":"` + f.alexHost.String() + `","agent_id":"` + f.agent.String() +
+			`","run_id":"` + f.alexRun.String() + `","state":"closed","opened_at":"` + ts(f.created) + `","started_at":"` + ts(f.created) +
+			`","closed_at":"` + ts(f.closed) + `","close_reason":"stopped_by_user","paused_ms":1500,"action_count":12,` +
+			`"front_app":"com.example.editor"}]`,
 	}
 	for key, w := range want {
 		validateSection(t, "devices."+key+".schema.json", sec[key])
@@ -143,7 +185,7 @@ func TestPersonalDataExport(t *testing.T) {
 	if err := p.Export(context.Background(), personaldata.Export{Subject: ids.New()}, empty); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"hosts", "host_session_users", "terminal_sessions"} {
+	for _, key := range []string{"hosts", "host_session_users", "terminal_sessions", "computer_sessions"} {
 		if got := string(empty.Sections[personaldata.FileDevices][key]); got != "[]" {
 			t.Errorf("%s of a stranger = %s, want []", key, got)
 		}
@@ -173,7 +215,7 @@ func TestPersonalDataErase(t *testing.T) {
 	if after := pdSnapshot(t, super, p.Tables()); !slices.Equal(after, before) {
 		t.Errorf("erase changed the tables of terminal:\nbefore %v\nafter  %v", before, after)
 	}
-	if want := []string{"hosts", "host_session_users", "terminal_sessions"}; !slices.Equal(p.Tables(), want) || p.Module() != "terminal" {
+	if want := []string{"hosts", "host_session_users", "terminal_sessions", "computer_sessions"}; !slices.Equal(p.Tables(), want) || p.Module() != "terminal" {
 		t.Errorf("module %s, tables %v", p.Module(), p.Tables())
 	}
 }
