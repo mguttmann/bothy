@@ -78,11 +78,11 @@ type OIDC struct {
 	cfg      Config
 	pepper   []byte
 	callback string
-	// consoleLogin and consoleStepUp are the console callbacks on the origin of server.public_url
-	// (M6-01).
-	consoleLogin, consoleStepUp string
-	d                           OIDCDeps
-	s                           *Service
+	// consoleLogin, consoleStepUp and consoleLink are the console callbacks on the origin of
+	// server.public_url (M6-01; the link of the page Sign-in, V1-14).
+	consoleLogin, consoleStepUp, consoleLink string
+	d                                        OIDCDeps
+	s                                        *Service
 }
 
 // Compile-time check: the incoming port.
@@ -119,7 +119,7 @@ func NewOIDC(cfg Config, pepper []byte, d OIDCDeps) (*OIDC, error) {
 	return &OIDC{
 		cfg: cfg, pepper: append([]byte(nil), pepper...), callback: u.Scheme + "://" + u.Host + callbackPath,
 		consoleLogin: u.Scheme + "://" + u.Host + consoleLoginCallback, consoleStepUp: u.Scheme + "://" + u.Host + consoleStepUpCallback,
-		d: d, s: d.Logins,
+		consoleLink: u.Scheme + "://" + u.Host + consoleLinkCallback, d: d, s: d.Logins,
 	}, nil
 }
 
@@ -162,7 +162,9 @@ func (o *OIDC) BeginOIDCLogin(ctx context.Context, in identity.OIDCBegin) (ident
 	return o.begin(ctx, in, oidcflow.ModeLogin, actor.Actor{}, opt)
 }
 
-// BeginIdentityLink implements identity.OIDCLogin (brief M1-41 "Link mode").
+// BeginIdentityLink implements identity.OIDCLogin (brief M1-41 "Link mode"). A console session
+// links back to the console callback of the page Sign-in, which needs no entry in the
+// provider's app_redirect_uris (400 for any other redirect; V1-14, as the console login).
 func (o *OIDC) BeginIdentityLink(ctx context.Context, a actor.Actor, in identity.OIDCBegin) (identity.OIDCBeginResult, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -171,8 +173,25 @@ func (o *OIDC) BeginIdentityLink(ctx context.Context, a actor.Actor, in identity
 	if err := o.authorize(ctx, a, authorize.ActionIdentityLink, userResource(a.ID)); err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
+	opt, err := o.linkOpts(a, in.AppRedirectURI)
+	if err != nil {
+		return identity.OIDCBeginResult{}, err
+	}
 	in.EnrollmentCode = ""
-	return o.begin(ctx, in, oidcflow.ModeLink, a, beginOpts{})
+	return o.begin(ctx, in, oidcflow.ModeLink, a, opt)
+}
+
+// linkOpts returns the options of a link flow begun by a: for the web console the console's
+// link callback, which redirect must name exactly; none for an app, whose redirect is checked
+// against the provider's app_redirect_uris.
+func (o *OIDC) linkOpts(a actor.Actor, redirect string) (beginOpts, error) {
+	if a.ClientComponent != string(identity.ComponentConsole) {
+		return beginOpts{}, nil
+	}
+	if redirect != o.consoleLink {
+		return beginOpts{}, consoleRedirectInvalid()
+	}
+	return beginOpts{redirect: o.consoleLink}, nil
 }
 
 // begin checks the request, loads the provider metadata and inserts the flow (steps 2 to 7 of

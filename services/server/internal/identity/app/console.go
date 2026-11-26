@@ -166,10 +166,12 @@ func (c *Console) BindStepUps(s *StepUps, local *LocalCredentials, o *OIDC) {
 	}
 }
 
-// The console callback paths on the origin of server.public_url (D-M6-01-1, D-M6-01-6).
+// The console callback paths on the origin of server.public_url (D-M6-01-1, D-M6-01-6; the link
+// of the page Sign-in, V1-14).
 const (
 	consoleLoginCallback  = "/console/login/callback"
 	consoleStepUpCallback = "/console/step-up/callback"
+	consoleLinkCallback   = "/console/sign-in/callback"
 )
 
 // stepUpCallback returns the console step-up callback URL of this server.
