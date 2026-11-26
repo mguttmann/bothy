@@ -16,6 +16,7 @@ from claude_code_runner.bgmode import (
 )
 from claude_code_runner.causes import CAUSES
 from claude_code_runner.config import load_config
+from claude_code_runner.environment import TELEMETRY_OFF
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 
 from .test_config import write
@@ -100,6 +101,15 @@ def test_every_command_of_the_mode_keeps_the_cli_on_its_version(tmp_path: Path) 
     assert built.env["DISABLE_AUTOUPDATER"] == "1"
     assert "ANTHROPIC_API_KEY" not in built.env
     assert built.config_dir == Path("/home/runner/.claude")
+
+
+def test_the_fallback_without_home_keeps_the_telemetry_opt_outs(tmp_path: Path) -> None:
+    """Without ``HOME`` the mode falls back to ``PATH`` alone, and the opt-outs stay (#907)."""
+    for cli_telemetry, expected in ((False, dict(TELEMETRY_OFF)), (True, {})):
+        config = dataclasses.replace(load_config(write(tmp_path)), cli_telemetry=cli_telemetry)
+        built = BackgroundMode(config, "/usr/bin/claude", {"PATH": "/usr/bin:/bin"})
+        assert {k: v for k, v in built.env.items() if k in dict(TELEMETRY_OFF)} == expected
+        assert built.env["DISABLE_AUTOUPDATER"] == "1"
 
 
 def _rows(text: str, heading: str) -> dict[str, list[str]]:

@@ -226,6 +226,8 @@ jobs:
           COMPONENTS: ${{ needs.plan.outputs.components }}
           COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          # The body becomes the squash commit on main and needs a sign-off (#872).
+          PR_BODY: ${{ github.event.pull_request.body }}
           # A dependency bot's own commits need no sign-off in its pull request (D-DEPS-3).
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           GH_TOKEN: ${{ github.token }}
@@ -292,6 +294,11 @@ jobs:
         env:
           MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: ${{ needs.plan.outputs.components }}
+          # G6 before the first release: the merge base with the base of the pull request, and
+          # its label "breaking change" releases a deliberate break below 1.0 (#1508). A label
+          # change starts no run; push or edit the body after it.
+          API_BREAKING_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || '' }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: make docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check api-clients tokens COMPONENTS="$COMPONENTS"
 
   # Secret scan of the history, Semgrep, Trivy, OSV and the license gate.

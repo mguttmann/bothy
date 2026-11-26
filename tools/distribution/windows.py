@@ -81,12 +81,13 @@ WINDOWS_SECRETS = ("WINDOWS_SIGNING_PFX", "WINDOWS_SIGNING_PFX_PASSWORD")
 # The compiled Dart code of the app inside the build output.
 DART_CODE = Path("data") / "app.so"
 # The Visual C++ runtime a Flutter Windows app loads; copied into the package (app-local
-# deployment), so the MSIX installs without a framework package.
+# deployment), so the MSIX installs without a framework package. The files come from the redist
+# folder of the build toolchain, which Microsoft's terms allow to redistribute (ADR 0078).
 VC_RUNTIME = ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
 LOGOS = ("StoreLogo.png", "Square150x150Logo.png", "Square44x44Logo.png")
 ICON = CLIENT / "windows" / "runner" / "resources" / "app_icon.ico"
 SDK_BIN = Path(r"C:\Program Files (x86)\Windows Kits\10\bin")
-SYSTEM32 = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32"
+VS_ROOT = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Microsoft Visual Studio"
 
 
 @dataclass
@@ -194,31 +195,62 @@ def build_app(
     return output, doc
 
 
+def _version_key(version: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in version.split(".") if p.isdigit())
+
+
+def vc_redist(vs_root: Path | None = None) -> tuple[Path, str]:
+    """Return the x64 CRT folder of the build toolchain's Visual C++ redist and its version.
+
+    Every Visual Studio under `vs_root` names its default redist version in
+    ``VC/Auxiliary/Build/Microsoft.VCRedistVersion.default.txt``; the newest of them wins, and
+    its ``VC/Redist/MSVC/<version>/x64/Microsoft.VC*.CRT`` holds the runtime.
+
+    Raises:
+        StepError: no Visual Studio under `vs_root` has such a folder.
+    """
+    root = vs_root or VS_ROOT
+    found: list[tuple[tuple[int, ...], Path, str]] = []
+    for marker in root.glob("*/*/VC/Auxiliary/Build/Microsoft.VCRedistVersion.default.txt"):
+        version = marker.read_text(encoding="utf-8").strip()
+        x64 = marker.parents[2] / "Redist" / "MSVC" / version / "x64"
+        found += [(_version_key(version), crt, version) for crt in x64.glob("Microsoft.VC*.CRT")]
+    if not found:
+        raise StepError(f"no Visual C++ redist of a Visual Studio under {root}")
+    _, crt, version = max(found)
+    return crt, version
+
+
 def stage(
     output: Path,
     cfg: dict[str, Any],
     version: appdist.AppVersion,
     branding: Mapping[str, Any],
     package: Path,
-    system32: Path | None = None,
+    vs_root: Path | None = None,
 ) -> Path:
     """Lay out the package directory of the MSIX from the build `output`; return it.
 
+    A file of `VC_RUNTIME` the build lacks comes from the toolchain's redist (`vc_redist`);
+    the step prints the folder and the version it took.
+
     Raises:
         StepError: the build has not exactly one executable, or the Visual C++ runtime is
-            neither in the build nor in `system32`.
+            neither in the build nor in the redist.
     """
     shutil.rmtree(package, ignore_errors=True)
     shutil.copytree(output, package)
     executables = sorted(p.name for p in package.glob("*.exe"))
     if len(executables) != 1:
         raise StepError(f"expected one executable in {output}, found {executables}")
-    for dll in VC_RUNTIME:
-        if not (package / dll).is_file():
-            source = (system32 or SYSTEM32) / dll
-            if not source.is_file():
-                raise StepError(f"{dll} is neither in the build nor in {system32 or SYSTEM32}")
-            shutil.copy2(source, package / dll)
+    missing = [dll for dll in VC_RUNTIME if not (package / dll).is_file()]
+    if missing:
+        crt, redist_version = vc_redist(vs_root)
+        print(f"stage: Visual C++ runtime {redist_version} from {crt}", flush=True)
+        for dll in missing:
+            if not (crt / dll).is_file():
+                raise StepError(f"{dll} is neither in the build nor in {crt}")
+            shutil.copy2(crt / dll, package / dll)
     assets = package / "Assets"
     assets.mkdir(exist_ok=True)
     logo = icon_png()

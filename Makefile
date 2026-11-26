@@ -77,6 +77,11 @@ GO_LICENSES_VERSION := v2.0.1
 GOVULNCHECK_VERSION := v1.8.0
 # renovate: datasource=pypi depName=semgrep
 SEMGREP_VERSION := 1.180.0
+# The CodeRabbit schema that `make lint` checks .coderabbit.yaml against: the vendor's copy at a
+# fixed commit, checked by its SHA-256 (#734); raise both together.
+CODERABBIT_SCHEMA_URL := https://raw.githubusercontent.com/coderabbitai/awesome-coderabbit/41993ea4a799a0bc35e2da1ead3b7f7a08d7de47/schema.v2.json
+CODERABBIT_SCHEMA_SHA256 := 6959497f1c31426b4d9ca8ed42313ee681030bc94204c3eebc9494a7b6d9181a
+CODERABBIT_SCHEMA := .cache/schemas/coderabbit-$(CODERABBIT_SCHEMA_SHA256).json
 REVIEW_BASE ?= main
 # Licenses allowed for dependencies of shipped components (`make licenses`).
 LICENSE_ALLOWLIST := quality/licenses/allowed.txt
@@ -260,7 +265,12 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
-	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
+	@# Fetched once into .cache and checked by its SHA-256 before every use; a changed file fails.
+	@if [ ! -f $(CODERABBIT_SCHEMA) ]; then mkdir -p $(dir $(CODERABBIT_SCHEMA)) && \
+	  curl -fsSL --retry 3 -o $(CODERABBIT_SCHEMA).tmp $(CODERABBIT_SCHEMA_URL) && \
+	  mv $(CODERABBIT_SCHEMA).tmp $(CODERABBIT_SCHEMA); fi
+	@$(UVRUN) python -c 'import hashlib, sys; f, want = sys.argv[1:]; got = hashlib.sha256(open(f, "rb").read()).hexdigest(); sys.exit(None if got == want else f"{f}: SHA-256 {got}, expected {want}")' $(CODERABBIT_SCHEMA) $(CODERABBIT_SCHEMA_SHA256) || { rm -f $(CODERABBIT_SCHEMA); exit 1; }
+	$(UVRUN) check-jsonschema --schemafile $(CODERABBIT_SCHEMA) .coderabbit.yaml
 	@# The pinned shellcheck also reads the run: blocks of the workflows; pyflakes stays off (no Python in run: blocks).
 	sc=$(call tool,shellcheck) || exit 1; $(call tool,actionlint) -shellcheck="$$sc" -pyflakes= .github/workflows/*.yml
 	@# Every tracked shell script, by its name (*.sh) or its first line (tools/ci/shell_scripts.py);
@@ -419,6 +429,11 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 	@# The pull request title becomes the squash commit on main (CI sets PR_TITLE).
 	@if [ -n "$${PR_TITLE:-}" ]; then f=$$(mktemp); printf '%s\n' "$$PR_TITLE" > "$$f"; \
 	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py "$$f" || rc=$$?; rm -f "$$f"; exit $$rc; fi
+	@# So does the body (CI sets PR_BODY): it needs a DCO sign-off unless a bot opened the pull
+	@# request (#872). PR_TITLE marks a pull request; an empty body fails.
+	@if [ -n "$${PR_TITLE:-}" ]; then f=$$(mktemp); printf '%s\n' "$${PR_BODY:-}" > "$$f"; \
+	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py --pr-body "$$f" --pr-author "$${PR_AUTHOR:-}" || rc=$$?; \
+	  rm -f "$$f"; exit $$rc; fi
 
 # ---- server gates ---------------------------------------------------------------------
 # Each server gate checks its prerequisites first (go, a Docker-compatible runtime, the pins
@@ -692,7 +707,11 @@ api-breaking: ## G6: no breaking change of the API against the last server relea
 	@# and a change under docs/api/ selects every gate component, the server included.
 	@if [ -z "$(call want,server)" ]; then $(call skip,api-breaking,component server not selected); \
 	elif [ ! -f docs/api/openapi.yaml ]; then $(call skip,api-breaking,docs/api/openapi.yaml does not exist yet); \
-	else $(UVRUN) python tools/api-checks/breaking.py check; fi
+	else allow=; case ",$${PR_LABELS:-}," in *",breaking change,"*) allow=--allow-break ;; esac; \
+	  $(UVRUN) python tools/api-checks/breaking.py check --base "$${API_BREAKING_BASE:-origin/main}" $$allow; fi
+	@# Before the first release the baseline is the merge base with the pull request's base
+	@# (CI sets API_BREAKING_BASE); the label "breaking change" (PR_LABELS, comma-separated)
+	@# releases a deliberate break while info.version is below 1.0 (#1508).
 
 signal-check: ## Dashboards, rules and SLOs use only catalogue metrics and labels; SLO thresholds are bucket bounds (M1-68)
 	$(UVRUN) python tools/signalcheck/signalcheck.py

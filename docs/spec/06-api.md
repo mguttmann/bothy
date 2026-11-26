@@ -691,7 +691,8 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    console and the check of `min_api_version` at an app installation compare values that are equal
    for every state, and a client must not use them as a compatibility signal before the first
    release. No gate holds the
-   steps of items 1 and 2; G6 (item 7) passes without a tag. The rule and its gate from the first
+   steps of items 1 and 2; below 1.0 G6 (item 7) compares with the merge base of the pull
+   request, and the label `breaking change` releases a break. The rule and its gate from the first
    release on are plan row V3-57.
 2. **Gateway.** Protocol versions are in `hello` and `identify`; an unsupported version closes with
    `4007` (04, 6.1). Event payloads change only additively; `schema_version` increases with each
@@ -731,11 +732,17 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    stated in the security advisory and in the changelog.
 7. **Check (G6, as built by M7-11).** `make api-breaking` compares `docs/api/openapi.yaml` of the
    working tree, including the frame and event schemas in its `components.schemas`, with the same
-   file of the base tag and fails on every row of the right column of the table above. The base is
-   the newest stable tag `server/vX.Y.Z` merged into `HEAD`, read with `git show`; a pre-release tag
-   (for example `-beta.N`) is the base only while no stable tag exists; without any tag the gate passes with a
-   notice. A break passes only when `info.version` raised its major version against the base
-   (items 4 and 5); nothing else lowers the gate. The tool is the own comparison
+   file of the base and fails on every row of the right column of the table above. While
+   `info.version` of the working tree is below 1.0 the base is the merge base of `HEAD` with the
+   base of the pull request (`API_BREAKING_BASE` in CI, locally `origin/main`), so a break the
+   label below accepted is not found again by a later pull request. From 1.0 on the base is the
+   newest stable tag `server/vX.Y.Z` merged into `HEAD`, read with `git show`; a pre-release tag
+   (for example `-beta.N`) is the base only while no stable tag exists. Each falls back to the
+   other, and only without both the gate passes with a notice. A break passes only
+   when `info.version` raised its major version against the base (items 4 and 5), or, while
+   `info.version` is below 1.0, when the pull request carries the label `breaking change` (a
+   deliberate break before 1.0, docs/decisions.d/AUD-PKG-R2-owner-ops.md); nothing else lowers
+   the gate. The tool is the own comparison
    `tools/api-checks/breaking.py` over the parsed YAML, not oasdiff: oasdiff 1.33.0 parses this
    OpenAPI 3.1 document, but reported neither a removed field of an event schema that no path
    references nor a changed `x-authz-action`, and a removed parameter only as a warning [verified,
@@ -793,7 +800,7 @@ request per subscription. Delivery, retry, verification at the receiver and inco
 | G3 | Generated tables of this chapter `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | the blocks of sections 5, 7, 16 and 17 and `webhook_events` in webhooks.md match the YAML files |
 | G4 | Code generation | the four generators from section 14 | generate, compile, no difference from the checked-in code |
 | G5 | Tolerance test | one test with a fixture per SDK (shared fixtures in `sdk/testdata/tolerance/`) | an unknown field is ignored, an unknown enum value is kept as its raw value (Dart: the generated unknown default case), an event of unknown type is skipped while the cursor still advances, a received `null` counts as an absent field; all without an error |
-| G6 | Breaking change check against the last release | `tools/api-checks/breaking.py` (`make api-breaking`; oasdiff missed rows, 13.7) | every row of the right column of the table in section 13, against the newest stable tag `server/v*` (13.7); a major step of `info.version` accepts a break |
+| G6 | Breaking change check against the last release | `tools/api-checks/breaking.py` (`make api-breaking`; oasdiff missed rows, 13.7) | every row of the right column of the table in section 13, against the newest stable tag `server/v*`, before the first release against the merge base of the pull request (13.7); a major step of `info.version` accepts a break, and below 1.0 the pull request label `breaking change` |
 | G7 | Property-based tests against the running server | Schemathesis against the server from the working tree with a throwaway PostgreSQL (`make contract-test`); the smoke test (`make portability`) checks the Compose stack | status codes, media types, response schemas and headers of every op; stateful sequences over the links that Schemathesis derives (the spec has no `links`; if the pinned version derives no transitions, this part counts as not proven); own checks: problem format, `Correlation-Id`, no `null`, 404 equality for foreign and missing IDs |
 | G8 | Response validation in integration tests | middleware in the test build | every response of every integration test matches the spec |
 | G9 | Gateway frames | the gateway test harness `services/server/internal/gateway/adapters/wstest` over `services/server/api/specschema` (M1-67), in the integration tests of `make test`; alone: `cd services/server && go test -race ./api/... ./internal/gateway/... ./internal/wire/...` | every frame the server sends in a gateway test matches its AsyncAPI message and its body schema of openapi.yaml strictly (no undeclared member, no `null`, integers below 2^53, at most `sync.ws_max_frame_bytes`, `seq` and `permission_version` exactly on durable events, `resource.version` as the catalogue says), the order per connection holds and every close code is in `x-close-codes`; `TestRegister_MatchesActionsAndAsyncAPI` holds the register of ops and event types and the enable list `gateway_ops` equal to actions.yaml and asyncapi.yaml (05, section 9); `TestConformance_M1EventCorpus` observes every M1 event type and server op; `TestHarness_OnlyEntryPoint` keeps the harness the only WebSocket client of the tests |

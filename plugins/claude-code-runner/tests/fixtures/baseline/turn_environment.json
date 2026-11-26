@@ -1,7 +1,10 @@
 {
   "ANTHROPIC_API_KEY": "<api-key>",
+  "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
   "CLAUDE_CONFIG_DIR": "<root>/state/claude-config/organization",
   "CLAUDE_PRODUCT_RUN": "1",
+  "DISABLE_ERROR_REPORTING": "1",
+  "DISABLE_TELEMETRY": "1",
   "HOME": "<root>/home",
   "LANG": "C.UTF-8",
   "LOGNAME": "alex",

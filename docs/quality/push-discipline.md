@@ -32,7 +32,10 @@ commit per feature, signed and linear.
 6. **Pull request.** One pull request per finished feature. The title is a
    Conventional Commit header line, because on merge it becomes the header line of the commit on `main`;
    CI checks it (`PR_TITLE` in `make commitlint`). The body becomes the message of that
-   commit, so title and body are written fresh, in your own words: what and why, how it
+   commit, so it ends with a `Signed-off-by: Name <e-mail>` line outside HTML comments, which
+   `make commitlint` requires (`PR_BODY`; not for a pull request of `dependabot[bot]`,
+   `renovate[bot]` or `github-actions[bot]`, `PR_BODY_BOTS` in `tools/hooks/commit_msg.py`;
+   which identity signs is OQ-25), and title and body are written fresh, in your own words: what and why, how it
    was verified, which commit the independent review covered with which verdict and what
    was fixed. Never paste a raw review report, bot or agent output, local paths, user or
    machine names, temporary folder names or notes about tools. Section
@@ -206,7 +209,8 @@ text of the pull request goes through the same deny list as every commit:
   the text itself. A `PR_BODY_FILE` that cannot be read fails the scan.
 - **Bots.** CodeRabbit writes its summary into the walkthrough comment, not into the body
   (`high_level_summary_in_walkthrough` in `.coderabbit.yaml`, schema at
-  https://coderabbit.ai/integrations/schema.v2.json, retrieved 2026-10-12), so bot text
+  https://coderabbit.ai/integrations/schema.v2.json, retrieved 2026-10-12; `make lint` checks
+  against the pinned copy named in docs/quality/toolchain.md), so bot text
   does not reach `main` and does not restart CI.
 
 What the gate does not cover, so `denylist-main.yml` stays the check after the merge (it

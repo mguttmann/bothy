@@ -6,9 +6,14 @@ schemas in its `components.schemas`, with the same file of the newest release ta
 `server/v*` reachable from HEAD and fails on every breaking change of the table in
 docs/spec/06-api.md section 13 (right column). Additive changes pass.
 
-Base rule (06 13 item 7): the newest stable tag `server/vX.Y.Z` merged into HEAD; a
-pre-release tag only when no stable tag exists; without any tag the check passes with a notice.
-A break passes only when `info.version` raised its major against the base (06 13 items 4 and 5).
+Base rule (06 13 item 7): while `info.version` of the working tree is below 1.0, the merge
+base of HEAD with `--base` (default `origin/main`; CI passes the base of the pull request), so a
+break a label accepted is never found again by a later pull request. From 1.0 on the newest
+stable tag `server/vX.Y.Z` merged into HEAD; a pre-release tag only when no stable tag exists.
+Each falls back to the other, and without both the check passes with a notice. A break passes
+only when `info.version` raised its major against the base (06 13 items 4 and 5), or, while
+`info.version` is below 1.0, when the pull request carries the label `breaking change`
+(`--allow-break`, #1508).
 
 The direction of a schema (request, response or both) decides whether a new required field is a
 break: paths give it for parameters, request bodies and responses, `webhooks` reversed (the
@@ -18,7 +23,8 @@ directions, so the check never misses a break because a direction is unknown.
 
 Command (from anywhere; `--root` defaults to the repository of this file):
 
-    breaking.py check [--root <dir>]   # exit 0 no break, a notice or an accepted major; 1 else
+    breaking.py check [--root <dir>] [--base <ref>] [--allow-break]
+                                       # exit 0 no break, a notice or an accepted break; 1 else
 
 Every finding is one line `api-breaking: <06 rule>: <location>: <detail>`.
 """
@@ -42,6 +48,10 @@ OPENAPI_PATH = "docs/api/openapi.yaml"
 ASYNCAPI_PATH = "docs/api/asyncapi.yaml"
 TAG_PREFIX = "server/v"
 PREFIX = "api-breaking"
+# Before the first release: the baseline is the merge base of HEAD with this ref (#1508).
+DEFAULT_BASE_REF = "origin/main"
+# The pull request label (.github/labels.yml) that releases a deliberate break before 1.0.
+BREAK_LABEL = "breaking change"
 
 # The rows of the breaking column of the table in 06 section 13, by finding kind.
 ROWS: Mapping[str, str] = {
@@ -675,22 +685,59 @@ def _published_tags(root: Path) -> list[str]:
     return listed.stdout.split()
 
 
-def check(root: Path, out: Callable[[str], None] = print) -> int:
+def _baseline(root: Path, base_ref: str, *, before_1_0: bool) -> tuple[str, str] | None:
+    """Return the revision to compare with and its name in the output, or None without one.
+
+    From 1.0 on the newest release tag (06 13 item 7). Below 1.0 the merge base of HEAD with
+    `base_ref`, the pull request's base branch (#1508): a break the label accepted then stays
+    accepted, because a later pull request compares only with what main holds, never again with
+    a pre-1.0 tag. A release tag is the fallback below 1.0 when there is no merge base, and the
+    merge base is the fallback from 1.0 on when there is no tag.
+    """
+    tag = select_base_tag(_published_tags(root))
+    if tag is not None and not before_1_0:
+        return tag, tag
+    found = _git(root, "merge-base", base_ref, "HEAD")
+    sha = found.stdout.strip() if found.returncode == 0 else ""
+    if sha:
+        return sha, f"the merge base {sha[:12]} with {base_ref}"
+    return (tag, tag) if tag is not None else None
+
+
+def check(
+    root: Path,
+    out: Callable[[str], None] = print,
+    *,
+    base_ref: str = DEFAULT_BASE_REF,
+    allow_break: bool = False,
+) -> int:
     """Run the gate on the repository at `root`.
 
     Args:
         root: repository root with docs/api/openapi.yaml in its working tree.
         out: receives each output line.
+        base_ref: without a release tag the baseline is the merge base of HEAD with this ref.
+        allow_break: the pull request carries the label `BREAK_LABEL`; a break then passes
+            while `info.version` of the working tree is below 1.0.
 
     Returns:
-        0 without a break, without a published version or with an accepted major step;
-        1 on a break or an input that cannot be compared.
+        0 without a break, without a baseline, with an accepted major step or an accepted
+        label; 1 on a break or an input that cannot be compared.
     """
     try:
-        tag = select_base_tag(_published_tags(root))
-        if tag is None:
-            out(f"{PREFIX}: no published version (no tag {TAG_PREFIX}*); nothing to compare")
+        current = root / OPENAPI_PATH
+        if not current.is_file():
+            raise BreakingError(f"{OPENAPI_PATH} is missing")
+        revision = _load_text(current.read_text("utf-8"), OPENAPI_PATH)
+        before_1_0 = _major(revision, "compared")[1] == 0
+        baseline = _baseline(root, base_ref, before_1_0=before_1_0)
+        if baseline is None:
+            out(
+                f"{PREFIX}: no published version (no tag {TAG_PREFIX}*) and no merge base "
+                f"with {base_ref}; nothing to compare"
+            )
             return 0
+        tag, name = baseline
         shown = _git(root, "show", f"{tag}:{OPENAPI_PATH}")
         if shown.returncode != 0:
             raise BreakingError(f"{tag} has no {OPENAPI_PATH}")
@@ -702,16 +749,17 @@ def check(root: Path, out: Callable[[str], None] = print) -> int:
         current_async = root / ASYNCAPI_PATH
         if current_async.is_file():
             asyncapi_docs.append(_load_text(current_async.read_text("utf-8"), ASYNCAPI_PATH))
-        current = root / OPENAPI_PATH
-        if not current.is_file():
-            raise BreakingError(f"{OPENAPI_PATH} is missing")
-        revision = _load_text(current.read_text("utf-8"), OPENAPI_PATH)
         result = evaluate(base, revision, asyncapi_docs=asyncapi_docs)
     except (BreakingError, OSError, UnicodeDecodeError) as exc:
         out(f"{PREFIX}: source: {exc}")
         return 1
+    return _report(result, name, out, allow_break=allow_break)
+
+
+def _report(result: Result, name: str, out: Callable[[str], None], *, allow_break: bool) -> int:
+    """Print the outcome of a comparison with `name`; return the exit code of `check`."""
     if not result.findings:
-        out(f"{PREFIX}: {OPENAPI_PATH} has no breaking change against {tag}")
+        out(f"{PREFIX}: {OPENAPI_PATH} has no breaking change against {name}")
         return 0
     count = len(result.findings)
     noun = "breaking change" if count == 1 else "breaking changes"
@@ -719,25 +767,38 @@ def check(root: Path, out: Callable[[str], None] = print) -> int:
     if result.accepted:
         for finding in result.findings:
             out(f"{PREFIX}: accepted ({step}): {finding.line()[len(PREFIX) + 2 :]}")
-        out(f"{PREFIX}: {count} {noun} against {tag} accepted by the major version step")
+        out(f"{PREFIX}: {count} {noun} against {name} accepted by the major version step")
+        return 0
+    if allow_break and result.revision_version.split(".", 1)[0] == "0":
+        why = f"label '{BREAK_LABEL}', before 1.0"
+        for finding in result.findings:
+            out(f"{PREFIX}: accepted ({why}): {finding.line()[len(PREFIX) + 2 :]}")
+        out(f"{PREFIX}: {count} {noun} against {name} accepted by the {why.replace(', ', ' ')}")
         return 0
     for finding in result.findings:
         out(finding.line())
     out(
-        f"{PREFIX}: {count} {noun} against {tag} ({step}); a break needs a new major version "
-        "of info.version (docs/spec/06-api.md section 13 items 4 and 5)"
+        f"{PREFIX}: {count} {noun} against {name} ({step}); a break needs a new major version "
+        "of info.version (docs/spec/06-api.md section 13 items 4 and 5), before 1.0 the label "
+        f"'{BREAK_LABEL}' on the pull request"
     )
     return 1
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line: `breaking.py check [--root <dir>]`; returns the exit code of `check`."""
+    """Command line of `check`; returns its exit code."""
     parser = argparse.ArgumentParser(description="API breaking-change check (06 G6).")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_check = sub.add_parser("check", help="compare with the last published version")
     p_check.add_argument("--root", type=Path, default=REPO)
+    p_check.add_argument(
+        "--base", default=DEFAULT_BASE_REF, help="ref whose merge base is the pre-release baseline"
+    )
+    p_check.add_argument(
+        "--allow-break", action="store_true", help=f"the pull request has the label {BREAK_LABEL}"
+    )
     args = parser.parse_args(argv)
-    return check(args.root)
+    return check(args.root, base_ref=args.base, allow_break=args.allow_break)
 
 
 if __name__ == "__main__":

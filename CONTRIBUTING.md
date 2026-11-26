@@ -172,7 +172,9 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
   early feedback.
 - Fill in the template. Describe what you verified and how. Title and body become the
   squash commit on `main`: write them fresh, without pasted tool output, local paths or
-  host names. CI scans both with the deny list and runs again when you edit them; check
+  host names. End the body with your `Signed-off-by:` line, the DCO sign-off of the squash
+  commit; `make commitlint` in CI fails without it (pull requests of bots excepted).
+  CI scans both with the deny list and runs again when you edit them; check
   the planned text before the push with `PR_TITLE=... PR_BODY_FILE=<file> make denylist`.
 - The required status check is `ci-ok`. Maintainers merge with squash only, so the history
   of `main` stays linear and every pull request is one commit.

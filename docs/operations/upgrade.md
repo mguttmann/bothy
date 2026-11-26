@@ -47,18 +47,51 @@ shows only the version of the specification, neither the server nor the schema v
 
 ### 2.1 Installations from a bundle
 
-This procedure replaces the images only. An installation made by `install.sh` also holds the files
-of its bundle, among them `compose.yaml`, `.env.example`, `infra/otel` and `infra/observability`
-with the Grafana panel plugin, and the marker `.bothy-install`, which names the version of that
-bundle. No step replaces them yet: after the procedure above they are still those of the installed
-bundle, also when the new release changed them, and a variable that the new `.env.example` adds is
-missing in `.env`. `install.sh` of another version refuses the folder instead of upgrading it,
-because a newer bundle over a `.env` that keeps the old `BOTHY_VERSION` would mix two releases.
-The OpenTofu modules do not upgrade either: the cloud modules ignore a changed `bothy_version` on
-an existing server, and over SSH the setup ends in that refusal. A step that upgrades the bundle
-is not built (docs/decisions.d/AUD-infra-compose-01.md, ruling AUD-IC1/5). Until it is, a release
-whose bundle changed needs manual work, and the section "Upgrade notes" of its release notes
-(section 1, item 1) is the place that says so.
+The procedure above replaces the images only. An installation made by `install.sh` also holds the
+files of its bundle, among them `compose.yaml`, `.env.example`, `infra/otel` and
+`infra/observability` with the Grafana panel plugin, and the marker `.bothy-install`, which names
+the version of that bundle. `install.sh` of another version refuses the folder instead of
+upgrading it, because a newer bundle over a `.env` that keeps the old `BOTHY_VERSION` would mix two
+releases, and there is no upgrade mode of `install.sh` before version 1.0
+(docs/decisions.d/AUD-PKG-R2-owner-ops.md). The OpenTofu modules do not upgrade either: the cloud
+modules ignore a changed `bothy_version` on an existing server, and over SSH the setup ends in that
+refusal; run the steps below on the server. `<dir>` is the folder of the installation, `<old>` and
+`<new>` are the two versions:
+
+1. Keep a copy of the installation, with modes, in a folder only its owner reads:
+   `cp -Rp <dir> <dir>.before-<new>` and then `chmod 700 <dir>.before-<new>`. It holds `.env` and
+   `infra/compose/secrets/`. The folder must not exist yet: a copy left from an earlier attempt
+   would receive `<dir>` inside it. When you repeat an upgrade that stopped after step 4, keep
+   the copy of the first attempt, which still holds `<old>`, skip this step and continue at
+   step 2; remove or rename a copy only when no attempt got past step 3.
+2. Download the bundle `bothy-compose-<new>.tar.gz` of the new product release and its
+   signature `bothy-compose-<new>.tar.gz.sigstore.json`, and check both as in
+   [release.md](release.md) 5.
+3. Unpack it into a new, empty folder and check that every member lies under `bothy-<new>/` and
+   that it holds neither `infra/compose/.env` nor `infra/compose/secrets/`.
+4. Copy the bundle over the installation: `cp -R <unpacked>/bothy-<new>/. <dir>/`. This replaces
+   every file of the bundle and leaves `.env` and `secrets/` as they are. A file that the new
+   bundle no longer has stays behind; the release notes name such files under "Upgrade notes".
+5. Compare the two templates,
+   `diff <dir>.before-<new>/infra/compose/.env.example <dir>/infra/compose/.env.example`, add
+   every new variable to `infra/compose/.env` with its value, and copy the value of
+   `BOTHY_VERSION` from the new `.env.example` into `.env`: it is the server version the product
+   release pins, which can differ from `<new>`, the version of the product release.
+6. Advance the marker: `printf 'version=%s\n' <new> > <dir>/.bothy-install`.
+7. In `<dir>/infra/compose` run the procedure of section 2 and its checks. Then recreate the
+   services that read files of the bundle only at their start, because Compose keeps a container
+   whose image did not change:
+   `docker compose up -d --force-recreate --no-deps otel-collector`, with the profile `scan` also
+   `clamav`, and with the profile `observability` also `prometheus alertmanager loki tempo
+   grafana`. Name a service of a profile only when that profile is enabled: Compose starts a
+   service that is named on the command line even when its profile is off. Run the checks of
+   section 2 again after the recreation: the first run saw the old containers of these services.
+
+The way back to `<old>` (section 3 item 1) puts the files of the copy back before
+`docker compose up -d`: every file of `<dir>.before-<new>` except `infra/compose/secrets/`, which
+keeps its newer state; then recreate the same services as in step 7, under the same profile
+conditions, and run the checks again. Remove the copy once the new version runs and the way back
+is no longer needed; it holds secrets.
 
 ## 3. Rollback
 
@@ -99,8 +132,10 @@ times the number of messages of the instance in millions.
 
 Not built: a gate that runs every migration against the schema of the previous version with test
 data and then the test suite of the previous version against the new schema (N-1 compatibility;
-plan row V3-37). Until then rules M1 to M12 hold by review, and `make migrations-lint` checks
-numbers, checksums and form rules only.
+plan row V3-37). Before V1 no such gate runs: it would take hours per change, and there is no
+release to go back to (docs/decisions.d/AUD-PKG-R2-owner-ops.md). Until then rules M1 to M12 hold
+by review, `make migrations-lint` checks numbers, checksums and form rules only, and an older
+build is not tested against a newer schema (section 3 item 1).
 
 ## 5. Schema check at startup
 

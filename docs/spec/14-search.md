@@ -539,8 +539,9 @@ The container has no outbound network access and is reachable only in the intern
 Load test: synthetic corpus with German and English texts, word frequency following a
 Zipf distribution, several spaces and channels, a principal sees a part of the channels.
 Queries with one to three words, phrases and negation. Measurement on the reference profile from
-[16-operations.md](16-operations.md) (capacity). The test runs in the release workflow and by hand,
-not on every PR (run time). If it misses the target, that is a release blocker.
+[16-operations.md](16-operations.md) (capacity). The test runs by hand before every release on a maintainer
+machine, in no CI workflow and not on every PR (run time; no paid runners, ADR 0063 item 4). If
+it misses the target, that is a release blocker.
 
 Measuring point: from the scheduled send time to the fully read response over loopback, an upper
 bound of the server time; the server runs with its default configuration; open load below

@@ -89,4 +89,5 @@ if it is out of date. Do not edit it by hand.
 | [0075](0075-search-assistant-through-an-agent-over-the-full-text-search.md) | Search assistant through an agent over the full-text search | accepted | 2026-11-04 |
 | [0076](0076-built-in-agents-hosted-by-the-claude-code-runner.md) | Built-in agents hosted by the Claude Code runner | accepted | 2026-11-06 |
 | [0077](0077-autonomous-runs-wake-ups-and-turn-handover.md) | Autonomous runs: wake-ups and turn handover | accepted | 2026-11-06 |
+| [0078](0078-visual-c-runtime-in-the-windows-package-from-the-toolchain-redist.md) | Visual C++ runtime in the Windows package from the toolchain redist | accepted | 2026-11-25 |
 <!-- adr-index:end -->

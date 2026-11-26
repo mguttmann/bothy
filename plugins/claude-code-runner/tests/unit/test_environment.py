@@ -11,9 +11,11 @@ import pytest
 from bothy_sdk.auth import Secret
 
 from claude_code_runner.environment import (
+    TELEMETRY_OFF,
     RunEnvironmentError,
     build_environment,
     clean_path,
+    fallback_environment,
     find_program,
 )
 
@@ -64,6 +66,9 @@ BASE_KEYS = {
     "TERM",
     "TMPDIR",
     "CLAUDE_PRODUCT_RUN",
+    "DISABLE_TELEMETRY",
+    "DISABLE_ERROR_REPORTING",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
 }
 
 
@@ -101,6 +106,46 @@ def test_turn_is_marked_as_product_run_even_from_a_bare_parent(tmp_path: Path) -
             bare, mode=mode, api_key=key, config_dir=cfg, forward_ssh_agent=False
         )
         assert env["CLAUDE_PRODUCT_RUN"] == "1"
+
+
+def test_cli_telemetry_is_off_by_default_and_set_by_the_runner(tmp_path: Path) -> None:
+    # runner.cli_telemetry false (the default): the runner itself sets the CLI's opt-outs, the
+    # allow list never takes them, nor any other value of them, from its own environment.
+    own = {**parent(tmp_path), **dict.fromkeys(dict(TELEMETRY_OFF), "0")}
+    env = build_environment(
+        own, mode="personal", api_key=None, config_dir=None, forward_ssh_agent=False
+    )
+    assert dict(TELEMETRY_OFF) == {
+        "DISABLE_TELEMETRY": "1",
+        "DISABLE_ERROR_REPORTING": "1",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    }
+    for name, value in TELEMETRY_OFF:
+        assert env[name] == value
+
+
+def test_cli_telemetry_on_sets_no_opt_out(tmp_path: Path) -> None:
+    own = {**parent(tmp_path), **dict.fromkeys(dict(TELEMETRY_OFF), "1")}
+    env = build_environment(
+        own,
+        mode="personal",
+        api_key=None,
+        config_dir=None,
+        forward_ssh_agent=False,
+        cli_telemetry=True,
+    )
+    assert set(env) == BASE_KEYS - set(dict(TELEMETRY_OFF))
+
+
+def test_fallback_environment_keeps_the_opt_outs(tmp_path: Path) -> None:
+    """The environment of a probe without ``HOME``: the cleaned ``PATH`` and, by default, the
+    CLI's opt-outs (#907)."""
+    good = str(tmp_path)
+    assert fallback_environment([good], cli_telemetry=False) == {
+        "PATH": good,
+        **dict(TELEMETRY_OFF),
+    }
+    assert fallback_environment([good], cli_telemetry=True) == {"PATH": good}
 
 
 def test_ssh_agent_only_with_switch(tmp_path: Path) -> None:

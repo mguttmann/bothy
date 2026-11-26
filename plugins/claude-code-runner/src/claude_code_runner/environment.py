@@ -10,12 +10,15 @@ files a turn writes as scratch output can be attached and never mix with another
 turn gets ``CLAUDE_PRODUCT_RUN=1``, set by the runner and never taken from its own environment:
 a user-level hook that would hold a headless session's turn open while background tasks run can
 recognise a product turn by this marker and let it end, so the session stays reachable
-(FIX-runner-responsive-turns). Mode ``organization`` adds ``ANTHROPIC_API_KEY`` and the runner's
-own ``CLAUDE_CONFIG_DIR``; ``personal`` adds nothing more (10 10.2, design note 7).
+(FIX-runner-responsive-turns). Unless ``runner.cli_telemetry`` is true, every turn also gets the
+CLI's opt-outs `TELEMETRY_OFF` (no usage telemetry, no error reports, no other non-essential
+traffic), likewise set by the runner and never taken from its own environment. Mode
+``organization`` adds ``ANTHROPIC_API_KEY`` and the runner's own ``CLAUDE_CONFIG_DIR``;
+``personal`` adds nothing more (10 10.2, design note 7).
 
 Examples:
     >>> sorted(build_environment({"HOME": "/home/alex", "SECRET": "x"}, mode="personal",
-    ...     api_key=None, config_dir=None, forward_ssh_agent=False))
+    ...     api_key=None, config_dir=None, forward_ssh_agent=False, cli_telemetry=True))
     ['CLAUDE_PRODUCT_RUN', 'HOME', 'PATH']
 """
 
@@ -29,9 +32,11 @@ from pathlib import Path
 from bothy_sdk.auth import Secret
 
 __all__ = [
+    "TELEMETRY_OFF",
     "RunEnvironmentError",
     "build_environment",
     "clean_path",
+    "fallback_environment",
     "find_program",
     "kept_environment",
 ]
@@ -39,6 +44,14 @@ __all__ = [
 _KEPT = ("HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR")
 _PRODUCT_MARKER = ("CLAUDE_PRODUCT_RUN", "1")
 _WIDE = stat.S_IWGRP | stat.S_IWOTH
+
+TELEMETRY_OFF = (
+    ("DISABLE_TELEMETRY", "1"),
+    ("DISABLE_ERROR_REPORTING", "1"),
+    ("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1"),
+)
+"""The Claude Code CLI's opt-outs of usage telemetry, error reports and other non-essential
+traffic, set while ``runner.cli_telemetry`` is false (09 18.2)."""
 
 
 class RunEnvironmentError(Exception):
@@ -97,6 +110,25 @@ def find_program(name: str, entries: Sequence[str]) -> str | None:
     return None
 
 
+def fallback_environment(path_entries: Sequence[str], *, cli_telemetry: bool) -> dict[str, str]:
+    """Return the environment of a CLI call when `build_environment` cannot build one.
+
+    The cleaned ``PATH`` alone and, while ``runner.cli_telemetry`` is false, `TELEMETRY_OFF`:
+    a missing ``HOME`` never lets the CLI send its telemetry.
+
+    Args:
+        path_entries: The cleaned ``PATH`` entries.
+        cli_telemetry: ``runner.cli_telemetry``.
+
+    Returns:
+        The environment.
+    """
+    env = {"PATH": os.pathsep.join(path_entries)}
+    if not cli_telemetry:
+        env.update(TELEMETRY_OFF)
+    return env
+
+
 def kept_environment(parent: Mapping[str, str]) -> dict[str, str]:
     """Return the allow list of 18.2 from the runner's own environment, without any mode part.
 
@@ -123,6 +155,7 @@ def build_environment(  # noqa: PLR0913 - the parts of a run environment are exp
     config_dir: Path | None,
     forward_ssh_agent: bool,
     tmpdir: Path | None = None,
+    cli_telemetry: bool = False,
 ) -> dict[str, str]:
     """Build the environment of ``auth status`` and of the turn of one run.
 
@@ -133,6 +166,7 @@ def build_environment(  # noqa: PLR0913 - the parts of a run environment are exp
         config_dir: ``<runner.state_dir>/claude-config/organization`` for ``organization``.
         forward_ssh_agent: ``runner.forward_ssh_agent``.
         tmpdir: The run's temporary directory; it replaces the runner's own ``TMPDIR``.
+        cli_telemetry: ``runner.cli_telemetry``; false adds `TELEMETRY_OFF`.
 
     Returns:
         The environment.
@@ -145,6 +179,8 @@ def build_environment(  # noqa: PLR0913 - the parts of a run environment are exp
         raise RunEnvironmentError("home_missing")
     env = kept_environment(parent)
     env[_PRODUCT_MARKER[0]] = _PRODUCT_MARKER[1]
+    if not cli_telemetry:
+        env.update(TELEMETRY_OFF)
     if tmpdir is not None:
         env["TMPDIR"] = str(tmpdir)
     if forward_ssh_agent and parent.get("SSH_AUTH_SOCK"):

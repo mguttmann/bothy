@@ -1612,9 +1612,9 @@ Targets are named values (section 22). A test in `make perf` holds every target;
 the target is "unchecked" (tickets). [ADR 0063](../adr/0063-performance-gate-for-the-event-log.md) governs when and on which environment measurements take place.
 
 State: the targets are not proven. No run of `make perf` on `perf.reference_profile` in mode
-`match` or `emulated` with every target met is recorded; the run on the reference host is an
-owner operation (ADR 0063), and no workflow runs `make perf`, so a regression shows only in a
-local run. The recorded runs missed targets: in mode `below`, M1-72/9 and M1-72/10
+`match` or `emulated` with every target met is recorded; the run happens by hand before every
+release on a maintainer machine (ADR 0063 item 4), and no CI workflow runs `make perf`, so a
+regression shows only in such a run. The recorded runs missed targets: in mode `below`, M1-72/9 and M1-72/10
 (`perf.catchup_page_p99` with a large visible set); on the build host of M7-18, D-M7-18-4
 (`perf.message_create_p99` 272 ms at 200 messages per second). The capacity table of
 [16-operations.md](16-operations.md) 13 comes from runs in mode `emulated`; they measure

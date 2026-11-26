@@ -98,6 +98,7 @@ from claude_code_runner.environment import (
     RunEnvironmentError,
     build_environment,
     clean_path,
+    fallback_environment,
     find_program,
     kept_environment,
 )
@@ -1167,11 +1168,17 @@ class RunnerHandler(AgentHandler):
                     self.config.state_dir / "claude-config" / "organization"
                 ),
                 forward_ssh_agent=False,
+                cli_telemetry=self.config.cli_telemetry,
             )
         if not self.config.allow_personal:
             raise RunEnvironmentError("no_billing_mode")
         return build_environment(
-            self.environ, mode="personal", api_key=None, config_dir=None, forward_ssh_agent=False
+            self.environ,
+            mode="personal",
+            api_key=None,
+            config_dir=None,
+            forward_ssh_agent=False,
+            cli_telemetry=self.config.cli_telemetry,
         )
 
     # ---- version probe --------------------------------------------------------------------
@@ -1184,9 +1191,10 @@ class RunnerHandler(AgentHandler):
                 api_key=None,
                 config_dir=None,
                 forward_ssh_agent=False,
+                cli_telemetry=self.config.cli_telemetry,
             )
         except RunEnvironmentError:
-            return {"PATH": os.pathsep.join(self.path_entries)}
+            return fallback_environment(self.path_entries, cli_telemetry=self.config.cli_telemetry)
 
     async def refresh_probe(self) -> Probe:
         """Probe ``claude --version`` now and keep the outcome.
@@ -1508,6 +1516,7 @@ class RunnerHandler(AgentHandler):
                 api_key=api_key,
                 config_dir=config_dir,
                 forward_ssh_agent=cfg.forward_ssh_agent,
+                cli_telemetry=cfg.cli_telemetry,
                 # The run's own scratch place, a root of answer attachments (M3-12 note 3 c).
                 tmpdir=ensure_private_dir(run_temp_dir(cfg.state_dir, state.run_id)),
             )
