@@ -136,6 +136,31 @@ func TestPairRequestBody(t *testing.T) {
 	}
 }
 
+// TestPairComputerOnlyBody holds D-CU-03-13: a computer-use-only host sends computer_use true
+// and an empty list of session users; without computer use the member is left out.
+func TestPairComputerOnlyBody(t *testing.T) {
+	s, o := setup(t, accept)
+	o.ComputerUse = true
+	o.Lists.SessionUsers = nil
+	if _, err := Pair(context.Background(), o); err != nil {
+		t.Fatal(err)
+	}
+	var req map[string]any
+	if err := json.Unmarshal(s.bodies[0], &req); err != nil {
+		t.Fatal(err)
+	}
+	if users, ok := req["session_users"].([]any); !ok || len(users) != 0 || req["computer_use"] != true {
+		t.Errorf("computer-only body: %s", s.bodies[0])
+	}
+	s, o = setup(t, accept)
+	if _, err := Pair(context.Background(), o); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(s.bodies[0]), "computer_use") {
+		t.Errorf("computer_use without computer use: %s", s.bodies[0])
+	}
+}
+
 func TestPairRequiresHTTPS(t *testing.T) {
 	_, o := setup(t, accept)
 	for _, u := range []string{"http://chat.example.com", "chat.example.com", "https://", "https://user@chat.example.com", "://x"} {

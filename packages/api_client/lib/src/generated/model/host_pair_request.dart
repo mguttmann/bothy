@@ -23,7 +23,8 @@ part 'host_pair_request.g.dart';
 /// * [osVersion]
 /// * [hostVersion]
 /// * [profiles]
-/// * [sessionUsers] - The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2).
+/// * [sessionUsers] - The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2). At least one, except with `computer_use`.
+/// * [computerUse] - The host service runs with `host_service.computer_use`; then `session_users` may be empty, a computer-use-only host that gives no terminal session (27 9.4, D-CU-03-13).
 @BuiltValue()
 abstract class HostPairRequest
     implements Built<HostPairRequest, HostPairRequestBuilder> {
@@ -51,9 +52,13 @@ abstract class HostPairRequest
   @BuiltValueField(wireName: r'profiles')
   BuiltList<HostProfile> get profiles;
 
-  /// The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2).
+  /// The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2). At least one, except with `computer_use`.
   @BuiltValueField(wireName: r'session_users')
   BuiltList<HostReportedSessionUser> get sessionUsers;
+
+  /// The host service runs with `host_service.computer_use`; then `session_users` may be empty, a computer-use-only host that gives no terminal session (27 9.4, D-CU-03-13).
+  @BuiltValueField(wireName: r'computer_use')
+  bool? get computerUse;
 
   HostPairRequest._();
 
@@ -61,7 +66,7 @@ abstract class HostPairRequest
       _$HostPairRequest;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(HostPairRequestBuilder b) => b;
+  static void _defaults(HostPairRequestBuilder b) => b..computerUse = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<HostPairRequest> get serializer =>
@@ -128,6 +133,13 @@ class _$HostPairRequestSerializer
         FullType(HostReportedSessionUser),
       ]),
     );
+    if (object.computerUse != null) {
+      yield r'computer_use';
+      yield serializers.serialize(
+        object.computerUse,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -216,6 +228,14 @@ class _$HostPairRequestSerializer
             ]),
           ) as BuiltList<HostReportedSessionUser>;
           result.sessionUsers.replace(valueDes);
+          break;
+        case r'computer_use':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.computerUse = valueDes;
           break;
         default:
           unhandled.add(key);

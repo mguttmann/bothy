@@ -140,6 +140,9 @@ type PairReport struct {
 	Platform, OSVersion, HostVersion string
 	Profiles                         []Profile
 	SessionUsers                     []ReportedSessionUser
+	// ComputerUse marks a host service with host_service.computer_use: it may pair without
+	// session users, a computer-use-only host without terminal (D-CU-03-13).
+	ComputerUse bool
 }
 
 // ReportLimits are the configured bounds of a report: host.os_user_max_chars,
@@ -163,7 +166,7 @@ var (
 )
 
 // ValidatePairReport checks the report of host.pair (Design note 4c to 4f of M2-41; HD1 on the
-// server): at least one session user, each a session user name (NewOSUser) distinct without
+// server): at least one session user unless ComputerUse (a computer-use-only host, D-CU-03-13), each a session user name (NewOSUser) distinct without
 // regard to case, its working directories non-empty display texts of at most
 // terminal.report_label_max_chars characters; profile names of the schema pattern, distinct and
 // of at most that length, display names alike; each list at most terminal.report_max_entries
@@ -181,6 +184,9 @@ func ValidatePairReport(r PairReport, lim ReportLimits) []errs.FieldError {
 		out = append(out, errs.FieldError{Pointer: "/host_version", Code: FieldInvalidFormat, Detail: "host_version must be SemVer 2.0.0 without v"})
 	}
 	out = append(out, checkProfiles(r.Profiles, lim)...)
+	if r.ComputerUse && len(r.SessionUsers) == 0 {
+		return out
+	}
 	return append(out, checkSessionUsers(r.SessionUsers, lim)...)
 }
 

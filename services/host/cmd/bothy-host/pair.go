@@ -119,7 +119,7 @@ func directPair(ctx context.Context, c *config.Config, server, code string, ca [
 		}
 	}
 	out, err := pairing.Pair(ctx, pairing.Options{ServerURL: server, Code: code, CAPEM: ca, State: st, Random: sys.random,
-		Platform: buildinfo.Platform(), OSVersion: sys.osVersion(), HostVersion: buildinfo.Version,
+		Platform: buildinfo.Platform(), OSVersion: sys.osVersion(), HostVersion: buildinfo.Version, ComputerUse: c.ComputerUse,
 		Lists: pairing.Lists{Profiles: res.Profiles, SessionUsers: res.SessionUsers}})
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, err)

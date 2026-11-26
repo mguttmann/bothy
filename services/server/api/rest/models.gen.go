@@ -12707,6 +12707,9 @@ type HostPairRequest struct {
 	// AuthPublicJwk Ed25519 public key as JWK (`kty = OKP`, `crv = Ed25519`); a private member is rejected.
 	AuthPublicJwk JsonObject `json:"auth_public_jwk"`
 
+	// ComputerUse The host service runs with `host_service.computer_use`; then `session_users` may be empty, a computer-use-only host that gives no terminal session (27 9.4, D-CU-03-13).
+	ComputerUse *bool `json:"computer_use,omitempty"`
+
 	// HostVersion Examples: 1.0.0
 	HostVersion string `json:"host_version"`
 
@@ -12717,7 +12720,7 @@ type HostPairRequest struct {
 	Platform       HostPlatform  `json:"platform"`
 	Profiles       []HostProfile `json:"profiles"`
 
-	// SessionUsers The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2).
+	// SessionUsers The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2). At least one, except with `computer_use`.
 	SessionUsers []HostReportedSessionUser `json:"session_users"`
 }
 

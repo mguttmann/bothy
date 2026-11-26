@@ -13127,8 +13127,13 @@ export interface components {
             /** @example 1.0.0 */
             host_version: string;
             profiles: components["schemas"]["HostProfile"][];
-            /** @description The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2). */
+            /** @description The session users of `host_service.session_users` with the display names of their working directories (24 section 2.2). At least one, except with `computer_use`. */
             session_users: components["schemas"]["HostReportedSessionUser"][];
+            /**
+             * @description The host service runs with `host_service.computer_use`; then `session_users` may be empty, a computer-use-only host that gives no terminal session (27 9.4, D-CU-03-13).
+             * @default false
+             */
+            computer_use: boolean;
         };
         HostPairResult: {
             host_id: components["schemas"]["Uuid"];

@@ -216,6 +216,9 @@ type PairHost struct {
 	Platform, OSVersion, HostVersion string
 	Profiles                         []Profile
 	SessionUsers                     []ReportedSessionUser
+	// ComputerUse is computer_use of the body: the host service runs with
+	// host_service.computer_use, so it may pair without session users (D-CU-03-13).
+	ComputerUse bool
 }
 
 // PairResult is the answer of pairHost (schema HostPairResult): only public data.

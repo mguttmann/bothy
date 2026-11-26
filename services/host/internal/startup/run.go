@@ -317,7 +317,7 @@ func (s *Service) PairFromAdmin(ctx context.Context, req PairRequest) PairAnswer
 		pair = pairing.Pair
 	}
 	out, err := pair(ctx, pairing.Options{ServerURL: req.ServerURL, Code: req.Code, CAPEM: req.CAPEM, State: s.d.State, Random: rand.Reader,
-		Platform: s.d.Platform, OSVersion: s.d.OSVersion, HostVersion: s.d.HostVersion,
+		Platform: s.d.Platform, OSVersion: s.d.OSVersion, HostVersion: s.d.HostVersion, ComputerUse: s.d.Config.ComputerUse,
 		Lists: pairing.Lists{Profiles: res.Profiles, SessionUsers: res.SessionUsers}})
 	if err != nil {
 		return PairAnswer{Error: err.Error()}

@@ -82,6 +82,9 @@ type Options struct {
 	Lists Lists
 	// Platform, OSVersion and HostVersion are HostPairRequest members.
 	Platform, OSVersion, HostVersion string
+	// ComputerUse is host_service.computer_use, sent as computer_use: the server then accepts an
+	// empty list of session users, a computer-use-only host (D-CU-03-13).
+	ComputerUse bool
 	// Random is the source of the key pairs.
 	Random io.Reader
 	// Transport overrides the HTTP transport (tests); nil uses the TLS roots above.
@@ -112,6 +115,7 @@ type pairRequest struct {
 	HostVersion    string                       `json:"host_version"`
 	Profiles       []doctor.Profile             `json:"profiles"`
 	SessionUsers   []doctor.ReportedSessionUser `json:"session_users"`
+	ComputerUse    bool                         `json:"computer_use,omitempty"`
 }
 
 // Body returns the request body of pairHost for the public keys; it holds no private member.
@@ -128,6 +132,7 @@ func body(o Options, noisePub, authPub []byte) ([]byte, error) {
 		PairingCode: o.Code, NoisePublicKey: enc.EncodeToString(noisePub),
 		AuthPublicJWK: map[string]string{"kty": "OKP", "crv": "Ed25519", "x": enc.EncodeToString(authPub)},
 		Platform:      o.Platform, OSVersion: o.OSVersion, HostVersion: o.HostVersion, Profiles: profiles, SessionUsers: users,
+		ComputerUse: o.ComputerUse,
 	})
 }
 

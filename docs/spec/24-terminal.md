@@ -830,7 +830,9 @@ Details of the pairing (M2-41, docs/DECISIONS.md D-M2-41-1 to D-M2-41-16):
   above all the private `d`, is `unknown_member` under `/auth_public_jwk/<name>`. The server stores
   the JWK as it builds it and its RFC 7638 thumbprint as `auth_jkt`.
 - **Report.** At least one session user (`empty`, otherwise the host can never offer a terminal,
-  HD1); names follow the pattern of 03, at most `host.os_user_max_chars` characters (`too_long`),
+  HD1), except with `computer_use` true: a computer-use-only host pairs with an empty list and
+  offers no terminal; `terminal.open` on it is refused with `terminal_denied` `no_session_user`
+  (07 2.12, D-CU-03-13); names follow the pattern of 03, at most `host.os_user_max_chars` characters (`too_long`),
   distinct without regard to case (`duplicate`); working directories, profile names, display names
   and `os_version` are display texts (SEC-IN-4) with at most `terminal.report_label_max_chars`
   characters; profile names distinct (`duplicate`); every list at most
