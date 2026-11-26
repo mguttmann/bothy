@@ -32,6 +32,7 @@ from claude_code_runner.bgpaths import SOCKET_PATH_MAX, bg_files, socket_path, s
 from claude_code_runner.bgsession import (
     DENIED_TOOLS,
     GUARD_TIMEOUT,
+    NO_PROMPT_SETTING,
     OWN_MESSAGE_DENIED,
     RUN_ENV_NAMES,
     BgSession,
@@ -187,7 +188,7 @@ def test_a_session_with_the_hook_keeps_sendmessage_for_its_own_subagents() -> No
 def test_the_settings_file_of_a_session_with_the_hook(tmp_path: Path) -> None:
     env = {"HOME": str(tmp_path / "nobody"), "TMPDIR": "/t"}
     document = settings_document(env, own_messages=True)
-    assert set(document) == {"worktree", "env", "hooks", "disableAllHooks"}
+    assert set(document) == {"worktree", "env", "permissions", "hooks", "disableAllHooks"}
     # A true of the project's settings would switch the hook off; --settings goes before it.
     assert document["disableAllHooks"] is False
     assert GUARD_TIMEOUT == 60  # the time limit 09 18.2 and the ruling name
@@ -205,7 +206,7 @@ def test_the_settings_file_of_a_session_with_the_hook(tmp_path: Path) -> None:
         f"{shlex.quote(sys.executable)} -I {shlex.quote(sendguard.__file__)} || exit 2"
     )
     # Without the decision nothing changes, and a hosted turn never gets the hook.
-    assert set(settings_document(env)) == {"worktree", "env"}
+    assert set(settings_document(env)) == {"worktree", "env", "permissions"}
     hosted = settings_document(env, {"disableAllHooks": True}, own_messages=True)
     assert hosted["disableAllHooks"] is True
     assert "hooks" not in hosted
@@ -294,6 +295,7 @@ def test_the_settings_file_holds_the_isolation_and_the_run_s_environment() -> No
             "TMPDIR": "/state/tmp/run",
             "SSH_AUTH_SOCK": "",
         },
+        "permissions": {"denyInsteadOfPrompting": True},
     }
     forwarded = settings_document({**env, "SSH_AUTH_SOCK": "/tmp/agent.sock"})
     assert forwarded["env"]["SSH_AUTH_SOCK"] == "/tmp/agent.sock"
@@ -315,7 +317,7 @@ def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessio
         {"CLAUDE_CONFIG_DIR": str(config)},
     ):
         assert "crossSessionInbound" not in settings_document(env)
-        assert set(settings_document(env)) == {"worktree", "env"}
+        assert set(settings_document(env)) == {"worktree", "env", "permissions"}
     # A null is no value for the CLI either, and a file it cannot read gives none.
     (config / "settings.json").write_text('{"crossSessionInbound": null}', "utf-8")
     assert "crossSessionInbound" not in settings_document({"CLAUDE_CONFIG_DIR": str(config)})
@@ -337,7 +339,7 @@ def test_a_hold_of_the_host_user_s_settings_is_replaced_by_accept(tmp_path: Path
     )
     document = settings_document({"HOME": str(home), "TMPDIR": "/t"})
     assert document["crossSessionInbound"] == "accept"
-    assert set(document) == {"worktree", "env", "crossSessionInbound"}
+    assert set(document) == {"worktree", "env", "permissions", "crossSessionInbound"}
     # CLAUDE_CONFIG_DIR goes before HOME, as for the CLI.
     other = tmp_path / "other"
     other.mkdir()
@@ -346,7 +348,7 @@ def test_a_hold_of_the_host_user_s_settings_is_replaced_by_accept(tmp_path: Path
     # A hosted turn's base keeps its members beside it.
     hosted = settings_document({"HOME": str(home)}, {"permissions": {"deny": ["X"]}})
     assert hosted["crossSessionInbound"] == "accept"
-    assert hosted["permissions"] == {"deny": ["X"]}
+    assert hosted["permissions"] == {"deny": ["X"], "denyInsteadOfPrompting": True}
 
 
 @pytest.mark.parametrize("value", ["refuse", "accept", "sometimes"])
@@ -925,6 +927,55 @@ def test_the_settings_file_of_a_hosted_turn_keeps_its_settings() -> None:
     base = {"disableAllHooks": True, "permissions": {"deny": ["Edit(CLAUDE.md)"]}}
     document = settings_document({"TMPDIR": "/t"}, base)
     assert document["disableAllHooks"] is True
-    assert document["permissions"] == base["permissions"]
+    assert document["permissions"] == {**base["permissions"], "denyInsteadOfPrompting": True}
     assert document["worktree"] == {"bgIsolation": "none"}
     assert document["env"]["TMPDIR"] == "/t"
+
+
+def test_every_settings_file_refuses_what_would_wait_for_a_person() -> None:
+    # A run can never answer a permission prompt (18.9). In a background session a check that
+    # bypass mode cannot skip (the CLI's check of a removal in a command it cannot parse with
+    # certainty) left the session waiting, and the runner stopped it with every agent of it;
+    # with the setting the CLI refuses the call and the turn goes on (FIX-RUNNER-BG-NO-PROMPT).
+    assert NO_PROMPT_SETTING == "denyInsteadOfPrompting"
+    for document in (
+        settings_document({}),
+        settings_document({"TMPDIR": "/t"}, own_messages=True),
+        settings_document({"TMPDIR": "/t"}, {"disableAllHooks": True}),
+    ):
+        assert document["permissions"][NO_PROMPT_SETTING] is True
+    # A hosted turn keeps every member of its own permissions, and its object is not changed.
+    base = {"permissions": {"deny": ["Edit(CLAUDE.md)"], "defaultMode": "dontAsk"}}
+    document = settings_document({}, base)
+    assert document["permissions"] == {
+        "deny": ["Edit(CLAUDE.md)"],
+        "defaultMode": "dontAsk",
+        NO_PROMPT_SETTING: True,
+    }
+    assert base == {"permissions": {"deny": ["Edit(CLAUDE.md)"], "defaultMode": "dontAsk"}}
+    # A false of the hosted settings does not switch it off: a run can never answer.
+    hosted = settings_document({}, {"permissions": {NO_PROMPT_SETTING: False}})
+    assert hosted["permissions"] == {NO_PROMPT_SETTING: True}
+
+
+def test_computer_mcp_directly_after_the_class_flags() -> None:
+    """27 10.1: in background mode ``--mcp-config`` follows the flags of the class, without
+    ``--strict-mcp-config``, and only under ``host`` (CU-T21)."""
+    computer = Path("/s/turns/r.computer.mcp.json")
+    got = argv("host", [], computer_mcp=computer, add_dir=Path("/s/files/t"))
+    assert got == [
+        *HEAD,
+        "--permission-mode",
+        "bypassPermissions",
+        "--disallowedTools",
+        *DENIED,
+        "--mcp-config",
+        str(computer),
+        "--add-dir",
+        "/s/files/t",
+        *TAIL,
+    ]
+    assert "--strict-mcp-config" not in got
+    for tool_class in ("chat", "scoped"):
+        with pytest.raises(ArgumentError):
+            argv(tool_class, [], computer_mcp=computer)

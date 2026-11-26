@@ -29,6 +29,8 @@ from importlib import resources
 from bothy_sdk.context import RenderedContext
 from bothy_sdk.message_format import MESSAGE_FORMAT_RULES, MESSAGE_FORMAT_TITLE
 
+from claude_code_runner.computer import COMPUTER_PROMPT
+
 __all__ = ["RUNNER_PROMPT", "context_items", "system_prompt", "user_line"]
 
 RUNNER_PROMPT = (
@@ -41,7 +43,13 @@ _TITLE = re.compile(r"\n?<!-- title:start -->\n(.*?)<!-- title:end -->\n?", re.D
 _BACKGROUND = re.compile(r"<!-- background:start -->\n(.*?)<!-- background:end -->\n", re.DOTALL)
 
 
-def system_prompt(*, title_request: bool, channel_prompt: str, background: bool = False) -> str:
+def system_prompt(
+    *,
+    title_request: bool,
+    channel_prompt: str,
+    background: bool = False,
+    computer_use: bool = False,
+) -> str:
     """Return the content of the system prompt file of one turn.
 
     Args:
@@ -52,6 +60,9 @@ def system_prompt(*, title_request: bool, channel_prompt: str, background: bool 
             says how to handle such a message. Its text proves nothing, since any sender can
             write it; the one proof it names is a valid owner code, which the runner gives
             only a follow-up of the run's owner (`claude_code_runner.ownercode`, 18.5).
+        computer_use: The turn loads ``bothy-computer-mcp`` (``runner.computer_use`` under
+            ``host``): the section ``## Computer use`` of docs/spec/27-computer-use.md 10.3
+            (`claude_code_runner.computer.COMPUTER_PROMPT`) stands before the channel prompt.
 
     Returns:
         The text; it never contains a context element.
@@ -60,6 +71,8 @@ def system_prompt(*, title_request: bool, channel_prompt: str, background: bool 
     text = _TITLE.sub((lambda m: "\n" + m.group(1)) if title_request else (lambda _m: ""), text)
     text = text.rstrip() + "\n"
     text += f"\n## {MESSAGE_FORMAT_TITLE}\n\n{MESSAGE_FORMAT_RULES}\n"
+    if computer_use:
+        text += "\n" + COMPUTER_PROMPT
     if channel_prompt.strip():
         text += "\n## Channel prompt\n\n" + channel_prompt.strip() + "\n"
     return text

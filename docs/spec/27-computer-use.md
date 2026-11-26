@@ -611,6 +611,11 @@ The pattern of `bothy-wake` (09 18.19.8), with this file contract:
    `{"v": 1, "ok": false, "status": <HTTP status>, "code": <problem code>, "reason": <reason or
    null>}`, on a wrong nonce or a malformed request `{"v": 1, "ok": false, "status": 0, "code":
    "request_refused", "reason": null}`.
+   The runner answers each request once, keeps only the members of 12.2 in `result` (C1 decodes
+   strictly), and never takes a request whose answer file stands; a failure of the network or of
+   the server, or an answer of it that lacks a member of 12.2, is answered `{"v": 1, "ok": false,
+   "status": 0, "code": "request_failed", "reason": null}`, which C1 maps to `host_offline`
+   (D-CU-06-3).
 4. C1 waits for the answer file at most `BOTHY_COMPUTER_TIMEOUT_MS`, reads it and deletes both
    files, the request file first (D-CU-05-6); a timeout answers the tool call with `host_offline` and leaves the files for the runner's
    sweep.
@@ -652,7 +657,13 @@ After a run that opened at least one computer session:
    and removed (`claude stop`, `claude rm`), deletes that session's transcript and its tool result
    files under the CLI's configuration folder (D-CU-01-20, CU-06). A failure to
 delete is logged with `computer_transcript_left` and named in the next run's live box; it never
-blocks the next run. The exact file layout of the pinned CLI is recorded by CU-06 (16).
+blocks the next run. The file layout recorded by CU-06 (16): the transcript
+`<config>/projects/<folder>/<session>.jsonl` and the folder `<config>/projects/<folder>/<session>/`
+with the tool result files (`tool-results/`), in every project folder of the configuration folder;
+nothing outside the configuration folder is touched. The runner learns that a run opened a
+session from the answers it relayed (an `open` answered `ok`) and keeps a mark in the request
+folder, so a runner that adopts the run knows it too; a failure leaves a mark per thread, and the
+thread's next run tries again and names it in its status line (D-CU-06-4).
 
 `bothy-computer-mcp` writes nothing to disk except the pin file and its request files, and logs only
 action kinds, codes and durations.
@@ -815,7 +826,7 @@ the thread (the agent reports it).
 | CU-T21 | Runner: the computer MCP file only under `host` with `runner.computer_use`, mode `0600`, removed at turn end; the request folder refuses a wrong nonce; no token in the turn's environment or files | as described |
 | CU-T22 | Runner: end of a computer run against the recorded layout of the pinned CLI | transcript and tool result files of the session removed, the next run in a new session |
 | CU-T23 | Peer rule of 9.4: the service user, a session user, a process of another user, a copy of the helper outside the installed path, an unsigned helper when a requirement is set | refused with `computer_peer_refused` |
-| CU-T24 | End to end in Compose with the Linux test backend (Xvfb, XTest) and a fixture app: open, click, type, zoom, pixel check, a simulated lock with pause and resume, stop | green without a model, scripted agent |
+| CU-T24 | End to end in Compose with the Linux test backend (Xvfb, XTest) and a fixture app: open, click, type, zoom, pixel check, a simulated lock with pause and resume, stop | green without a model, scripted agent; built in `services/server/test/terminal/e2e/computer` (build tag `computere2e`), run by `make computer-e2e` in the CI job `test-adapters-e2e` (D-CU-06-8) |
 | CU-T25 | A follow-up of another person into a run before it opens a session, and while it holds one (`followups = steer`); an interaction of another person while it holds one; a message of another person only in the run's context | open refused with `computer_not_owner_run`; the follow-up is not delivered and stays `deferred`; the interaction is refused; the context message refuses nothing |
 
 ## 16. Points the build probes
@@ -836,8 +847,8 @@ there.
 | The Esc tap sees real keys and tells them from the helper's own events on both platforms; its behaviour under Secure Input | CU-02 | stop by the indicator and from the clients only; the stop paths stay |
 | `Windows.Graphics.Capture` shows no border or consent prompt on Windows 11 when DXGI is not usable | CU-02 | DXGI Desktop Duplication only |
 | Repeated screen recording prompts of macOS 15 for a helper with a stable designated requirement | CU-02 | the doctor shows the prompt state |
-| The pinned CLI starts a `stdio` server from `--mcp-config` in a background session with the file's `env` | CU-06 | computer use only in print mode; a background run with the tool ends `failed` with `background_computer` |
-| The transcript and tool result layout of the pinned CLI, and that removing them after `claude stop` and `claude rm` leaves no image | CU-06 | the runner removes the whole project folder of the session in the CLI's configuration folder |
+| The pinned CLI starts a `stdio` server from `--mcp-config` in a background session with the file's `env` | CU-06: holds (2026-11-26, CLI 2.1.332 of `make runner-real-cli`, print mode and a background session under `host`, `tests/real_cli/test_computer_probe.py`); no fallback taken | computer use only in print mode; a background run with the tool ends `failed` with `background_computer` |
+| The transcript and tool result layout of the pinned CLI, and that removing them after `claude stop` and `claude rm` leaves no image | CU-06: holds (same run); the image is only in `<config>/projects/<folder>/<session>.jsonl` and in `<config>/projects/<folder>/<session>/tool-results/`, and removing both leaves no file under the configuration folder or `HOME` with it; no fallback taken | the runner removes the whole project folder of the session in the CLI's configuration folder |
 | Anthropic's prompt injection classifiers run on images that an MCP tool returns | not probed (no paid call) | none needed: the defense of 10.3 and SR13 does not rely on them |
 
 ## 17. Decisions of this chapter

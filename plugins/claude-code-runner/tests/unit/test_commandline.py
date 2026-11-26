@@ -205,3 +205,51 @@ def test_values_starting_with_dash_rejected(value: str) -> None:
         choose_model(value, "model-large")
     with pytest.raises(ArgumentError):
         argv("scoped", [value])
+
+
+COMPUTER = Path("/var/lib/claude-code-runner/turns/r.computer.mcp.json")
+
+
+def test_computer_mcp_directly_after_permission_prompts_only_under_host() -> None:
+    """27 10.1 and 09 18.2 stage CU: ``--mcp-config`` right after ``--permission-prompts none``,
+    without ``--strict-mcp-config``; never below ``host`` (CU-T21)."""
+    flags = ["--permission-mode", "bypassPermissions"]
+    incoming = Path("/var/lib/claude-code-runner/files/t")
+    got = build_argv(
+        claude_bin="/usr/bin/claude",
+        model="model-large",
+        session=SESSION,
+        tool_class="host",
+        tools=[],
+        add_dir=incoming,
+        system_prompt_file=PROMPT,
+        plugin_dirs=[Path("/srv/skills/x")],
+        computer_mcp=COMPUTER,
+    )
+    assert got == [
+        *BASE,
+        *flags,
+        *TAIL,
+        "--mcp-config",
+        str(COMPUTER),
+        "--plugin-dir",
+        "/srv/skills/x",
+        "--add-dir",
+        str(incoming),
+        *END,
+    ]
+    assert "--strict-mcp-config" not in got
+    for tool_class in ("chat", "scoped"):
+        with pytest.raises(ArgumentError):
+            build_argv(
+                claude_bin="/usr/bin/claude",
+                model="model-large",
+                session=SESSION,
+                tool_class=tool_class,
+                tools=[],
+                add_dir=None,
+                system_prompt_file=PROMPT,
+                computer_mcp=COMPUTER,
+            )
+    # Without the file the list is the one of 18.2 (an installation without the key).
+    assert argv("host", []) == BASE + flags + TAIL + END

@@ -186,6 +186,12 @@ CAUSES: dict[str, str] = {
         "host, so the runner does not continue it in the background. Remove that entry with "
         "claude rm on the runner host or start a new post"
     ),
+    "computer_transcript_left": (
+        "The runner could not delete the transcript of an earlier computer session of this "
+        "thread, so its screenshots stayed on the runner host after that run. The runner tries "
+        "again at every run of this thread; the operator can delete the session's files in the "
+        "configuration folder of Claude Code"
+    ),
     "background_api_key": (
         "This run is billed to the organization's API key, and a background session of Claude "
         "Code takes no API key. Run it with a personal login, or set runner.launch_mode to "

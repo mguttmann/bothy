@@ -80,6 +80,7 @@ from claude_code_runner.commandline import (
     ArgumentError,
     HostedArgs,
     class_flags,
+    computer_argument,
     hosted_additions,
     hosted_class_flags,
 )
@@ -93,6 +94,7 @@ __all__ = [
     "GUARD_TIMEOUT",
     "MANAGED_SETTINGS_DIR",
     "NAME_PREFIX",
+    "NO_PROMPT_SETTING",
     "OWN_MESSAGE_DENIED",
     "RUN_ENV_NAMES",
     "BgSession",
@@ -172,6 +174,11 @@ RUN_ENV_NAMES = ("CLAUDE_PRODUCT_RUN", "DISABLE_AUTOUPDATER", "TMPDIR", "SSH_AUT
 INBOUND_SETTING = "crossSessionInbound"
 """The CLI's setting of what a session takes from other sessions (``accept``, ``hold``,
 ``refuse``; unset: a rule per message by the permission classes of both sessions)."""
+
+NO_PROMPT_SETTING = "denyInsteadOfPrompting"
+"""The CLI's setting below ``permissions`` that denies a tool call at once where the session
+would wait for a person to approve it; the model gets the refusal and the turn goes on. It only
+ever refuses, and ``true`` from any source wins (read in the file of the pinned CLI)."""
 
 _ENVELOPE = "cross-session-message"
 """The element the CLI wraps a message of another session in; its attribute ``from-mode`` is
@@ -283,6 +290,7 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     hosted: HostedArgs | None = None,
     plugin_dirs: Sequence[Path] = (),
     own_messages: bool = False,
+    computer_mcp: Path | None = None,
 ) -> list[str]:
     """Build the argument list of the launch command in the order of 09 18.2.
 
@@ -313,14 +321,19 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
         own_messages: The settings file carries the hook of `claude_code_runner.sendguard`
             (`own_agent_messages`), so ``SendMessage`` is not disallowed.
+        computer_mcp: The per-turn MCP file of ``bothy-computer-mcp`` (docs/spec/27-computer-use.md
+            10.1): ``--mcp-config`` directly after the flags of the class, without
+            ``--strict-mcp-config``, only under ``host``.
 
     Returns:
         The argument list.
 
     Raises:
         ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``,
-            or a channel skill folder below ``host``.
+            a channel skill folder below ``host``, or a computer MCP file below ``host``.
     """
+    if computer_mcp is not None and tool_class != "host":  # 27 10.1: never below host
+        raise ArgumentError("invalid_argument")
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     if add_dir is not None and tool_class == "chat":
@@ -332,6 +345,7 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         argv += ["--resume", resume]
     argv += ["--bg", "--name", name, "--model", model]
     argv += background_class_flags(tool_class, tools, hosted, own_messages=own_messages)
+    argv += computer_argument(computer_mcp)
     if hosted is None:
         argv += [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
     else:
@@ -357,11 +371,17 @@ def settings_document(
 ) -> dict[str, Any]:
     """Return the settings of a run's background session (``--settings``, 09 18.2).
 
-    Exactly two members, and with ``own_messages`` two more. ``worktree.bgIsolation`` ``none``
+    Exactly three members, a fourth only on a ``hold`` of the host user (below), and with
+    ``own_messages`` two more. ``worktree.bgIsolation`` ``none``
     keeps the session in the project folder: without it a background session moves into a
     Git worktree of its own, against 18.1, and its transcript moves with it. ``env`` carries
     what must reach the session process, because of the launching command's environment only
-    ``PATH`` does.
+    ``PATH`` does. ``permissions.denyInsteadOfPrompting`` ``true`` (`NO_PROMPT_SETTING`) makes
+    the CLI refuse a tool call that would wait for a person's approval, which a run can never
+    give (18.9): a check of the CLI that even bypass mode cannot skip, such as its check of a
+    removal in a command it cannot parse with certainty, otherwise left the session waiting,
+    and the runner stopped it with every agent of it (FIX-RUNNER-BG-NO-PROMPT). The model gets
+    the refusal as the tool's result and the turn goes on.
 
     Every name of `RUN_ENV_NAMES` is set in every document, a name the turn has no value for
     to the empty text: a session inherits the environment of the supervisor, which lives across
@@ -392,7 +412,8 @@ def settings_document(
     choice. A hosted turn never gets the hook: its settings switch hooks off (26 5.4).
 
     A hosted turn gives the settings of 26 5.4 as ``base``; the document is then those
-    settings with the two members added (they carry no ``env`` and no ``worktree``).
+    settings with the three members added (they carry no ``env`` and no ``worktree``), and the
+    members of their ``permissions`` stay beside the setting.
 
     Args:
         env: The environment of the turn (`claude_code_runner.environment.build_environment`).
@@ -409,7 +430,14 @@ def settings_document(
         "TMPDIR": env.get("TMPDIR", ""),
         "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
-    document = {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
+    permissions = dict((base or {}).get("permissions") or {})
+    permissions[NO_PROMPT_SETTING] = True
+    document = {
+        **(base or {}),
+        "worktree": {"bgIsolation": "none"},
+        "env": session_env,
+        "permissions": permissions,
+    }
     if host_inbound_value(env) == "hold":
         document[INBOUND_SETTING] = "accept"
     if own_messages and base is None:

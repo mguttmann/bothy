@@ -33,6 +33,7 @@ __all__ = [
     "ensure_private_dir",
     "hosted_dir",
     "is_private_dir",
+    "recorded_runs",
     "sweep",
     "write_private",
 ]
@@ -188,7 +189,7 @@ def sweep(
     """
     limit = (time.time() if now is None else now) - retention
     deleted = sum(_sweep_files(root / name, limit) for name in _SWEPT)
-    return deleted + _sweep_runs(root, limit, set(active) | _recorded_runs(root))
+    return deleted + _sweep_runs(root, limit, set(active) | recorded_runs(root))
 
 
 def _sweep_files(base: Path, limit: float) -> int:
@@ -237,10 +238,17 @@ def _sweep_runs(root: Path, limit: float, busy: set[str]) -> int:
     return deleted
 
 
-def _recorded_runs(root: Path) -> set[str]:
-    """The runs with a turn record (own or left for adoption)."""
+def recorded_runs(root: Path) -> set[str]:
+    """The runs with a turn record (own or left for adoption).
+
+    Args:
+        root: ``runner.state_dir`` (or a hosted agent's state folder).
+
+    Returns:
+        The run ids of the files ``turns/<run_id>.json``.
+    """
     turns = root / "turns"
-    return {p.stem for p in turns.glob("*.json")} if turns.is_dir() else set()
+    return {p.stem for p in turns.glob("*.json") if "." not in p.stem} if turns.is_dir() else set()
 
 
 def _newest(entry: Path) -> float:

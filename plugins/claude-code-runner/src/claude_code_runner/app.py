@@ -70,6 +70,7 @@ from claude_code_runner.adoption import (
     adoption_decision,
     process_matches,
     read_turn_record,
+    record_paths,
 )
 from claude_code_runner.attachments import fetch_attachments, run_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
@@ -93,6 +94,7 @@ from claude_code_runner.commandline import (
     reported_model,
     scoped_tools,
 )
+from claude_code_runner.computer import sweep_computer
 from claude_code_runner.config import RunnerConfig
 from claude_code_runner.environment import (
     RunEnvironmentError,
@@ -130,7 +132,7 @@ from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.searchassist import SearchAssistant
 from claude_code_runner.secrets import SecretError, resolve
-from claude_code_runner.statedir import ensure_private_dir, sweep
+from claude_code_runner.statedir import ensure_private_dir, recorded_runs, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.team import ACCEPTED_TRIGGER_KINDS, facts_of
 from claude_code_runner.transcribe import Transcriber
@@ -682,7 +684,7 @@ class RunnerHandler(AgentHandler):
             adapter: The built adapter (its client, inbox and outbox).
         """
         turns = self.config.state_dir / "turns"
-        for path in sorted(turns.glob("*.json")) if turns.is_dir() else []:
+        for path in record_paths(turns):
             # Checked before anything is built from it: the run of its file name, and UUIDs
             # for the thread and the session, whose names the locks carry. Only the record of
             # a run before ``run.start`` carries no session: it is removed by its phase, and
@@ -706,6 +708,11 @@ class RunnerHandler(AgentHandler):
             poll=self.config.poll_interval,
             timeout=self.config.cli_probe_timeout,
         )
+        # A run whose record the start removed ends its computer use here: the sweep deletes
+        # the screenshots of a session it opened (27 10.5, D-CU-06-4).
+        adopted = {str(r) for r in self.adopted}
+        for state_dir in (self.config.state_dir, *sorted(self.config.state_dir.glob("hosted/*"))):
+            sweep_computer(state_dir, adopted | recorded_runs(state_dir))
 
     async def _adopt(
         self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID
@@ -1558,6 +1565,7 @@ class RunnerHandler(AgentHandler):
             with contextlib.suppress(OSError):
                 active = {str(r) for r in (*self._runs, *self.adopted)}
                 sweep(self.config.state_dir, self.config.stream_log_retention, active=active)
+                sweep_computer(self.config.state_dir, active | recorded_runs(self.config.state_dir))
 
 
 class Runner:
@@ -1714,6 +1722,9 @@ class Runner:
 
     def _startup_files(self) -> None:
         sweep(self.config.state_dir, self.config.stream_log_retention)
+        # What a crashed runner left of computer use; a run with a record stays for adoption.
+        for state_dir in (self.config.state_dir, *sorted(self.config.state_dir.glob("hosted/*"))):
+            sweep_computer(state_dir, recorded_runs(state_dir))
 
     async def run(self) -> CloseReason:
         """Build the adapter and run it until it stops.

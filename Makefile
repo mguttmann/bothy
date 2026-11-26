@@ -173,7 +173,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
-        trivy-image portability portability-trial load-capacity console-e2e console-web-test alert-e2e adapters-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability portability-trial load-capacity console-e2e console-web-test alert-e2e adapters-e2e computer-e2e runner-real-cli linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test templates-check commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
@@ -271,8 +271,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
 	else gl=$(call tool,golangci-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live,perf,sdkserver ./... && \
-	    "$$gl" run --build-tags contract_validate,contract_live,perf,sdkserver ./...) || exit 1; done; \
+	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live,perf,sdkserver,computere2e ./... && \
+	    "$$gl" run --build-tags contract_validate,contract_live,perf,sdkserver,computere2e ./...) || exit 1; done; \
 	  for m in $(filter $(GO_CROSS_MODULES),$(GO_MODS)); do for os in $(GO_CROSS_OS); do \
 	    (cd $$m && GOOS=$$os go vet ./... && GOOS=$$os "$$gl" run ./...) || exit 1; done; done; fi
 	@# One analysis at the root covers every member of the workspace (docs/DECISIONS.md D-M4-01-5).
@@ -1090,6 +1090,24 @@ alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the ch
 adapters-e2e: ## End-to-end suites of the Hermes adapter and the Claude Code runner against the real server (tests/realserver)
 	cd plugins/hermes-adapter && $(UV) run --locked pytest -m e2e tests/realserver
 	cd plugins/claude-code-runner && $(UV) run --locked pytest -m e2e tests/realserver
+
+# The end-to-end test of computer use CU-T24 (docs/spec/27-computer-use.md 15, brief CU-06): first
+# Fake-Claude's MCP client against the bothy-computer-mcp of this tree, then the Compose stack of the
+# terminal suite with the desktop (host service, Linux test backend in Xvfb, fixture app) and the
+# runner machine (the Claude Code runner with runner.computer_use and the scripted Fake-Claude),
+# services/server/test/terminal/e2e/computer (build tag computere2e). Needs Go, uv and a
+# Docker-compatible runtime; `make check` leaves it out, the CI job test-adapters-e2e runs it.
+computer-e2e: ## CU-T24: computer use end to end, server, host service with the Linux test backend and the runner with a scripted Fake-Claude in Compose (needs Docker)
+	cd plugins/claude-code-runner && $(UV) run --locked pytest -m e2e tests/computer_mcp
+	cd services/server && go test -tags computere2e -count=1 -timeout 60m -v ./test/terminal/e2e/computer/
+
+# The background part of the runner's real-CLI suite (FIX-RUNNER-BG-NO-PROMPT): background sessions
+# of the Claude Code CLI version the runner runs with (tests/real_cli/ci_cli.py) against the local stand-in for the API, free (no login, no model
+# call). It refuses to run outside CI: a background session shares the CLI's supervisor with the
+# host user's sessions, so it never runs beside an operator's runner. The CI job
+# test-adapters-e2e runs it.
+runner-real-cli: ## Background sessions of the Claude Code CLI the runner runs with against the stand-in API, CI only (plugins/claude-code-runner/tests/real_cli/ci_cli.py)
+	cd plugins/claude-code-runner && $(UV) run --locked python tests/real_cli/ci_cli.py
 
 # The desktop E2E suite and the performance level (M4-34; 15 19 and 20), each with its terminal
 # part (M4-38: the client stack of the terminal with a host container, Go and Docker). Not part

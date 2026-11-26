@@ -29,7 +29,16 @@ The packages split the scenarios as follows: `conformance` (profile `default`) T
 TM-T12, TM-T17, TM-T19, TM-T20, TM-T22, TM-T23, TM-T28, AZ-M54 to AZ-M61 and ID-T28;
 `hostpolicy` TM-T21, TM-T24 and TM-T29; `limits` (profile `limits`) TM-T11; `twonode` (profile
 `twonode`) TM-T15; `restart` TM-T16 on a stack of its own, because it restarts the server;
-`hostplatform` the platform suite of `services/host/test/platform` in a fresh host container.
+`hostplatform` the platform suite of `services/host/test/platform` in a fresh host container;
+`computer` (build tag `computere2e`, `make computer-e2e`, not part of `make check`) the end-to-end
+test of computer use CU-T24 of [27-computer-use.md](../../../../docs/spec/27-computer-use.md) on a
+stack whose host image adds Xvfb, Python and Tk (`suite.MainWith` with `Extra.HostPackages`): a
+desktop container with the host service, the Linux test backend of
+[`services/host/test/computer_backend`](../../../host/test/computer_backend/README.md) and the
+fixture app, and a runner container with the Claude Code runner of this tree, its Python
+dependencies for Linux (`uv export` and `uv pip install --target` from the runner's lock), the
+`bothy-computer-mcp` of this tree and the scripted Fake-Claude
+(`plugins/claude-code-runner/tests/fake_claude/fake_computer.py`).
 TM-T16 also runs under load in `make perf` (`TestChaosTMT16` in
 [`test/chaos`](../chaos/README.md), build tag `perf`).
 
@@ -181,6 +190,7 @@ build session creates it before the run, and nowhere else.
 ## Cached images
 
 The server image `termsuite-server:<12 hex>` and the host image `termsuite-host:<12 hex>` stay as
-local build cache under their content-addressed tags. `docker image ls 'termsuite-server'` and
+local build cache under their content-addressed tags (a host image with added packages is tagged by
+the Dockerfile and its package list). `docker image ls 'termsuite-server'` and
 `docker image ls 'termsuite-host'` list them, `docker image rm <tag>` removes one; the next run
 builds it again ([infra/compose/test/README.md](../../../../infra/compose/test/README.md)).
