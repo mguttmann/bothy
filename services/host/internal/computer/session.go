@@ -119,6 +119,10 @@ func (s *csession) serve() {
 		return
 	}
 	s.mu.Lock()
+	if s.ended {
+		s.mu.Unlock()
+		return
+	}
 	s.tr = tr
 	state := stateActive
 	if m.c.Helper.State().Locked {
@@ -189,6 +193,12 @@ func (s *csession) handshake(st Stream, msg1 []byte) (Claims, *noise.Transport, 
 	}
 	if d := m.admit(s.ctx, s.o.SessionID, cl.Gen); d != "" {
 		return Claims{}, nil, d
+	}
+	if s.isEnded() {
+		// The session ended while the checks ran; its end freed the lock already, so the lock
+		// admit took again is freed here (an end never leaves the controller lock held).
+		m.lock.release(s.o.SessionID)
+		return Claims{}, nil, DetailHandshakeFailed
 	}
 	b, _ := json.Marshal(payload2{V: 1, HostVersion: m.c.HostVersion, Platform: m.c.Platform})
 	msg2, tr, err := resp.WriteMessage2(b)
@@ -319,6 +329,12 @@ func (s *csession) dropQueued() {
 			return
 		}
 	}
+}
+
+func (s *csession) isEnded() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ended
 }
 
 func (s *csession) paused() bool {

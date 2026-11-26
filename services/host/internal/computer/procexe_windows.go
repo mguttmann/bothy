@@ -5,52 +5,73 @@ package computer
 import (
 	"context"
 	"errors"
+	"net"
 	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/OWNER/bothy/services/host/internal/confirm"
 )
 
 // errSigner is a helper whose Authenticode signature does not verify or whose signer subject
 // differs from the requirement of the build.
 var errSigner = errors.New("computer: signature of the helper refused")
 
-// procCryptMsgClose closes the message handle of CryptQueryObject; golang.org/x/sys/windows has no
-// wrapper for it.
-var procCryptMsgClose = windows.NewLazySystemDLL("crypt32.dll").NewProc("CryptMsgClose")
+// errNotPeer is a pipe client whose process is not the one that connected.
+var errNotPeer = errors.New("computer: the process behind the connection changed")
 
-// DefaultExePath returns the executable path of process pid with QueryFullProcessImageNameW.
-func DefaultExePath(pid int) (string, error) {
-	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid)) //nolint:gosec // G115: a process ID of the peer credentials
+// stillActive is STILL_ACTIVE, the exit code of a running process.
+const stillActive = 259
+
+// winProc is the pipe client process, held by a handle opened at the accept: while the handle is
+// open the PID cannot be reused, and Windows has no exec that replaces the image of a process.
+type winProc struct {
+	h windows.Handle
+}
+
+// DefaultBind opens the process of the pipe client p (its PID from GetNamedPipeClientProcessId)
+// and keeps the handle for the life of the connection; a process created after the accept holds a
+// reused PID and is refused.
+func DefaultBind(_ net.Conn, p confirm.Peer, accepted time.Time) (Process, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(p.PID)) //nolint:gosec // G115: a process ID of the peer credentials
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer func() { _ = windows.CloseHandle(h) }()
-	buf := make([]uint16, windows.MAX_LONG_PATH)
-	n := uint32(len(buf)) //nolint:gosec // G115: MAX_LONG_PATH fits into uint32
-	if err := windows.QueryFullProcessImageName(h, 0, &buf[0], &n); err != nil {
+	var created, exited, kernel, user windows.Filetime
+	if err := windows.GetProcessTimes(h, &created, &exited, &kernel, &user); err != nil || !time.Unix(0, created.Nanoseconds()).Before(accepted) {
+		_ = windows.CloseHandle(h)
+		return nil, errNotPeer
+	}
+	return &winProc{h: h}, nil
+}
+
+// Current implements Process: the held process still runs.
+func (w *winProc) Current() error {
+	var code uint32
+	if err := windows.GetExitCodeProcess(w.h, &code); err != nil || code != stillActive {
+		return errNotPeer
+	}
+	return nil
+}
+
+// ExePath implements Process: QueryFullProcessImageNameW through the held handle.
+func (w *winProc) ExePath() (string, error) {
+	var buf [windows.MAX_LONG_PATH]uint16
+	n := uint32(len(buf))
+	if err := windows.QueryFullProcessImageName(w.h, 0, &buf[0], &n); err != nil {
 		return "", err
 	}
 	return windows.UTF16ToString(buf[:n]), nil
 }
 
-// DefaultStartTime returns the creation time of process pid (GetProcessTimes).
-func DefaultStartTime(pid int) (time.Time, error) {
-	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid)) //nolint:gosec // G115: a process ID of the peer credentials
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer func() { _ = windows.CloseHandle(h) }()
-	var created, exited, kernel, user windows.Filetime
-	if err := windows.GetProcessTimes(h, &created, &exited, &kernel, &user); err != nil {
-		return time.Time{}, err
-	}
-	return time.Unix(0, created.Nanoseconds()), nil
-}
+// Close implements Process: the handle is released.
+func (w *winProc) Close() error { return windows.CloseHandle(w.h) }
 
-// DefaultVerifySignature checks the Authenticode signature of path with WinVerifyTrust and that a
-// certificate of the signature carries the subject requirement as its simple display name
-// (docs/spec/27-computer-use.md 9.4: Authenticode with the publisher subject).
+// DefaultVerifySignature checks the Authenticode signature of path with WinVerifyTrust and that
+// the certificate of the signer itself (the leaf of the signer's chain that the trust provider
+// built, not any certificate embedded in the signature) carries the subject requirement as its
+// simple display name (docs/spec/27-computer-use.md 9.4: Authenticode with the publisher subject).
 func DefaultVerifySignature(_ context.Context, path, requirement string) error {
 	p, err := windows.UTF16PtrFromString(path)
 	if err != nil {
@@ -61,42 +82,53 @@ func DefaultVerifySignature(_ context.Context, path, requirement string) error {
 		RevocationChecks: windows.WTD_REVOKE_NONE, UnionChoice: windows.WTD_CHOICE_FILE, StateAction: windows.WTD_STATEACTION_VERIFY,
 		FileOrCatalogOrBlobOrSgnrOrCert: unsafe.Pointer(file)} //nolint:gosec // G103: the WINTRUST_DATA union points at the file info (the API's layout)
 	verr := windows.WinVerifyTrustEx(windows.InvalidHWND, &windows.WINTRUST_ACTION_GENERIC_VERIFY_V2, data)
+	// The signer is read from the provider data of the verification, before the state closes.
+	ok := verr == nil && signerSubjectIs(data.StateData, requirement)
 	data.StateAction = windows.WTD_STATEACTION_CLOSE
 	_ = windows.WinVerifyTrustEx(windows.InvalidHWND, &windows.WINTRUST_ACTION_GENERIC_VERIFY_V2, data)
-	if verr != nil {
-		return errSigner
-	}
-	if !signerSubject(p, requirement) {
+	if !ok {
 		return errSigner
 	}
 	return nil
 }
 
-// signerSubject reports whether a certificate of the embedded signature of the file p has the
-// simple display name subject.
-func signerSubject(p *uint16, subject string) bool {
-	var enc, content, format uint32
-	var store, msg windows.Handle
-	if err := windows.CryptQueryObject(windows.CERT_QUERY_OBJECT_FILE, unsafe.Pointer(p), windows.CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, //nolint:gosec // G103: the API takes the UTF-16 path as a pointer
-		windows.CERT_QUERY_FORMAT_FLAG_BINARY, 0, &enc, &content, &format, &store, &msg, nil); err != nil {
+// The helpers of wintrust.dll that read the signer of a verification; golang.org/x/sys/windows
+// has no wrappers for them.
+var (
+	wintrust                           = windows.NewLazySystemDLL("wintrust.dll")
+	procWTHelperProvDataFromStateData  = wintrust.NewProc("WTHelperProvDataFromStateData")
+	procWTHelperGetProvSignerFromChain = wintrust.NewProc("WTHelperGetProvSignerFromChain")
+	procWTHelperGetProvCertFromChain   = wintrust.NewProc("WTHelperGetProvCertFromChain")
+)
+
+// cryptProviderCert is the start of CRYPT_PROVIDER_CERT (wintrust.h): cbStruct, then pCert.
+type cryptProviderCert struct {
+	CbStruct uint32
+	PCert    *windows.CertContext
+}
+
+// signerSubjectIs reports whether the leaf certificate of the first signer of the verification
+// state has the simple display name subject.
+func signerSubjectIs(state windows.Handle, subject string) bool {
+	prov, _, _ := procWTHelperProvDataFromStateData.Call(uintptr(state))
+	if prov == 0 {
 		return false
 	}
-	defer func() {
-		_ = windows.CertCloseStore(store, 0)
-		_, _, _ = procCryptMsgClose.Call(uintptr(msg))
-	}()
-	var cert *windows.CertContext
-	for {
-		next, err := windows.CertEnumCertificatesInStore(store, cert)
-		if err != nil || next == nil {
-			return false
-		}
-		cert = next
-		var buf [512]uint16
-		n := windows.CertGetNameString(cert, windows.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nil, &buf[0], uint32(len(buf)))
-		if n > 1 && windows.UTF16ToString(buf[:n-1]) == subject {
-			_ = windows.CertFreeCertificateContext(cert)
-			return true
-		}
+	sgnr, _, _ := procWTHelperGetProvSignerFromChain.Call(prov, 0, 0, 0)
+	if sgnr == 0 {
+		return false
 	}
+	pc, _, _ := procWTHelperGetProvCertFromChain.Call(sgnr, 0)
+	if pc == 0 {
+		return false
+	}
+	// The address comes from wintrust.dll (memory outside the Go heap the trust provider owns until
+	// the state closes); reading it through a pointer to the integer keeps the conversion explicit.
+	cert := *(**cryptProviderCert)(unsafe.Pointer(&pc)) //nolint:gosec // G103: a CRYPT_PROVIDER_CERT of the trust provider
+	if cert.PCert == nil {
+		return false
+	}
+	var buf [512]uint16
+	n := windows.CertGetNameString(cert.PCert, windows.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nil, &buf[0], uint32(len(buf)))
+	return n > 1 && windows.UTF16ToString(buf[:n-1]) == subject
 }

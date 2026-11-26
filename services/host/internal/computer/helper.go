@@ -7,7 +7,9 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
@@ -73,6 +75,9 @@ type HelperOptions struct {
 	Listener net.Listener
 	// PeerOf returns the peer of an accepted connection (confirm.PeerOf in production).
 	PeerOf func(net.Conn) (confirm.Peer, error)
+	// Bind captures the peer process of an accepted connection (DefaultBind in production); nil
+	// binds none, which only the Linux rule accepts.
+	Bind func(c net.Conn, p confirm.Peer, accepted time.Time) (Process, error)
 	// Rule is the peer rule of 27 9.4.
 	Rule PeerRule
 	// MaxBytes is host_service.computer_frame_max_bytes.
@@ -108,7 +113,6 @@ type Helper struct {
 	mu      sync.Mutex
 	conn    *helperConn
 	peer    confirm.Peer
-	id      Identity
 	state   HelperState
 	seq     int64
 	pending map[int64]chan Reply
@@ -116,8 +120,19 @@ type Helper struct {
 
 // helperConn is one trusted connection.
 type helperConn struct {
-	c   net.Conn
-	wmu sync.Mutex
+	c    net.Conn
+	proc Process
+	wmu  sync.Mutex
+	// refused is set when a later check of the peer rule closed the connection; the report then
+	// says refused, not absent.
+	refused atomic.Bool
+}
+
+// closeProc releases the binding of a peer process, if any.
+func closeProc(p Process) {
+	if p != nil {
+		_ = p.Close()
+	}
 }
 
 // NewHelper returns a Helper for o; Serve starts it.
@@ -165,37 +180,46 @@ func (h *Helper) Serve(ctx context.Context) error {
 	}
 }
 
-// accept checks the peer of c (accepted at accepted), waits for hello, checks the peer again and
-// serves the connection.
+// accept checks the peer of c (accepted at accepted) with the process the connection captured,
+// waits for hello, checks the peer again and serves the connection.
 func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	var peer confirm.Peer
-	var id Identity
+	var proc Process
 	var err error
 	if h.o.PeerOf == nil {
 		err = ErrPeerRefused
-	} else if peer, err = h.o.PeerOf(c); err == nil {
-		id, err = h.o.Rule.Identify(ctx, peer, accepted)
+	} else if peer, err = h.o.PeerOf(c); err == nil && h.o.Bind != nil {
+		proc, err = h.o.Bind(c, peer, accepted)
+	}
+	if err == nil {
+		err = h.o.Rule.Check(ctx, peer, proc)
 	}
 	if err != nil {
+		closeProc(proc)
 		h.refused(ctx, c)
 		return
 	}
+	// A peer that never sends hello must not hold Serve past its end.
+	stop := context.AfterFunc(ctx, func() { _ = c.Close() })
 	kind, body, err := ReadFrame(c, h.o.MaxBytes)
+	stop()
 	op, msg, derr := DecodeMsg(body)
 	hello, ok := msg.(*Hello)
 	if err != nil || kind != KindJSON || derr != nil || op != OpHello || !ok {
+		closeProc(proc)
 		_ = c.Close()
 		return
 	}
 	// The process behind the connection must still be the one admitted before hello (27 9.4).
-	if h.o.Rule.Same(ctx, peer, id) != nil {
+	if h.o.Rule.Check(ctx, peer, proc) != nil {
+		closeProc(proc)
 		h.refused(ctx, c)
 		return
 	}
-	hc := &helperConn{c: c}
+	hc := &helperConn{c: c, proc: proc}
 	h.mu.Lock()
 	old := h.conn
-	h.conn, h.peer, h.id = hc, peer, id
+	h.conn, h.peer = hc, peer
 	var pend map[int64]chan Reply
 	if old != nil {
 		pend = h.pending
@@ -260,8 +284,14 @@ func (h *Helper) read(hc *helperConn) {
 	}
 }
 
+// doneCodes are the codes of done (27 9.4); another one is answered as os_refused.
+var doneCodes = []string{CodeOK, CodeScreenLocked, CodeSecureDesktop, CodeOSRefused, CodeInvalidAction}
+
 // done reads the image of a capture answer and hands the reply to its request.
 func (h *Helper) done(hc *helperConn, d *Done) bool {
+	if !slices.Contains(doneCodes, d.Code) {
+		d.Code = CodeOSRefused
+	}
 	r := Reply{Done: *d}
 	if d.Image != nil {
 		kind, img, err := ReadFrame(hc.c, h.o.MaxBytes)
@@ -309,6 +339,7 @@ func merge(s *HelperState, m *StateMsg) {
 // request fails, and EventGone goes out.
 func (h *Helper) gone(hc *helperConn) {
 	_ = hc.c.Close()
+	closeProc(hc.proc)
 	h.mu.Lock()
 	if h.conn != hc {
 		h.mu.Unlock()
@@ -316,7 +347,7 @@ func (h *Helper) gone(hc *helperConn) {
 	}
 	h.conn = nil
 	before := h.state
-	h.state = HelperState{}
+	h.state = HelperState{Refused: hc.refused.Load()}
 	pend := h.pending
 	h.pending = map[int64]chan Reply{}
 	after := h.state
@@ -352,18 +383,19 @@ func (h *Helper) State() HelperState {
 	return h.state
 }
 
-// Recheck runs the peer rule again on the current connection and checks that its process is still
-// the admitted one (27 9.4: again before every session);
+// Recheck runs the peer rule again on the current connection, with the process it captured (27
+// 9.4: again before every session);
 // a failure closes the connection and returns ErrPeerRefused, no connection ErrHelperAbsent.
 func (h *Helper) Recheck(ctx context.Context) error {
 	h.mu.Lock()
-	hc, peer, id := h.conn, h.peer, h.id
+	hc, peer := h.conn, h.peer
 	h.mu.Unlock()
 	if hc == nil {
 		return ErrHelperAbsent
 	}
-	if err := h.o.Rule.Same(ctx, peer, id); err != nil {
+	if err := h.o.Rule.Check(ctx, peer, hc.proc); err != nil {
 		h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused))
+		hc.refused.Store(true)
 		_ = hc.c.Close()
 		return ErrPeerRefused
 	}
@@ -413,6 +445,11 @@ func (h *Helper) Request(ctx context.Context, seq int64, m any) (Reply, error) {
 	}
 	h.pending[seq] = ch
 	h.mu.Unlock()
+	if ctx.Err() != nil {
+		// The session ended (its release and hide may be out already): nothing more is sent.
+		h.forget(seq)
+		return Reply{}, ctx.Err()
+	}
 	if err := h.write(hc, m); err != nil {
 		h.forget(seq)
 		return Reply{}, ErrHelperGone

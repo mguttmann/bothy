@@ -5,73 +5,79 @@ package computer
 import (
 	"context"
 	"errors"
+	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
 )
 
-// starts is a fake table of process start times.
-type starts map[int]time.Time
-
-func (s starts) of(pid int) (time.Time, error) {
-	if t, ok := s[pid]; ok {
-		return t, nil
+// TestPeerExecAfterConnectAndPIDReuse: the peer rule checks the process the connection captured;
+// an exec of another image after the connect (the same PID and start time, another PID version)
+// and a process that took over the PID of an exited peer are both refused, at the connection and
+// at every later check (27 9.4, D-CU-03-12).
+func TestPeerExecAfterConnectAndPIDReuse(t *testing.T) {
+	procs := procTable{10: helperPath}
+	r := rule(procs, "", nil, map[string]bool{helperPath: true})
+	peer := confirm.Peer{UID: uidAlex, PID: 10}
+	p := procs.proc(10)
+	if err := r.Check(context.Background(), peer, p); err != nil {
+		t.Fatalf("genuine helper: %v", err)
 	}
-	return time.Time{}, errors.New("no such process")
-}
-
-// TestPeerIdentityPIDReuse: the identity of a helper peer is its process ID with the start time of
-// the process, which must lie before the connection was accepted; a process that took over the
-// PID of a peer that exited (PID reuse) starts later and is refused, and so is a peer whose
-// identity changed between the admission and a later check (27 9.4, D-CU-03-12).
-func TestPeerIdentityPIDReuse(t *testing.T) {
-	accepted := time.Unix(1_800_000_000, 0)
-	st := starts{10: accepted.Add(-time.Minute), 20: accepted.Add(time.Second)}
-	r := rule(procTable{10: helperPath, 20: helperPath}, "", nil, map[string]bool{helperPath: true})
-	r.StartTime = st.of
-	id, err := r.Identify(context.Background(), confirm.Peer{UID: uidAlex, PID: 10}, accepted)
-	if err != nil || id.PID != 10 || !id.Start.Equal(accepted.Add(-time.Minute)) {
-		t.Fatalf("genuine helper: %+v %v", id, err)
+	*p.now = 2 // the connector exec'd the helper image, or exited and another process took the PID
+	if err := r.Check(context.Background(), peer, p); !errors.Is(err, ErrPeerRefused) {
+		t.Errorf("changed process: %v", err)
 	}
-	if _, err := r.Identify(context.Background(), confirm.Peer{UID: uidAlex, PID: 20}, accepted); !errors.Is(err, ErrPeerRefused) {
-		t.Errorf("a process started after the accept (PID reuse): %v", err)
-	}
-	if err := r.Same(context.Background(), confirm.Peer{UID: uidAlex, PID: 10}, id); err != nil {
-		t.Errorf("unchanged peer: %v", err)
-	}
-	st[10] = accepted.Add(time.Hour) // the peer exited and another process took its PID
-	if err := r.Same(context.Background(), confirm.Peer{UID: uidAlex, PID: 10}, id); !errors.Is(err, ErrPeerRefused) {
-		t.Errorf("reused PID after the admission: %v", err)
-	}
-	r.StartTime = nil
-	if _, err := r.Identify(context.Background(), confirm.Peer{UID: uidAlex, PID: 10}, accepted); !errors.Is(err, ErrPeerRefused) {
-		t.Errorf("no start time source: %v", err)
+	if err := r.Check(context.Background(), peer, nil); !errors.Is(err, ErrPeerRefused) {
+		t.Errorf("no captured process: %v", err)
 	}
 }
 
-// TestHelperRecheckAfterHelloPIDReuse: a peer whose PID changes identity while the host service
-// waits for hello is refused after hello (the connection closes, the helper stays absent).
-func TestHelperRecheckAfterHelloPIDReuse(t *testing.T) {
+// changingProc is a captured process that turns into another one after a number of checks.
+type changingProc struct {
+	calls atomic.Int64
+	after int64
+}
+
+func (c *changingProc) Current() error {
+	if c.calls.Add(1) > c.after {
+		return errors.New("exec after connect")
+	}
+	return nil
+}
+func (c *changingProc) ExePath() (string, error) { return helperPath, c.Current() }
+func (c *changingProc) Close() error             { return nil }
+
+// TestHelperRecheckAfterHello: a peer whose process changes while the host service waits for
+// hello is refused after hello; the helper stays absent and the refusal is logged.
+func TestHelperRecheckAfterHello(t *testing.T) {
 	r := newRig(t)
-	r.h.o.Rule = rule(procTable{4242: helperPath}, "", nil, map[string]bool{helperPath: true})
-	r.h.o.Rule.Console.ConsoleOwner = func(context.Context) (string, error) { return uidAlex, nil }
-	now := time.Now()
-	calls := 0
-	r.h.o.Rule.StartTime = func(int) (time.Time, error) {
-		calls++
-		if calls == 1 {
-			return now.Add(-time.Minute), nil
-		}
-		return now.Add(time.Minute), nil // another process took the PID before hello was read
-	}
+	r.h.o.Rule = rule(nil, "", nil, map[string]bool{helperPath: true})
+	cp := &changingProc{after: 3} // the checks before hello pass, the one after it fails
+	r.h.o.Bind = func(net.Conn, confirm.Peer, time.Time) (Process, error) { return cp, nil }
 	r.connect(hello())
 	deadline := time.Now().Add(wait)
-	for time.Now().Before(deadline) && calls < 2 {
+	for time.Now().Before(deadline) && cp.calls.Load() <= cp.after {
 		time.Sleep(5 * time.Millisecond)
 	}
 	time.Sleep(50 * time.Millisecond)
-	if st := r.h.State(); st.Connected {
-		t.Fatalf("helper admitted after its identity changed: %+v", st)
+	if st := r.h.State(); st.Connected || !st.Refused {
+		t.Fatalf("helper state after its process changed: %+v", st)
 	}
+}
+
+// TestRecheckRefusalReportsRefused: a helper that a later check refuses is reported as refused,
+// not absent.
+func TestRecheckRefusalReportsRefused(t *testing.T) {
+	r := newRig(t)
+	r.h.o.Rule = rule(nil, "", nil, map[string]bool{helperPath: true})
+	cp := &changingProc{after: 6} // the checks before and after hello pass (three calls each), the next fails
+	r.h.o.Bind = func(net.Conn, confirm.Peer, time.Time) (Process, error) { return cp, nil }
+	r.connect(hello())
+	r.waitState(func(s HelperState) bool { return s.Connected })
+	if err := r.h.Recheck(context.Background()); !errors.Is(err, ErrPeerRefused) {
+		t.Fatalf("recheck %v", err)
+	}
+	r.waitState(func(s HelperState) bool { return !s.Connected && s.Refused })
 }

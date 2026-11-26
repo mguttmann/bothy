@@ -93,10 +93,12 @@ Normative: [27-computer-use.md](../../docs/spec/27-computer-use.md); rulings:
 `\\.\pipe\bothy-host-computer`, Linux `/run/bothy-host-computer/computer.sock` for the test peer
 of `host_service.computer_test_peer` only) and admits the computer helper by the peer rule of 27 9.4
 (console user, not the service user or a session user, the installed helper path with the rule of
-HD10, the signing requirement of the build, the identity bound to the process start time and checked
+HD10, the signing requirement of the build; the peer is the process the connection captured: macOS
+audit token with its PID version, Windows the client process handle held from the accept; checked
 again after `hello` and before every session); a refused peer is closed and logged with
 `computer_peer_refused`. The helper's `hello` and `state` become the `report` object `computer`;
-without the key nothing listens and the object says `helper: absent`.
+without the key nothing listens and the report carries no object `computer` (the server reads it as
+`helper: absent`).
 
 `computer.open` checks helper, enablement and the controller lock (one live computer session per
 host), shows the indicator and dials `/api/v1/hosts/computer-sessions/{session_id}/stream`; message

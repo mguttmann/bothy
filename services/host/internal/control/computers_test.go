@@ -16,15 +16,16 @@ import (
 )
 
 // wireReport is the body of report on the wire: the report of startup and the object computer
-// (docs/spec/27-computer-use.md 12.3).
+// (docs/spec/27-computer-use.md 12.3), absent without host_service.computer_use.
 type wireReport struct {
 	startup.Report
-	Computer control.ComputerReport `json:"computer"`
+	Computer *control.ComputerReport `json:"computer"`
 }
 
-// TestReportComputerAbsent: without host_service.computer_use the report carries computer with
-// helper absent (27 4 item 2).
-func TestReportComputerAbsent(t *testing.T) {
+// TestReportWithoutComputerUse: without host_service.computer_use the report carries no object
+// computer, so it is the report of before computer use, which the server reads as helper absent
+// (brief rule 11, D-CU-03-6); the report frame equals the plain report byte for byte.
+func TestReportWithoutComputerUse(t *testing.T) {
 	t.Parallel()
 	srv := controltest.New(t)
 	c := newClient(t, srv, nil)
@@ -33,13 +34,14 @@ func TestReportComputerAbsent(t *testing.T) {
 	if err := c.Report(ctx(t), sampleReport("Debian 13")); err != nil {
 		t.Fatal(err)
 	}
+	raw := conn.Expect(t, ctx(t), "report")
 	var r wireReport
-	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil {
-		t.Fatal(err)
+	if err := controltest.Strict(raw, &r); err != nil || r.Computer != nil {
+		t.Fatalf("report %+v %v", r.Computer, err)
 	}
-	want := control.ComputerReport{Helper: "absent", Permissions: control.ComputerPermissions{Capture: "unknown", Input: "unknown"}, Signature: "development"}
-	if r.Computer != want {
-		t.Errorf("computer %+v, want %+v", r.Computer, want)
+	var plain startup.Report
+	if err := controltest.Strict(raw, &plain); err != nil {
+		t.Errorf("the report is no longer the plain report: %v", err)
 	}
 }
 
@@ -140,7 +142,7 @@ func TestComputerOps(t *testing.T) {
 		t.Fatal(err)
 	}
 	var r wireReport
-	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.Computer != fc.report {
+	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.Computer == nil || *r.Computer != fc.report {
 		t.Fatalf("report %+v %v", r.Computer, err)
 	}
 	sid := "0192f3a4-5b6c-7d8e-9f01-23456789abcd"
@@ -157,7 +159,7 @@ func TestComputerOps(t *testing.T) {
 	if err := c.ComputerChanged(ctx(t)); err != nil {
 		t.Fatal(err)
 	}
-	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || !r.Computer.Locked {
+	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.Computer == nil || !r.Computer.Locked {
 		t.Fatalf("changed report %+v %v", r.Computer, err)
 	}
 	ops := fc.seen()

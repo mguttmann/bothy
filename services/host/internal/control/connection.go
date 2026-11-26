@@ -147,7 +147,7 @@ func (k *conn) sendReport(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := k.writeFrame(ctx, opReport, reportFrame{Report: withPeer(r, k.peerLocal), Computer: k.c.computers.Report()}, true); err != nil {
+	if err := k.writeFrame(ctx, opReport, reportOf(withPeer(r, k.peerLocal), k.c.computers), true); err != nil {
 		return err
 	}
 	if k.c.reportWritten != nil {

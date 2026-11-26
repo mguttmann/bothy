@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
 	"github.com/OWNER/bothy/services/host/internal/hostos"
@@ -21,13 +20,27 @@ var ErrPeerRefused = errors.New("computer: helper peer refused")
 // LogPeerRefused is the log code of a refused helper peer (CU-T23).
 const LogPeerRefused = "computer_peer_refused"
 
+// Process is the peer process of one helper connection as the connection captured it at connect
+// time (macOS the audit token with its PID version, Windows a handle of the pipe client opened at
+// the accept). It never names another process: an exit, a reuse of the PID or an exec of another
+// image after the connect makes Current fail (D-CU-03-12).
+type Process interface {
+	// Current returns nil while the process behind the connection is still the captured one.
+	Current() error
+	// ExePath returns the executable of the captured process.
+	ExePath() (string, error)
+	// Close releases what the binding holds.
+	Close() error
+}
+
 // PeerRule decides which process may act as the computer helper (docs/spec/27-computer-use.md 9.4,
 // D-CU-01-24): the user of the active console session (the rule of the confirmation agent, which
-// already refuses the service user and every configured or former session user), the executable at
-// the installed helper path, a file and folder chain of a trusted owner (the rule of HD10), and the
-// code signing requirement of the build when it carries one. On Linux the helper does not exist:
-// only the user named by host_service.computer_test_peer passes there, and the path and signature
-// parts do not apply. Every missing function and every lookup error refuses.
+// already refuses the service user and every configured or former session user), the executable of
+// the process bound to the connection at the installed helper path, a file and folder chain of a
+// trusted owner (the rule of HD10), and the code signing requirement of the build when it carries
+// one. On Linux the helper does not exist: only the user named by host_service.computer_test_peer
+// passes there (the uid SO_PEERCRED took at connect), and the path and signature parts do not
+// apply. Every missing function and every lookup error refuses.
 type PeerRule struct {
 	// GOOS is the platform the rule runs on.
 	GOOS string
@@ -37,9 +50,6 @@ type PeerRule struct {
 	TestPeerUID string
 	// HelperPath is the installed path of the helper executable.
 	HelperPath string
-	// ExePath returns the executable path of a process (macOS kern.procargs2, Windows
-	// QueryFullProcessImageNameW).
-	ExePath func(pid int) (string, error)
 	// Trusted applies the rule of a place for all (HD10) to a path.
 	Trusted func(path string) bool
 	// Requirement is the code signing requirement of this build (buildinfo); empty means a
@@ -47,79 +57,31 @@ type PeerRule struct {
 	Requirement string
 	// VerifySignature checks that the executable at path satisfies requirement.
 	VerifySignature func(ctx context.Context, path, requirement string) error
-	// StartTime returns the start time of a process (macOS kern.proc.pid, Windows
-	// GetProcessTimes); with the process ID it is the identity of the peer (Identify).
-	StartTime func(pid int) (time.Time, error)
 }
 
-// Identity is a helper peer bound to its process: the process ID and the start time of the
-// process. A process that takes over the PID of an exited peer starts later, so a changed start
-// time is another process (D-CU-03-12).
-type Identity struct {
-	PID   int
-	Start time.Time
-}
-
-// Identify runs Check for the peer of a connection accepted at acceptedAt and binds it to its
-// process: the start time is read before and after the checks of the executable, must not change
-// in between, and must lie before acceptedAt, because the peer created the connection before it was
-// accepted; a later process holds a reused PID. On Linux the peer is the uid that SO_PEERCRED took
-// at connect time, so no PID is involved there. Errors: ErrPeerRefused.
-func (r PeerRule) Identify(ctx context.Context, p confirm.Peer, acceptedAt time.Time) (Identity, error) {
-	if r.GOOS == hostos.Linux {
-		return Identity{PID: p.PID}, r.Check(ctx, p)
-	}
-	if r.StartTime == nil {
-		return Identity{}, ErrPeerRefused
-	}
-	before, err := r.StartTime(p.PID)
-	if err != nil || !before.Before(acceptedAt) {
-		return Identity{}, ErrPeerRefused
-	}
-	if err := r.Check(ctx, p); err != nil {
-		return Identity{}, err
-	}
-	if after, err := r.StartTime(p.PID); err != nil || !after.Equal(before) {
-		return Identity{}, ErrPeerRefused
-	}
-	return Identity{PID: p.PID, Start: before}, nil
-}
-
-// Same runs Check again and verifies that the process behind p is still the one of id (after
-// hello and before every session, 27 9.4). Errors: ErrPeerRefused.
-func (r PeerRule) Same(ctx context.Context, p confirm.Peer, id Identity) error {
-	if r.GOOS == hostos.Linux {
-		return r.Check(ctx, p)
-	}
-	if r.StartTime == nil || p.PID != id.PID {
-		return ErrPeerRefused
-	}
-	if err := r.Check(ctx, p); err != nil {
-		return err
-	}
-	if now, err := r.StartTime(p.PID); err != nil || !now.Equal(id.Start) {
-		return ErrPeerRefused
-	}
-	return nil
-}
-
-// Check returns nil when p may act as the helper, else ErrPeerRefused. The error names no user,
-// path or process.
-func (r PeerRule) Check(ctx context.Context, p confirm.Peer) error {
+// Check returns nil when the peer p, whose process proc the connection captured, may act as the
+// helper, else ErrPeerRefused. The process must be the captured one before the executable is read
+// and again after the signature check, so neither a reused PID nor an exec of another image after
+// the connect passes. It runs at the connection, after hello and before every session. The error
+// names no user, path or process.
+func (r PeerRule) Check(ctx context.Context, p confirm.Peer, proc Process) error {
 	if r.GOOS == hostos.Linux {
 		if r.TestPeerUID == "" || p.UID != r.TestPeerUID || p.UID == r.Console.ServiceUID {
 			return ErrPeerRefused
 		}
 		return nil
 	}
-	if r.ExePath == nil || r.Trusted == nil || r.HelperPath == "" || p.PID <= 0 || !r.Console.Allow(ctx, p) {
+	if proc == nil || r.Trusted == nil || r.HelperPath == "" || p.PID <= 0 || !r.Console.Allow(ctx, p) || proc.Current() != nil {
 		return ErrPeerRefused
 	}
-	exe, err := r.ExePath(p.PID)
+	exe, err := proc.ExePath()
 	if err != nil || !samePath(r.GOOS, exe, r.HelperPath) || !r.Trusted(exe) {
 		return ErrPeerRefused
 	}
 	if r.Requirement != "" && (r.VerifySignature == nil || r.VerifySignature(ctx, exe, r.Requirement) != nil) {
+		return ErrPeerRefused
+	}
+	if proc.Current() != nil {
 		return ErrPeerRefused
 	}
 	return nil

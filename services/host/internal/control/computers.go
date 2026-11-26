@@ -149,13 +149,13 @@ type Computers interface {
 	EndAll(ctx context.Context)
 	// Resend sends the computer.ended that could not be reported before over n.
 	Resend(ctx context.Context, n ComputerNotifier)
-	// Report returns the object computer of the next report.
+	// Report returns the object computer of the next report; RefuseComputers' object is not sent.
 	Report() ComputerReport
 }
 
 // RefuseComputers is the computer manager of a host without host_service.computer_use: nothing
-// listens, the report says helper absent, and every computer.open ends at once with open_failed
-// and helper_absent (27 4 item 2).
+// listens, the report carries no object computer (which the server reads as helper absent), and
+// every computer.open ends at once with open_failed and helper_absent (27 4 item 2).
 type RefuseComputers struct {
 	// Signature is the signature state of this build for the report.
 	Signature string
@@ -193,7 +193,8 @@ func (RefuseComputers) Resend(context.Context, ComputerNotifier) {
 	// RefuseComputers reports its refusals at once and keeps none.
 }
 
-// Report implements Computers: the helper is absent.
+// Report implements Computers: the helper is absent; the client omits this object from the report
+// of a host without computer use (reportOf).
 func (r RefuseComputers) Report() ComputerReport {
 	sig := r.Signature
 	if sig == "" {

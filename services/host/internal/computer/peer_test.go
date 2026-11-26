@@ -23,22 +23,45 @@ const (
 // procTable is a fake process table: pid to executable path.
 type procTable map[int]string
 
-func (p procTable) exe(pid int) (string, error) {
-	if s, ok := p[pid]; ok {
-		return s, nil
-	}
-	return "", errors.New("no such process")
+// fakeProc is a captured peer process; version is the PID version at connect, now points at the
+// current one (an exec or a PID reuse changes it).
+type fakeProc struct {
+	exe     string
+	version int
+	now     *int
+	closed  bool
 }
 
-// rule returns the peer rule of macOS with the fake process table and a signature check that
-// accepts exactly the signed paths.
-func rule(procs procTable, requirement string, signed map[string]bool, trusted map[string]bool) PeerRule {
+func (f *fakeProc) Current() error {
+	if f.exe == "" || f.now == nil || *f.now != f.version {
+		return errors.New("not the captured process")
+	}
+	return nil
+}
+
+func (f *fakeProc) ExePath() (string, error) {
+	if err := f.Current(); err != nil {
+		return "", err
+	}
+	return f.exe, nil
+}
+
+func (f *fakeProc) Close() error { f.closed = true; return nil }
+
+// proc returns the captured process of pid in the table.
+func (p procTable) proc(pid int) *fakeProc {
+	v := 1
+	return &fakeProc{exe: p[pid], version: 1, now: &v}
+}
+
+// rule returns the peer rule of macOS with a signature check that accepts exactly the signed
+// paths.
+func rule(_ procTable, requirement string, signed map[string]bool, trusted map[string]bool) PeerRule {
 	return PeerRule{
 		GOOS: hostos.Darwin,
 		Console: confirm.Rule{ServiceUID: uidService, Excluded: func() []string { return []string{uidSam} },
 			ConsoleOwner: func(context.Context) (string, error) { return uidAlex, nil }},
 		HelperPath:  helperPath,
-		ExePath:     procs.exe,
 		Trusted:     func(p string) bool { return trusted[p] },
 		Requirement: requirement,
 		VerifySignature: func(_ context.Context, p, req string) error {
@@ -71,9 +94,10 @@ func TestPeerRule(t *testing.T) {
 		{"untrusted folder chain", confirm.Peer{UID: uidAlex, PID: 10}, rule(procs, "", nil, map[string]bool{}), false},
 		{"unknown process", confirm.Peer{UID: uidAlex, PID: 99}, rule(procs, "", nil, trusted), false},
 		{"no pid", confirm.Peer{UID: uidAlex}, rule(procs, "", nil, trusted), false},
+		{"no captured process", confirm.Peer{UID: uidAlex, PID: 99}, rule(procs, "", nil, trusted), false},
 	}
 	for _, c := range cases {
-		err := c.r.Check(context.Background(), c.peer)
+		err := c.r.Check(context.Background(), c.peer, procs.proc(c.peer.PID))
 		if (err == nil) != c.allowed {
 			t.Errorf("%s: %v, want allowed %v", c.name, err, c.allowed)
 		}
@@ -87,18 +111,18 @@ func TestPeerRule(t *testing.T) {
 // admits nobody (27 9.4).
 func TestPeerRuleLinux(t *testing.T) {
 	r := PeerRule{GOOS: hostos.Linux, Console: confirm.Rule{ServiceUID: uidService}}
-	if r.Check(context.Background(), confirm.Peer{UID: uidAlex, PID: 5}) == nil {
+	if r.Check(context.Background(), confirm.Peer{UID: uidAlex, PID: 5}, nil) == nil {
 		t.Error("empty test peer admits a user")
 	}
 	r.TestPeerUID = uidAlex
-	if err := r.Check(context.Background(), confirm.Peer{UID: uidAlex, PID: 5}); err != nil {
+	if err := r.Check(context.Background(), confirm.Peer{UID: uidAlex, PID: 5}, nil); err != nil {
 		t.Errorf("test peer refused: %v", err)
 	}
-	if r.Check(context.Background(), confirm.Peer{UID: uidRobin, PID: 5}) == nil {
+	if r.Check(context.Background(), confirm.Peer{UID: uidRobin, PID: 5}, nil) == nil {
 		t.Error("another user admitted")
 	}
 	r.TestPeerUID = uidService
-	if r.Check(context.Background(), confirm.Peer{UID: uidService, PID: 5}) == nil {
+	if r.Check(context.Background(), confirm.Peer{UID: uidService, PID: 5}, nil) == nil {
 		t.Error("the service user admitted as test peer")
 	}
 }

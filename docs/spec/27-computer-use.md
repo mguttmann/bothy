@@ -438,14 +438,18 @@ the normal mode with a service user (D-CU-01-26).
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
   Otherwise the connection is closed and logged with `computer_peer_refused`.
-- Peer identity (both directions, D-CU-03-12): the identity of a peer is bound to the connection,
-  never to a process ID alone. The host service takes the peer's process ID from the connection
-  (macOS `LOCAL_PEERPID`, Windows the pipe client) together with the start time of that process,
-  which must lie before the connection was accepted and must not change while the executable is
-  checked; it checks the same identity again after `hello` and before every session, and closes the
-  channel when it changed (a process that took over the PID of an exited peer starts later). On
-  Linux the peer is the uid that `SO_PEERCRED` took at connect time. The helper checks its side
-  the same way: its peer is the service user, pinned by uid from the connection's credentials (CU-02).
+- Peer identity (both directions, D-CU-03-12): the peer is the process the connection captured at
+  connect time, never a process looked up by its ID. macOS: the audit token of the socket
+  (`LOCAL_PEERTOKEN`) with its PID version, which changes with every exec and differs for a
+  process that reuses the PID; the executable and the signature are checked only while the current
+  PID version equals the token's, before and after. Windows: a handle of the pipe client process
+  opened at the accept and held for the life of the connection (a process created after the accept
+  holds a reused PID and is refused; Windows has no exec); the image is read through that handle, and
+  the signer is the leaf certificate of the signer chain that `WinVerifyTrust` built. Linux: the uid
+  that `SO_PEERCRED` took at connect time. The host service runs the rule at the connection, after
+  `hello` and before every session, and closes the channel when it fails. The helper checks its side
+  the same way: its peer is the service user, pinned by the uid of the connection's credentials
+  (CU-02).
 - Protocol: frames of a 4-byte big-endian length (of type byte and content, at most
   `host_service.computer_frame_max_bytes`), one type byte and the content: `0x01` a UTF-8 JSON object,
   `0x02` the bytes of one image, sent directly after the `done` that announces it. The channel
@@ -602,7 +606,7 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 
 | Op | Direction | Content |
 |---|---|---|
-| `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; `signature` is `verified` when the build of the host service carries a code signing requirement for the helper (which the peer rule of 9.4 then enforces), else `development`, also with `helper` `absent` (D-CU-03-6); this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
+| `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; `signature` is `verified` when the build of the host service carries a code signing requirement for the helper (which the peer rule of 9.4 then enforces), else `development`; a host without `host_service.computer_use` omits `computer`, and the server reads that as `helper` `absent` (D-CU-03-6); this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
 | `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `audit_apps_max`, `status_interval_ms` |
 | `computer.close` | server to host | `{session_id, reason}` |
 | `computer.disable` | server to host | `{generation}` |

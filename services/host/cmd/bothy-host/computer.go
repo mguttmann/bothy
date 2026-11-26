@@ -75,7 +75,7 @@ func newComputer(c *config.Config, st *state.Dir, log *slog.Logger, env doctor.E
 		return nil, err
 	}
 	cw := &computerWiring{}
-	cw.helper = computer.NewHelper(computer.HelperOptions{Listener: l, PeerOf: confirm.PeerOf, Rule: peerRule(c, st, env),
+	cw.helper = computer.NewHelper(computer.HelperOptions{Listener: l, PeerOf: confirm.PeerOf, Bind: computer.DefaultBind, Rule: peerRule(c, st, env),
 		MaxBytes: c.ComputerFrameMaxBytes, Log: log, OnEvent: func(e computer.Event) {
 			if cw.mgr != nil {
 				cw.mgr.HelperEvent(e)
@@ -106,9 +106,9 @@ func peerRule(c *config.Config, st *state.Dir, env doctor.Env) computer.PeerRule
 	svc, _ := env.Users.Lookup(env.ServiceUser)
 	u := sessionAccounts{c: c, st: st, users: env.Users}
 	r := computer.PeerRule{GOOS: sys.goos, Console: confirm.DefaultRule(svc.ID, u.ids),
-		HelperPath: computer.HelperPath(sys.goos, sys.getenv("ProgramFiles")), ExePath: computer.DefaultExePath,
+		HelperPath:  computer.HelperPath(sys.goos, sys.getenv("ProgramFiles")),
 		Trusted:     computer.TrustedPath(sys.goos, env.Resolver, env.Security, u.writers),
-		Requirement: buildinfo.ComputerHelperRequirement, VerifySignature: computer.DefaultVerifySignature, StartTime: computer.DefaultStartTime}
+		Requirement: buildinfo.ComputerHelperRequirement, VerifySignature: computer.DefaultVerifySignature}
 	if sys.goos == hostos.Linux && c.ComputerTestPeer != "" {
 		if a, err := env.Users.Lookup(c.ComputerTestPeer); err == nil {
 			r.TestPeerUID = a.ID
