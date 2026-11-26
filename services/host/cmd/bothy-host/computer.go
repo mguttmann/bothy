@@ -108,7 +108,7 @@ func peerRule(c *config.Config, st *state.Dir, env doctor.Env) computer.PeerRule
 	r := computer.PeerRule{GOOS: sys.goos, Console: confirm.DefaultRule(svc.ID, u.ids),
 		HelperPath: computer.HelperPath(sys.goos, sys.getenv("ProgramFiles")), ExePath: computer.DefaultExePath,
 		Trusted:     computer.TrustedPath(sys.goos, env.Resolver, env.Security, u.writers),
-		Requirement: buildinfo.ComputerHelperRequirement, VerifySignature: computer.DefaultVerifySignature}
+		Requirement: buildinfo.ComputerHelperRequirement, VerifySignature: computer.DefaultVerifySignature, StartTime: computer.DefaultStartTime}
 	if sys.goos == hostos.Linux && c.ComputerTestPeer != "" {
 		if a, err := env.Users.Lookup(c.ComputerTestPeer); err == nil {
 			r.TestPeerUID = a.ID

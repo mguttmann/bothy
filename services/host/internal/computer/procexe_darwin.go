@@ -37,6 +37,16 @@ func DefaultExePath(pid int) (string, error) {
 	return string(rest[:end]), nil
 }
 
+// DefaultStartTime returns the start time of process pid from kern.proc.pid (kinfo_proc
+// p_starttime) without cgo.
+func DefaultStartTime(pid int) (time.Time, error) {
+	k, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
+	if err != nil || k.Proc.P_pid != int32(pid) { //nolint:gosec // G115: a process ID of the peer credentials
+		return time.Time{}, errNoExe
+	}
+	return time.Unix(k.Proc.P_starttime.Sec, int64(k.Proc.P_starttime.Usec)*int64(time.Microsecond)), nil
+}
+
 // DefaultVerifySignature runs codesign --verify --strict -R=<requirement> on path (the designated
 // requirement with the team ID that the build carries, docs/spec/27-computer-use.md 9.4).
 func DefaultVerifySignature(ctx context.Context, path, requirement string) error {

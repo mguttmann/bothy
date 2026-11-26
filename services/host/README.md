@@ -93,7 +93,8 @@ Normative: [27-computer-use.md](../../docs/spec/27-computer-use.md); rulings:
 `\\.\pipe\bothy-host-computer`, Linux `/run/bothy-host-computer/computer.sock` for the test peer
 of `host_service.computer_test_peer` only) and admits the computer helper by the peer rule of 27 9.4
 (console user, not the service user or a session user, the installed helper path with the rule of
-HD10, the signing requirement of the build); a refused peer is closed and logged with
+HD10, the signing requirement of the build, the identity bound to the process start time and checked
+again after `hello` and before every session); a refused peer is closed and logged with
 `computer_peer_refused`. The helper's `hello` and `state` become the `report` object `computer`;
 without the key nothing listens and the object says `helper: absent`.
 

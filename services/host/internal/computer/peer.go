@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
 	"github.com/OWNER/bothy/services/host/internal/hostos"
@@ -46,6 +47,60 @@ type PeerRule struct {
 	Requirement string
 	// VerifySignature checks that the executable at path satisfies requirement.
 	VerifySignature func(ctx context.Context, path, requirement string) error
+	// StartTime returns the start time of a process (macOS kern.proc.pid, Windows
+	// GetProcessTimes); with the process ID it is the identity of the peer (Identify).
+	StartTime func(pid int) (time.Time, error)
+}
+
+// Identity is a helper peer bound to its process: the process ID and the start time of the
+// process. A process that takes over the PID of an exited peer starts later, so a changed start
+// time is another process (D-CU-03-12).
+type Identity struct {
+	PID   int
+	Start time.Time
+}
+
+// Identify runs Check for the peer of a connection accepted at acceptedAt and binds it to its
+// process: the start time is read before and after the checks of the executable, must not change
+// in between, and must lie before acceptedAt, because the peer created the connection before it was
+// accepted; a later process holds a reused PID. On Linux the peer is the uid that SO_PEERCRED took
+// at connect time, so no PID is involved there. Errors: ErrPeerRefused.
+func (r PeerRule) Identify(ctx context.Context, p confirm.Peer, acceptedAt time.Time) (Identity, error) {
+	if r.GOOS == hostos.Linux {
+		return Identity{PID: p.PID}, r.Check(ctx, p)
+	}
+	if r.StartTime == nil {
+		return Identity{}, ErrPeerRefused
+	}
+	before, err := r.StartTime(p.PID)
+	if err != nil || !before.Before(acceptedAt) {
+		return Identity{}, ErrPeerRefused
+	}
+	if err := r.Check(ctx, p); err != nil {
+		return Identity{}, err
+	}
+	if after, err := r.StartTime(p.PID); err != nil || !after.Equal(before) {
+		return Identity{}, ErrPeerRefused
+	}
+	return Identity{PID: p.PID, Start: before}, nil
+}
+
+// Same runs Check again and verifies that the process behind p is still the one of id (after
+// hello and before every session, 27 9.4). Errors: ErrPeerRefused.
+func (r PeerRule) Same(ctx context.Context, p confirm.Peer, id Identity) error {
+	if r.GOOS == hostos.Linux {
+		return r.Check(ctx, p)
+	}
+	if r.StartTime == nil || p.PID != id.PID {
+		return ErrPeerRefused
+	}
+	if err := r.Check(ctx, p); err != nil {
+		return err
+	}
+	if now, err := r.StartTime(p.PID); err != nil || !now.Equal(id.Start) {
+		return ErrPeerRefused
+	}
+	return nil
 }
 
 // Check returns nil when p may act as the helper, else ErrPeerRefused. The error names no user,

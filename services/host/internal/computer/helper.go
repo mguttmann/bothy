@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/confirm"
 )
@@ -107,6 +108,7 @@ type Helper struct {
 	mu      sync.Mutex
 	conn    *helperConn
 	peer    confirm.Peer
+	id      Identity
 	state   HelperState
 	seq     int64
 	pending map[int64]chan Reply
@@ -148,6 +150,7 @@ func (h *Helper) Serve(ctx context.Context) error {
 	defer wg.Wait()
 	for {
 		c, err := h.o.Listener.Accept()
+		accepted := time.Now()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -157,28 +160,24 @@ func (h *Helper) Serve(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			h.accept(ctx, c)
+			h.accept(ctx, c, accepted)
 		}()
 	}
 }
 
-// accept checks the peer of c, waits for hello and serves the connection.
-func (h *Helper) accept(ctx context.Context, c net.Conn) {
+// accept checks the peer of c (accepted at accepted), waits for hello, checks the peer again and
+// serves the connection.
+func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	var peer confirm.Peer
+	var id Identity
 	var err error
 	if h.o.PeerOf == nil {
 		err = ErrPeerRefused
 	} else if peer, err = h.o.PeerOf(c); err == nil {
-		err = h.o.Rule.Check(ctx, peer)
+		id, err = h.o.Rule.Identify(ctx, peer, accepted)
 	}
 	if err != nil {
-		h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused))
-		_ = c.Close()
-		h.update(func(s *HelperState) {
-			if !s.Connected {
-				s.Refused = true
-			}
-		})
+		h.refused(ctx, c)
 		return
 	}
 	kind, body, err := ReadFrame(c, h.o.MaxBytes)
@@ -188,10 +187,15 @@ func (h *Helper) accept(ctx context.Context, c net.Conn) {
 		_ = c.Close()
 		return
 	}
+	// The process behind the connection must still be the one admitted before hello (27 9.4).
+	if h.o.Rule.Same(ctx, peer, id) != nil {
+		h.refused(ctx, c)
+		return
+	}
 	hc := &helperConn{c: c}
 	h.mu.Lock()
 	old := h.conn
-	h.conn, h.peer = hc, peer
+	h.conn, h.peer, h.id = hc, peer, id
 	var pend map[int64]chan Reply
 	if old != nil {
 		pend = h.pending
@@ -212,6 +216,18 @@ func (h *Helper) accept(ctx context.Context, c net.Conn) {
 			Permissions: hello.Permissions, HelperVersion: hello.HelperVersion, Locked: hello.Locked}
 	})
 	h.read(hc)
+}
+
+// refused closes a connection whose peer the rule refused, logs computer_peer_refused and reports
+// the helper as refused while no trusted helper is connected.
+func (h *Helper) refused(ctx context.Context, c net.Conn) {
+	h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused))
+	_ = c.Close()
+	h.update(func(s *HelperState) {
+		if !s.Connected {
+			s.Refused = true
+		}
+	})
 }
 
 // read serves one trusted connection until it breaks or sends a frame against the protocol.
@@ -336,16 +352,17 @@ func (h *Helper) State() HelperState {
 	return h.state
 }
 
-// Recheck runs the peer rule again on the current connection (27 9.4: again before every session);
+// Recheck runs the peer rule again on the current connection and checks that its process is still
+// the admitted one (27 9.4: again before every session);
 // a failure closes the connection and returns ErrPeerRefused, no connection ErrHelperAbsent.
 func (h *Helper) Recheck(ctx context.Context) error {
 	h.mu.Lock()
-	hc, peer := h.conn, h.peer
+	hc, peer, id := h.conn, h.peer, h.id
 	h.mu.Unlock()
 	if hc == nil {
 		return ErrHelperAbsent
 	}
-	if err := h.o.Rule.Check(ctx, peer); err != nil {
+	if err := h.o.Rule.Same(ctx, peer, id); err != nil {
 		h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused))
 		_ = hc.c.Close()
 		return ErrPeerRefused

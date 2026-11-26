@@ -5,6 +5,7 @@ package computer
 import (
 	"context"
 	"errors"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -31,6 +32,20 @@ func DefaultExePath(pid int) (string, error) {
 		return "", err
 	}
 	return windows.UTF16ToString(buf[:n]), nil
+}
+
+// DefaultStartTime returns the creation time of process pid (GetProcessTimes).
+func DefaultStartTime(pid int) (time.Time, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid)) //nolint:gosec // G115: a process ID of the peer credentials
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer func() { _ = windows.CloseHandle(h) }()
+	var created, exited, kernel, user windows.Filetime
+	if err := windows.GetProcessTimes(h, &created, &exited, &kernel, &user); err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, created.Nanoseconds()), nil
 }
 
 // DefaultVerifySignature checks the Authenticode signature of path with WinVerifyTrust and that a

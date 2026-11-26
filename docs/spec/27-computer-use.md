@@ -438,6 +438,14 @@ the normal mode with a service user (D-CU-01-26).
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
   Otherwise the connection is closed and logged with `computer_peer_refused`.
+- Peer identity (both directions, D-CU-03-12): the identity of a peer is bound to the connection,
+  never to a process ID alone. The host service takes the peer's process ID from the connection
+  (macOS `LOCAL_PEERPID`, Windows the pipe client) together with the start time of that process,
+  which must lie before the connection was accepted and must not change while the executable is
+  checked; it checks the same identity again after `hello` and before every session, and closes the
+  channel when it changed (a process that took over the PID of an exited peer starts later). On
+  Linux the peer is the uid that `SO_PEERCRED` took at connect time. The helper checks its side
+  the same way: its peer is the service user, pinned by uid from the connection's credentials (CU-02).
 - Protocol: frames of a 4-byte big-endian length (of type byte and content, at most
   `host_service.computer_frame_max_bytes`), one type byte and the content: `0x01` a UTF-8 JSON object,
   `0x02` the bytes of one image, sent directly after the `done` that announces it. The channel
