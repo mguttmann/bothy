@@ -3,9 +3,11 @@
 package confirm
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/windows"
 )
@@ -34,5 +36,39 @@ func TestListenSetsTheTokenUserAsPipeOwner(t *testing.T) {
 	}
 	if !owner.Equals(u.User.Sid) {
 		t.Fatalf("pipe owner %s, want the token user %s", owner, u.User.Sid)
+	}
+}
+
+// TestListenServesASecondConnection: the second Accept creates a further instance of the pipe,
+// which needs read and write for its creator besides FILE_CREATE_PIPE_INSTANCE; before, the
+// second helper connection to the computer pipe failed with "Access is denied".
+func TestListenServesASecondConnection(t *testing.T) {
+	endpoint := fmt.Sprintf(`\\.\pipe\bothy-confirm-second-test-%d`, os.Getpid())
+	l, err := Listen(endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = l.Close() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	accepted := make(chan error, 2)
+	go func() {
+		for range 2 {
+			c, err := l.Accept()
+			if err == nil {
+				_ = c.Close()
+			}
+			accepted <- err
+		}
+	}()
+	for i := range 2 {
+		c, err := dialEndpoint(ctx, endpoint)
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		if err := <-accepted; err != nil {
+			t.Fatalf("accept %d: %v", i, err)
+		}
+		_ = c.Close()
 	}
 }
