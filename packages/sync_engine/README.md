@@ -216,7 +216,7 @@ through the `Fetcher` instead.
 | `file.updated` | `files` | seq |
 | `command.changed` | `commands` (`removed` deletes) | version |
 | `instance.updated` | `instance` (reloaded with `getInstance`) | seq |
-| `host.updated`, `terminal_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST) | version |
+| `host.updated`, `terminal_session.changed`, `computer_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST; CU-07 for computer sessions) | version |
 | `status.updated` | none: announced on `statusUpdates` after the commit (M7-21, the status view reloads `getStatus`) | seq |
 | `run.wake_changed` | `run_wakes`: the state and reason of a stored wake-up at once, then the thread's list reloaded with `listThreadWakes` after the commit when the thread is stored here (AR-08; the payload carries no label or condition) | seq; the reload by version |
 | `access.changed` | `sync_state.permission_version`, removal, REST structure | seq |
@@ -227,7 +227,7 @@ In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `ru
 `CatchUpListener` and `SyncEngine`), `host.presence_changed` (`hostEvents`, M4-36). Skipped, the cursor advances (no local table):
 `access.expiring`, `agent.config_changed`, `agent.definition_changed`, `agent.followup`, `agent.hosting_changed`,
 `agent.invocation`, `agent.wake_input`, `agent_session.changed`, `channel.settings_changed`, `command.invoked`,
-`computer_session.changed` (until the clients of CU-07 apply it), `device.pending`, `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
+`device.pending`, `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
 `interaction.created`, `run.cancel_requested`, and every type the catalogue does not know.
 
 Host events (M4-36): `SyncEngine.hostEvents` (`HostEventsHub`) carries `HostChanged`
