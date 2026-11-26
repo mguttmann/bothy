@@ -18,6 +18,7 @@ import 'language_section.dart';
 import 'notifications_entry.dart';
 import 'privacy_section.dart';
 import 'refused_writes_notice.dart';
+import 'sign_in_section.dart';
 
 /// The sections of D8 in their order, with their path segment.
 enum SettingsSection {
@@ -35,6 +36,10 @@ enum SettingsSection {
 
   /// Own devices and sessions.
   devices('devices'),
+
+  /// The own sign-in methods: password with one-time code, passkeys, linked login services
+  /// (V1-14).
+  signIn('sign-in'),
 
   /// Crash reports and performance data.
   privacy('privacy'),
@@ -68,6 +73,7 @@ enum SettingsSection {
     language => l.settingsSectionLanguage,
     keyboard => l.settingsSectionKeyboard,
     devices => l.settingsSectionDevices,
+    signIn => l.settingsSectionSignIn,
     privacy => l.settingsSectionPrivacy,
     security => l.settingsSectionSecurity,
     about => l.settingsSectionAbout,
@@ -183,6 +189,7 @@ Widget sectionBody(SettingsSection section) => Column(
       SettingsSection.language => const LanguageSection(),
       SettingsSection.keyboard => const KeyboardSection(),
       SettingsSection.devices => const DevicesSection(),
+      SettingsSection.signIn => const SignInSection(),
       SettingsSection.privacy => const PrivacySection(),
       SettingsSection.security => const AppLockSection(),
       SettingsSection.about => const AboutSection(),

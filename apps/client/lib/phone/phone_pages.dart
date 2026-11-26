@@ -256,6 +256,7 @@ const List<SettingsSection> phoneSettingsSections = [
   SettingsSection.notifications,
   SettingsSection.language,
   SettingsSection.devices,
+  SettingsSection.signIn,
   SettingsSection.privacy,
   SettingsSection.security,
   SettingsSection.about,

@@ -277,8 +277,11 @@ void main() {
       overrides: as(EmergencyRole.owner),
     );
     await app.go('/settings');
-    await tester.ensureVisible(
+    // The list builds lazily; the entry is below the sections (V1-14 added Sign-in).
+    await tester.scrollUntilVisible(
       find.byKey(const ValueKey('phone.me.emergency')),
+      200,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('phone.me.emergency')));

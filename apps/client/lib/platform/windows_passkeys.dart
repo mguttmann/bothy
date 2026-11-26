@@ -14,7 +14,6 @@ library;
 import 'dart:convert';
 
 import 'package:auth/auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// The channel the Windows runner serves (windows/runner/flutter_window.cpp).
@@ -29,14 +28,14 @@ const int defaultPasskeyTimeoutMs = 300000;
 /// A cancelled or declined Windows Hello prompt throws a [PlatformException] with the code
 /// `cancelled`, the same error the iOS and Android adapters throw ([DomainPasskeys]); the login
 /// flows show it as a refused passkey, and a step-up treats it like a refused signer: any error
-/// that is not an `AuthException` becomes `StepUpCancelled` (packages/auth step_up.dart). Any other failure of Windows throws a
-/// [PlatformException] with the code `failed` and the WebAuthn error name in its message.
+/// that is not an `AuthException` becomes `StepUpCancelled` (packages/auth step_up.dart). Any
+/// other failure of Windows throws a [PlatformException] with the code `failed` and the WebAuthn
+/// error name in its message.
 /// Options for a relying party that does not cover the origin's host are refused with a
 /// [StateError] before Windows is asked.
 final class WindowsPasskeys implements PasskeyAuthenticator {
-  /// Creates the adapter for [origin] over [channel]; use [create], which also asks whether
+  /// Creates the adapter for [origin] over [channel]; [available] or [create] tell whether
   /// Windows Hello is there.
-  @visibleForTesting
   WindowsPasskeys({required String origin, MethodChannel? channel})
     : origin = Uri.parse(origin).origin,
       _channel = channel ?? webauthnChannel;
@@ -47,15 +46,23 @@ final class WindowsPasskeys implements PasskeyAuthenticator {
   static Future<WindowsPasskeys?> create({
     required String origin,
     MethodChannel? channel,
-  }) async {
-    final passkeys = WindowsPasskeys(origin: origin, channel: channel);
+  }) async => await available(channel: channel)
+      ? WindowsPasskeys(origin: origin, channel: channel)
+      : null;
+
+  /// Whether this Windows has a user-verifying platform authenticator and the runner serves
+  /// the WebAuthn channel; the app asks once at start (main.dart), because the answer does not
+  /// depend on the instance.
+  static Future<bool> available({MethodChannel? channel}) async {
     try {
-      final available = await passkeys._channel.invokeMethod<bool>('available');
-      return available == true ? passkeys : null;
+      final answer = await (channel ?? webauthnChannel).invokeMethod<bool>(
+        'available',
+      );
+      return answer == true;
     } on MissingPluginException {
-      return null;
+      return false;
     } on PlatformException {
-      return null;
+      return false;
     }
   }
 

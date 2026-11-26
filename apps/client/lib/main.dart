@@ -15,6 +15,7 @@ import 'app/providers/retry.dart';
 import 'platform/android_platform.dart';
 import 'platform/ios_platform.dart' show IosPlatformApi;
 import 'platform/notification_channels.dart';
+import 'platform/windows_passkeys.dart' show WindowsPasskeys;
 import 'telemetry/measurements.dart';
 
 /// Starts the app on macOS, Windows, iOS and Android with the ports of the platform
@@ -55,7 +56,13 @@ Future<void> main() async {
       iosDeviceName = null;
     }
   }
-  final ports = productionPorts(android: android, iosDeviceName: iosDeviceName);
+  // Windows Hello as the passkey port of the Windows app (V1-14); no answer means none.
+  final windowsHello = Platform.isWindows && await WindowsPasskeys.available();
+  final ports = productionPorts(
+    android: android,
+    iosDeviceName: iosDeviceName,
+    windowsHello: windowsHello,
+  );
   ports.measurements.attachFrameTimings(SchedulerBinding.instance);
   runApp(
     ProviderScope(

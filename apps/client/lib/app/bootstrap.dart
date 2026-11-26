@@ -50,6 +50,7 @@ import '../platform/push_android.dart';
 import '../platform/push_apple.dart';
 import '../platform/secure_store.dart';
 import '../platform/terminal_guard.dart';
+import '../platform/windows_passkeys.dart';
 import '../share/share_android.dart';
 import '../share/share_apple.dart';
 import '../sync/agent_ops.dart';
@@ -104,6 +105,7 @@ final class AppPorts {
     AppConfig? config,
     this.passkeys,
     this.passkeyDomain,
+    this.passkeysOfOrigin,
     this.protectFiles = _noProtection,
     this.clock = const SystemClock(),
     this.openDatabase = _openEncrypted,
@@ -199,6 +201,10 @@ final class AppPorts {
   /// below it (15 8; D-M5-02-5), on Android for the App Links host itself (D-M5-03-3).
   final String? passkeyDomain;
 
+  /// The passkeys of a build that needs no domain but the instance's origin (the Windows app
+  /// over Windows Hello, V1-14), or null; when set, [passkeysFor] takes it before [passkeys].
+  final PasskeyAuthenticator Function(Uri origin)? passkeysOfOrigin;
+
   /// Protects the database file and its companions before the first open (15 6.3).
   final FileProtector protectFiles;
 
@@ -207,6 +213,8 @@ final class AppPorts {
   /// The passkeys for [instance]: [passkeys], unless the build names a domain that cannot
   /// serve the instance's host (D-M5-02-5, D-M5-03-3).
   PasskeyAuthenticator? passkeysFor(InstanceInfo instance) {
+    final ofOrigin = passkeysOfOrigin;
+    if (ofOrigin != null) return ofOrigin(instance.address);
     final domain = passkeyDomain;
     if (domain == null) return passkeys;
     final host = instance.address.host;
@@ -335,6 +343,7 @@ AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
   AndroidRunnerInfo? android,
   String? iosDeviceName,
+  bool windowsHello = false,
 }) {
   final lifecycle = FlutterAppLifecycle();
   AppLocalizations texts() => lookupAppLocalizations(
@@ -425,6 +434,11 @@ AppPorts productionPorts({
         : () => webAuth,
     passkeys: passkeys,
     passkeyDomain: phone ? domain : null,
+    // Windows Hello serves any relying party of the instance's origin ([windowsHello], read
+    // at start; V1-14); the Mac keeps no passkey port (D-M4-18-9).
+    passkeysOfOrigin: windowsHello
+        ? (origin) => WindowsPasskeys(origin: origin.toString())
+        : null,
     protectFiles: ios == null ? AppPorts._noProtection : ios.protectFiles,
     transport: IoGatewayTransport(),
     lifecycle: lifecycle,

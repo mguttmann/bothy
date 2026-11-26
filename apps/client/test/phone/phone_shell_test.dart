@@ -182,7 +182,18 @@ void main() {
       );
     }
     expect(find.byKey(const ValueKey('phone.me.keyboard')), findsNothing);
+    // The list builds lazily; "Log out" is below the sections (V1-14 added Sign-in).
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('shell.logout')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.byKey(const ValueKey('shell.logout')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('phone.me.appearance')),
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.byKey(const ValueKey('phone.me.appearance')));
     await tester.pumpAndSettle();
     expect(app.location, '/settings/appearance');
