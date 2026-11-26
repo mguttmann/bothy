@@ -63,6 +63,9 @@ func (o *OSOps) Run(ctx context.Context, argv []string) error {
 // Mkdir implements Ops; the DACL comes from a win.acl step, the owner is Administrators
 // (adminOwner).
 func (o *OSOps) Mkdir(path string, _ fs.FileMode, owner string) error {
+	if err := refuseSquatted(path); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return err
 	}
@@ -71,6 +74,9 @@ func (o *OSOps) Mkdir(path string, _ fs.FileMode, owner string) error {
 
 // Write implements Ops; the file inherits the DACL of its folder, the owner is Administrators.
 func (o *OSOps) Write(path string, content []byte, _ fs.FileMode, owner string) error {
+	if err := refuseSquatted(path); err != nil {
+		return err
+	}
 	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, content) { //nolint:gosec // a path of the plan
 		return adminOwner(path, owner)
 	}
@@ -88,6 +94,55 @@ func (o *OSOps) Write(path string, content []byte, _ fs.FileMode, owner string) 
 // (docs/decisions.d/AUD-PKG-R2-06-host-platform-ci.md). The virtual account of the host service
 // cannot be made owner without a restore privilege; HD4 accepts Administrators for the state
 // directory.
+// errSquatted refuses a path that existed before install with an owner install does not trust.
+var errSquatted = errors.New("exists with an untrusted owner or as a reparse point")
+
+// refuseSquatted refuses an existing path that is a reparse point (a junction or a symbolic link)
+// or whose owner is none of SYSTEM, Administrators, TrustedInstaller, the virtual account of the
+// host service and the account that runs install. adminOwner would otherwise hand a folder that
+// an unprivileged account created in advance (C:\ProgramData lets every user create folders) to
+// Administrators with the DACL and the content of that account, and the checks of HD4 and HD10
+// would then trust it. A missing path passes.
+func refuseSquatted(path string) error {
+	fi, err := os.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if fi.Mode()&(fs.ModeSymlink|fs.ModeIrregular) != 0 {
+		return fmt.Errorf("%s: %w", path, errSquatted)
+	}
+	if attrs, ok := fi.Sys().(*windows.Win32FileAttributeData); ok && attrs.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		return fmt.Errorf("%s: %w", path, errSquatted)
+	}
+	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	if err != nil {
+		return err
+	}
+	o, _, err := sd.Owner()
+	if err != nil {
+		return err
+	}
+	if !trustedOwners().contains(o.String()) {
+		return fmt.Errorf("%s: %w", path, errSquatted)
+	}
+	return nil
+}
+
+// trustedOwners returns the owners refuseSquatted accepts on this host.
+func trustedOwners() ownerSet {
+	set := ownerSet{hostos.SIDSystem, hostos.SIDAdministrators, hostos.SIDTrustedInstall}
+	if sid, _, _, err := windows.LookupSID("", HostAccountWindows); err == nil {
+		set = append(set, sid.String())
+	}
+	if u, err := windows.GetCurrentProcessToken().GetTokenUser(); err == nil {
+		set = append(set, u.User.Sid.String())
+	}
+	return set
+}
+
 func adminOwner(path, owner string) error {
 	if owner == "" {
 		return nil
@@ -104,6 +159,9 @@ func adminOwner(path, owner string) error {
 // aside first and is removed when no process runs it any more. Installing from the installed
 // binary itself copies nothing.
 func (o *OSOps) Copy(src, dst string, _ fs.FileMode, owner string) error {
+	if err := refuseSquatted(dst); err != nil {
+		return err
+	}
 	if a, err := os.Stat(src); err == nil {
 		if b, err := os.Stat(dst); err == nil && os.SameFile(a, b) {
 			return adminOwner(dst, owner)

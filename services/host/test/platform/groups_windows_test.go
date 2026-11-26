@@ -5,7 +5,9 @@
 package platform
 
 import (
+	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/OWNER/bothy/services/host/internal/hostos"
@@ -34,4 +36,25 @@ func TestPlatform_ServiceAccountGroups(t *testing.T) {
 		t.Error("the membership of the service account in Administrators does not show")
 	}
 	refusedWith(t, "forbidden_group")
+}
+
+// TestPlatform_SquattedStateDir: a person who is no administrator creates the state directory
+// before install (C:\ProgramData lets every user create folders). install refuses it instead of
+// making it the state directory of the service with the owner Administrators, and the folder
+// keeps its owner.
+func TestPlatform_SquattedStateDir(t *testing.T) {
+	track(t)
+	createPerson(t, personUser)
+	t.Cleanup(func() { _ = os.RemoveAll(stateDir()) })
+	if out, c := asUser(personUser, "cmd", "/c", "mkdir", stateDir()); c != 0 {
+		t.Fatalf("mkdir as %s: %d %s", personUser, c, out)
+	}
+	writeConfig(t, "  session_users: ["+userA+"]\n")
+	t.Cleanup(func() { uninstall(t, []string{userA}) })
+	if out, c := host("install", "--drive-root-confirm", "yes"); c == 0 || !strings.Contains(out, "untrusted owner") {
+		t.Errorf("install over a squatted state directory: %d\n%s", c, out)
+	}
+	if out := sh(t, "powershell", "-NoProfile", "-Command", "(Get-Acl -LiteralPath '"+stateDir()+"').Owner"); !strings.Contains(strings.ToLower(out), personUser) {
+		t.Errorf("the squatted folder changed its owner: %s", out)
+	}
 }
