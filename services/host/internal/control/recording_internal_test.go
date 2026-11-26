@@ -156,7 +156,7 @@ func FuzzDecodeServerFrame(f *testing.F) {
 		if err != nil {
 			return
 		}
-		if _, ok := required[op]; !ok || body == nil {
+		if _, ok := requiredOf(op); !ok || body == nil {
 			t.Fatalf("decoded %q without a body", op)
 		}
 	})

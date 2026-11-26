@@ -79,7 +79,20 @@ type Config struct {
 	// owner that the host service and its only session user run as; empty for the separate users of
 	// ADR 0068.
 	OwnerAccount string
+	// ComputerUse is host_service.computer_use (docs/spec/27-computer-use.md 4, 9.4): open the
+	// helper channel and accept computer sessions; refused together with OwnerAccount.
+	ComputerUse bool
+	// ComputerFrameMaxBytes is host_service.computer_frame_max_bytes: the longest frame on the
+	// helper channel, an image included.
+	ComputerFrameMaxBytes int
+	// ComputerTestPeer is host_service.computer_test_peer (Linux only, tests only): the user whose
+	// process may act as the helper; empty admits nobody.
+	ComputerTestPeer string
 }
+
+// DefaultComputerFrameMaxBytes is the default of host_service.computer_frame_max_bytes
+// (docs/spec/27-computer-use.md 18).
+const DefaultComputerFrameMaxBytes = 64 << 20
 
 // Workdirs returns the configured list of sessionUser, or nil.
 func (c *Config) Workdirs(sessionUser string) []Workdir {
@@ -126,6 +139,7 @@ func Defaults(p Platform) Config {
 		ScrollbackBytes:         1048576,
 		ReconnectBackoffBase:    time.Second,
 		ReconnectBackoffCap:     5 * time.Minute,
+		ComputerFrameMaxBytes:   DefaultComputerFrameMaxBytes,
 	}
 }
 
@@ -196,6 +210,9 @@ func Parse(b []byte, p Platform) (*Config, error) {
 	if err := c.ownerAccountRules(p, ownerSet); err != nil {
 		return nil, err
 	}
+	if err := c.computerRules(p); err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
 
@@ -262,6 +279,12 @@ func (c *Config) set(key string, v *yaml.Node) error {
 		c.ReconnectBackoffCap, err = positiveDuration(key, v)
 	case keyOwnerAccount:
 		c.OwnerAccount, err = str(key, v)
+	case keyComputerUse:
+		c.ComputerUse, err = boolean(key, v)
+	case keyComputerFrameMax:
+		c.ComputerFrameMaxBytes, err = integer(key, v)
+	case keyComputerTestPeer:
+		c.ComputerTestPeer, err = str(key, v)
 	default:
 		err = invalid(key, "unknown key")
 	}
@@ -273,6 +296,28 @@ const goosWindows = "windows"
 
 // keyOwnerAccount is the key of the owner account mode.
 const keyOwnerAccount = "host_service.owner_account"
+
+// Keys of computer sessions (docs/spec/27-computer-use.md 18).
+const (
+	keyComputerUse      = "host_service.computer_use"
+	keyComputerFrameMax = "host_service.computer_frame_max_bytes"
+	keyComputerTestPeer = "host_service.computer_test_peer"
+)
+
+// computerRules applies the rules of the computer keys (27 9.4): a frame limit above zero, the
+// test peer only on Linux, and computer use never with the owner account mode, whose service runs
+// as the console user that the peer rule must refuse (D-CU-01-26).
+func (c *Config) computerRules(p Platform) error {
+	switch {
+	case c.ComputerFrameMaxBytes <= 0:
+		return invalid(keyComputerFrameMax, "must be above zero")
+	case c.ComputerTestPeer != "" && p.GOOS != "linux":
+		return invalid(keyComputerTestPeer, "is a test setting of Linux only")
+	case c.ComputerUse && c.OwnerAccount != "":
+		return invalid(keyComputerUse, "must be false with "+keyOwnerAccount+"; computer use needs the service user mode")
+	}
+	return nil
+}
 
 // ownerAccountRules applies the rules of host_service.owner_account (D-OA-1, D-OA-3, D-OA-10): a
 // name, not on Windows, the only session user (an empty list is filled in) and no local

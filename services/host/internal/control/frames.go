@@ -119,13 +119,34 @@ var required = map[string][]string{
 	opError:        {"op", "code"},
 }
 
+// memberSessionID is the member session_id that several ops carry.
+const memberSessionID = "session_id"
+
+// requiredComputer are the members of the server ops of computer sessions
+// (docs/spec/27-computer-use.md 12.3). They are kept apart from required because the server
+// recording (server_frames.json) gains them with the server side of the stage (CU-04).
+var requiredComputer = map[string][]string{
+	opComputerOpen:    {memberSessionID, "run_id", "agent_id", "agent_name", "user_id", "data_path", "expires_at", "settings"},
+	opComputerClose:   {memberSessionID, "reason"},
+	opComputerDisable: {"generation"},
+}
+
+// requiredOf returns the required members of the server op op and whether it is one.
+func requiredOf(op string) ([]string, bool) {
+	if keys, ok := required[op]; ok {
+		return keys, true
+	}
+	keys, ok := requiredComputer[op]
+	return keys, ok
+}
+
 // ErrFrame is a server frame the client cannot read: close 4002.
 var ErrFrame = errors.New("control: malformed frame of the server")
 
 // decodeServerFrame decodes one text frame of the server strictly: exactly the members op and d,
 // an op the server sends, every required member present, no unknown member, no null. It returns
-// the op and the body as its type (Hello, ReadyFrame, HeartbeatAck, SessionOpen, SessionClose or
-// ErrorFrame). Errors wrap ErrFrame.
+// the op and the body as its type (Hello, ReadyFrame, HeartbeatAck, SessionOpen, SessionClose,
+// ComputerOpen, ComputerClose, ComputerDisable or ErrorFrame). Errors wrap ErrFrame.
 func decodeServerFrame(b []byte) (string, any, error) {
 	var env struct {
 		Op *string         `json:"op"`
@@ -135,7 +156,7 @@ func decodeServerFrame(b []byte) (string, any, error) {
 		return "", nil, fmt.Errorf("%w: envelope", ErrFrame)
 	}
 	op := *env.Op
-	keys, ok := required[op]
+	keys, ok := requiredOf(op)
 	if !ok {
 		return "", nil, fmt.Errorf("%w: op is no server op", ErrFrame)
 	}
@@ -167,6 +188,12 @@ func decodeServerFrame(b []byte) (string, any, error) {
 		v = &SessionClose{}
 	case opError:
 		v = &ErrorFrame{}
+	case opComputerOpen:
+		v = &ComputerOpen{}
+	case opComputerClose:
+		v = &ComputerClose{}
+	case opComputerDisable:
+		v = &ComputerDisable{}
 	}
 	if err := strictDecode(env.D, v); err != nil {
 		return "", nil, fmt.Errorf("%w: %s body", ErrFrame, op)

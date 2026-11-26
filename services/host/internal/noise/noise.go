@@ -19,6 +19,9 @@ const (
 	ProtocolName = "Noise_NK_25519_ChaChaPoly_SHA256"
 	// PrologueLabel opens the prologue (docs/spec/24-terminal.md 5.2); 16 ASCII bytes.
 	PrologueLabel = "bothy-terminal/1"
+	// ComputerPrologueLabel opens the prologue of a computer session
+	// (docs/spec/27-computer-use.md 5.3 step 0); 16 ASCII bytes like PrologueLabel.
+	ComputerPrologueLabel = "bothy-computer/1"
 	// MaxMessageLen is the largest Noise message (Noise revision 34, section 3).
 	MaxMessageLen = 65535
 	// TagLen is the length of the ChaChaPoly authentication tag (Noise revision 34, section 12.3).
@@ -67,8 +70,20 @@ func ParseID(s string) ([IDLen]byte, error) {
 // 5.2). Both sides must use the same prologue, else the handshake fails: it binds every stream
 // to its protocol version, its session and its host.
 func Prologue(sessionID, hostID [IDLen]byte) []byte {
-	p := make([]byte, 0, len(PrologueLabel)+2*IDLen)
-	p = append(p, PrologueLabel...)
+	return PrologueWith(PrologueLabel, sessionID, hostID)
+}
+
+// PrologueWith returns label || sessionID || hostID; an empty label means PrologueLabel. A
+// computer session uses ComputerPrologueLabel (docs/spec/27-computer-use.md 5.3 step 0), so a
+// stream of one kind never completes a handshake of the other.
+//
+// Example: PrologueWith(ComputerPrologueLabel, sid, hid) is 48 bytes starting "bothy-computer/1".
+func PrologueWith(label string, sessionID, hostID [IDLen]byte) []byte {
+	if label == "" {
+		label = PrologueLabel
+	}
+	p := make([]byte, 0, len(label)+2*IDLen)
+	p = append(p, label...)
 	p = append(p, sessionID[:]...)
 	return append(p, hostID[:]...)
 }

@@ -211,20 +211,22 @@ agent opens a new one.
 As 24 5.2 with the prologue of 5.3 step 0: `Noise_NK_25519_ChaChaPoly_SHA256`, every WebSocket
 binary message exactly one Noise message of at most 65535 bytes, a frame at most 65519 bytes
 (`frame.MaxLen`), text frames forbidden (`4002`). After a failed decryption or frame the session
-ends with `error` and `stream_fault`.
+ends with `error` and `stream_fault`; after a failed decryption the transport is broken, so no
+`cu_state` `stopped` follows it.
 
 ### 6.2 Data of a frame
 
 Control frames carry one UTF-8 JSON object without unknown members; numbers are integers. Image
-data is raw bytes. All coordinates are pixels of the screenshot named by `scale_id`.
+data is raw bytes. All coordinates are pixels of the screenshot named by `scale_id`: every action
+with `coordinate` or `region` carries `scale_id` in its `args` (D-CU-03-2).
 
 ### 6.3 Frame types
 
 | Type | Name | Direction | Content |
 |---|---|---|---|
 | `0x04` | `close` | C1 to host | end the session (`done`); no content (24 5.4) |
-| `0x20` | `cu_action` | C1 to host | `{"seq", "action", "args"}`; `seq` grows by one per action |
-| `0x21` | `cu_result` | host to C1 | `{"seq", "code", "image", "width", "height", "scale_id", "app", "cursor"}`; `image` says whether image frames follow; `app` is the identity of the frontmost app (bundle ID or executable name, with a display name); `cursor` only for `cursor_position` |
+| `0x20` | `cu_action` | C1 to host | `{"seq", "action", "args"}`; `seq` starts at 1 and grows by one per action (another value is a wrong content); `args` is an object, `{}` for an action without arguments |
+| `0x21` | `cu_result` | host to C1 | `{"seq", "code", "image", "width", "height", "scale_id", "app", "cursor"}`; `image` says whether image frames follow; `width`, `height` and `scale_id` name the image (0 without one; `scale_id` also with `cursor`); `app` is the identity of the frontmost app `{"id", "name"}` (bundle ID or executable name, with a display name; empty strings before the helper named one); `cursor` `{"x", "y"}` in pixels of the screenshot `scale_id`, only for `cursor_position` |
 | `0x22` | `cu_image_begin` | host to C1 | `{"seq", "format", "width", "height", "scale_id", "bytes"}`; `format` `jpeg` or `png` |
 | `0x23` | `cu_image_data` | host to C1 | 1 to 65518 bytes of the image, in order |
 | `0x24` | `cu_image_end` | host to C1 | no content; the sum of the data frames equals `bytes` |
@@ -445,7 +447,9 @@ the normal mode with a service user (D-CU-01-26).
   setting.
 - Peer rule (D-CU-01-24), at the connection and again before every session: the peer is the user of
   the active console session (the rule of the confirmation agent, 24 6.4), not the service user and
-  not a session user of `host_service.session_users`; its executable is the installed helper path,
+  not a session user of `host_service.session_users`; its executable is the installed helper path
+  (macOS `/Library/Application Support/bothy-host/bin/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper`,
+  Windows `%ProgramFiles%\bothy-host\bothy-computer-helper.exe`, D-CU-03-7),
   whose file and folder chain belong to a trusted owner (the rule of HD10); and when the host
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
@@ -465,6 +469,20 @@ the normal mode with a service user (D-CU-01-26).
   `development`) takes its endpoint from the environment variable `BOTHY_COMPUTER_HELPER_CHANNEL`
   instead and skips this check, for the CI jobs of section 16; a verified build ignores the
   variable.
+- Peer identity (both directions, D-CU-03-12): the peer is the process the connection captured at
+  connect time, never a process looked up by its ID. macOS: the audit token of the socket
+  (`LOCAL_PEERTOKEN`) with its PID version, which changes with every exec and differs for a
+  process that reuses the PID; the executable and the signature are checked only while the current
+  PID version equals the token's, before and after. Windows: a handle of the pipe client process
+  opened at the accept and held for the life of the connection (a process created after the accept
+  holds a reused PID and is refused; a PID reused between the connect and the accept is not
+  detected, which needs the client to exit in that gap and the new process to be the signed helper
+  at the installed path; Windows has no exec); the image is read through that handle, and
+  the signer is the leaf certificate of the signer chain that `WinVerifyTrust` built. Linux: the uid
+  that `SO_PEERCRED` took at connect time. The host service runs the rule at the connection, after
+  `hello` and before every session, and closes the channel when it fails. The helper checks its side
+  the same way: its peer is the service user, pinned by the uid of the connection's credentials
+  (CU-02).
 - Protocol: frames of a 4-byte big-endian length (of type byte and content, at most
   `host_service.computer_frame_max_bytes`), one type byte and the content: `0x01` a UTF-8 JSON object,
   `0x02` the bytes of one image, sent directly after the `done` that announces it. The channel
@@ -653,13 +671,13 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 
 | Op | Direction | Content |
 |---|---|---|
-| `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
+| `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; `signature` is `verified` when the build of the host service carries a code signing requirement for the helper (which the peer rule of 9.4 then enforces), else `development`; a host without `host_service.computer_use` omits `computer`, and the server reads that as `helper` `absent` (D-CU-03-6); this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
 | `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `scroll_amount_max`, `audit_apps_max`, `status_interval_ms` |
 | `computer.close` | server to host | `{session_id, reason}` |
 | `computer.disable` | server to host | `{generation}` |
 | `computer.started` | host to server | `{session_id, state}` with `active` or `paused` |
-| `computer.state` | host to server | `{session_id, state, reason, action_count, front_app}`; sent on every state change and at most every `computer.status_interval` while actions run, so the chip shows the frontmost app and the count |
-| `computer.ended` | host to server | `{session_id, close_reason, close_detail, action_counts, apps, paused_ms}` |
+| `computer.state` | host to server | `{session_id, state, reason, action_count, front_app}`; sent on every state change and at most every `computer.status_interval` while actions run, so the chip shows the frontmost app and the count; `front_app` is `{id, name, signer}` (empty strings before the helper named one) |
+| `computer.ended` | host to server | `{session_id, close_reason, close_detail, action_counts, apps, paused_ms}`; `close_detail` absent without a detail; `apps` items `{id, name, signer}`; never after `computer.close`, whose session the server ended itself (D-CU-03-5) |
 
 The host service sends only the close reasons `done`, `stopped_by_user`, `device_disabled`,
 `connection_lost`, `open_failed` and `error`.

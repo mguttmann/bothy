@@ -43,6 +43,9 @@ type InitiatorConfig struct {
 	// Ephemeral is required: the device computes client_ephemeral_key_hash from it before the
 	// session is opened (docs/spec/15-client-architecture.md 23.2, step 2).
 	Ephemeral KeyPair
+	// Label opens the prologue; empty means PrologueLabel (a terminal session),
+	// ComputerPrologueLabel a computer session (docs/spec/27-computer-use.md 5.3).
+	Label string
 }
 
 // Initiator is the device side of the handshake: WriteMessage1, then ReadMessage2. It is not
@@ -57,7 +60,7 @@ type Initiator struct {
 // NewInitiator starts the handshake of the device. The error wraps ErrInvalidKey if the
 // ephemeral public key does not belong to its private key.
 func NewInitiator(cfg InitiatorConfig) (*Initiator, error) {
-	return newInitiator(cfg.HostStatic, Prologue(cfg.SessionID, cfg.HostID), cfg.Ephemeral)
+	return newInitiator(cfg.HostStatic, PrologueWith(cfg.Label, cfg.SessionID, cfg.HostID), cfg.Ephemeral)
 }
 
 // newInitiator takes a raw prologue; the test vectors of TM-T01 use their own prologues.
@@ -136,6 +139,9 @@ type ResponderConfig struct {
 	// Random is the source of the ephemeral key when Ephemeral is nil; nil means
 	// crypto/rand.Reader.
 	Random io.Reader
+	// Label opens the prologue; empty means PrologueLabel (a terminal session),
+	// ComputerPrologueLabel a computer session (docs/spec/27-computer-use.md 5.3).
+	Label string
 }
 
 // Responder is the host side of the handshake: ReadMessage1, then WriteMessage2. It is not safe
@@ -150,7 +156,7 @@ type Responder struct {
 // NewResponder starts the handshake of the host service. The error wraps ErrInvalidKey if a
 // public key does not belong to its private key, or reports a failed read of Random.
 func NewResponder(cfg ResponderConfig) (*Responder, error) {
-	return newResponder(cfg.Static, Prologue(cfg.SessionID, cfg.HostID), cfg.Ephemeral, cfg.Random)
+	return newResponder(cfg.Static, PrologueWith(cfg.Label, cfg.SessionID, cfg.HostID), cfg.Ephemeral, cfg.Random)
 }
 
 // newResponder takes a raw prologue; the test vectors of TM-T01 use their own prologues.
