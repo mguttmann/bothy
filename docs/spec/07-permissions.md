@@ -991,10 +991,14 @@ hold at the moment of the check (owner ruling OR-1 of 2026-11-26, [27-computer-u
    the run's `triggered_by`, or `command` with a command that `triggered_by` invoked in a session
    (`triggering_command_id`). Wake runs, team runs, runs from an interaction and runs of an app or
    another agent never qualify.
-5. Every input the run took so far was given by `triggered_by` (03 `run_feeders`): a run that a
-   follow-up, interaction or deferred follow-up of another person fed never opens or attaches a
-   session. While a run has a non-closed computer session, a follow-up of any other person is not
-   delivered into it (it stays `queued`, then `deferred`, 09 7), whatever `followups` says.
+5. Every input of the run spoke for `triggered_by`: every row of 03 `run_feeders` of the run with
+   `source` `trigger`, `followup`, `interaction`, `command` or `wake_input` has `principal_id` equal
+   to `triggered_by` (a row with NULL, an agent's or app's input, fails). Rows with `source`
+   `context` do not count: messages of other authors in the run's context are data, like screen
+   content (T-CU-01). While a run has a non-closed computer session, a follow-up of any other person
+   or principal is not delivered into it (it stays `queued`, then `deferred`, 09 7), whatever
+   `followups` says, and an interaction of anyone other than `triggered_by` with a component of
+   that run is refused with `403 forbidden` and `reason: computer_not_owner_run`.
 3. `triggered_by` is an active owner, with the owner status from the current owner list (the check
    without a request, R-AZ-29).
 4. For `computer.open` and `computer.attach`: the host is a desktop of that owner (27 4 item 3:
@@ -1544,7 +1548,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | AZ-M65 | Runner agent in Alex's run | desktop R1 | `computer.open` | enablement disabled remotely, same generation reported | `forbidden` `computer_not_enabled` |
 | AZ-M66 | Runner agent in Alex's ended run | desktop R1 enabled | `computer.open` | run `completed` | `invocation_token_invalid` `run_inactive` |
 | AZ-M67 | Owner | computer session of another owner's run | `computer.stop` | | `allow`, session ends `stopped_by_user` |
-| AZ-M68 | Runner agent in Alex's run that took a follow-up of Sam | desktop R1 enabled | `computer.open` | `run_feeders` names Sam | `forbidden` `computer_not_owner_run`; Sam's later follow-up is not delivered while a session is open |
+| AZ-M68 | Runner agent in Alex's run that took a follow-up of Sam | desktop R1 enabled | `computer.open` | `run_feeders` names Sam with `followup` | `forbidden` `computer_not_owner_run`; Sam's later follow-up is not delivered and Sam's interaction is refused while a session is open; a `context` row naming Sam does not refuse |
 
 ### 11.2 Required tests
 

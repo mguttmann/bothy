@@ -591,7 +591,7 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 | Op | Direction | Content |
 |---|---|---|
 | `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
-| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `audit_apps_max` |
+| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `audit_apps_max`, `status_interval_ms` |
 | `computer.close` | server to host | `{session_id, reason}` |
 | `computer.disable` | server to host | `{generation}` |
 | `computer.started` | host to server | `{session_id, state}` with `active` or `paused` |
@@ -605,8 +605,8 @@ The host service sends only the close reasons `done`, `stopped_by_user`, `device
 
 - Durable `computer_session.changed` (resource `computer_session`, receive action self, audience the
   triggering owner): state, reason, desktop, frontmost app identity, action count.
-- `host.updated` carries the listed state of 4 item 3 and the reported `computer` object to everyone
-  with `host.read`.
+- `host.updated` carries the listed state of 4 item 3 and the reported `computer` object only to
+  active owners with `host.read` (07 2.15 item 5); other readers get the host without them.
 - Refusals: `403 forbidden` with `reason` `computer_not_owner_run` (SR13), `computer_tool_class`
   (SR2), `computer_not_enabled` (section 4 item 3); `409 conflict` with `reason` `computer_busy`
   or `computer_run_busy`; `409 host_unavailable`; `404 not_found`; `invocation_token_invalid` as SR9.
@@ -675,7 +675,7 @@ the thread (the agent reports it).
 | CU-T22 | Runner: end of a computer run against the recorded layout of the pinned CLI | transcript and tool result files of the session removed, the next run in a new session |
 | CU-T23 | Peer rule of 9.4: the service user, a session user, a process of another user, a copy of the helper outside the installed path, an unsigned helper when a requirement is set | refused with `computer_peer_refused` |
 | CU-T24 | End to end in Compose with the Linux test backend (Xvfb, XTest) and a fixture app: open, click, type, zoom, pixel check, a simulated lock with pause and resume, stop | green without a model, scripted agent |
-| CU-T25 | A follow-up of another person into a run before it opens a session, and while it holds one (`followups = steer`) | open refused with `computer_not_owner_run`; the follow-up is not delivered while the session is open and stays `deferred` |
+| CU-T25 | A follow-up of another person into a run before it opens a session, and while it holds one (`followups = steer`); an interaction of another person while it holds one; a message of another person only in the run's context | open refused with `computer_not_owner_run`; the follow-up is not delivered and stays `deferred`; the interaction is refused; the context message refuses nothing |
 
 ## 16. Points the build probes
 
