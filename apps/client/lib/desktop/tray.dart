@@ -85,10 +85,16 @@ final class NoTray implements TrayPort {
 ///
 /// Example: `await TrayManagerTray().show(iconAsset: trayIconAsset, ...);`
 final class TrayManagerTray with TrayListener implements TrayPort {
-  /// Creates the tray on [manager] (the plugin's instance by default).
-  TrayManagerTray({TrayManager? manager}) : _manager = manager ?? trayManager;
+  /// Creates the tray on [manager] (the plugin's instance by default); with [menuOnClick] a
+  /// click on the icon opens the menu instead of the window (macOS, where the icon exists only
+  /// for the computer entry, D-CU-07-4).
+  TrayManagerTray({TrayManager? manager, this.menuOnClick = false})
+    : _manager = manager ?? trayManager;
 
   final TrayManager _manager;
+
+  /// Whether a click on the icon opens the menu.
+  final bool menuOnClick;
   final StreamController<TrayAction> _actions =
       StreamController<TrayAction>.broadcast();
 
@@ -153,7 +159,9 @@ final class TrayManagerTray with TrayListener implements TrayPort {
   }
 
   @override
-  void onTrayIconMouseDown() => _add(TrayAction.open);
+  void onTrayIconMouseDown() => menuOnClick
+      ? unawaited(_manager.popUpContextMenu())
+      : _add(TrayAction.open);
 
   @override
   void onTrayIconRightMouseDown() => unawaited(_manager.popUpContextMenu());

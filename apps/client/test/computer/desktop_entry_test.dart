@@ -45,6 +45,7 @@ void main() {
     WidgetTester tester,
     ComputerDesktopView desktop, {
     Locale locale = const Locale('en'),
+    bool owner = true,
   }) async {
     var changed = 0;
     final c = ProviderContainer(
@@ -52,7 +53,7 @@ void main() {
         computerPortsProvider.overrideWithValue(
           ComputerPorts(api: api, events: events.stream),
         ),
-        isOwnerProvider.overrideWith((ref) async => true),
+        isOwnerProvider.overrideWith((ref) async => owner),
       ],
     );
     addTearDown(c.dispose);
@@ -134,6 +135,24 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'without the owner check the switch-off fails instead of claiming success',
+    (tester) async {
+      await pump(tester, view(), owner: false);
+      await tester.tap(find.text('Switch enablement off'));
+      await tester.pumpAndSettle();
+      expect(api.calls, isEmpty);
+      expect(
+        find.text('Computer control of Desk is switched off.'),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Could not switch the enablement off'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('a desktop without enablement offers no switch-off', (
     tester,

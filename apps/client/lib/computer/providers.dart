@@ -97,22 +97,26 @@ class ComputerSessions extends _$ComputerSessions {
   }
 
   /// Stops [sessionId] (`computer.stop`, 27 8.3) and shows its end once. Throws the error of
-  /// the call (a refusal, no connection); the session then stays as it was.
+  /// the call (a refusal, no connection), and a [StateError] before the login or the owner
+  /// check; the session then stays as it was.
   Future<void> stop(String sessionId) async {
-    final ports = _ports;
-    if (ports == null) return;
+    final ports = _ports ?? (throw StateError(_unavailable));
     final session = await ports.api.stop(sessionId);
     if (!ref.mounted || !identical(_ports, ports)) return;
     _apply(ComputerStatus.fromSession(session));
   }
 
   /// Switches the enablement of [hostId] off (`computer.device.disable`, 27 4 item 4); the
-  /// end of its session arrives as an event. Throws the error of the call.
+  /// end of its session arrives as an event. Throws the error of the call, and a [StateError]
+  /// before the login or the owner check.
   Future<void> disableDevice(String hostId) async {
-    final ports = _ports;
-    if (ports == null) return;
+    final ports = _ports ?? (throw StateError(_unavailable));
     await ports.api.disableDevice(hostId);
   }
+
+  /// Before the login or the owner check no request goes out, so a stop or a switch-off
+  /// fails instead of reporting a success that never reached the server.
+  static const String _unavailable = 'computer use is not available yet';
 
   /// Hides the ended [sessionId] for good.
   void dismiss(String sessionId) {

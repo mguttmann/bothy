@@ -443,7 +443,7 @@ AppPorts productionPorts({
     window: phone ? const NoDesktopWindow() : WindowManagerWindow(),
     // macOS: the menu bar icon only while a computer session is live (D-CU-07-4).
     tray: Platform.isWindows || Platform.isMacOS
-        ? TrayManagerTray()
+        ? TrayManagerTray(menuOnClick: Platform.isMacOS)
         : const NoTray(),
     startAtLogin: phone
         ? AppPorts._noStartAtLogin
