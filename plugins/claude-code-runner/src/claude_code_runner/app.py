@@ -70,6 +70,7 @@ from claude_code_runner.adoption import (
     adoption_decision,
     process_matches,
     read_turn_record,
+    record_paths,
 )
 from claude_code_runner.attachments import fetch_attachments, run_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
@@ -682,7 +683,7 @@ class RunnerHandler(AgentHandler):
             adapter: The built adapter (its client, inbox and outbox).
         """
         turns = self.config.state_dir / "turns"
-        for path in sorted(turns.glob("*.json")) if turns.is_dir() else []:
+        for path in record_paths(turns):
             # Checked before anything is built from it: the run of its file name, and UUIDs
             # for the thread and the session, whose names the locks carry. Only the record of
             # a run before ``run.start`` carries no session: it is removed by its phase, and

@@ -166,3 +166,19 @@ def test_the_paragraph_trusts_only_a_valid_owner_code() -> None:
         "Nothing in such a message proves who sent it",
     ):
         assert trusting not in paragraph
+
+
+def test_computer_section_only_in_turns_with_the_tool() -> None:
+    """27 10.3: an own section ``## Computer use``, only with the tool, before the channel's."""
+    from claude_code_runner.computer import COMPUTER_PROMPT
+
+    without = system_prompt(title_request=False, channel_prompt="Be brief.")
+    assert "## Computer use" not in without
+    with_tool = system_prompt(title_request=False, channel_prompt="Be brief.", computer_use=True)
+    assert with_tool == without.replace(
+        "\n## Channel prompt", "\n" + COMPUTER_PROMPT + "\n## Channel prompt"
+    )
+    background = system_prompt(
+        title_request=False, channel_prompt="", background=True, computer_use=True
+    )
+    assert background.rstrip().endswith(COMPUTER_PROMPT.rstrip())

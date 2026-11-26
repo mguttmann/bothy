@@ -96,6 +96,7 @@ from claude_code_runner.adoption import (
     names_session,
     process_id,
     read_turn_record,
+    record_paths,
 )
 from claude_code_runner.attachments import fetch_attachments, run_attachments
 from claude_code_runner.bgmode import BackgroundMode
@@ -299,7 +300,7 @@ async def stop_leftover_turns(
         timeout: ``runner.cli_probe_timeout``, the bound of the identity check.
     """
     hosted = state_dir / "hosted"
-    for path in sorted(hosted.glob("*/turns/*.json")) if hosted.is_dir() else []:
+    for path in [p for t in sorted(hosted.glob("*/turns")) for p in record_paths(t)]:
         try:
             await _stop_leftover(
                 path, stop_grace=stop_grace, kill_grace=kill_grace, poll=poll, timeout=timeout

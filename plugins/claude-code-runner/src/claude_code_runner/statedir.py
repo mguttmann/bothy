@@ -240,7 +240,7 @@ def _sweep_runs(root: Path, limit: float, busy: set[str]) -> int:
 def _recorded_runs(root: Path) -> set[str]:
     """The runs with a turn record (own or left for adoption)."""
     turns = root / "turns"
-    return {p.stem for p in turns.glob("*.json")} if turns.is_dir() else set()
+    return {p.stem for p in turns.glob("*.json") if "." not in p.stem} if turns.is_dir() else set()
 
 
 def _newest(entry: Path) -> float:

@@ -39,6 +39,7 @@ __all__ = [
     "choose_model",
     "choose_session",
     "class_flags",
+    "computer_argument",
     "hosted_additions",
     "hosted_class_flags",
     "reported_model",
@@ -198,6 +199,27 @@ def hosted_additions(
     return [*added, "--strict-mcp-config"]
 
 
+def computer_argument(computer_mcp: Path | None) -> list[str]:
+    """``--mcp-config <file>`` of the computer MCP file, or nothing without one (27 10.1).
+
+    No ``--strict-mcp-config``: the host user's own MCP servers load as before. The flag takes
+    several values, so every caller puts another flag after it.
+
+    Args:
+        computer_mcp: The per-turn file, or ``None``.
+
+    Returns:
+        The arguments.
+
+    Examples:
+        >>> computer_argument(Path("/s/turns/r.computer.mcp.json"))
+        ['--mcp-config', '/s/turns/r.computer.mcp.json']
+        >>> computer_argument(None)
+        []
+    """
+    return [] if computer_mcp is None else ["--mcp-config", str(computer_mcp)]
+
+
 def budget_argument(value: float) -> str:
     """The value of ``--max-budget-usd``: the cost cap as a plain decimal number (26 5.8).
 
@@ -318,6 +340,7 @@ def build_argv(  # noqa: PLR0913 - every input of the command line is explicit
     hosted: HostedArgs | None = None,
     plugin_dirs: Sequence[Path] = (),
     max_budget_usd: str | None = None,
+    computer_mcp: Path | None = None,
 ) -> list[str]:
     """Build the argument list of one turn in the order of 18.2 (and 26 5.3 for a hosted one).
 
@@ -332,14 +355,19 @@ def build_argv(  # noqa: PLR0913 - every input of the command line is explicit
         hosted: The parts of a hosted turn (26 5.3); ``None`` for the runner's own agent.
         plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
         max_budget_usd: The cost cap of a hosted definition (`budget_argument`), if any.
+        computer_mcp: The per-turn MCP file of ``bothy-computer-mcp`` (``runner.computer_use``,
+            docs/spec/27-computer-use.md 10.1): ``--mcp-config`` directly after
+            ``--permission-prompts none``, without ``--strict-mcp-config``, only under ``host``.
 
     Returns:
         The argument list.
 
     Raises:
-        ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``, or
-            a channel skill folder below ``host``.
+        ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``, a
+            channel skill folder below ``host``, or a computer MCP file below ``host``.
     """
+    if computer_mcp is not None and tool_class != "host":  # 27 10.1: never below host
+        raise ArgumentError("invalid_argument")
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     if add_dir is not None and tool_class == "chat":
@@ -369,6 +397,7 @@ def build_argv(  # noqa: PLR0913 - every input of the command line is explicit
         *flags,
         "--permission-prompts",
         "none",
+        *computer_argument(computer_mcp),
         *added,
     ]
     if add_dir is not None:

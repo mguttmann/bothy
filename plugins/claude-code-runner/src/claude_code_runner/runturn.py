@@ -149,6 +149,19 @@ from claude_code_runner.causes import (
     turn_end_cause,
 )
 from claude_code_runner.commandline import HostedArgs, SessionChoice, build_argv, reported_model
+from claude_code_runner.computer import (
+    ComputerPaths,
+    RequestFolder,
+    mark_left,
+    mcp_document,
+    new_nonce,
+    read_turn_nonce,
+    remove_session_files,
+    server_call,
+    take_left,
+    write_turn_file,
+)
+from claude_code_runner.computer import remove_run_files as remove_computer_files
 from claude_code_runner.failures import (
     SESSION_MISSING_TEXT,
     ErrorKind,
@@ -652,6 +665,12 @@ class RunTurn:
         self.owner_lines = OwnerLines()
         """The owner codes written so far and the marked lines, to judge what a session took;
         the turn record keeps the codes, never a text."""
+        # ---- runner.computer_use (docs/spec/27-computer-use.md 10) ----
+        self.computer: RequestFolder | None = None
+        """The run's request folder while it is served; ``None`` without the tool."""
+        self._computer_task: asyncio.Task[None] | None = None
+        self._last_bg: BgSession | None = None
+        """The run's latest background session, which the end of a computer run removes."""
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -669,6 +688,7 @@ class RunTurn:
             self._persist()
         await self._open_turn()
         try:
+            self._computer_start(adopt=False)
             await self._drive(_Attempt(resume=self.session.resume), precheck=False)
         except asyncio.CancelledError:
             await self._on_cancelled()
@@ -677,6 +697,7 @@ class RunTurn:
             await self._on_error(exc)
             raise
         finally:
+            await self._computer_finish()
             self._end()
 
     async def _open_turn(self) -> None:
@@ -710,8 +731,10 @@ class RunTurn:
             now=lambda: datetime.now(UTC),
             progress_interval=self.cfg.progress_patch_interval,
         )
-        if self.state.notice:
-            await self._status_line(self.state.notice)
+        left = await self._computer_left_note()
+        notice = ". ".join(n for n in (self.state.notice, left) if n)
+        if notice:
+            await self._status_line(notice)
 
     async def _drive(  # noqa: PLR0911, PLR0912 - one branch per action
         self,
@@ -891,6 +914,114 @@ class RunTurn:
                 remove_launch_files(self.cfg.state_dir, str(self.handle.run_id))
             if self.bg is not None:
                 remove_bg_files(self._bg_state, self.handle.run_id)
+
+    # ---- computer use (docs/spec/27-computer-use.md 10) --------------------------------------
+
+    def _computer_wanted(self) -> bool:
+        """``runner.computer_use`` and a turn under ``host``: never below it (27 10.1)."""
+        return (
+            self.cfg.computer_use
+            and self.cfg.computer_mcp_bin is not None
+            and self.cfg.tool_class == "host"
+        )
+
+    def _computer_paths(self) -> ComputerPaths:
+        return ComputerPaths(self.cfg.state_dir, self.handle.run_id)
+
+    def _computer_mcp(self) -> Path | None:
+        """The per-turn MCP file of ``--mcp-config`` while the run serves its requests."""
+        return self._computer_paths().turn_file if self.computer is not None else None
+
+    def _computer_start(self, *, adopt: bool) -> None:
+        """Write the per-turn file with a fresh nonce and serve the request folder (27 10.2).
+
+        A runner that adopts the run keeps the nonce of the file the first runner wrote, so a
+        ``bothy-computer-mcp`` that still runs goes on with its requests.
+
+        Args:
+            adopt: The run outlived an earlier runner.
+        """
+        if self.computer is not None or not self._computer_wanted():
+            return
+        paths = self._computer_paths()
+        nonce = read_turn_nonce(paths) if adopt else None
+        if nonce is None:
+            nonce = new_nonce()
+            document = mcp_document(
+                self.cfg.computer_mcp_bin,  # type: ignore[arg-type]  # checked in _computer_wanted
+                paths,
+                nonce,
+                self.cfg.computer_request_timeout,
+                self.cfg.server_url,
+            )
+            write_turn_file(paths, document)
+        else:
+            ensure_private_dir(paths.request_dir)
+        call = server_call(self.handle.client, self.handle.bound)
+        self.computer = RequestFolder(paths, nonce, call, poll=self.cfg.poll_interval, ids=self.ids)
+        self._computer_task = asyncio.ensure_future(self.computer.serve())
+
+    async def _computer_finish(self, *, kept: bool = False) -> None:
+        """The end of the run's computer use (27 10.5 item 2, CU-T22).
+
+        The request folder is no longer served. After a run that opened a session, once its
+        process is gone (print mode) or its background session is stopped and removed
+        (``claude stop``, ``claude rm``), the transcript and the tool result files of the
+        session are deleted; a failure logs ``computer_transcript_left`` and leaves a mark the
+        thread's next run names. A run that stays for a next runner (a live turn, a handover)
+        keeps everything.
+
+        Args:
+            kept: The run stays for a next runner (an adopted turn that is not done).
+        """
+        folder, task = self.computer, self._computer_task
+        if folder is None:
+            return
+        self.computer = self._computer_task = None
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        if kept or self.handed_over or self._handing_over():
+            return
+        process = self.process or self.adopted_group
+        if process is not None and not isinstance(process, BgSession) and process.alive():
+            return  # a live turn's files stay with its record for the next start (18.9)
+        paths = self._computer_paths()
+        if folder.opened:
+            if self._last_bg is not None:
+                await self._terminate(self._last_bg, self.ids)
+            config_dir = self._config_dir()
+            ref = self.session.ref
+            if config_dir is None or not await asyncio.to_thread(
+                remove_session_files, config_dir, ref
+            ):
+                _warn("computer_transcript_left", **self.ids)
+                if config_dir is not None:
+                    mark_left(self.cfg.state_dir, self.state.thread_id, config_dir, ref)
+            else:
+                _log("computer_transcript_removed", **self.ids)
+        remove_computer_files(paths)
+
+    async def _computer_left_note(self) -> str | None:
+        """Name a transcript an earlier computer run of the thread left (27 10.5 item 2).
+
+        The deletion is tried again first; the note names the leftover either way, because the
+        screenshots lay on the runner host longer than the run.
+
+        Returns:
+            The status line, or ``None`` without a leftover.
+        """
+        left = take_left(self.cfg.state_dir, self.state.thread_id)
+        if left is None:
+            return None
+        config_dir, ref = left
+        if await asyncio.to_thread(remove_session_files, config_dir, ref):
+            _log("computer_transcript_removed", **self.ids)
+            return cause("computer_transcript_left")
+        _warn("computer_transcript_left", **self.ids)
+        mark_left(self.cfg.state_dir, self.state.thread_id, config_dir, ref)
+        return cause("computer_transcript_left")
 
     def _crash(self, point: str) -> None:
         """The test-only crash hook after a step of the handshake (`crash_point`)."""
@@ -1121,7 +1252,9 @@ class RunTurn:
             text = paths.system_prompt.read_text()
         else:
             text = system_prompt(
-                title_request=self.title_request, channel_prompt=self.state.channel_prompt
+                title_request=self.title_request,
+                channel_prompt=self.state.channel_prompt,
+                computer_use=self.computer is not None,
             )
         if attempt.hint:
             path = paths.system_prompt.with_name(f"{self.handle.run_id}.retry-prompt.md")
@@ -1140,6 +1273,7 @@ class RunTurn:
             title_request=self.title_request,
             channel_prompt=self.state.channel_prompt,
             background=True,
+            computer_use=self.computer is not None,
         )
         if attempt.hint:
             text = text.rstrip() + "\n\n## Retry\n\n" + RETRY_HINT + "\n"
@@ -1168,6 +1302,7 @@ class RunTurn:
             hosted=self.state.hosted,
             plugin_dirs=self.state.plugin_dirs,
             max_budget_usd=self.state.max_budget_usd,
+            computer_mcp=self._computer_mcp(),
         )
 
     async def _rebase_once(self, attempt: _Attempt) -> None:
@@ -1246,6 +1381,8 @@ class RunTurn:
         """
         paths = self._paths()
         session = process if isinstance(process, BgSession) else None
+        if session is not None:
+            self._last_bg = session
         try:
             if reader is None:
                 reader = StreamReader(
@@ -2958,6 +3095,7 @@ class RunTurn:
         phase = str(record.get("phase") or "")
         self._restore(record, known_steps, fresh=phase == "transcribing")
         try:
+            self._computer_start(adopt=True)
             if self.ledger.finishing is not None:
                 # The previous runner decided the end and may have stored its costs: repeat it.
                 decided = self.ledger.finishing
@@ -2973,6 +3111,7 @@ class RunTurn:
             await self._on_error(exc)
             raise
         finally:
+            await self._computer_finish()
             self._end()
 
     async def _restart_transcribing(self) -> None:
@@ -3479,6 +3618,7 @@ class RunTurn:
             hosted=hosted,
             plugin_dirs=self.state.plugin_dirs,
             own_messages=own,
+            computer_mcp=self._computer_mcp(),
         )
         await self._rebase_once(attempt)
         self.process = None
@@ -4022,7 +4162,7 @@ class RunTurn:
                 self.phase = "open"
         self._offer_held()
 
-    async def adopt_background(
+    async def adopt_background(  # noqa: PLR0915 - one statement per part of the adoption
         self, record: dict[str, Any], session: BgSession, known_steps: Mapping[str, str]
     ) -> None:
         """Continue a background turn that outlived the previous runner (09 18.9).
@@ -4046,8 +4186,10 @@ class RunTurn:
         part = record.get("bg")
         self.bg_record = dict(part) if isinstance(part, Mapping) else {}
         self._restore_adopted(record, known_steps)
+        self._last_bg = session
         done = False
         try:
+            self._computer_start(adopt=True)
             if self.ledger.finishing is not None:
                 # The previous runner decided the end and may have stored its costs: repeat it.
                 await self._terminate(session, self.ids)
@@ -4099,6 +4241,7 @@ class RunTurn:
             raise
         finally:
             # An orderly stop of this runner keeps the record for the next start.
+            await self._computer_finish(kept=not done)
             if done:
                 self.phase = "ended"
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
@@ -4216,6 +4359,7 @@ class RunTurn:
         self.live.restore(record.get("steps"), known_steps)
         done = False
         try:
+            self._computer_start(adopt=True)
             if self.ledger.finishing is not None:
                 # The previous runner decided the end and may have stored its costs: repeat it.
                 decided = self.ledger.finishing
@@ -4264,6 +4408,7 @@ class RunTurn:
             raise
         finally:
             # An orderly stop of this runner keeps the record for the next start (D-M2-35-20).
+            await self._computer_finish(kept=not done)
             if done:
                 self.phase = "ended"
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")

@@ -34,7 +34,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from claude_code_runner.adoption import read_identity, read_turn_record
+from claude_code_runner.adoption import read_identity, read_turn_record, record_paths
 
 if TYPE_CHECKING:
     from bothy_sdk.adapter import Adapter
@@ -107,7 +107,7 @@ def handover_records(state_dir: Path) -> list[Path]:
     turns = state_dir / "turns"
     if not turns.is_dir():
         return found
-    for path in sorted(turns.glob("*.json")):
+    for path in record_paths(turns):
         record = read_turn_record(path)
         if record is not None and "phase" in record:
             found.append(path)
@@ -225,7 +225,7 @@ async def _stop_left(config: RunnerConfig) -> None:
     from claude_code_runner.app import Runner  # noqa: PLC0415 - the runner imports this module
 
     turns = config.state_dir / "turns"
-    if not turns.is_dir() or not any(turns.glob("*.json")):
+    if not record_paths(turns):
         return
     if not config.turn_handover and handover_records(config.state_dir):
         # The key went off while turns were handed over: they are still stopped through their
