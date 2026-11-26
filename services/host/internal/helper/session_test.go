@@ -311,7 +311,7 @@ func TestSessionLifecycle(t *testing.T) {
 	if !out.IsFrame || out.SessionID != sid {
 		t.Fatalf("output packet %+v", out)
 	}
-	if f, err := frame.Decode(out.Frame, frame.FromHost); err != nil || f.Type != frame.TypeData || string(f.Data) != "hello" {
+	if f, err := frame.Decode(out.Frame, frame.KindTerminal, frame.FromHost); err != nil || f.Type != frame.TypeData || string(f.Data) != "hello" {
 		t.Fatalf("output frame %+v (%v)", f, err)
 	}
 

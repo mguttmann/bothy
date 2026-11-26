@@ -282,7 +282,7 @@ func (s *session) seal(req request) (response, error) {
 	if err != nil {
 		return response{}, err
 	}
-	if _, err := frame.Decode(fb, frame.FromDevice); err != nil {
+	if _, err := frame.Decode(fb, frame.KindTerminal, frame.FromDevice); err != nil {
 		return response{}, err
 	}
 	msg, err := s.transport.Encrypt(fb)
@@ -306,7 +306,7 @@ func (s *session) open(req request) (response, error) {
 	if err != nil {
 		return response{}, err
 	}
-	if _, err := frame.Decode(plain, frame.FromHost); err != nil {
+	if _, err := frame.Decode(plain, frame.KindTerminal, frame.FromHost); err != nil {
 		return response{}, err
 	}
 	return response{Frame: encoded(plain)}, nil

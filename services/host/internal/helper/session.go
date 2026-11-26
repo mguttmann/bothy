@@ -144,7 +144,7 @@ func (sc *sessionChannel) input(p localchan.Packet) {
 	sc.mu.Lock()
 	pr := sc.procs[p.SessionID]
 	sc.mu.Unlock()
-	f, err := frame.Decode(p.Frame, frame.FromDevice)
+	f, err := frame.Decode(p.Frame, frame.KindTerminal, frame.FromDevice)
 	if pr == nil || err != nil || f.Type != frame.TypeData {
 		return
 	}
