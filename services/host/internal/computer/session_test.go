@@ -182,6 +182,9 @@ func TestOpenChecks(t *testing.T) {
 		if !strings.Contains(r.logText(), LogPeerRefused) {
 			t.Error("no computer_peer_refused in the log (CU-T23)")
 		}
+		if !strings.Contains(r.logText(), "reason="+ReasonTestPeer) { // the rig runs the rule of Linux
+			t.Errorf("the refusal does not say why: %s", r.logText())
+		}
 		if rep := r.m.Report(); rep.Helper != control.HelperRefused {
 			t.Errorf("report %+v", rep)
 		}

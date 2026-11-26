@@ -187,7 +187,7 @@ func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	var proc Process
 	var err error
 	if h.o.PeerOf == nil {
-		err = ErrPeerRefused
+		err = refuse(ReasonNoPeer)
 	} else if peer, err = h.o.PeerOf(c); err == nil && h.o.Bind != nil {
 		proc, err = h.o.Bind(c, peer, accepted)
 	}
@@ -196,7 +196,7 @@ func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	}
 	if err != nil {
 		closeProc(proc)
-		h.refused(ctx, c)
+		h.refused(ctx, c, RefusalReason(err))
 		return
 	}
 	// A peer that never sends hello must not hold Serve past its end.
@@ -207,15 +207,18 @@ func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	hello, ok := msg.(*Hello)
 	if err != nil || kind != KindJSON || derr != nil || op != OpHello || !ok {
 		closeProc(proc)
+		h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused), slog.String(attrRefusal, ReasonNoHello))
 		_ = c.Close()
 		return
 	}
 	// The process behind the connection must still be the one admitted before hello (27 9.4).
-	if h.o.Rule.Check(ctx, peer, proc) != nil {
+	if err := h.o.Rule.Check(ctx, peer, proc); err != nil {
 		closeProc(proc)
-		h.refused(ctx, c)
+		h.refused(ctx, c, RefusalReason(err))
 		return
 	}
+	h.log.LogAttrs(ctx, slog.LevelInfo, LogHelperConnected, slog.String(attrCode, LogHelperConnected),
+		slog.Bool(attrEnabled, hello.Enabled), slog.String(attrHelperVersion, hello.HelperVersion))
 	hc := &helperConn{c: c, proc: proc}
 	h.mu.Lock()
 	old := h.conn
@@ -242,10 +245,10 @@ func (h *Helper) accept(ctx context.Context, c net.Conn, accepted time.Time) {
 	h.read(hc)
 }
 
-// refused closes a connection whose peer the rule refused, logs computer_peer_refused and reports
-// the helper as refused while no trusted helper is connected.
-func (h *Helper) refused(ctx context.Context, c net.Conn) {
-	h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused))
+// refused closes a connection whose peer the rule refused, logs computer_peer_refused with the
+// reason and reports the helper as refused while no trusted helper is connected.
+func (h *Helper) refused(ctx context.Context, c net.Conn, reason string) {
+	h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused), slog.String(attrRefusal, reason))
 	_ = c.Close()
 	h.update(func(s *HelperState) {
 		if !s.Connected {
@@ -346,6 +349,7 @@ func (h *Helper) gone(hc *helperConn) {
 		return
 	}
 	h.conn = nil
+	h.log.LogAttrs(context.Background(), slog.LevelInfo, LogHelperGone, slog.String(attrCode, LogHelperGone))
 	before := h.state
 	h.state = HelperState{Refused: hc.refused.Load()}
 	pend := h.pending
@@ -394,7 +398,7 @@ func (h *Helper) Recheck(ctx context.Context) error {
 		return ErrHelperAbsent
 	}
 	if err := h.o.Rule.Check(ctx, peer, hc.proc); err != nil {
-		h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused))
+		h.log.LogAttrs(ctx, slog.LevelWarn, LogPeerRefused, slog.String(attrCode, LogPeerRefused), slog.String(attrRefusal, RefusalReason(err)))
 		hc.refused.Store(true)
 		_ = hc.c.Close()
 		return ErrPeerRefused

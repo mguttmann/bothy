@@ -27,6 +27,7 @@ from fakes import FakeRun, ok
 VERSION = hostdist.component_version()
 SET_SCRIPT = hostdist.INFRA / "set-computer-use.sh"
 SET_SCRIPT_PS1 = hostdist.INFRA / "windows" / "set-computer-use.ps1"
+START_SCRIPT_PS1 = hostdist.INFRA / "windows" / "start-computer-helper.ps1"
 TEAM = "TEAM123456"
 DR = (
     'designated => identifier "com.example.bothy-computer-helper" and anchor apple generic and '
@@ -365,6 +366,8 @@ def test_helper_package_windows(
     defines = [wix[i + 1] for i, a in enumerate(wix) if a == "-d"]
     assert f"HelperPath={helper}" in defines
     assert f"HelperScript={SET_SCRIPT_PS1}" in defines
+    assert f"HelperStartScript={START_SCRIPT_PS1}" in defines
+    assert START_SCRIPT_PS1.is_file()
     signed = [c[-1] for c in run.calls if c[:2] == ["signtool.exe", "sign"]]
     if thumbprint:
         assert signed == [str(tmp_path / "work" / "msi-bin" / "bothy-host.exe"), str(msi)]
@@ -379,7 +382,12 @@ def test_the_msi_has_the_helper_only_with_its_define() -> None:
     block = wxs[start:end]
     # Everything of the helper sits inside the block, so a release build carries none of it.
     outside = re.sub(r"<!--.*?-->", "", wxs[:start] + wxs[end:], flags=re.DOTALL)
-    for part in ("ComputerHelper", "bothy-computer-helper.exe", "set-computer-use.ps1"):
+    for part in (
+        "ComputerHelper",
+        "bothy-computer-helper.exe",
+        "set-computer-use.ps1",
+        "start-computer-helper.ps1",
+    ):
         assert part in block
         assert part not in outside
     assert 'Level="1000"' in block
@@ -387,6 +395,36 @@ def test_the_msi_has_the_helper_only_with_its_define() -> None:
     assert 'Name="bothy-computer-helper"' in block
     assert 'Impersonate="no"' in block
     assert "&amp;ComputerHelper=3" in block
+
+
+def test_the_msi_starts_the_helper_after_install() -> None:
+    """The helper runs right after the install in the console session, not only after a login:
+    a deferred action as the system account (it needs SeTcbPrivilege for uiAccess), after the
+    files, only when the feature is installed, and never failing the install (on a test machine:
+    the helper was absent until it was started by hand)."""
+    wxs = (hostdist.INFRA / "windows" / "bothy-host.wxs").read_text(encoding="utf-8")
+    action = re.search(r'<CustomAction Id="StartComputerHelper"[^>]*/>', wxs)
+    assert action
+    for attr in (
+        'Execute="deferred"',
+        'Impersonate="no"',
+        'Return="ignore"',
+        "start-computer-helper.ps1",
+        "-Helper",
+    ):
+        assert attr in action.group(0)
+    assert re.search(
+        r'<Custom Action="StartComputerHelper" After="SetComputerUse" '
+        r'Condition="&amp;ComputerHelper=3" />',
+        wxs,
+    )
+    assert 'Component Id="HelperStartScript"' in wxs
+    assert 'ComponentRef Id="HelperStartScript"' in wxs
+    script = START_SCRIPT_PS1.read_text(encoding="utf-8")
+    # uiAccess needs the token route; a plain Start-Process from the system account gives error 740.
+    for call in ("WTSQueryUserToken", "TokenUIAccess", "CreateProcessAsUserW", "winsta0\\default"):
+        assert call in script
+    assert script.rstrip().endswith("exit 0")
 
 
 # ---- command line ---------------------------------------------------------------------------

@@ -107,6 +107,46 @@ func TestPeerRule(t *testing.T) {
 	}
 }
 
+// TestPeerRuleReasons: every refusal carries the step that refused it, so the log line
+// computer_peer_refused tells a machine's cause apart (on a macOS test machine the helper
+// was refused without a hint why).
+func TestPeerRuleReasons(t *testing.T) {
+	procs := procTable{10: helperPath, 11: copyPath}
+	trusted := map[string]bool{helperPath: true, copyPath: true}
+	req := `identifier "com.example.bothy.computer-helper" and anchor apple generic`
+	cases := []struct {
+		name   string
+		peer   confirm.Peer
+		proc   Process
+		r      PeerRule
+		reason string
+	}{
+		{"no captured process", confirm.Peer{UID: uidAlex, PID: 10}, nil, rule(procs, "", nil, trusted), ReasonNoPeer},
+		{"another user", confirm.Peer{UID: uidRobin, PID: 10}, procs.proc(10), rule(procs, "", nil, trusted), ReasonConsoleUser},
+		{"process gone", confirm.Peer{UID: uidAlex, PID: 99}, procs.proc(99), rule(procs, "", nil, trusted), ReasonProcessChanged},
+		{"executable unreadable", confirm.Peer{UID: uidAlex, PID: 10}, exeErr{}, rule(procs, "", nil, trusted), ReasonExeUnavailable},
+		{"copy outside the installed path", confirm.Peer{UID: uidAlex, PID: 11}, procs.proc(11), rule(procs, "", nil, trusted), ReasonPathMismatch},
+		{"untrusted folder chain", confirm.Peer{UID: uidAlex, PID: 10}, procs.proc(10), rule(procs, "", nil, map[string]bool{}), ReasonPathUntrusted},
+		{"unsigned helper", confirm.Peer{UID: uidAlex, PID: 10}, procs.proc(10), rule(procs, req, nil, trusted), ReasonSignature},
+	}
+	for _, c := range cases {
+		err := c.r.Check(context.Background(), c.peer, c.proc)
+		if !errors.Is(err, ErrPeerRefused) || RefusalReason(err) != c.reason {
+			t.Errorf("%s: %v, want reason %s", c.name, err, c.reason)
+		}
+	}
+	if RefusalReason(errors.New("other")) != ReasonNoPeer {
+		t.Error("a foreign error has no reason of its own")
+	}
+}
+
+// exeErr is a captured process whose executable cannot be read.
+type exeErr struct{}
+
+func (exeErr) Current() error           { return nil }
+func (exeErr) ExePath() (string, error) { return "", errors.New("no path") }
+func (exeErr) Close() error             { return nil }
+
 // TestPeerRuleLinux: Linux admits exactly the user of host_service.computer_test_peer; empty
 // admits nobody (27 9.4).
 func TestPeerRuleLinux(t *testing.T) {

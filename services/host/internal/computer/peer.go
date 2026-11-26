@@ -17,8 +17,61 @@ import (
 // refuses; the connection is closed and logged with computer_peer_refused.
 var ErrPeerRefused = errors.New("computer: helper peer refused")
 
-// LogPeerRefused is the log code of a refused helper peer (CU-T23).
-const LogPeerRefused = "computer_peer_refused"
+// Log codes of the helper channel: a refused peer (CU-T23, with the key reason), a helper that
+// passed the rule and sent hello, and the end of that connection.
+const (
+	LogPeerRefused     = "computer_peer_refused"
+	LogHelperConnected = "computer_helper_connected"
+	LogHelperGone      = "computer_helper_gone"
+	attrRefusal        = "reason"
+	attrEnabled        = "enabled"
+	attrHelperVersion  = "helper_version"
+)
+
+// The reasons of a refused helper peer, logged with LogPeerRefused under the key reason, so a
+// refusal on a machine can be told apart without naming a user, path or process.
+const (
+	// ReasonNoPeer: the user, process ID or process binding of the connection could not be read.
+	ReasonNoPeer = "no_peer"
+	// ReasonConsoleUser: the peer is not the user of the active console session (or is the service
+	// user or a session user).
+	ReasonConsoleUser = "console_user"
+	// ReasonProcessChanged: the process behind the connection is no longer the captured one.
+	ReasonProcessChanged = "process_changed"
+	// ReasonExeUnavailable: the executable of the peer process could not be read.
+	ReasonExeUnavailable = "exe_unavailable"
+	// ReasonPathMismatch: the peer runs another executable than the installed helper.
+	ReasonPathMismatch = "path_mismatch"
+	// ReasonPathUntrusted: the helper's file or folder chain fails the rule of HD10.
+	ReasonPathUntrusted = "path_untrusted"
+	// ReasonSignature: the helper does not satisfy the code signing requirement of the build.
+	ReasonSignature = "signature"
+	// ReasonTestPeer: on Linux the peer is not host_service.computer_test_peer.
+	ReasonTestPeer = "test_peer"
+	// ReasonNoHello: the peer passed the rule but sent no valid hello.
+	ReasonNoHello = "no_hello"
+)
+
+// RefusalError is the error of a refused peer: errors.Is(err, ErrPeerRefused) holds, and Reason
+// is one of the Reason constants.
+type RefusalError struct{ Reason string }
+
+// Error names the reason.
+func (e *RefusalError) Error() string { return ErrPeerRefused.Error() + ": " + e.Reason }
+
+// Is makes errors.Is(err, ErrPeerRefused) hold.
+func (e *RefusalError) Is(target error) bool { return target == ErrPeerRefused }
+
+func refuse(reason string) error { return &RefusalError{Reason: reason} }
+
+// RefusalReason returns the reason of err, ReasonNoPeer for any other error.
+func RefusalReason(err error) string {
+	var r *RefusalError
+	if errors.As(err, &r) {
+		return r.Reason
+	}
+	return ReasonNoPeer
+}
 
 // Process is the peer process of one helper connection as the connection captured it at connect
 // time (macOS the audit token with its PID version, Windows a handle of the pipe client opened at
@@ -67,22 +120,32 @@ type PeerRule struct {
 func (r PeerRule) Check(ctx context.Context, p confirm.Peer, proc Process) error {
 	if r.GOOS == hostos.Linux {
 		if r.TestPeerUID == "" || p.UID != r.TestPeerUID || p.UID == r.Console.ServiceUID {
-			return ErrPeerRefused
+			return refuse(ReasonTestPeer)
 		}
 		return nil
 	}
-	if proc == nil || r.Trusted == nil || r.HelperPath == "" || p.PID <= 0 || !r.Console.Allow(ctx, p) || proc.Current() != nil {
-		return ErrPeerRefused
+	switch {
+	case proc == nil || r.Trusted == nil || r.HelperPath == "" || p.PID <= 0:
+		return refuse(ReasonNoPeer)
+	case !r.Console.Allow(ctx, p):
+		return refuse(ReasonConsoleUser)
+	case proc.Current() != nil:
+		return refuse(ReasonProcessChanged)
 	}
 	exe, err := proc.ExePath()
-	if err != nil || !samePath(r.GOOS, exe, r.HelperPath) || !r.Trusted(exe) {
-		return ErrPeerRefused
+	switch {
+	case err != nil:
+		return refuse(ReasonExeUnavailable)
+	case !samePath(r.GOOS, exe, r.HelperPath):
+		return refuse(ReasonPathMismatch)
+	case !r.Trusted(exe):
+		return refuse(ReasonPathUntrusted)
 	}
 	if r.Requirement != "" && (r.VerifySignature == nil || r.VerifySignature(ctx, exe, r.Requirement) != nil) {
-		return ErrPeerRefused
+		return refuse(ReasonSignature)
 	}
 	if proc.Current() != nil {
-		return ErrPeerRefused
+		return refuse(ReasonProcessChanged)
 	}
 	return nil
 }

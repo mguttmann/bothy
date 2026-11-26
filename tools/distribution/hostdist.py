@@ -1291,6 +1291,8 @@ def helper_package_windows(
             f"HelperPath={helper}",
             "-d",
             f"HelperScript={INFRA / 'windows' / 'set-computer-use.ps1'}",
+            "-d",
+            f"HelperStartScript={INFRA / 'windows' / 'start-computer-helper.ps1'}",
             "-o",
             msi,
         ]

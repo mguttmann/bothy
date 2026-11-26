@@ -440,7 +440,10 @@ server refuses another): helper installed and trusted (9.4), connected, enabled,
 `/Library/Application Support/bothy-host/bin/` next to `bothy-host` with the LaunchAgent
 `/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
 `%ProgramFiles%\bothy-host\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
-machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule); the enablement's state file
+machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule). The installer starts the
+helper at once in the session of the person at the console (macOS `launchctl bootstrap gui/<uid>`
+in the postinstall, Windows `start-computer-helper.ps1` as a deferred action of the system account
+with a uiAccess token of that session), so no new login is needed; the enablement's state file
 in the user's account (D-CU-02-4). A package built from a signed helper sets the host service's
 `buildinfo.ComputerHelperRequirement` to the helper's designated requirement (macOS) or the
 publisher subject of the machine's certificate (Windows); a package without one is a development
@@ -477,7 +480,16 @@ start is not refused, and the host gives no terminal session.
   whose file and folder chain belong to a trusted owner (the rule of HD10); and when the host
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
   designated requirement with the team ID; Windows: Authenticode with the publisher subject).
-  Otherwise the connection is closed and logged with `computer_peer_refused`.
+  Otherwise the connection is closed and logged with `computer_peer_refused` and the key `reason`,
+  the step that refused it (`no_peer`, `console_user`, `process_changed`, `exe_unavailable`,
+  `path_mismatch`, `path_untrusted`, `signature`, `test_peer`, or `no_hello` for a peer without a
+  valid `hello`); it names no user, path or process. The executable is read for a process of
+  another user (macOS `proc_pidpath`, not `kern.procargs2`, which only root and the process's own
+  user may read). A helper that passes is logged with `computer_helper_connected`, the end of its
+  connection with `computer_helper_gone`.
+- The helper opens the Windows pipe with exactly the rights its DACL grants interactive users
+  (`FILE_GENERIC_READ` plus `FILE_WRITE_DATA`), never `GENERIC_WRITE`, which adds
+  `FILE_CREATE_PIPE_INSTANCE` and is refused.
 - Host side, checked by the helper before its `hello` (D-CU-02-5): on macOS the expected peer is
   pinned to the service user `bothy-host` (looked up by name; missing or equal to the helper's own
   user trusts nobody) or root; the socket's peer (`getpeereid`) must be one of them and never the

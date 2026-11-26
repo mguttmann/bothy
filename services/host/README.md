@@ -96,7 +96,8 @@ of `host_service.computer_test_peer` only) and admits the computer helper by the
 HD10, the signing requirement of the build; the peer is the process the connection captured: macOS
 audit token with its PID version, Windows the client process handle held from the accept; checked
 again after `hello` and before every session); a refused peer is closed and logged with
-`computer_peer_refused`. The helper's `hello` and `state` become the `report` object `computer`;
+`computer_peer_refused` and the step that refused it under `reason` (27 9.4); an admitted helper
+is logged with `computer_helper_connected`, its end with `computer_helper_gone`. The helper's `hello` and `state` become the `report` object `computer`;
 without the key nothing listens and the report carries no object `computer` (the server reads it as
 `helper: absent`).
 

@@ -5,9 +5,17 @@
 /// The decision of the server check of the helper channel (D-CU-02-5), kept apart from the Win32
 /// calls that gather its inputs so the rule is tested without Windows.
 
+#include <cstdint>
 #include <string_view>
 
 namespace bothy::helper {
+
+/// The rights the helper asks for when it opens the host service's pipe: FILE_GENERIC_READ plus
+/// FILE_WRITE_DATA, exactly what the pipe's DACL grants interactive users (`pipeSDDL` in
+/// services/host/internal/confirm/peer_windows.go). GENERIC_WRITE would add FILE_APPEND_DATA (on a
+/// pipe FILE_CREATE_PIPE_INSTANCE), FILE_WRITE_EA and FILE_WRITE_ATTRIBUTES, which the DACL does
+/// not grant, so CreateFile would fail with ERROR_ACCESS_DENIED and the helper never connect.
+inline constexpr std::uint32_t kPipeClientAccess = 0x0012008b;
 
 /// The SID string of LocalSystem.
 inline constexpr std::string_view kLocalSystemSid = "S-1-5-18";

@@ -26,12 +26,14 @@ const codesignTimeout = 20 * time.Second
 
 // Constants of the kernel interface without cgo: the option LOCAL_PEERTOKEN of SOL_LOCAL (the
 // audit token of the peer at connect time, sys/un.h) and proc_info with PROC_PIDUNIQIDENTIFIERINFO
-// (the PID version of a process, sys/proc_info.h).
+// (the PID version of a process) and PROC_PIDPATHINFO (its executable, sys/proc_info.h).
 const (
 	solLocal                 = 0
 	sysProcInfo              = 336 // SYS_proc_info of sys/syscall.h; libSystem has no proc_pidinfo without cgo
 	procInfoCallPidinfo      = 2
 	procPidUniqIdentifierInf = 17
+	procPidPathInfo          = 11   // PROC_PIDPATHINFO of sys/proc_info.h
+	procPidPathInfoMaxSize   = 4096 // PROC_PIDPATHINFO_MAXSIZE, 4 * MAXPATHLEN
 	tokenPID                 = 5
 	tokenPIDVersion          = 7
 )
@@ -109,7 +111,7 @@ func (d darwinProc) Current() error {
 	return nil
 }
 
-// ExePath implements Process: the executable from kern.procargs2, read between two checks of the
+// ExePath implements Process: the executable from proc_pidpath, read between two checks of the
 // PID version, so it is the image of the captured process.
 func (d darwinProc) ExePath() (string, error) {
 	if err := d.Current(); err != nil {
@@ -128,19 +130,22 @@ func (d darwinProc) ExePath() (string, error) {
 // Close implements Process: the token holds nothing.
 func (darwinProc) Close() error { return nil }
 
-// exePath returns the executable path of process pid from kern.procargs2: the buffer starts with
-// argc (4 bytes), followed by the executable path ending in NUL.
+// exePath returns the executable path of process pid with proc_pidpath (proc_info
+// PROC_PIDPATHINFO), which reads the path of a process of any user; the path is resolved (no
+// symbolic link in it), and the installed helper path has none. kern.procargs2 is readable
+// only for root and the process's own user, and the host service (bothy-host) reads the helper of
+// the person at the console, so it refused every helper.
 func exePath(pid int) (string, error) {
-	b, err := unix.SysctlRaw("kern.procargs2", pid)
-	if err != nil || len(b) < 5 {
+	buf := make([]byte, procPidPathInfoMaxSize)
+	_, _, e := syscall.Syscall6(sysProcInfo, procInfoCallPidinfo, uintptr(pid), procPidPathInfo, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) //nolint:gosec // G103,G115: proc_info writes at most len(buf) bytes of the path into buf
+	if e != 0 {
 		return "", errNoExe
 	}
-	rest := b[4:]
-	end := bytes.IndexByte(rest, 0)
+	end := bytes.IndexByte(buf, 0)
 	if end <= 0 {
 		return "", errNoExe
 	}
-	return string(rest[:end]), nil
+	return string(buf[:end]), nil
 }
 
 // DefaultVerifySignature runs codesign --verify --strict -R=<requirement> on path (the designated

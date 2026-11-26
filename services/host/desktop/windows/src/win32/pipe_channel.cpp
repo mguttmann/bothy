@@ -7,8 +7,10 @@
 
 #include <aclapi.h>
 #include <sddl.h>
+#include <shlobj.h>
 
 #include <memory>
+#include <string>
 
 #include "bothy/helper/trust.hpp"
 
@@ -74,6 +76,44 @@ std::string pipe_owner_sid(HANDLE pipe) {
   LocalFree(sd);
   return out;
 }
+
+// The channel log `%LOCALAPPDATA%\bothy-computer-helper\channel.log`: one line per change of the
+// channel (connected, closed, an open that fails with a new error, a refused server), so a helper
+// that never reaches the host service can be diagnosed on the machine (on a test machine: the
+// pipe refused GENERIC_WRITE with error 5 and nothing said so). It holds no message content and
+// starts over above kChannelLogMax bytes.
+constexpr LONGLONG kChannelLogMax = 256 * 1024;
+
+void note(const std::wstring& text) {
+  OutputDebugStringW((L"bothy-computer-helper: " + text + L"\n").c_str());
+  PWSTR base = nullptr;
+  if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &base))) return;
+  std::wstring dir = std::wstring(base) + L"\\bothy-computer-helper";
+  CoTaskMemFree(base);
+  if (!CreateDirectoryW(dir.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) return;
+  std::wstring path = dir + L"\\channel.log";
+  WIN32_FILE_ATTRIBUTE_DATA info{};
+  bool restart = GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info) &&
+                 ((static_cast<LONGLONG>(info.nFileSizeHigh) << 32) | info.nFileSizeLow) > kChannelLogMax;
+  HANDLE f = CreateFileW(path.c_str(), restart ? GENERIC_WRITE : FILE_APPEND_DATA, FILE_SHARE_READ, nullptr,
+                         restart ? CREATE_ALWAYS : OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (f == INVALID_HANDLE_VALUE) return;
+  SYSTEMTIME t{};
+  GetLocalTime(&t);
+  wchar_t stamp[32];
+  swprintf_s(stamp, L"%04u-%02u-%02uT%02u:%02u:%02u ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+  std::string line = to_utf8(std::wstring(stamp) + text) + "\r\n";
+  DWORD written = 0;
+  WriteFile(f, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+  CloseHandle(f);
+}
+
+// kNoError marks "nothing logged yet" and kServerRefused a refused server in the change tracking.
+constexpr DWORD kNoError = 0;
+constexpr DWORD kServerRefused = 0xFFFFFFFF;
+// A connection that ends within kShortMs was most likely refused by the host service (its log says
+// why: computer_peer_refused with a reason); repeats of it are not logged.
+constexpr ULONGLONG kShortMs = 5000;
 
 }  // namespace
 
@@ -177,20 +217,29 @@ bool PipeChannel::send_image(const std::vector<std::uint8_t>& image) {
 
 void PipeChannel::run() {
   DWORD wait = kRetryFirstMs;
+  DWORD logged = kNoError;  // the last failure written to the channel log
+  bool quiet = false;       // short connections are repeating; not logged until a long one
   std::vector<std::uint8_t> buf(kReadChunk);
   while (!quit_) {
     // SECURITY_IDENTIFICATION: the server may learn who connected but cannot act as the helper.
-    HANDLE h = CreateFileW(pipe_name_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+    // kPipeClientAccess: only the rights the pipe's DACL grants interactive users (trust.hpp).
+    HANDLE h = CreateFileW(pipe_name_.c_str(), kPipeClientAccess, 0, nullptr, OPEN_EXISTING,
                            FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, nullptr);
     if (h == INVALID_HANDLE_VALUE) {
-      if (GetLastError() == ERROR_PIPE_BUSY) WaitNamedPipeW(pipe_name_.c_str(), wait);
+      DWORD error = GetLastError();
+      if (error != logged && error != ERROR_PIPE_BUSY) {
+        note(L"channel open failed: error " + std::to_wstring(error));
+        logged = error;
+      }
+      if (error == ERROR_PIPE_BUSY) WaitNamedPipeW(pipe_name_.c_str(), wait);
       else WaitForSingleObject(quit_event_, wait);
       wait = std::min(wait * 2, kRetryCapMs);
       continue;
     }
     if (check_server_ && !pipe_server_trusted(h)) {
       // Someone else holds the endpoint name (D-CU-02-5): say nothing to it and try again later.
-      OutputDebugStringW(L"bothy-computer-helper: pipe server refused (not the host service)\n");
+      if (logged != kServerRefused) note(L"pipe server refused (not the host service)");
+      logged = kServerRefused;
       CloseHandle(h);
       WaitForSingleObject(quit_event_, wait);
       wait = std::min(wait * 2, kRetryCapMs);
@@ -203,6 +252,9 @@ void PipeChannel::run() {
       id = ++connection_;
     }
     wait = kRetryFirstMs;
+    logged = kNoError;
+    if (!quiet) note(L"channel connected");
+    ULONGLONG opened = GetTickCount64();
     push(Event{Event::Kind::Connected, Frame{}, id});
 
     FrameReader reader(frame_max_);
@@ -245,6 +297,13 @@ void PipeChannel::run() {
       pipe_ = INVALID_HANDLE_VALUE;
     }
     CloseHandle(h);
+    if (GetTickCount64() - opened >= kShortMs) {
+      note(L"channel closed");
+      quiet = false;
+    } else if (!quiet) {
+      note(L"channel closed at once (refused by the host service? see its log); repeats are not logged");
+      quiet = true;
+    }
     if (interrupt_ != nullptr) interrupt_->raise(Interrupt::Kind::ChannelBroken);
     push(Event{Event::Kind::Broken, Frame{}, id});
   }

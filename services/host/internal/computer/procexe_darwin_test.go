@@ -88,8 +88,13 @@ func TestDefaultBindExecAfterConnect(t *testing.T) {
 	if err := proc.Current(); err != nil {
 		t.Fatalf("before the exec: %v", err)
 	}
-	if exe, err := proc.ExePath(); err != nil || exe != self {
-		t.Fatalf("exe %q %v, want %q", exe, err, self)
+	// proc_pidpath names the image by its resolved path (/tmp is /private/tmp).
+	want, err := filepath.EvalSymlinks(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exe, err := proc.ExePath(); err != nil || exe != want {
+		t.Fatalf("exe %q %v, want %q", exe, err, want)
 	}
 	_, _ = stdin.Write([]byte{1}) // the child execs /bin/sleep now, the socket stays open
 	deadline := testkit.Deadline()
@@ -101,5 +106,20 @@ func TestDefaultBindExecAfterConnect(t *testing.T) {
 	}
 	if _, err := proc.ExePath(); err == nil {
 		t.Error("ExePath answers for the exec'd image")
+	}
+}
+
+// TestExePathOfAnotherUsersProcess: the host service reads the executable of a helper that runs as
+// another user (the service user bothy-host, the helper as the person at the console). The
+// earlier kern.procargs2 refuses that to everyone but root and the process's own user, so every
+// helper on the Mac was refused (report helper "refused"). launchd (PID 1)
+// runs as root; the test runs as an ordinary user and needs no privilege.
+func TestExePathOfAnotherUsersProcess(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("as root every process is readable; the check needs another user")
+	}
+	exe, err := exePath(1)
+	if err != nil || exe != "/sbin/launchd" {
+		t.Fatalf("exePath(1) = %q, %v; want /sbin/launchd", exe, err)
 	}
 }
