@@ -747,6 +747,13 @@ the server; the form covers REST requests and durable events, not gateway frames
   agent callers.
 - `retryRun` knows no thread operator rule (09 3.4 step 4a); `operator_not_in_channel` is scripted
   with `faults.onRequest`.
+- Computer use (CU-07, `rest/computer_handlers.dart`, `world_terminal.dart`):
+  `listComputerSessions`, `stopComputerSession` and `disableComputerDevice` for owners only
+  (`403 owner_only` otherwise); `getHost` and `listHosts` add `computer`, `computer_listed` and
+  `computer_disabled_generation` for owners, `host.updated` never; tests open a session with
+  `FakeWorld.openComputerSession` and report the helper with `reportComputer`. The engine turns
+  `computer_session.changed` into `ComputerSessionChanged` on the host event hub, without a
+  table.
 - Terminal (M4-36, `rest/terminal_handlers.dart`, `terminal_stream_fake.dart`,
   `world_terminal.dart`): `listTerminalSessions`, `getTerminalSession`, `openTerminalSession`
   (a grant `terminal`, the assignee, an own session user the host reports, a known profile and
