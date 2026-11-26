@@ -802,12 +802,20 @@ def test_go_lint_runs_vet_and_the_pinned_golangci_lint(fakes: Fakes, shell: list
     assert result.returncode == 0, result.stdout + result.stderr
     module = str(fakes.module.resolve())
     assert [(c["args"], c["cwd"]) for c in fakes.calls("go")] == [
-        (["vet", "-tags", "contract_validate,contract_live,perf,sdkserver", "./..."], module)
+        (
+            ["vet", "-tags", "contract_validate,contract_live,perf,sdkserver,computere2e", "./..."],
+            module,
+        )
     ]
     [lint] = fakes.calls("golangci-lint")
     assert lint["exe"] == str(fakes.pins / "golangci-lint" / "golangci-lint")
     assert (lint["args"], lint["cwd"]) == (
-        ["run", "--build-tags", "contract_validate,contract_live,perf,sdkserver", "./..."],
+        [
+            "run",
+            "--build-tags",
+            "contract_validate,contract_live,perf,sdkserver,computere2e",
+            "./...",
+        ],
         module,
     )
     assert {c["cwd"] for c in fakes.calls("fetch")} == {str(REPO)}

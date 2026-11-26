@@ -5,12 +5,6 @@
 # configuration generated from architecture/modules.yaml (make arch).
 version: "2"
 
-# The end-to-end test of computer use (test/terminal/e2e/computer, CU-T24) carries the build tag
-# computere2e; with it the lint sees those files too.
-run:
-  build-tags:
-    - computere2e
-
 linters:
   default: standard
   enable:
