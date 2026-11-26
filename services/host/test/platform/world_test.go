@@ -551,6 +551,9 @@ func buildFake() error {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return errors.New(firstLine(string(out)))
 	}
+	if err := adminOwned(filepath.Join(fakeDir(), exeName("claude"))); err != nil {
+		return err
+	}
 	return openForAll(startLogPath())
 }
 

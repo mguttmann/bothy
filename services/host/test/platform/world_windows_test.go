@@ -151,6 +151,7 @@ func homeOpen(t *testing.T, p string) bool {
 func removeAddedUser(_ *testing.T, user string) {
 	_, _ = try("sc.exe", "stop", "bothy-host-helper-"+user)
 	_, _ = try("sc.exe", "delete", "bothy-host-helper-"+user)
+	deleteWindowsProfile(user)
 	_, _ = try("net", "user", user, "/delete")
 }
 
