@@ -60,7 +60,7 @@ public final class MacCapturer: Capturer {
 
     /// The display under the center of the frontmost app's frontmost normal window.
     private static func displayOfFrontmostWindow() -> CGDirectDisplayID? {
-        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+        guard let pid = MainThread.sync({ NSWorkspace.shared.frontmostApplication?.processIdentifier }),
             let windows = CGWindowListCopyWindowInfo(
                 [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]]

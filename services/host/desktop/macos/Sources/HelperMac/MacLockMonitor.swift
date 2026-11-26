@@ -39,20 +39,26 @@ public final class MacLockMonitor: LockMonitor {
             (workspace, NSWorkspace.screensDidSleepNotification, { $0.displayAsleep = true }),
             (workspace, NSWorkspace.screensDidWakeNotification, { $0.displayAsleep = false }),
         ]
-        for (center, name, update) in watch {
-            let token = center.addObserver(forName: name, object: nil, queue: nil) {
-                [weak self] _ in
-                guard let self else { return }
-                self.lock.withLock { update(self) }
-                self.dispatch(onChange)
+        // Distributed notifications arrive through the run loop of the registering thread; the
+        // controller's queue has none, so the observers live on the main thread.
+        MainThread.sync {
+            for (center, name, update) in watch {
+                let token = center.addObserver(forName: name, object: nil, queue: nil) {
+                    [weak self] _ in
+                    guard let self else { return }
+                    self.lock.withLock { update(self) }
+                    self.dispatch(onChange)
+                }
+                observers.append((center, token))
             }
-            observers.append((center, token))
         }
     }
 
     public func stop() {
-        for (center, token) in observers { center.removeObserver(token) }
-        observers.removeAll()
+        MainThread.sync {
+            for (center, token) in observers { center.removeObserver(token) }
+            observers.removeAll()
+        }
     }
 
     public func isLocked() -> Bool {
