@@ -163,12 +163,17 @@ func (s *csession) message1(st Stream) ([]byte, bool) {
 	}
 }
 
-// payload2 is the payload of message 2 (27 5.1 step 9).
+// payload2 is the payload of message 2 (27 5.1 step 9). Features names what this host understands
+// beyond version 1: quick, the member of cu_action for a batch item before the last (27 6.4).
 type payload2 struct {
-	V           int    `json:"v"`
-	HostVersion string `json:"host_version"`
-	Platform    string `json:"platform"`
+	V           int      `json:"v"`
+	HostVersion string   `json:"host_version"`
+	Platform    string   `json:"platform"`
+	Features    []string `json:"features"`
 }
+
+// hostFeatures are the features of payload2.
+var hostFeatures = []string{"quick"}
 
 // handshake runs the steps 0 to 11 of 27 5.3 and writes message 2; it returns the claims and the
 // transport, or the close detail of the first failing step.
@@ -200,7 +205,7 @@ func (s *csession) handshake(st Stream, msg1 []byte) (Claims, *noise.Transport, 
 		m.lock.release(s.o.SessionID)
 		return Claims{}, nil, DetailHandshakeFailed
 	}
-	b, _ := json.Marshal(payload2{V: 1, HostVersion: m.c.HostVersion, Platform: m.c.Platform})
+	b, _ := json.Marshal(payload2{V: 1, HostVersion: m.c.HostVersion, Platform: m.c.Platform, Features: hostFeatures})
 	msg2, tr, err := resp.WriteMessage2(b)
 	if err != nil {
 		return Claims{}, nil, DetailHandshakeFailed

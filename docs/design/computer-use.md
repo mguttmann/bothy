@@ -207,7 +207,8 @@ HD1 to HD11, `host_service.require_local_confirm`, the end path of M2-46.
 Estimates, unverified; no source names seconds per action. A model turn of a few seconds
 dominates; capture, scaling and encoding, the image chunks through the relay and the settle wait
 add well under a second each; a step thus takes a few seconds, and a `batch` of several actions costs
-one model turn. Levers: `batch` in the tool descriptions, the automatic image, JPEG for screenshots
+one model turn, with the settle wait and the image only after its last item (`quick`, 27 6.4).
+Levers: `batch` in the tool descriptions, the automatic image, JPEG for screenshots
 and PNG for `zoom`, an image edge around 1280 pixels and never above 1920x1080 [S2], a Noise channel
 that stays open for the whole session. Old images are not pruned, because [S2] says that breaks
 later thinking blocks of current models; the CLI's compaction handles growth. CU-06 measures host and

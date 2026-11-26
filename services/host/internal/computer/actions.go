@@ -150,6 +150,11 @@ func validArgs(action string, a args, s control.ComputerSettings) bool {
 	return true
 }
 
+// quickPause is the pause after an input action with quick (a batch item before the last one,
+// 27 6.4) instead of computer.settle; a shorter computer.settle wins. It gives the screen a moment
+// for the next item (a field that takes focus, a menu that opens) without waiting for an image.
+const quickPause = 50 * time.Millisecond
+
 // outcome is the result of one action before it is sent.
 type outcome struct {
 	code    string
@@ -179,7 +184,8 @@ func (s *csession) act(a frame.Action) {
 		o.img, o.format)
 }
 
-// run1 executes a and returns its outcome.
+// run1 executes a and returns its outcome; quick drops the image of an input action and of wait
+// (27 6.4).
 func (s *csession) run1(a frame.Action) outcome {
 	ar, ok := s.parseArgs(a.Action, a.Args)
 	if !ok {
@@ -197,17 +203,17 @@ func (s *csession) run1(a frame.Action) outcome {
 	case actCursorPosition:
 		return s.position()
 	case actWait:
-		if !s.sleep(time.Duration(ar.DurationMs) * time.Millisecond) {
+		if !s.sleep(time.Duration(ar.DurationMs)*time.Millisecond) || a.Quick {
 			return outcome{code: CodeOK}
 		}
 		return s.capture(nil, -1)
 	}
-	return s.input(a.Action, ar)
+	return s.input(a.Action, ar, a.Quick)
 }
 
 // input runs an action that injects input (do), then the automatic image after computer.settle
-// when computer.auto_screenshot is on.
-func (s *csession) input(action string, ar args) outcome {
+// when computer.auto_screenshot is on; with quick only the pause of quickPause and no image.
+func (s *csession) input(action string, ar args, quick bool) outcome {
 	d := Do{Op: OpDo, Action: action, Modifiers: ar.Modifiers, Direction: ar.Direction, Amount: ar.Amount, Text: ar.Text, Keys: ar.Keys}
 	if ar.Repeat != nil {
 		d.Repeat = *ar.Repeat
@@ -233,7 +239,12 @@ func (s *csession) input(action string, ar args) outcome {
 	if r.Done.Code != CodeOK || !s.o.Settings.AutoScreenshot {
 		return outcome{code: r.Done.Code}
 	}
-	if !s.sleep(time.Duration(s.o.Settings.SettleMs) * time.Millisecond) {
+	settle := time.Duration(s.o.Settings.SettleMs) * time.Millisecond
+	if quick {
+		s.sleep(min(settle, quickPause))
+		return outcome{code: CodeOK}
+	}
+	if !s.sleep(settle) {
 		return outcome{code: CodeOK}
 	}
 	if o := s.capture(nil, -1); o.code == CodeOK {

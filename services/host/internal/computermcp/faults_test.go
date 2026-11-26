@@ -204,7 +204,7 @@ func TestActionTooLongForOneFrame(t *testing.T) {
 	if res := r.call("screenshot", map[string]any{}); res.IsError {
 		t.Errorf("the next action: %q", res.text())
 	}
-	if got := r.host.received(); len(got) != 1 || got[0].Seq != 1 {
+	if got := r.host.received(); len(got) != 1 || got[0].Seq != 2 { // seq 1 is the screenshot of open_session
 		t.Errorf("host got %+v", got)
 	}
 	r.stop()

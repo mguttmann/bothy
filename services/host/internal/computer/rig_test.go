@@ -446,7 +446,8 @@ func (r *rig) handshake(sid string, edit func(map[string]any)) (*device, bool) {
 			r.t.Fatal(err)
 		}
 		var p2 map[string]any
-		if json.Unmarshal(p, &p2) != nil || p2["v"] != float64(1) || p2["platform"] != "macos" || p2["host_version"] != "1.0.0" {
+		if json.Unmarshal(p, &p2) != nil || p2["v"] != float64(1) || p2["platform"] != "macos" || p2["host_version"] != "1.0.0" ||
+			!slices.Contains(asSlice(p2["features"]), any("quick")) {
 			r.t.Errorf("message 2 payload %s", p)
 		}
 		return &device{t: r.t, s: s, tr: tr}, true
@@ -506,8 +507,20 @@ func (d *device) sendFrame(f frame.Frame) {
 // action sends one action and returns its result and image.
 func (d *device) action(name string, args string) (frame.Result, []byte, frame.ImageBegin) {
 	d.t.Helper()
+	return d.send(name, args, false)
+}
+
+// quickAction sends one action with quick, as a batch item before the last one (27 6.4).
+func (d *device) quickAction(name string, args string) (frame.Result, []byte, frame.ImageBegin) {
+	d.t.Helper()
+	return d.send(name, args, true)
+}
+
+// send sends one action and returns its result and image.
+func (d *device) send(name string, args string, quick bool) (frame.Result, []byte, frame.ImageBegin) {
+	d.t.Helper()
 	d.seq++
-	f, err := frame.NewAction(frame.Action{Seq: d.seq, Action: name, Args: json.RawMessage(args)})
+	f, err := frame.NewAction(frame.Action{Seq: d.seq, Action: name, Args: json.RawMessage(args), Quick: quick})
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -576,3 +589,9 @@ func (f *fakeHelper) pressedAfterRelease() bool {
 }
 
 var _ io.Closer = (*pipeListener)(nil)
+
+// asSlice returns v as a JSON array, nil when it is none.
+func asSlice(v any) []any {
+	a, _ := v.([]any)
+	return a
+}

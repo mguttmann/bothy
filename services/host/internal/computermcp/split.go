@@ -12,8 +12,8 @@ import (
 
 // typeBudget is the number of bytes the JSON form of one text may take inside a cu_action
 // frame of the action type: frame.MaxLen less the type byte and the envelope
-// {"seq":<largest seq>,"action":"type","args":{"text":""}} (27 6.3, 7).
-var typeBudget = frame.MaxLen - 1 - len(`{"seq":,"action":"type","args":{"text":""}}`) - len(strconv.FormatInt(math.MaxInt64, 10))
+// {"seq":<largest seq>,"action":"type","args":{"text":""},"quick":true} (27 6.3, 6.4, 7).
+var typeBudget = frame.MaxLen - 1 - len(`{"seq":,"action":"type","args":{"text":""},"quick":true}`) - len(strconv.FormatInt(math.MaxInt64, 10))
 
 // splitText splits text into parts whose JSON string form fits typeBudget each, so every part is
 // one type action (27 7: "C1 splits a long type text into several actions that each fit one

@@ -1085,7 +1085,7 @@ Source: [27-computer-use.md](../spec/27-computer-use.md), section 18.
 | `computer.open_timeout` | `BOTHY_COMPUTER__OPEN_TIMEOUT` | Server | duration | `20s` | deadline until both sides are paired and the handshake is done (5.1) | active |
 | `computer.image_max_edge` | `BOTHY_COMPUTER__IMAGE_MAX_EDGE` | Server | int | `1280` | longest edge of a screenshot in pixels, sent to the host with `computer.open` (6.5) | active |
 | `computer.jpeg_quality` | `BOTHY_COMPUTER__JPEG_QUALITY` | Server | int | `80` | JPEG quality of a screenshot, 1 to 100 (6.5) | active |
-| `computer.settle` | `BOTHY_COMPUTER__SETTLE` | Server | duration | `500ms` | wait after an action before its automatic image (6.4) | active |
+| `computer.settle` | `BOTHY_COMPUTER__SETTLE` | Server | duration | `500ms` | wait after an action before its automatic image (6.4); a `batch` item before the last waits 50 ms instead | active |
 | `computer.auto_screenshot` | `BOTHY_COMPUTER__AUTO_SCREENSHOT` | Server | bool | `true` | an image after every action that changes the screen (6.4) | active |
 | `computer.wait_max` | `BOTHY_COMPUTER__WAIT_MAX` | Server | duration | `60s` | longest `wait` of one action (6.4) | active |
 | `computer.key_repeat_max` | `BOTHY_COMPUTER__KEY_REPEAT_MAX` | Server | int | `50` | highest `repeat` of one `key` action (6.4) | active |

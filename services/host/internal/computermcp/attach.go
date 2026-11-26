@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync"
 
 	"github.com/coder/websocket"
@@ -85,6 +86,9 @@ type session struct {
 	ended     *endedError
 	lastScale int64
 	platform  string // the platform the host named in message 2
+	// quick is set when message 2 names the feature quick: batch items before the last go
+	// without their settle wait and image (27 6.4).
+	quick bool
 }
 
 // attachParams is what attach needs: the grant, the initiator built from the ephemeral key whose
@@ -122,13 +126,13 @@ func attach(ctx context.Context, p attachParams) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
-	tr, platform, err := handshake(step, ws, init, p.grant.Token)
+	tr, p2, err := handshake(step, ws, init, p.grant.Token)
 	if err != nil {
 		_ = ws.CloseNow()
 		return nil, err
 	}
 	s := &session{id: p.grant.SessionID, hostID: p.hostID, desktop: p.desktop, ws: ws, tr: tr, in: make(chan inbound, inboundBuffer),
-		platform: platform}
+		platform: p2.Platform, quick: slices.Contains(p2.Features, featureQuick)}
 	rctx, rcancel := context.WithCancel(context.WithoutCancel(ctx))
 	s.cancel = rcancel
 	go s.read(rctx)
@@ -183,35 +187,42 @@ func newHTTPClient(roots *x509.CertPool) *http.Client {
 	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}} // nosemgrep: bothy-go-egress-only -- the host module has no egress package; C1 dials only attach_path on the origin of runner.server_url (D-CU-05-2)
 }
 
+// featureQuick is the feature of message 2 for the member quick of cu_action (27 5.1 step 9, 6.4).
+const featureQuick = "quick"
+
+// message2 is the payload of message 2 as C1 reads it; an older host names no features.
+type message2 struct {
+	V        int      `json:"v"`
+	Platform string   `json:"platform"`
+	Features []string `json:"features"`
+}
+
 // handshake sends message 1 with the token and reads message 2 (27 5.1 step 9); it returns the
-// transport and the platform the host names.
-func handshake(ctx context.Context, ws *websocket.Conn, init *noise.Initiator, token string) (*noise.Transport, string, error) {
+// transport and the payload of message 2.
+func handshake(ctx context.Context, ws *websocket.Conn, init *noise.Initiator, token string) (*noise.Transport, message2, error) {
 	m1, err := init.WriteMessage1([]byte(token))
 	if err != nil {
-		return nil, "", err
+		return nil, message2{}, err
 	}
 	if err := ws.Write(ctx, websocket.MessageBinary, m1); err != nil {
-		return nil, "", refusalOf(err)
+		return nil, message2{}, refusalOf(err)
 	}
 	typ, m2, err := ws.Read(ctx)
 	if err != nil {
-		return nil, "", refusalOf(err)
+		return nil, message2{}, refusalOf(err)
 	}
 	if typ != websocket.MessageBinary {
-		return nil, "", errStream
+		return nil, message2{}, errStream
 	}
 	payload, tr, err := init.ReadMessage2(m2)
 	if err != nil {
-		return nil, "", errStream
+		return nil, message2{}, errStream
 	}
-	var p2 struct {
-		V        int    `json:"v"`
-		Platform string `json:"platform"`
-	}
+	var p2 message2
 	if json.Unmarshal(payload, &p2) != nil || p2.V != 1 {
-		return nil, "", errStream
+		return nil, message2{}, errStream
 	}
-	return tr, p2.Platform, nil
+	return tr, p2, nil
 }
 
 // readHello reads the hello of computerAttach and checks that it offers version 1.
@@ -404,14 +415,15 @@ func (s *session) drainStates() error {
 
 // do sends one action and returns its result with the image reassembled (27 6.3): cu_result,
 // then for an image cu_image_begin, the data frames and cu_image_end, whose data must sum to
-// bytes; only cu_state stopped may stand between them.
-func (s *session) do(ctx context.Context, action string, args json.RawMessage) (result, error) {
+// bytes; only cu_state stopped may stand between them. quick marks a batch item before the last
+// one and is sent only to a host that named the feature (27 6.4).
+func (s *session) do(ctx context.Context, action string, args json.RawMessage, quick bool) (result, error) {
 	if err := s.drainStates(); err != nil {
 		return result{}, err
 	}
 	// The frame is built and its length checked before the seq is taken, so an action that does
 	// not fit one frame leaves the session and the order of seq untouched (27 6.3).
-	f, err := frame.NewAction(frame.Action{Seq: s.seq + 1, Action: action, Args: args})
+	f, err := frame.NewAction(frame.Action{Seq: s.seq + 1, Action: action, Args: args, Quick: quick && s.quick})
 	if err == nil {
 		_, err = frame.Encode(f)
 	}

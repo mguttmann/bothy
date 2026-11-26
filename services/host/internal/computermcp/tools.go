@@ -289,10 +289,10 @@ var actionDescriptions = map[string]string{
 	actTripleClick:    "Triple-click the left button at a point.",
 	actMouseMove:      "Move the pointer to a point.",
 	actCursorPosition: "Return the position of the pointer in pixels of the last screenshot.",
-	actScroll:         "Scroll at a point.",
-	actType:           "Type text.",
-	actKey:            "Press and release a key or a key combination.",
-	actWait:           "Wait, then take a screenshot.",
+	actScroll:         "Scroll at a point. To move through a page, Page_Down or space with key is often faster.",
+	actType:           "Type text. To open a page, type its full address (a search page with the search words in its address) into the address bar instead of clicking through a start page.",
+	actKey:            "Press and release a key or a key combination. Prefer keys to the pointer: cmd+l (ctrl+l on Windows) for the address bar, cmd+f (ctrl+f) to find text, Page_Down or space to scroll a page.",
+	actWait:           "Wait, then take a screenshot (inside a batch only as its last item). After an action that loads a page, put the wait into the same batch instead of calling it alone.",
 }
 
 // actionSchema returns the input schema of an action tool.
@@ -308,9 +308,9 @@ func actionSchema(action string) map[string]any {
 // toolDefs returns the tools of 27 7 in a fixed order.
 func toolDefs() []toolDef {
 	defs := []toolDef{
-		{Name: toolListDesktops, Title: "List desktops", Description: "List the desktops of the run's owner: name, host ID, platform, online, locked, busy.",
+		{Name: toolListDesktops, Title: "List desktops", Description: "List the desktops of the run's owner: name, host ID, platform, online, locked, busy. Pass the host ID to open_session.",
 			InputSchema: schema(nil)},
-		{Name: toolOpenSession, Title: "Open a computer session", Description: "Open the computer session of this run on a desktop, named by its name or host ID.",
+		{Name: toolOpenSession, Title: "Open a computer session", Description: "Open the computer session of this run on a desktop, named by its host ID from list_desktops (a unique name works too). Returns the first screenshot of the screen.",
 			InputSchema: schema(map[string]any{"desktop": map[string]any{keyType: typeString, keyMinLength: 1, keyDescription: "the desktop's name or host ID"}}, "desktop")},
 	}
 	for _, a := range actions {
@@ -322,7 +322,7 @@ func toolDefs() []toolDef {
 	}
 	defs = append(defs,
 		toolDef{Name: toolBatch, Title: "Run several actions",
-			Description: "Run a list of actions in order, each an object with action and its arguments. The first failure stops the batch; one image at the end.",
+			Description: "Run a list of actions in order, each an object with action and its arguments. Put every step whose result you can foresee into one batch, with the wait that follows it as the last item (for example key cmd+l, type the address, key Return, wait 1500). Only the last item waits for the screen to settle and returns the one image; the items before it run back to back without images. The first failure stops the batch.",
 			InputSchema: schema(map[string]any{"actions": map[string]any{keyType: typeArray, keyMinItems: 1,
 				keyItems: map[string]any{keyType: "object", "properties": item, "required": []string{argAction}, "additionalProperties": false}}}, "actions")},
 		toolDef{Name: toolDone, Title: "End the computer session", Description: "End the computer session of this run.", InputSchema: schema(nil)},

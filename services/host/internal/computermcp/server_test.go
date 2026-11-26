@@ -83,6 +83,23 @@ func TestToolsListEqualsChapter27(t *testing.T) {
 	if len(names) != len(wantTools) {
 		t.Errorf("tools %v, want the %d of chapter 27 7", names, len(wantTools))
 	}
+	// The descriptions steer toward fewer model rounds (27 7): a batch with its wait, the host
+	// ID of list_desktops, the first screenshot of open_session, keys instead of the pointer.
+	desc := map[string]string{}
+	for _, tool := range res.Tools {
+		desc[tool.Name] = tool.Description
+	}
+	for name, phrase := range map[string]string{
+		toolBatch:        "with the wait that follows it as the last item",
+		toolListDesktops: "Pass the host ID to open_session",
+		toolOpenSession:  "Returns the first screenshot",
+		actKey:           "cmd+l (ctrl+l on Windows)",
+		actType:          "type its full address",
+	} {
+		if !strings.Contains(desc[name], phrase) {
+			t.Errorf("description of %s lacks %q", name, phrase)
+		}
+	}
 	r.stop()
 }
 
@@ -99,11 +116,17 @@ func TestConformance(t *testing.T) {
 	if bad := r.call("screenshot", map[string]any{}); !bad.IsError || !strings.HasPrefix(bad.text(), "no_session") {
 		t.Errorf("screenshot without a session: %+v", bad)
 	}
-	r.open()
+	// open_session returns the first screenshot (27 7).
+	opened := r.open()
+	if img, mime := opened.image(t); mime != "image/jpeg" || !bytes.Equal(img, testImage(3000, 1)) ||
+		!strings.Contains(opened.text(), "Computer session open on "+tDesktopA) || !strings.Contains(opened.text(), "scale_id 4") ||
+		!strings.Contains(opened.text(), dataLine) {
+		t.Fatalf("open_session: %q with a %q image of %d bytes", opened.text(), mime, len(img))
+	}
 
 	shot := r.call("screenshot", map[string]any{})
 	img, mime := shot.image(t)
-	if shot.IsError || mime != "image/jpeg" || !bytes.Equal(img, testImage(3000, 1)) {
+	if shot.IsError || mime != "image/jpeg" || !bytes.Equal(img, testImage(3000, 2)) {
 		t.Fatalf("screenshot: error %v mime %q image of %d bytes", shot.IsError, mime, len(img))
 	}
 	if shot.Content[0].Type != "text" {
@@ -133,7 +156,7 @@ func TestConformance(t *testing.T) {
 	}
 	r.host.mu.Unlock()
 	zoom := r.call("zoom", map[string]any{"region": []int{0, 0, 100, 50}, "scale_id": 4})
-	if img, mime := zoom.image(t); zoom.IsError || mime != "image/png" || !bytes.Equal(img, testImage(70000, 3)) {
+	if img, mime := zoom.image(t); zoom.IsError || mime != "image/png" || !bytes.Equal(img, testImage(70000, 4)) {
 		t.Errorf("zoom: error %v mime %q %d bytes", zoom.IsError, mime, len(img))
 	}
 	cur := r.call("cursor_position", map[string]any{})
@@ -146,7 +169,7 @@ func TestConformance(t *testing.T) {
 		t.Fatalf("host got %d actions", len(got))
 	}
 	for i, a := range got {
-		if a.Seq != int64(i+1) {
+		if a.Seq != int64(i+2) { // seq 1 is the screenshot of open_session
 			t.Errorf("action %d has seq %d", i, a.Seq)
 		}
 	}
@@ -205,15 +228,64 @@ func TestBatchStopsAtFirstFailure(t *testing.T) {
 			images++
 		}
 	}
-	if img, _ := res.image(t); images != 1 || !bytes.Equal(img, testImage(2000, 1)) {
+	if img, _ := res.image(t); images != 1 || !bytes.Equal(img, testImage(2000, 2)) {
 		t.Errorf("batch has %d images", images)
 	}
 	// A batch of successes returns only the last image.
 	ok := r.call("batch", map[string]any{"actions": []any{map[string]any{"action": "screenshot"}, map[string]any{"action": "mouse_move", "coordinate": []int{5, 5}}}})
-	if img, _ := ok.image(t); ok.IsError || !bytes.Equal(img, testImage(2000, 4)) || strings.Contains(ok.text(), "Not executed") {
+	if img, _ := ok.image(t); ok.IsError || !bytes.Equal(img, testImage(2000, 5)) || strings.Contains(ok.text(), "Not executed") {
 		t.Errorf("batch of successes: %+v", ok.text())
 	}
 	r.stop()
+}
+
+// TestBatchQuickItems: every item of a batch but the last is sent with quick, so the host skips
+// its settle wait and its image; the last item returns the one image (27 6.4, 7). A host whose
+// message 2 does not name the feature gets no quick.
+func TestBatchQuickItems(t *testing.T) {
+	r := newRig(t)
+	r.initialize()
+	r.open()
+	res := r.call("batch", map[string]any{"actions": []any{
+		map[string]any{"action": "left_click", "coordinate": []int{1, 2}, "scale_id": 4},
+		map[string]any{"action": "key", "keys": "cmd+l"},
+		map[string]any{"action": "type", "text": "example.com"},
+		map[string]any{"action": "key", "keys": "Return"},
+		map[string]any{"action": "wait", "duration_ms": 1500},
+	}})
+	if res.IsError {
+		t.Fatalf("batch: %s", res.text())
+	}
+	got := r.host.received()
+	if len(got) != 5 {
+		t.Fatalf("host got %d actions", len(got))
+	}
+	for i, a := range got {
+		if a.Quick != (i < len(got)-1) {
+			t.Errorf("item %d (%s) has quick %v", i+1, a.Action, a.Quick)
+		}
+	}
+	if img, _ := res.image(t); !bytes.Equal(img, testImage(3000, 6)) || got[4].Seq != 6 { // seq 1 is the screenshot of open_session
+		t.Errorf("batch image is not the one of the last item")
+	}
+	r.stop()
+
+	old := newRig(t)
+	old.host.features = nil
+	old.initialize()
+	old.open()
+	if res := old.call("batch", map[string]any{"actions": []any{
+		map[string]any{"action": "key", "keys": "cmd+l"},
+		map[string]any{"action": "key", "keys": "Return"},
+	}}); res.IsError {
+		t.Fatalf("batch at an older host: %s", res.text())
+	}
+	for _, a := range old.host.received() {
+		if a.Quick {
+			t.Errorf("an older host got quick on %s", a.Action)
+		}
+	}
+	old.stop()
 }
 
 // TestTypeSplitsLongText: a text longer than one frame becomes several type actions whose
@@ -249,6 +321,10 @@ func TestTypeSplitsLongText(t *testing.T) {
 		if err := json.Unmarshal(a.Args, &args); err != nil || a.Action != "type" {
 			t.Fatalf("action %s %v", a.Action, err)
 		}
+		// Only the last part waits computer.settle and returns the image (27 7).
+		if last := a.Seq == int64(len(frames))+1; a.Quick == last { // seq 1 is the screenshot of open_session
+			t.Errorf("part %d of %d has quick %v", a.Seq, len(frames), a.Quick)
+		}
 		joined.WriteString(args.Text)
 	}
 	if joined.String() != text {
@@ -262,7 +338,7 @@ func TestSplitTextBoundaries(t *testing.T) {
 		parts := splitText(text)
 		var b strings.Builder
 		for _, p := range parts {
-			f, err := frame.NewAction(frame.Action{Seq: 1 << 62, Action: "type", Args: mustArgs(t, p)})
+			f, err := frame.NewAction(frame.Action{Seq: 1 << 62, Action: "type", Args: mustArgs(t, p), Quick: true})
 			if err != nil {
 				t.Fatalf("part of %d bytes: %v", len(p), err)
 			}
@@ -349,9 +425,9 @@ func TestPausedSessionPassesCodes(t *testing.T) {
 	r.host.openState = frame.State{State: frame.StatePaused, Reason: "locked"}
 	r.host.mu.Unlock()
 	r.initialize()
-	res := r.open()
-	if !strings.Contains(res.text(), "paused") {
-		t.Errorf("open text %q", res.text())
+	res := r.open() // no first screenshot while paused: one text block
+	if !strings.Contains(res.text(), "paused") || len(res.Content) != 1 {
+		t.Errorf("open text %q with %d blocks", res.text(), len(res.Content))
 	}
 	r.host.mu.Lock()
 	r.host.script = func(a frame.Action) []frame.Frame { return codeOnly(a, "screen_locked") }
@@ -643,11 +719,17 @@ func TestInvalidArguments(t *testing.T) {
 	r.stop()
 }
 
-// TestClickBeforeAnyImage: a coordinate without a scale_id and without an image is refused.
+// TestClickBeforeAnyImage: a coordinate without a scale_id and without an image is refused; the
+// first screenshot of open_session failed here, and open_session says so with the session open.
 func TestClickBeforeAnyImage(t *testing.T) {
 	r := newRig(t)
 	r.initialize()
-	r.open()
+	r.host.mu.Lock()
+	r.host.script = func(a frame.Action) []frame.Frame { return codeOnly(a, "os_refused") }
+	r.host.mu.Unlock()
+	if res := r.open(); len(res.Content) != 1 || !strings.Contains(res.text(), "os_refused") || !strings.Contains(res.text(), "take a screenshot") {
+		t.Errorf("open_session with a failed first screenshot: %+v", res)
+	}
 	if res := r.call("left_click", map[string]any{"coordinate": []int{1, 2}}); !res.IsError || !strings.HasPrefix(res.text(), "invalid_action") {
 		t.Errorf("click before an image: %q", res.text())
 	}

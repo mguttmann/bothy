@@ -56,6 +56,8 @@ type fakeHost struct {
 	script func(a frame.Action) []frame.Frame
 	// openState is the first cu_state.
 	openState frame.State
+	// features are the features message 2 names; nil leaves the member out like an older host.
+	features []string
 	// refuseM1, when its code is set, closes the connection after message 1 like a host check
 	// of 27 5.3 that failed.
 	refuseM1 closing
@@ -82,7 +84,8 @@ func newFakeHost(t *testing.T) *fakeHost {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := &fakeHost{t: t, static: kp, sessions: map[string]*fakeSession{}, openState: frame.State{State: frame.StateActive, Reason: ""}}
+	h := &fakeHost{t: t, static: kp, sessions: map[string]*fakeSession{}, openState: frame.State{State: frame.StateActive, Reason: ""},
+		features: []string{"quick"}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/computer/sessions/{id}/attach", h.serveAttach)
 	h.srv = httptest.NewServer(mux)
@@ -131,7 +134,7 @@ func (h *fakeHost) serveAttach(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	h.attaches++
 	s := h.sessions[r.PathValue("id")]
-	static, openState, refuse := h.static, h.openState, h.refuseM1
+	static, openState, refuse, features := h.static, h.openState, h.refuseM1, h.features
 	h.mu.Unlock()
 	hello, _ := json.Marshal(map[string]any{"op": "hello", "d": map[string]any{"protocol_versions": []int{1}, "server_time": "2026-11-26T09:30:00.000Z"}})
 	if ws.Write(ctx, websocket.MessageText, hello) != nil {
@@ -166,7 +169,12 @@ func (h *fakeHost) serveAttach(w http.ResponseWriter, r *http.Request) {
 		_ = ws.Close(refuse.code, refuse.reason)
 		return
 	}
-	m2, tr, err := resp.WriteMessage2([]byte(`{"v":1,"host_version":"1.0.0","platform":"macos"}`))
+	p2 := map[string]any{"v": 1, "host_version": "1.0.0", "platform": "macos"}
+	if features != nil {
+		p2["features"] = features
+	}
+	p2b, _ := json.Marshal(p2)
+	m2, tr, err := resp.WriteMessage2(p2b)
 	if err != nil || ws.Write(ctx, websocket.MessageBinary, m2) != nil {
 		return
 	}
@@ -219,6 +227,10 @@ func (h *fakeHost) serveAttach(w http.ResponseWriter, r *http.Request) {
 		script := h.script
 		h.mu.Unlock()
 		out := okImage(a, 3000, frame.FormatJPEG)
+		if a.Quick && a.Action != "screenshot" && a.Action != "zoom" {
+			// The host answers a quick action without an image (27 6.4).
+			out = codeOnly(a, "ok")
+		}
 		if script != nil {
 			out = script(a)
 		}
@@ -625,12 +637,17 @@ func (tr toolResult) image(t *testing.T) ([]byte, string) {
 	return nil, ""
 }
 
-// open opens a session on desktop A after initialize.
+// open opens a session on desktop A after initialize. The first screenshot of open_session
+// (seq 1) is dropped from the actions and frames the fake host recorded, so a test counts its
+// own actions; their seq starts at 2.
 func (r *rig) open() toolResult {
 	r.t.Helper()
 	res := r.call("open_session", map[string]any{"desktop": tDesktopA})
 	if res.IsError {
 		r.t.Fatalf("open_session: %s", res.text())
 	}
+	r.host.mu.Lock()
+	r.host.actions, r.host.frames = nil, nil
+	r.host.mu.Unlock()
 	return res
 }

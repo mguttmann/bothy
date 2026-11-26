@@ -559,3 +559,64 @@ func TestDisableReachesHelper(t *testing.T) {
 		t.Errorf("disable %+v", d)
 	}
 }
+
+// TestQuickActions: an action with quick (a batch item before the last, 27 6.4) injects its input
+// and answers without an image after a pause of at most 50 ms instead of computer.settle; a wait
+// with quick only waits, a screenshot keeps its image; an action without quick keeps the settle
+// and the automatic image.
+func TestQuickActions(t *testing.T) {
+	r := newRig(t)
+	fh := r.connect(hello())
+	r.waitState(func(s HelperState) bool { return s.Connected })
+	const settle = 1000 * time.Millisecond
+	op := openOp(sidA)
+	op.Settings.SettleMs = settle.Milliseconds()
+	r.m.Open(context.Background(), op, r.n)
+	d, ok := r.handshake(sidA, nil)
+	if !ok {
+		t.Fatalf("handshake refused: %v", r.n.endedOf(sidA))
+	}
+	if st := d.state(); st.State != frame.StateActive {
+		t.Fatalf("first cu_state %+v", st)
+	}
+	shot, _, _ := d.action(actScreenshot, `{}`)
+	if shot.Code != CodeOK || !shot.Image {
+		t.Fatalf("screenshot %+v", shot)
+	}
+	captures, dos := len(fh.opsOf(OpCapture)), len(fh.opsOf(OpDo))
+	for _, c := range []struct{ name, args string }{
+		{actLeftClick, `{"coordinate":[10,10],"scale_id":` + itoa(shot.ScaleID) + `}`},
+		{actKey, `{"keys":"cmd+l"}`},
+		{actType, `{"text":"example.com"}`},
+		{actWait, `{"duration_ms":0}`},
+	} {
+		start := time.Now()
+		res, img, _ := d.quickAction(c.name, c.args)
+		took := time.Since(start)
+		if res.Code != CodeOK || res.Image || img != nil || res.ScaleID != 0 {
+			t.Errorf("quick %s: %+v with %d image bytes", c.name, res, len(img))
+		}
+		if took >= settle-100*time.Millisecond {
+			t.Errorf("quick %s took %v, the settle is %v", c.name, took, settle)
+		}
+		if c.name != actWait && took < quickPause {
+			t.Errorf("quick %s took %v, less than the pause of %v", c.name, took, quickPause)
+		}
+	}
+	if n := len(fh.opsOf(OpCapture)); n != captures {
+		t.Errorf("quick actions took %d captures", n-captures)
+	}
+	if n := len(fh.opsOf(OpDo)); n != dos+3 {
+		t.Errorf("quick actions injected %d times, want 3", n-dos)
+	}
+	if res, img, _ := d.quickAction(actScreenshot, `{}`); res.Code != CodeOK || !res.Image || len(img) == 0 {
+		t.Errorf("quick screenshot %+v", res)
+	}
+	start := time.Now()
+	res, img, _ := d.action(actKey, `{"keys":"Return"}`)
+	if took := time.Since(start); res.Code != CodeOK || !res.Image || len(img) == 0 || took < settle {
+		t.Errorf("last action %+v after %v with %d image bytes", res, took, len(img))
+	}
+	d.sendFrame(frame.Close())
+	r.n.waitEnded(t, sidA)
+}

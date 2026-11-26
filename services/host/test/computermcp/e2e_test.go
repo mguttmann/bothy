@@ -166,8 +166,11 @@ func TestComputerMCPEndToEnd(t *testing.T) {
 	if res := c.call("list_desktops", nil); res.IsError || !strings.Contains(res.text(), tDesktop) {
 		t.Fatalf("list_desktops: %s", res.text())
 	}
+	// open_session returns the first screenshot (27 7).
 	if res := c.call("open_session", map[string]any{"desktop": tDesktop}); res.IsError {
 		t.Fatalf("open_session: %s", res.text())
+	} else if oimg, omime := res.image(t); omime != "image/jpeg" || len(oimg) == 0 {
+		t.Errorf("open_session without its first screenshot: %s", res.text())
 	}
 	expectOp(ctx, t, ops, "computer.started")
 
@@ -203,6 +206,7 @@ func TestComputerMCPEndToEnd(t *testing.T) {
 		t.Errorf("zoom: %s %v", zoom.text(), err)
 	}
 
+	// The click is a quick item (no settle wait, no image), the screenshot the last one.
 	batch := c.call("batch", map[string]any{"actions": []any{
 		map[string]any{"action": "left_click", "coordinate": []int{220, 40}},
 		map[string]any{"action": "screenshot"},

@@ -217,7 +217,10 @@ func checkCalls(t *testing.T, lines []call) {
 		return c
 	}
 	expectOK(0, "list_desktops")
-	expectOK(1, "open_session")
+	// open_session returns the first screenshot (27 7).
+	if opened := decode(t, expectOK(1, "open_session"), "image/jpeg"); !red(opened, redPixel.X, redPixel.Y) {
+		t.Error("open_session: the first screenshot lacks the red square")
+	}
 	shot := expectOK(2, "screenshot")
 	if !strings.Contains(shot.Text, dataLine) || !strings.Contains(shot.Text, "scale_id") {
 		t.Errorf("screenshot text lacks the data line or the scale_id: %q", firstLine(shot.Text))

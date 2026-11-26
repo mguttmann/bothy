@@ -14,7 +14,7 @@ import (
 // The frame types of a computer session (docs/spec/27-computer-use.md 6.3). The values are
 // protocol constants. A computer session also uses TypeClose (bothy-computer-mcp ends the session).
 const (
-	TypeCUAction     Type = 0x20 // device: one action {"seq", "action", "args"}
+	TypeCUAction     Type = 0x20 // device: one action {"seq", "action", "args", "quick"}
 	TypeCUResult     Type = 0x21 // host: the result of an action
 	TypeCUImageBegin Type = 0x22 // host: the start of an image
 	TypeCUImageData  Type = 0x23 // host: 1 to MaxImageChunk bytes of the image
@@ -40,11 +40,14 @@ const (
 )
 
 // Action is the body of cu_action. Args is the JSON object of the action's arguments (27 6.4); its
-// members are checked by the host service per action, not here.
+// members are checked by the host service per action, not here. Quick, optional, marks a batch
+// item before the last one: the host skips the automatic image and waits a short pause instead
+// of computer.settle (27 6.4); only a host that names the feature quick in message 2 gets it.
 type Action struct {
 	Seq    int64           `json:"seq"`
 	Action string          `json:"action"`
 	Args   json.RawMessage `json:"args"`
+	Quick  bool            `json:"quick,omitempty"`
 }
 
 // App is the identity of the frontmost app: a bundle ID or executable name with a display name.
@@ -99,7 +102,7 @@ const (
 
 // members are the required and optional members of each JSON body.
 var members = map[Type]struct{ required, optional []string }{
-	TypeCUAction:     {required: []string{memberSeq, "action", "args"}},
+	TypeCUAction:     {required: []string{memberSeq, "action", "args"}, optional: []string{"quick"}},
 	TypeCUResult:     {required: []string{memberSeq, "code", "image", memberWidth, memberHeight, memberScaleID, "app"}, optional: []string{"cursor"}},
 	TypeCUImageBegin: {required: []string{memberSeq, "format", memberWidth, memberHeight, memberScaleID, "bytes"}},
 	TypeCUState:      {required: []string{"state", "reason"}},

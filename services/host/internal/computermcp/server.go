@@ -178,11 +178,28 @@ func (s *Server) openSession(ctx context.Context, raw json.RawMessage) callResul
 		return attachFailure(err)
 	}
 	s.sess = sess
-	text := fmt.Sprintf("Computer session open on %s (%s), state %s. Take a screenshot to see the screen.", name, sess.platform, sess.state)
+	text := fmt.Sprintf("Computer session open on %s (%s), state %s.", name, sess.platform, sess.state)
 	if sess.state == "paused" {
-		text += " The screen is locked: actions answer screen_locked until the owner unlocks it."
+		return callResult{text: text + " The screen is locked: actions answer screen_locked until the owner unlocks it. Take a screenshot to see the screen after the unlock."}
 	}
-	return callResult{text: text}
+	return s.firstImage(ctx, sess, text)
+}
+
+// firstImage takes the first screenshot of an active session, so the agent sees the screen
+// without an extra call (27 7). The session stays open when the screenshot fails: the result
+// names the code and asks for a screenshot.
+func (s *Server) firstImage(ctx context.Context, sess *session, text string) callResult {
+	r, err := sess.do(ctx, actScreenshot, json.RawMessage(`{}`), false)
+	switch {
+	case err != nil:
+		return s.sessionFailure(err)
+	case r.code != codeOK || r.img == nil:
+		clear(r.img)
+		return withState(sess, callResult{text: text + " The first screenshot failed: " + failure(r.code, "").text + "; take a screenshot."})
+	}
+	out := render(actScreenshot, r, nil)
+	out.text = text + "\n" + out.text
+	return withState(sess, out)
 }
 
 // attachFailure maps an error of attach.
@@ -296,7 +313,7 @@ func (s *Server) single(ctx context.Context, name string, raw json.RawMessage) c
 	if err != nil {
 		return failure(CodeInvalidAction, err.Error())
 	}
-	r, err := s.run(ctx, sess, st)
+	r, err := s.run(ctx, sess, st, false)
 	if err != nil {
 		return s.sessionFailure(err)
 	}
@@ -313,18 +330,20 @@ func withState(sess *session, r callResult) callResult {
 }
 
 // run sends one step: a type text as its parts in order, stopping at the first part that fails.
-// The result is that of the last part sent; images of earlier parts are dropped.
-func (s *Server) run(ctx context.Context, sess *session, st step) (result, error) {
+// The result is that of the last part sent. quick marks the step as a batch item before the last
+// one; every part of a type text but the last is quick as well, so only the end of the text
+// waits computer.settle and returns an image (27 6.4, 7).
+func (s *Server) run(ctx context.Context, sess *session, st step, quick bool) (result, error) {
 	if st.action != actType {
 		b, _ := json.Marshal(st.args)
-		return sess.do(ctx, st.action, b)
+		return sess.do(ctx, st.action, b, quick)
 	}
 	var r result
-	for _, p := range st.parts {
+	for i, p := range st.parts {
 		clear(r.img)
 		b, _ := json.Marshal(map[string]string{argText: p})
 		var err error
-		if r, err = sess.do(ctx, actType, b); err != nil || r.code != codeOK {
+		if r, err = sess.do(ctx, actType, b, quick || i < len(st.parts)-1); err != nil || r.code != codeOK {
 			return r, err
 		}
 	}
@@ -344,8 +363,10 @@ func (s *Server) sessionFailure(err error) callResult {
 }
 
 // batch runs the actions in order; the first failure stops it, every later item answers
-// notExecuted, and the last image comes once at the end (27 7). Every item is checked before
-// the first runs, so a malformed batch runs nothing.
+// notExecuted, and the last image comes once at the end (27 7). Every item before the last is
+// sent with quick, so the host skips its settle wait and its image; only the last item waits
+// computer.settle and returns the image. Every item is checked before the first runs, so a
+// malformed batch runs nothing.
 func (s *Server) batch(ctx context.Context, raw json.RawMessage) callResult {
 	sess, res, ok := s.live()
 	if !ok {
@@ -363,7 +384,7 @@ func (s *Server) batch(ctx context.Context, raw json.RawMessage) callResult {
 			lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, notExecuted))
 			continue
 		}
-		r, line, ok := s.batchItem(ctx, sess, name, items[i])
+		r, line, ok := s.batchItem(ctx, sess, name, items[i], i < len(names)-1)
 		failed = !ok
 		lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, line))
 		if r.img != nil {
@@ -403,13 +424,14 @@ func parseBatch(raw json.RawMessage) ([]string, []json.RawMessage, error) {
 	return names, items, nil
 }
 
-// batchItem runs one item of a batch and returns its result, its line and whether it succeeded.
-func (s *Server) batchItem(ctx context.Context, sess *session, name string, raw json.RawMessage) (result, string, bool) {
+// batchItem runs one item of a batch and returns its result, its line and whether it succeeded;
+// quick marks an item before the last one.
+func (s *Server) batchItem(ctx context.Context, sess *session, name string, raw json.RawMessage, quick bool) (result, string, bool) {
 	st, err := s.prepare(sess, name, raw)
 	if err != nil {
 		return result{}, failure(CodeInvalidAction, err.Error()).text, false
 	}
-	r, err := s.run(ctx, sess, st)
+	r, err := s.run(ctx, sess, st, quick)
 	switch {
 	case err != nil:
 		return result{}, s.sessionFailure(err).text, false

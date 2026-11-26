@@ -29,6 +29,7 @@ func computerFrames(t *testing.T) []struct {
 	}{
 		{Close(), FromDevice},
 		{must(NewAction(Action{Seq: 1, Action: "left_click", Args: []byte(`{"coordinate":[10,20],"scale_id":1}`)})), FromDevice},
+		{must(NewAction(Action{Seq: 2, Action: "key", Args: []byte(`{"keys":"Return"}`), Quick: true})), FromDevice},
 		{must(NewResult(Result{Seq: 1, Code: "ok", Image: true, Width: 1280, Height: 800, ScaleID: 1, App: App{ID: "com.example.editor", Name: "Editor"}})), FromHost},
 		{must(NewResult(Result{Seq: 2, Code: "ok", App: App{}, Cursor: &Point{X: 3, Y: 4}})), FromHost},
 		{must(NewImageBegin(ImageBegin{Seq: 1, Format: "jpeg", Width: 1280, Height: 800, ScaleID: 1, Bytes: 4})), FromHost},
@@ -132,6 +133,8 @@ func TestComputerMalformed(t *testing.T) {
 		{"action empty", []byte{0x20}, FromDevice},
 		{"action seq zero", append([]byte{0x20}, `{"seq":0,"action":"screenshot","args":{}}`...), FromDevice},
 		{"action empty name", append([]byte{0x20}, `{"seq":1,"action":"","args":{}}`...), FromDevice},
+		{"action quick no bool", append([]byte{0x20}, `{"seq":1,"action":"key","args":{"keys":"a"},"quick":1}`...), FromDevice},
+		{"action quick null", append([]byte{0x20}, `{"seq":1,"action":"key","args":{"keys":"a"},"quick":null}`...), FromDevice},
 		{"result missing app", append([]byte{0x21}, `{"seq":1,"code":"ok","image":false,"width":0,"height":0,"scale_id":0}`...), FromHost},
 		{"begin bad format", append([]byte{0x22}, `{"seq":1,"format":"gif","width":1,"height":1,"scale_id":1,"bytes":1}`...), FromHost},
 		{"begin zero bytes", append([]byte{0x22}, `{"seq":1,"format":"png","width":1,"height":1,"scale_id":1,"bytes":0}`...), FromHost},
@@ -175,8 +178,16 @@ func TestComputerParse(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, err := f.ActionBody()
-	if err != nil || a.Seq != 7 || a.Action != "key" || !strings.Contains(string(a.Args), "cmd+q") {
+	if err != nil || a.Seq != 7 || a.Action != "key" || !strings.Contains(string(a.Args), "cmd+q") || a.Quick {
 		t.Errorf("ActionBody = %+v, %v", a, err)
+	}
+	// quick is optional: a batch item before the last one (27 6.3, 6.4).
+	f, err = Decode(append([]byte{0x20}, `{"seq":8,"action":"key","args":{"keys":"a"},"quick":true}`...), KindComputer, FromDevice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a, err = f.ActionBody(); err != nil || !a.Quick {
+		t.Errorf("ActionBody quick = %+v, %v", a, err)
 	}
 	f, err = Decode(append([]byte{0x25}, `{"state":"stopped","reason":"done"}`...), KindComputer, FromHost)
 	if err != nil {
