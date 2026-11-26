@@ -79,9 +79,7 @@ type session struct {
 	state     string // active or paused
 	ended     *endedError
 	lastScale int64
-	hostInfo  struct {
-		Platform string `json:"platform"`
-	}
+	platform  string // the platform the host named in message 2
 }
 
 // attachParams is what attach needs: the grant, the initiator built from the ephemeral key whose
@@ -98,7 +96,7 @@ type attachParams struct {
 // attach connects attach_path, sends identify with the token, runs the Noise handshake with the
 // token as the payload of message 1 and reads the first cu_state (27 5.1 steps 8 and 9). Every
 // step waits at most cfg.Timeout. A refusal of the server or the host is returned as an
-// *attachRefusal with the close code and reason.
+// *attachRefusedError with the close code and reason.
 func attach(ctx context.Context, p attachParams) (*session, error) {
 	sidb, err := noise.ParseID(p.grant.SessionID)
 	if err != nil {
@@ -108,81 +106,106 @@ func attach(ctx context.Context, p attachParams) (*session, error) {
 	if err != nil {
 		return nil, errors.New("computermcp: host_id is no UUID")
 	}
-	u, err := attachURL(p.cfg.Server, p.grant.AttachPath)
-	if err != nil {
-		return nil, err
-	}
 	init, err := noise.NewInitiator(noise.InitiatorConfig{HostStatic: p.hostKey, SessionID: sidb, HostID: hostb, Ephemeral: p.ephemeral,
 		Label: noise.ComputerPrologueLabel})
 	if err != nil {
 		return nil, err
 	}
-	hc := p.cfg.HTTPClient
-	if hc == nil {
-		hc = http.DefaultClient
-	}
 	step, cancel := context.WithTimeout(ctx, p.cfg.Timeout)
 	defer cancel()
-	ws, _, err := websocket.Dial(step, u, &websocket.DialOptions{HTTPClient: hc, CompressionMode: websocket.CompressionDisabled})
+	ws, err := dialAttach(step, p)
+	if err != nil {
+		return nil, err
+	}
+	tr, platform, err := handshake(step, ws, init, p.grant.Token)
+	if err != nil {
+		_ = ws.CloseNow()
+		return nil, err
+	}
+	s := &session{id: p.grant.SessionID, hostID: p.hostID, desktop: p.desktop, ws: ws, tr: tr, in: make(chan inbound, inboundBuffer),
+		platform: platform}
+	rctx, rcancel := context.WithCancel(context.WithoutCancel(ctx))
+	s.cancel = rcancel
+	go s.read(rctx)
+	first, err := s.next(step)
+	if err == nil && first.Type != frame.TypeCUState {
+		err = errStream
+	}
+	if err == nil {
+		err = s.applyState(first)
+	}
+	if err != nil {
+		s.close()
+		return nil, err
+	}
+	return s, nil
+}
+
+// dialAttach opens the attach connection, reads hello and sends identify with the token.
+func dialAttach(ctx context.Context, p attachParams) (*websocket.Conn, error) {
+	u, err := attachURL(p.cfg.Server, p.grant.AttachPath)
+	if err != nil {
+		return nil, err
+	}
+	hc := p.cfg.HTTPClient
+	if hc == nil {
+		hc = newHTTPClient()
+	}
+	ws, resp, err := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPClient: hc, CompressionMode: websocket.CompressionDisabled})
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
 	if err != nil {
 		return nil, refusalOf(err)
 	}
 	ws.SetReadLimit(noise.MaxMessageLen)
-	fail := func(err error) (*session, error) {
+	if err := readHello(ctx, ws); err != nil {
 		_ = ws.CloseNow()
 		return nil, err
 	}
-	if err := readHello(step, ws); err != nil {
-		return fail(err)
-	}
 	id, _ := json.Marshal(map[string]any{"op": "identify", "d": map[string]any{"protocol_version": attachProtocolVersion, "token": p.grant.Token}})
-	if err := ws.Write(step, websocket.MessageText, id); err != nil {
-		return fail(refusalOf(err))
+	if err := ws.Write(ctx, websocket.MessageText, id); err != nil {
+		_ = ws.CloseNow()
+		return nil, refusalOf(err)
 	}
-	m1, err := init.WriteMessage1([]byte(p.grant.Token))
+	return ws, nil
+}
+
+// newHTTPClient returns the client of the attach connection: no proxy from the environment, the
+// system's roots. C1 dials only attach_path on the origin of runner.server_url (D-CU-05-2).
+func newHTTPClient() *http.Client {
+	return &http.Client{Transport: &http.Transport{}} // nosemgrep: bothy-go-egress-only -- the host module has no egress package; C1 dials only attach_path on the origin of runner.server_url (D-CU-05-2)
+}
+
+// handshake sends message 1 with the token and reads message 2 (27 5.1 step 9); it returns the
+// transport and the platform the host names.
+func handshake(ctx context.Context, ws *websocket.Conn, init *noise.Initiator, token string) (*noise.Transport, string, error) {
+	m1, err := init.WriteMessage1([]byte(token))
 	if err != nil {
-		return fail(err)
+		return nil, "", err
 	}
-	if err := ws.Write(step, websocket.MessageBinary, m1); err != nil {
-		return fail(refusalOf(err))
+	if err := ws.Write(ctx, websocket.MessageBinary, m1); err != nil {
+		return nil, "", refusalOf(err)
 	}
-	typ, m2, err := ws.Read(step)
+	typ, m2, err := ws.Read(ctx)
 	if err != nil {
-		return fail(refusalOf(err))
+		return nil, "", refusalOf(err)
 	}
 	if typ != websocket.MessageBinary {
-		return fail(errStream)
+		return nil, "", errStream
 	}
 	payload, tr, err := init.ReadMessage2(m2)
 	if err != nil {
-		return fail(errStream)
+		return nil, "", errStream
 	}
-	s := &session{id: p.grant.SessionID, hostID: p.hostID, desktop: p.desktop, ws: ws, tr: tr, in: make(chan inbound, inboundBuffer)}
 	var p2 struct {
 		V        int    `json:"v"`
 		Platform string `json:"platform"`
 	}
 	if json.Unmarshal(payload, &p2) != nil || p2.V != 1 {
-		return fail(errStream)
+		return nil, "", errStream
 	}
-	s.hostInfo.Platform = p2.Platform
-	rctx, rcancel := context.WithCancel(context.WithoutCancel(ctx))
-	s.cancel = rcancel
-	go s.read(rctx)
-	first, err := s.next(step)
-	if err != nil {
-		s.close()
-		return nil, err
-	}
-	if first.Type != frame.TypeCUState {
-		s.close()
-		return nil, errStream
-	}
-	if err := s.applyState(first); err != nil {
-		s.close()
-		return nil, err
-	}
-	return s, nil
+	return tr, p2.Platform, nil
 }
 
 // readHello reads the hello of computerAttach and checks that it offers version 1.
@@ -208,20 +231,20 @@ func readHello(ctx context.Context, ws *websocket.Conn) error {
 	return errStream
 }
 
-// attachRefusal is a close of the attach connection before the session started.
-type attachRefusal struct {
+// attachRefusedError is a close of the attach connection before the session started.
+type attachRefusedError struct {
 	code   int
 	reason string
 }
 
-func (e *attachRefusal) Error() string {
+func (e *attachRefusedError) Error() string {
 	return fmt.Sprintf("computermcp: attach closed with %d %s", e.code, e.reason)
 }
 
 // toolCode maps the close to a code of 27 7: the details not_enabled, helper_absent and
 // helper_untrusted are not_enabled, busy is busy, the reasons of authorize map like a refusal of
 // the runner, 4102 is host_offline, everything else stopped (D-CU-05-7).
-func (e *attachRefusal) toolCode() string {
+func (e *attachRefusedError) toolCode() string {
 	switch e.reason {
 	case "not_enabled", "helper_absent", "helper_untrusted":
 		return CodeNotEnabled
@@ -236,11 +259,11 @@ func (e *attachRefusal) toolCode() string {
 	return CodeStopped
 }
 
-// refusalOf turns a close of the peer into an *attachRefusal; other errors stay.
+// refusalOf turns a close of the peer into an *attachRefusedError; other errors stay.
 func refusalOf(err error) error {
 	var ce websocket.CloseError
 	if errors.As(err, &ce) {
-		return &attachRefusal{code: int(ce.Code), reason: ce.Reason}
+		return &attachRefusedError{code: int(ce.Code), reason: ce.Reason}
 	}
 	return err
 }
@@ -383,35 +406,41 @@ func (s *session) do(ctx context.Context, action string, args json.RawMessage) (
 	if err := s.send(ctx, f); err != nil {
 		return result{}, err
 	}
+	r, err := s.awaitResult(ctx)
+	if err != nil {
+		return result{}, err
+	}
+	out := result{code: r.Code, width: r.Width, height: r.Height, scaleID: r.ScaleID, app: r.App, cursor: r.Cursor}
+	if r.Image {
+		if out.img, out.format, err = s.image(ctx, r); err != nil {
+			return result{}, err
+		}
+	}
+	if out.scaleID > 0 && (out.img != nil || out.cursor != nil) {
+		s.lastScale = out.scaleID
+	}
+	return out, nil
+}
+
+// awaitResult reads frames until the cu_result of the last action; cu_state frames before it
+// are applied, any other frame is a stream fault.
+func (s *session) awaitResult(ctx context.Context) (frame.Result, error) {
 	for {
 		f, err := s.next(ctx)
 		if err != nil {
-			return result{}, err
+			return frame.Result{}, err
 		}
-		switch f.Type {
-		case frame.TypeCUState:
+		if f.Type == frame.TypeCUState {
 			if err := s.applyState(f); err != nil {
-				return result{}, err
+				return frame.Result{}, err
 			}
 			continue
-		case frame.TypeCUResult:
-		default:
-			return result{}, s.end(endStreamFault)
 		}
 		r, err := f.ResultBody()
-		if err != nil || r.Seq != s.seq {
-			return result{}, s.end(endStreamFault)
+		if f.Type != frame.TypeCUResult || err != nil || r.Seq != s.seq {
+			return frame.Result{}, s.end(endStreamFault)
 		}
-		out := result{code: r.Code, width: r.Width, height: r.Height, scaleID: r.ScaleID, app: r.App, cursor: r.Cursor}
-		if r.Image {
-			if out.img, out.format, err = s.image(ctx, r); err != nil {
-				return result{}, err
-			}
-		}
-		if out.scaleID > 0 && (out.img != nil || out.cursor != nil) {
-			s.lastScale = out.scaleID
-		}
-		return out, nil
+		return r, nil
 	}
 }
 
@@ -429,34 +458,46 @@ func (s *session) image(ctx context.Context, r frame.Result) ([]byte, string, er
 		b.Bytes < 1 || (b.Format != frame.FormatJPEG && b.Format != frame.FormatPNG) {
 		return nil, "", s.end(endStreamFault)
 	}
+	img, err := s.imageData(ctx, b.Bytes)
+	if err != nil {
+		return nil, "", err
+	}
+	return img, b.Format, nil
+}
+
+// imageData reads the data frames up to cu_image_end; their sum must be exactly want bytes.
+func (s *session) imageData(ctx context.Context, want int64) ([]byte, error) {
 	var img []byte
 	for {
 		f, err := s.next(ctx)
+		if err == nil {
+			err = s.imageFrame(f, &img, want)
+		}
+		if errors.Is(err, errImageDone) {
+			return img, nil
+		}
 		if err != nil {
 			clear(img)
-			return nil, "", err
-		}
-		switch f.Type {
-		case frame.TypeCUImageData:
-			if int64(len(img)+len(f.Data)) > b.Bytes {
-				clear(img)
-				return nil, "", s.end(endStreamFault)
-			}
-			img = append(img, f.Data...)
-		case frame.TypeCUImageEnd:
-			if int64(len(img)) != b.Bytes {
-				clear(img)
-				return nil, "", s.end(endStreamFault)
-			}
-			return img, b.Format, nil
-		case frame.TypeCUState:
-			clear(img)
-			return nil, "", s.stateInImage(f)
-		default:
-			clear(img)
-			return nil, "", s.end(endStreamFault)
+			return nil, err
 		}
 	}
+}
+
+// errImageDone marks cu_image_end with the right number of bytes.
+var errImageDone = errors.New("computermcp: image complete")
+
+// imageFrame applies one frame inside an image to img.
+func (s *session) imageFrame(f frame.Frame, img *[]byte, want int64) error {
+	switch {
+	case f.Type == frame.TypeCUImageData && int64(len(*img)+len(f.Data)) <= want:
+		*img = append(*img, f.Data...)
+		return nil
+	case f.Type == frame.TypeCUImageEnd && int64(len(*img)) == want:
+		return errImageDone
+	case f.Type == frame.TypeCUState:
+		return s.stateInImage(f)
+	}
+	return s.end(endStreamFault)
 }
 
 // stateInImage handles a cu_state inside an image: only stopped may stand there.

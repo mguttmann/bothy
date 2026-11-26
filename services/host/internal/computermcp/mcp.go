@@ -13,6 +13,9 @@ import (
 	"slices"
 )
 
+// jsonrpcVersion is the member jsonrpc of every message.
+const jsonrpcVersion = "2.0"
+
 // ServerName is the name of the MCP server (27 7), so the tools are mcp__bothy_computer__<name>.
 const ServerName = "bothy_computer"
 
@@ -68,23 +71,7 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 	defer s.closeSession()
 	lines := make(chan []byte)
 	readErr := make(chan error, 1)
-	go func() {
-		r := bufio.NewReader(in)
-		for {
-			line, err := r.ReadBytes('\n')
-			if len(bytes.TrimSpace(line)) > 0 {
-				select {
-				case lines <- line:
-				case <-ctx.Done():
-					return
-				}
-			}
-			if err != nil {
-				readErr <- err
-				return
-			}
-		}
-	}()
+	go readLines(ctx, in, lines, readErr)
 	w := bufio.NewWriter(out)
 	for {
 		select {
@@ -96,18 +83,41 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 			}
 			return err
 		case line := <-lines:
-			answer := s.handle(ctx, line)
-			if answer == nil {
-				continue
-			}
-			if _, err := w.Write(append(answer, '\n')); err != nil {
-				return err
-			}
-			if err := w.Flush(); err != nil {
+			if err := writeLine(w, s.handle(ctx, line)); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+// readLines sends every non-empty line of in to lines and the error that ends in to errs.
+func readLines(ctx context.Context, in io.Reader, lines chan<- []byte, errs chan<- error) {
+	r := bufio.NewReader(in)
+	for {
+		line, err := r.ReadBytes('\n')
+		if len(bytes.TrimSpace(line)) > 0 {
+			select {
+			case lines <- line:
+			case <-ctx.Done():
+				return
+			}
+		}
+		if err != nil {
+			errs <- err
+			return
+		}
+	}
+}
+
+// writeLine writes one answer and a newline and flushes; nil writes nothing.
+func writeLine(w *bufio.Writer, answer []byte) error {
+	if answer == nil {
+		return nil
+	}
+	if _, err := w.Write(append(answer, '\n')); err != nil {
+		return err
+	}
+	return w.Flush()
 }
 
 // handle answers one line; nil means no answer (a notification).
@@ -120,7 +130,7 @@ func (s *Server) handle(ctx context.Context, line []byte) []byte {
 	if err := json.Unmarshal(trimmed, &req); err != nil {
 		return encodeError(nil, rpcParseError, "parse error", nil)
 	}
-	if req.JSONRPC != "2.0" || req.Method == "" {
+	if req.JSONRPC != jsonrpcVersion || req.Method == "" {
 		return encodeError(req.ID, rpcInvalidRequest, "invalid request", nil)
 	}
 	if req.ID == nil {
@@ -130,7 +140,7 @@ func (s *Server) handle(ctx context.Context, line []byte) []byte {
 	if rerr != nil {
 		return encodeError(req.ID, rerr.Code, rerr.Message, rerr.Data)
 	}
-	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": res})
+	b, _ := json.Marshal(map[string]any{"jsonrpc": jsonrpcVersion, "id": req.ID, "result": res})
 	return b
 }
 
@@ -139,7 +149,7 @@ func encodeError(id json.RawMessage, code int, msg string, data any) []byte {
 	if id == nil {
 		id = json.RawMessage("null")
 	}
-	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "error": rpcError{Code: code, Message: msg, Data: data}})
+	b, _ := json.Marshal(map[string]any{"jsonrpc": jsonrpcVersion, "id": id, "error": rpcError{Code: code, Message: msg, Data: data}})
 	return b
 }
 
@@ -159,12 +169,7 @@ func (s *Server) call(ctx context.Context, req rpcRequest) (map[string]any, *rpc
 	}
 	switch req.Method {
 	case "initialize":
-		s.initialized = true
-		v := legacyVersions[0]
-		if slices.Contains(legacyVersions, p.ProtocolVersion) {
-			v = p.ProtocolVersion
-		}
-		return map[string]any{"protocolVersion": v, "capabilities": capabilities(), "serverInfo": s.serverInfo(), "instructions": instructions}, nil
+		return s.initialize(p), nil
 	case "ping":
 		return map[string]any{}, nil
 	}
@@ -179,31 +184,54 @@ func (s *Server) call(ctx context.Context, req rpcRequest) (map[string]any, *rpc
 	case "tools/list":
 		res = map[string]any{"tools": toolDefs()}
 	case "tools/call":
-		if !s.knownTool(p.Name) {
-			return nil, &rpcError{Code: rpcInvalidParams, Message: "unknown tool"}
+		if res, rerr = s.toolsCall(ctx, p); rerr != nil {
+			return nil, rerr
 		}
-		args := p.Arguments
-		if len(bytes.TrimSpace(args)) == 0 || bytes.Equal(bytes.TrimSpace(args), []byte("null")) {
-			args = json.RawMessage(`{}`)
-		}
-		if bytes.TrimSpace(args)[0] != '{' {
-			return nil, &rpcError{Code: rpcInvalidParams, Message: "arguments must be an object"}
-		}
-		res = toolContent(s.callTool(ctx, p.Name, args))
 	default:
 		return nil, &rpcError{Code: rpcMethodNotFound, Message: "method not found"}
 	}
 	if modern {
-		// The current revision: every result names its type, cache hints say "do not keep",
-		// and serverInfo moves into _meta.
-		res["resultType"] = "complete"
-		res["_meta"] = map[string]any{metaServerInfo: s.serverInfo()}
-		if req.Method != "tools/call" {
-			res["ttlMs"] = 0
-			res["cacheScope"] = "public"
-		}
+		s.modernResult(req.Method, res)
 	}
 	return res, nil
+}
+
+// initialize answers initialize of the legacy era with the requested revision when it is
+// listed, else the newest.
+func (s *Server) initialize(p params) map[string]any {
+	s.initialized = true
+	v := legacyVersions[0]
+	if slices.Contains(legacyVersions, p.ProtocolVersion) {
+		v = p.ProtocolVersion
+	}
+	return map[string]any{"protocolVersion": v, "capabilities": capabilities(), "serverInfo": s.serverInfo(), "instructions": instructions}
+}
+
+// toolsCall runs tools/call: an unknown tool or arguments that are no object are protocol
+// errors; everything else is a tool result.
+func (s *Server) toolsCall(ctx context.Context, p params) (map[string]any, *rpcError) {
+	if !s.knownTool(p.Name) {
+		return nil, &rpcError{Code: rpcInvalidParams, Message: "unknown tool"}
+	}
+	args := bytes.TrimSpace(p.Arguments)
+	if len(args) == 0 || bytes.Equal(args, []byte("null")) {
+		args = []byte(`{}`)
+	}
+	if args[0] != '{' {
+		return nil, &rpcError{Code: rpcInvalidParams, Message: "arguments must be an object"}
+	}
+	return toolContent(s.callTool(ctx, p.Name, args)), nil
+}
+
+// modernResult adds what the current revision asks of every result: its type, serverInfo in
+// _meta, and for the cacheable results the hint not to keep them.
+func (s *Server) modernResult(method string, res map[string]any) {
+	res["resultType"] = "complete"
+	res["_meta"] = map[string]any{metaServerInfo: s.serverInfo()}
+	if method != "tools/call" {
+		res["ttlMs"] = 0
+		res["cacheScope"] = "public"
+	}
 }
 
 // era decides the protocol era of a request: the version in _meta (the current revision), or
@@ -241,9 +269,9 @@ func (s *Server) serverInfo() map[string]any {
 // toolContent turns a result into the content of tools/call: the text block first, then the
 // image block (base64, image/jpeg or image/png). The image bytes are cleared once encoded.
 func toolContent(r callResult) map[string]any {
-	content := []map[string]any{{"type": "text", "text": r.text}}
+	content := []map[string]any{{keyType: "text", "text": r.text}}
 	if r.img != nil {
-		content = append(content, map[string]any{"type": "image", "data": base64.StdEncoding.EncodeToString(r.img), "mimeType": r.mime})
+		content = append(content, map[string]any{keyType: "image", "data": base64.StdEncoding.EncodeToString(r.img), "mimeType": r.mime})
 		clear(r.img)
 	}
 	return map[string]any{"content": content, "isError": r.isError}

@@ -87,6 +87,10 @@ linters:
       # cmd/bothy-host is the one place that reads the environment (M2-42 adds its commands).
       - path: ^cmd/bothy-host/
         linters: [forbidigo]
+      # cmd/bothy-computer-mcp reads the five variables of the runner's MCP file
+      # (docs/spec/27-computer-use.md 10.1, CU-05) and hands them to internal/computermcp.
+      - path: ^cmd/bothy-computer-mcp/
+        linters: [forbidigo]
       # The tests of the recordings and fingerprint vectors read UPDATE_RECORDINGS, the switch of
       # make -C services/host recordings that writes the test data instead of comparing it
       # (docs/DECISIONS.md D-M2-38-18; the control recordings since M2-43).

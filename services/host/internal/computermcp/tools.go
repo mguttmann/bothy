@@ -178,17 +178,8 @@ func parseAction(action string, raw json.RawMessage) (map[string]any, actionArgs
 
 // checkValues applies the value rules of 27 6.4 that do not depend on the host's settings.
 func checkValues(action string, m map[string]json.RawMessage, a actionArgs) error {
-	_, hasCoord := m[argCoordinate]
-	_, hasRegion := m[argRegion]
-	switch {
-	case hasCoord && (len(a.Coordinate) != 2 || slices.ContainsFunc(a.Coordinate, negative)):
-		return fmt.Errorf("coordinate of %s must be [x, y] with x and y of at least 0", action)
-	case hasRegion && (len(a.Region) != 4 || slices.ContainsFunc(a.Region, negative)):
-		return fmt.Errorf("region of %s must be [x0, y0, x1, y1] with values of at least 0", action)
-	case a.ScaleID != nil && *a.ScaleID < 1:
-		return fmt.Errorf("scale_id of %s must be at least 1", action)
-	case slices.ContainsFunc(a.Modifiers, func(x string) bool { return !slices.Contains(modifierNames, x) }):
-		return fmt.Errorf("modifiers of %s are shift, ctrl, alt, cmd and win", action)
+	if err := checkPoints(action, m, a); err != nil {
+		return err
 	}
 	switch action {
 	case actScroll:
@@ -211,12 +202,43 @@ func checkValues(action string, m map[string]json.RawMessage, a actionArgs) erro
 	return nil
 }
 
+// checkPoints checks coordinate, region, scale_id and modifiers.
+func checkPoints(action string, m map[string]json.RawMessage, a actionArgs) error {
+	_, hasCoord := m[argCoordinate]
+	_, hasRegion := m[argRegion]
+	switch {
+	case hasCoord && (len(a.Coordinate) != 2 || slices.ContainsFunc(a.Coordinate, negative)):
+		return fmt.Errorf("coordinate of %s must be [x, y] with x and y of at least 0", action)
+	case hasRegion && (len(a.Region) != 4 || slices.ContainsFunc(a.Region, negative)):
+		return fmt.Errorf("region of %s must be [x0, y0, x1, y1] with values of at least 0", action)
+	case a.ScaleID != nil && *a.ScaleID < 1:
+		return fmt.Errorf("scale_id of %s must be at least 1", action)
+	case slices.ContainsFunc(a.Modifiers, func(x string) bool { return !slices.Contains(modifierNames, x) }):
+		return fmt.Errorf("modifiers of %s are shift, ctrl, alt, cmd and win", action)
+	}
+	return nil
+}
+
 func negative(v int64) bool { return v < 0 }
 
 // usesScale reports whether the action names a point or a region of a screenshot.
 func usesScale(action string) bool {
 	return slices.Contains(argRules[action].allowed, argScaleID)
 }
+
+// Members and values of the JSON schemas and the content blocks.
+const (
+	keyType        = "type"
+	keyDescription = "description"
+	keyEnum        = "enum"
+	keyMinLength   = "minLength"
+	keyItems       = "items"
+	keyMinItems    = "minItems"
+	keyMinimum     = "minimum"
+	typeArray      = "array"
+	typeInteger    = "integer"
+	typeString     = "string"
+)
 
 // toolDef is one entry of tools/list.
 type toolDef struct {
@@ -228,7 +250,7 @@ type toolDef struct {
 
 // schema returns an object schema without additional members.
 func schema(props map[string]any, required ...string) map[string]any {
-	s := map[string]any{"type": "object", "properties": props, "additionalProperties": false}
+	s := map[string]any{keyType: "object", "properties": props, "additionalProperties": false}
 	if props == nil {
 		s["properties"] = map[string]any{}
 	}
@@ -240,20 +262,20 @@ func schema(props map[string]any, required ...string) map[string]any {
 
 // argSchemas are the JSON schemas of the members of 27 6.4.
 var argSchemas = map[string]map[string]any{
-	argCoordinate: {"type": "array", "items": map[string]any{"type": "integer", "minimum": 0}, "minItems": 2, "maxItems": 2,
-		"description": "[x, y] in pixels of the screenshot named by scale_id"},
-	argRegion: {"type": "array", "items": map[string]any{"type": "integer", "minimum": 0}, "minItems": 4, "maxItems": 4,
-		"description": "[x0, y0, x1, y1] in pixels of the screenshot named by scale_id"},
-	argScaleID: {"type": "integer", "minimum": 1,
-		"description": "the scale_id of the screenshot the coordinates refer to; default: the last image of this session"},
-	argModifiers: {"type": "array", "items": map[string]any{"type": "string", "enum": modifierNames}, "uniqueItems": true,
-		"description": "keys held during the click"},
-	argDirection:  {"type": "string", "enum": directions},
-	argAmount:     {"type": "integer", "minimum": 1, "description": "scroll steps"},
-	argText:       {"type": "string", "minLength": 1, "description": "text typed as Unicode input, whatever the keyboard layout"},
-	argKeys:       {"type": "string", "minLength": 1, "description": "a key or combination, for example cmd+shift+t, Return or F5"},
-	argRepeat:     {"type": "integer", "minimum": 1, "description": "how often to press; the host caps it"},
-	argDurationMS: {"type": "integer", "minimum": 0, "description": "milliseconds to wait before the image; the host caps it"},
+	argCoordinate: {keyType: typeArray, keyItems: map[string]any{keyType: typeInteger, keyMinimum: 0}, keyMinItems: 2, "maxItems": 2,
+		keyDescription: "[x, y] in pixels of the screenshot named by scale_id"},
+	argRegion: {keyType: typeArray, keyItems: map[string]any{keyType: typeInteger, keyMinimum: 0}, keyMinItems: 4, "maxItems": 4,
+		keyDescription: "[x0, y0, x1, y1] in pixels of the screenshot named by scale_id"},
+	argScaleID: {keyType: typeInteger, keyMinimum: 1,
+		keyDescription: "the scale_id of the screenshot the coordinates refer to; default: the last image of this session"},
+	argModifiers: {keyType: typeArray, keyItems: map[string]any{keyType: typeString, keyEnum: modifierNames}, "uniqueItems": true,
+		keyDescription: "keys held during the click"},
+	argDirection:  {keyType: typeString, keyEnum: directions},
+	argAmount:     {keyType: typeInteger, keyMinimum: 1, keyDescription: "scroll steps"},
+	argText:       {keyType: typeString, keyMinLength: 1, keyDescription: "text typed as Unicode input, whatever the keyboard layout"},
+	argKeys:       {keyType: typeString, keyMinLength: 1, keyDescription: "a key or combination, for example cmd+shift+t, Return or F5"},
+	argRepeat:     {keyType: typeInteger, keyMinimum: 1, keyDescription: "how often to press; the host caps it"},
+	argDurationMS: {keyType: typeInteger, keyMinimum: 0, keyDescription: "milliseconds to wait before the image; the host caps it"},
 }
 
 // actionDescriptions are the descriptions of the thirteen action tools.
@@ -289,20 +311,20 @@ func toolDefs() []toolDef {
 		{Name: toolListDesktops, Title: "List desktops", Description: "List the desktops of the run's owner: name, host ID, platform, online, locked, busy.",
 			InputSchema: schema(nil)},
 		{Name: toolOpenSession, Title: "Open a computer session", Description: "Open the computer session of this run on a desktop, named by its name or host ID.",
-			InputSchema: schema(map[string]any{"desktop": map[string]any{"type": "string", "minLength": 1, "description": "the desktop's name or host ID"}}, "desktop")},
+			InputSchema: schema(map[string]any{"desktop": map[string]any{keyType: typeString, keyMinLength: 1, keyDescription: "the desktop's name or host ID"}}, "desktop")},
 	}
 	for _, a := range actions {
 		defs = append(defs, toolDef{Name: a, Title: a, Description: actionDescriptions[a], InputSchema: actionSchema(a)})
 	}
-	item := map[string]any{argAction: map[string]any{"type": "string", "enum": actions}}
+	item := map[string]any{argAction: map[string]any{keyType: typeString, keyEnum: actions}}
 	for k, v := range argSchemas {
 		item[k] = v
 	}
 	defs = append(defs,
 		toolDef{Name: toolBatch, Title: "Run several actions",
 			Description: "Run a list of actions in order, each an object with action and its arguments. The first failure stops the batch; one image at the end.",
-			InputSchema: schema(map[string]any{"actions": map[string]any{"type": "array", "minItems": 1,
-				"items": map[string]any{"type": "object", "properties": item, "required": []string{argAction}, "additionalProperties": false}}}, "actions")},
+			InputSchema: schema(map[string]any{"actions": map[string]any{keyType: typeArray, keyMinItems: 1,
+				keyItems: map[string]any{keyType: "object", "properties": item, "required": []string{argAction}, "additionalProperties": false}}}, "actions")},
 		toolDef{Name: toolDone, Title: "End the computer session", Description: "End the computer session of this run.", InputSchema: schema(nil)},
 	)
 	return defs

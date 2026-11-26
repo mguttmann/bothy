@@ -26,6 +26,7 @@ import (
 
 	"github.com/OWNER/bothy/services/host/internal/frame"
 	"github.com/OWNER/bothy/services/host/internal/noise"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // Test values (white label: example persons and example.com only).
@@ -34,7 +35,7 @@ const (
 	tHostB    = "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e02"
 	tNonce    = "nonce-of-the-run-of-alex"
 	tDesktopA = "Desk of Alex"
-	tWait     = 10 * time.Second
+	tWait     = testkit.Patience
 )
 
 // fakeHost is the server attach endpoint and the host service in one: it serves hello and
@@ -251,7 +252,7 @@ func testImage(n int, seed byte) []byte {
 // okImage answers a with code ok and an image of n bytes in format.
 func okImage(a frame.Action, n int, format string) []frame.Frame {
 	return imageFrames(frame.Result{Seq: a.Seq, Code: "ok", Image: true, Width: 1280, Height: 800, ScaleID: 4,
-		App: frame.App{ID: "com.example.editor", Name: "Editor"}}, testImage(n, byte(a.Seq)), format)
+		App: frame.App{ID: "com.example.editor", Name: "Editor"}}, testImage(n, byte(a.Seq)), format) //nolint:gosec // G115: small test sequence numbers
 }
 
 // imageFrames returns cu_result, cu_image_begin, the chunks and cu_image_end.
@@ -292,7 +293,7 @@ type fakeRunner struct {
 func newFakeRunner(ctx context.Context, t *testing.T, host *fakeHost) *fakeRunner {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.Chmod(dir, 0o700); err != nil {
+	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: the request folder of 27 10.2 is 0700
 		t.Fatal(err)
 	}
 	r := &fakeRunner{t: t, dir: dir, host: host, keys: map[string]noise.KeyPair{}, gens: map[string]int64{}}
@@ -332,7 +333,7 @@ func (r *fakeRunner) loop(ctx context.Context) {
 			if _, err := os.Stat(answer); err == nil {
 				continue
 			}
-			b, err := os.ReadFile(filepath.Join(r.dir, name))
+			b, err := os.ReadFile(filepath.Join(r.dir, name)) //nolint:gosec // G304: a request file of the test folder
 			if err != nil {
 				continue
 			}
@@ -458,8 +459,7 @@ func (s *syncBuffer) String() string {
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	t.Cleanup(cancel)
+	ctx := testkit.Context(t)
 	host := newFakeHost(t)
 	runner := newFakeRunner(ctx, t, host)
 	pinDir := t.TempDir()
@@ -501,7 +501,7 @@ func (r *rig) stop() {
 		if err != nil {
 			r.t.Fatalf("Serve: %v", err)
 		}
-	case <-time.After(tWait):
+	case <-time.After(testkit.Patience):
 		r.t.Fatal("Serve did not end after EOF")
 	}
 }
@@ -547,7 +547,7 @@ func (r *rig) read() rpcResponse {
 			r.t.Fatalf("answer is no JSON: %v", err)
 		}
 		return resp
-	case <-time.After(2 * tWait):
+	case <-time.After(testkit.Patience):
 		r.t.Fatal("no answer")
 	}
 	return rpcResponse{}

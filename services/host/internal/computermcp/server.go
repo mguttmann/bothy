@@ -46,6 +46,14 @@ func New(cfg Config) (*Server, error) {
 		pins: &pinStore{path: cfg.PinsPath, random: cfg.Random}}, nil
 }
 
+// The log line of a tool call: the tool, the code and the duration only (27 10.5).
+const (
+	msgTool        = "computer tool"
+	attrTool       = "tool"
+	attrCode       = "code"
+	attrDurationMS = "duration_ms"
+)
+
 // callResult is the outcome of a tool call before it becomes MCP content: one text block and at
 // most one image.
 type callResult struct {
@@ -72,8 +80,8 @@ func (s *Server) callTool(ctx context.Context, name string, args json.RawMessage
 	if res.isError {
 		code, _, _ = strings.Cut(res.text, ":")
 	}
-	s.log.LogAttrs(ctx, slog.LevelInfo, "computer tool", slog.String("tool", name), slog.String("code", code),
-		slog.Int64("duration_ms", time.Since(start).Milliseconds()))
+	s.log.LogAttrs(ctx, slog.LevelInfo, msgTool, slog.String(attrTool, name), slog.String(attrCode, code),
+		slog.Int64(attrDurationMS, time.Since(start).Milliseconds()))
 	return res
 }
 
@@ -170,7 +178,7 @@ func (s *Server) openSession(ctx context.Context, raw json.RawMessage) callResul
 		return attachFailure(err)
 	}
 	s.sess = sess
-	text := fmt.Sprintf("Computer session open on %s (%s), state %s. Take a screenshot to see the screen.", name, sess.hostInfo.Platform, sess.state)
+	text := fmt.Sprintf("Computer session open on %s (%s), state %s. Take a screenshot to see the screen.", name, sess.platform, sess.state)
 	if sess.state == "paused" {
 		text += " The screen is locked: actions answer screen_locked until the owner unlocks it."
 	}
@@ -179,7 +187,7 @@ func (s *Server) openSession(ctx context.Context, raw json.RawMessage) callResul
 
 // attachFailure maps an error of attach.
 func attachFailure(err error) callResult {
-	var ref *attachRefusal
+	var ref *attachRefusedError
 	var ended *endedError
 	switch {
 	case errors.As(err, &ref):
@@ -340,24 +348,9 @@ func (s *Server) batch(ctx context.Context, raw json.RawMessage) callResult {
 	if !ok {
 		return res
 	}
-	var b struct {
-		Actions []json.RawMessage `json:"actions"`
-	}
-	if err := strictDecode(raw, &b); err != nil || len(b.Actions) == 0 {
-		return failure(CodeInvalidAction, "batch needs actions, a list of at least one action")
-	}
-	names := make([]string, len(b.Actions))
-	items := make([]json.RawMessage, len(b.Actions))
-	for i, it := range b.Actions {
-		var m map[string]json.RawMessage
-		if json.Unmarshal(it, &m) != nil || m == nil || json.Unmarshal(m[argAction], &names[i]) != nil || !isAction(names[i]) {
-			return failure(CodeInvalidAction, fmt.Sprintf("item %d of batch has no known action", i+1))
-		}
-		delete(m, argAction)
-		items[i], _ = json.Marshal(m)
-		if _, _, err := parseAction(names[i], items[i]); err != nil {
-			return failure(CodeInvalidAction, fmt.Sprintf("item %d: %v", i+1, err))
-		}
+	names, items, err := parseBatch(raw)
+	if err != nil {
+		return failure(CodeInvalidAction, err.Error())
 	}
 	var lines []string
 	var last result
@@ -367,24 +360,9 @@ func (s *Server) batch(ctx context.Context, raw json.RawMessage) callResult {
 			lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, notExecuted))
 			continue
 		}
-		st, err := s.prepare(sess, name, items[i])
-		if err != nil {
-			failed = true
-			lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, failure(CodeInvalidAction, err.Error()).text))
-			continue
-		}
-		r, err := s.run(ctx, sess, st)
-		switch {
-		case err != nil:
-			failed = true
-			lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, s.sessionFailure(err).text))
-			continue
-		case r.code != codeOK:
-			failed = true
-			lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, failure(r.code, "").text))
-		default:
-			lines = append(lines, fmt.Sprintf("%d. %s: ok%s", i+1, name, cursorText(r)))
-		}
+		r, line, ok := s.batchItem(ctx, sess, name, items[i])
+		failed = !ok
+		lines = append(lines, fmt.Sprintf("%d. %s: %s", i+1, name, line))
 		if r.img != nil {
 			clear(last.img)
 			last = r
@@ -395,6 +373,47 @@ func (s *Server) batch(ctx context.Context, raw json.RawMessage) callResult {
 	out := withState(sess, render(toolBatch, last, lines))
 	out.isError = failed
 	return out
+}
+
+// parseBatch returns the action names and the arguments of the items, each checked against
+// 27 6.4.
+func parseBatch(raw json.RawMessage) ([]string, []json.RawMessage, error) {
+	var b struct {
+		Actions []json.RawMessage `json:"actions"`
+	}
+	if err := strictDecode(raw, &b); err != nil || len(b.Actions) == 0 {
+		return nil, nil, errors.New("batch needs actions, a list of at least one action")
+	}
+	names := make([]string, len(b.Actions))
+	items := make([]json.RawMessage, len(b.Actions))
+	for i, it := range b.Actions {
+		var m map[string]json.RawMessage
+		if json.Unmarshal(it, &m) != nil || m == nil || json.Unmarshal(m[argAction], &names[i]) != nil || !isAction(names[i]) {
+			return nil, nil, fmt.Errorf("item %d of batch has no known action", i+1)
+		}
+		delete(m, argAction)
+		items[i], _ = json.Marshal(m)
+		if _, _, err := parseAction(names[i], items[i]); err != nil {
+			return nil, nil, fmt.Errorf("item %d: %w", i+1, err)
+		}
+	}
+	return names, items, nil
+}
+
+// batchItem runs one item of a batch and returns its result, its line and whether it succeeded.
+func (s *Server) batchItem(ctx context.Context, sess *session, name string, raw json.RawMessage) (result, string, bool) {
+	st, err := s.prepare(sess, name, raw)
+	if err != nil {
+		return result{}, failure(CodeInvalidAction, err.Error()).text, false
+	}
+	r, err := s.run(ctx, sess, st)
+	switch {
+	case err != nil:
+		return result{}, s.sessionFailure(err).text, false
+	case r.code != codeOK:
+		return r, failure(r.code, "").text, false
+	}
+	return r, "ok" + cursorText(r), true
 }
 
 // isAction reports whether name is one of the thirteen actions.

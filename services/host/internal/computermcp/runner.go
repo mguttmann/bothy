@@ -173,7 +173,7 @@ func (c *requestClient) do(ctx context.Context, req any) (json.RawMessage, *Refu
 	tick := time.NewTicker(answerPoll)
 	defer tick.Stop()
 	for {
-		b, err := os.ReadFile(ansPath)
+		b, err := os.ReadFile(ansPath) //nolint:gosec // G304: the answer file of this request in the runner's folder (27 10.2)
 		if err == nil {
 			// The request goes first: while it exists without an answer the runner would take
 			// it again.
@@ -226,7 +226,7 @@ func strictDecode(b []byte, v any) error {
 // writeAtomic writes b to path with mode 0600 through the new file tmp in the same folder and a
 // rename, so a reader sees the old or the new content, never a part.
 func writeAtomic(path, tmp string, b []byte) error {
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0o600)
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0o600) //nolint:gosec // G304: a new file next to the request or pin file (27 10.2, 10.4)
 	if err != nil {
 		return err
 	}

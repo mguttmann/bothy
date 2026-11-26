@@ -44,6 +44,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/doctor"
 	"github.com/OWNER/bothy/services/host/internal/hostos"
 	"github.com/OWNER/bothy/services/host/internal/noise"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 	"github.com/OWNER/bothy/services/host/internal/startup"
@@ -57,23 +58,22 @@ const (
 	tNonce   = "nonce-of-the-run-of-alex"
 	tDesktop = "Desk of Alex"
 	display  = ":96"
-	wait     = 20 * time.Second
+	wait     = testkit.Patience
 )
 
 // TestComputerMCPEndToEnd: list, open, screenshot with a pixel check, clicks and text into the
 // fixture app, zoom, a batch, a simulated lock with screen_locked and the resume, and done.
 func TestComputerMCPEndToEnd(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
+	ctx := testkit.Context(t)
 	tmp := t.TempDir()
 	backendDir, err := filepath.Abs("../computer_backend")
 	if err != nil {
 		t.Fatal(err)
 	}
 	events := filepath.Join(tmp, "events.jsonl")
-	env := append(os.Environ(), "DISPLAY="+display)
+	env := []string{"DISPLAY=" + display, "PATH=/usr/local/bin:/usr/bin:/bin", "HOME=" + tmp}
 	start := func(name string, args ...string) *exec.Cmd {
-		c := exec.Command(name, args...)
+		c := exec.CommandContext(ctx, name, args...) //nolint:gosec // G204: the fixed programs of the test container
 		c.Env, c.Stdout, c.Stderr = env, os.Stderr, os.Stderr
 		if err := c.Start(); err != nil {
 			t.Fatalf("start %s: %v", name, err)
@@ -147,7 +147,7 @@ func TestComputerMCPEndToEnd(t *testing.T) {
 	}
 
 	// The attach relay and the runner of the stand-in server.
-	relay := httptest.NewServer(attachRelay(ctx, t, srv))
+	relay := httptest.NewServer(attachRelay(ctx, srv))
 	t.Cleanup(relay.Close)
 	reqDir := filepath.Join(tmp, "requests")
 	if err := os.Mkdir(reqDir, 0o700); err != nil {
@@ -217,7 +217,7 @@ func TestComputerMCPEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	locked := false
-	for deadline := time.Now().Add(wait); time.Now().Before(deadline) && !locked; time.Sleep(100 * time.Millisecond) {
+	for deadline := testkit.Deadline(); time.Now().Before(deadline) && !locked; time.Sleep(100 * time.Millisecond) {
 		locked = strings.HasPrefix(c.call("screenshot", nil).text(), "screen_locked")
 	}
 	if !locked {
@@ -227,7 +227,7 @@ func TestComputerMCPEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	resumed := false
-	for deadline := time.Now().Add(wait); time.Now().Before(deadline) && !resumed; time.Sleep(100 * time.Millisecond) {
+	for deadline := testkit.Deadline(); time.Now().Before(deadline) && !resumed; time.Sleep(100 * time.Millisecond) {
 		resumed = !c.call("screenshot", nil).IsError
 	}
 	if !resumed {
@@ -253,7 +253,7 @@ func red(img image.Image, x, y int) bool {
 
 func waitFor(t *testing.T, cond func() bool, what string) {
 	t.Helper()
-	for deadline := time.Now().Add(wait); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+	for deadline := testkit.Deadline(); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
 		if cond() {
 			return
 		}
@@ -262,7 +262,7 @@ func waitFor(t *testing.T, cond func() bool, what string) {
 }
 
 func hasEvent(path, needle string) bool {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // G304: the event file of the fixture app
 	return err == nil && bytes.Contains(b, []byte(needle))
 }
 
@@ -306,7 +306,7 @@ func runRunner(ctx context.Context, t *testing.T, dir string, cc *sessiontest.Co
 			if _, err := os.Stat(ans); err == nil {
 				continue
 			}
-			b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			b, err := os.ReadFile(filepath.Join(dir, e.Name())) //nolint:gosec // G304: a request file of the test folder
 			if err != nil {
 				continue
 			}
@@ -350,7 +350,7 @@ func runRunner(ctx context.Context, t *testing.T, dir string, cc *sessiontest.Co
 
 // attachRelay is the computerAttach endpoint of the stand-in server: hello, identify, then every
 // binary message unchanged to and from the host's data connection of the session.
-func attachRelay(ctx context.Context, t *testing.T, srv *sessiontest.Server) http.Handler {
+func attachRelay(ctx context.Context, srv *sessiontest.Server) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/computer/sessions/{id}/attach", func(w http.ResponseWriter, r *http.Request) {
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
