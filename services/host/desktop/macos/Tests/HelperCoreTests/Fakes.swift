@@ -157,38 +157,51 @@ final class FakeWaker: Waker {
     }
 }
 
-/// Fake Esc tap with the shared `EscFilter` of the platform tap, so the held-Esc and
-/// auto-repeat rules of 27 9.6 item 4 run as in the app.
+/// Fake Esc tap with the shared `EscFilter` and `TapGeneration` of the platform tap, so the
+/// held-Esc rules (27 9.6 item 4) and the generations of taps (item 5) run as in the app.
 final class FakeEscTap: EscTap {
     let journal: Journal
-    var handler: ((Bool) -> EscDecision)?
     let filter = EscFilter()
+    let generations = TapGeneration<(Bool) -> EscDecision>()
     init(journal: Journal) { self.journal = journal }
-    var running: Bool { handler != nil }
+    var running: Bool { generations.currentValue != nil }
 
     func start(handler: @escaping (Bool) -> EscDecision) throws {
-        self.handler = handler
+        _ = generations.endCurrent()
+        _ = generations.begin(handler)
         filter.start()
         journal.add("tap.start")
     }
 
     func stop() {
-        handler = nil
         filter.stop()
+        _ = generations.endCurrent()
         journal.add("tap.stop")
     }
 
-    /// Feeds one Esc key event to the tap and returns its answer. A real Esc that the filter
-    /// counts as a new press reaches the controller as the platform tap's handler does.
+    /// Feeds one Esc key event to the current tap and returns its answer. A real Esc that the
+    /// filter counts as a new press reaches the controller as the platform tap's handler does.
     func key(down: Bool, injected: Bool) -> EscDecision {
+        key(down: down, injected: injected, generation: generations.generation)
+    }
+
+    /// Feeds one Esc key event to the tap of `generation`, as a late callback of an old tap.
+    func key(down: Bool, injected: Bool, generation: Int) -> EscDecision {
         let verdict = filter.handle(down: down, injected: injected)
-        if verdict.stopsSession, let handler { _ = handler(false) }
+        if verdict.stopsSession, let handler = generations.value(for: generation) {
+            _ = handler(false)
+        }
         return verdict.decision
+    }
+
+    /// The teardown of the tap before the current one, arriving late (after the next start).
+    func lateTeardownOfPrevious() {
+        _ = generations.end(generation: generations.generation - 1)
     }
 
     /// Feeds an Esc key down to the tap.
     func press(injected: Bool) -> EscDecision {
-        if injected, let handler { return handler(true) }
+        if injected, let handler = generations.currentValue { return handler(true) }
         return key(down: true, injected: injected)
     }
 }

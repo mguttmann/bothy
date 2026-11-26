@@ -497,7 +497,10 @@ public final class HelperController {
         case "scroll":
             guard let point = point(message),
                 let direction = message["direction"]?.stringValue.flatMap(ScrollDirection.init),
-                let amount = message["amount"]?.intValue, amount >= 1, amount <= Int64(Int32.max)
+                // The host service enforces computer.scroll_amount_max; the helper holds its
+                // default as an outer bound (27 9.6 item 3).
+                let amount = message["amount"]?.intValue, amount >= 1,
+                amount <= Int64(Limits.scrollAmountMax)
             else { return nil }
             return Plan(count: Int(amount) + 1) { index in
                 index == 0 ? [.move(point)] : [.scroll(point, direction, 1)]
