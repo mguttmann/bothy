@@ -364,8 +364,9 @@ session on the same host is no conflict.
 
 ### 9.1 macOS
 
-- Swift app with Developer ID, hardened runtime, notarized, without sandbox; registered as a
-  LaunchAgent in the GUI domain of the user; the usage texts stand in the helper's `Info.plist`.
+- Swift app with a Developer ID signature and the hardened runtime, without sandbox, signed on the
+  owner's own Mac and not notarized (D-CU-01-29); registered as a LaunchAgent in the GUI domain of
+  the user; the usage texts stand in the helper's `Info.plist`.
 - Capture: ScreenCaptureKit (`SCScreenshotManager`, macOS 14 or later), the indicator window
   excluded with `SCContentFilter`. Input: `CGEvent`. App identity:
   `AXUIElementCopyElementAtPosition`, then the process ID, then the bundle ID and team ID.
@@ -375,15 +376,17 @@ session on the same host is no conflict.
 - Esc tap: an event tap that swallows a real Esc while a session is live.
 - Permissions: screen recording and accessibility for the helper's bundle ID; detected with
   `CGPreflightScreenCaptureAccess` and `AXIsProcessTrusted`; the helper offers a link that opens the
-  right pane of the system settings, never grants itself anything and uses no MDM profile. A
-  release test compares the designated requirement of the signed helper with the previous release,
-  because a changed requirement silently voids the grants.
+  right pane of the system settings, never grants itself anything and uses no MDM profile. The
+  signing step compares the designated requirement of the signed helper with the one of the
+  previous signed build and fails on a change, because a changed requirement silently voids the
+  grants.
 - Indicator: a border window around the screen with a stop button, a menu bar item "Agent <name>
   controls this computer, Esc to stop", and the system's own recording indicator.
 
 ### 9.2 Windows
 
-- A C++ Win32 executable with `uiAccess=true` in its manifest, signed with Authenticode, installed
+- A C++ Win32 executable with `uiAccess=true` in its manifest, signed with Authenticode by a
+  self-signed certificate trusted only on the owner's Windows computer (D-CU-01-29), installed
   under `Program Files` (a condition of `uiAccess`), started at login in the interactive session
   (the host MSI writes the start entry); the host service keeps its normal mode, no owner account
   mode is needed.
@@ -399,15 +402,17 @@ session on the same host is no conflict.
 
 ### 9.3 Install, update, doctor
 
-The helper ships with the host service's packages: macOS in the host `.pkg` (`release-apple` of
-`services/host/Makefile`), Windows in the host MSI (`release-windows`). Both packages set
-`host_service.computer_use` only when the person installing selects the helper component. `bothy-host
+The helper is not published (D-CU-01-29): the release packages of `release.yml` carry no helper.
+On the owner's machine the signed helper goes into a host package with an optional helper
+component, built there: macOS a host `.pkg` (`helper-package-macos` of `services/host/Makefile`),
+Windows a host MSI (`helper-package-windows`). Both packages set `host_service.computer_use` only
+when the person installing selects the helper component. `bothy-host
 doctor` prints a section `computer` (no HD check: the doctor list of 24 3.5 stays HD1 to HD11 and the
 server refuses another): helper installed and trusted (9.4), connected, enabled, the permissions of
 9.1 granted, signed or a development build; the same state goes to the server in the `report` object
 `computer` (12.3). A build
-without a signing identity is for development only and says so in the doctor and in the report
-(D-CU-01-22).
+without a signature that verifies is for development only and says so in the doctor and in the
+report (D-CU-01-29).
 
 ### 9.4 Local channel between host service and helper
 
@@ -684,7 +689,7 @@ Unverified until the named ticket probes them; each has its fallback.
 | Point | Probed by | Fallback when it does not hold |
 |---|---|---|
 | Hosted `macos-15` runners allow screen capture and accessibility without a dialog; `windows-2025` runners have an interactive desktop for capture and `SendInput` | CU-02 (probe job first) | build, signature and doctor tests only on that platform; the gap is recorded in the stage report and in this table |
-| `uiAccess` reaches windows of higher integrity with a helper signed by the instance's certificate, and with a self-signed certificate in the trusted root store | CU-02 | the helper runs without `uiAccess`; elevated windows answer `os_refused` |
+| `uiAccess` reaches windows of higher integrity with a helper signed by a self-signed certificate in the trusted root store of the machine (D-CU-01-29) | CU-02 | the helper runs without `uiAccess`; elevated windows answer `os_refused` |
 | Which lock and screen saver signals are reliable on macOS 14 and 15; whether the display assertion prevents the automatic lock | CU-02 | lock detection by polling the session dictionary every `computer.settle`; no promise about the automatic lock |
 | The Esc tap sees real keys and tells them from the helper's own events on both platforms; its behaviour under Secure Input | CU-02 | stop by the indicator and from the clients only; the stop paths stay |
 | `Windows.Graphics.Capture` shows no border or consent prompt on Windows 11 when DXGI is not usable | CU-02 | DXGI Desktop Duplication only |

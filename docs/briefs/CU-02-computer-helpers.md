@@ -4,14 +4,14 @@ Status: ready | Depends on: none (specification merged) | Milestone: CU
 
 ## Goal
 
-After this ticket the "Bothy Computer Helper" exists for macOS (Swift) and Windows (C++, Win32) as the only process with screen capture and input rights, in the owner's desktop session: capture, input, app identity, lock and secure-desktop state, keeping the display awake, the Esc tap, the indicator with a stop button, the enablement switch with its generation, and the helper side of the local channel of `docs/spec/27-computer-use.md` 9.4. It ships inside the host packages, is signed in the existing release jobs, and a probe job tells whether hosted CI runners can prove capture and input; native jobs in `host-platform.yml` then test it.
+After this ticket the "Bothy Computer Helper" exists for macOS (Swift) and Windows (C++, Win32) as the only process with screen capture and input rights, in the owner's desktop session: capture, input, app identity, lock and secure-desktop state, keeping the display awake, the Esc tap, the indicator with a stop button, the enablement switch with its generation, and the helper side of the local channel of `docs/spec/27-computer-use.md` 9.4. It goes into a host package with an optional helper component, is signed on the owner's own machines and never published (D-CU-01-29), and a probe job tells whether hosted CI runners can prove capture and input; native jobs in `host-platform.yml` then test it.
 
 ## Read first
 
 - `docs/spec/27-computer-use.md` sections 1, 4, 6.4, 6.5, 8.2 to 8.4, 9 (all), 15 (CU-T13 to CU-T16, CU-T23), 16 and 18.
-- `docs/spec/24-terminal.md` 2.2 (packages and install of the host service), 6.4 (the confirmation agent and its console-user rule, the model for the peer side); `docs/spec/18-release.md` (signing).
+- `docs/spec/24-terminal.md` 2.2 (packages and install of the host service), 6.4 (the confirmation agent and its console-user rule, the model for the peer side); `docs/spec/18-release.md` 6.3 (the host package chain the helper packages reuse); `docs/decisions.d/CU-01.md` D-CU-01-29 (signing on the owner's machines).
 - `services/host/testdata/computer/channel-vectors.json` (the channel vectors every codec must read).
-- Code on the base branch: `services/host/Makefile` (targets `release-apple`, `release-windows`, `platform-test`), `tools/distribution/hostdist.py`, `.github/workflows/release.yml` (jobs `build-apple`, `build-windows`), `.github/workflows/host-platform.yml`, `infra/host/` (package definitions), `services/host/internal/confirm` (dialog agent in the desktop session).
+- Code on the base branch: `services/host/Makefile` (targets `release-apple`, `release-windows`, `platform-test`), `tools/distribution/hostdist.py` (its package and signing steps, which the helper packages reuse), `.github/workflows/host-platform.yml`, `infra/host/` (package definitions), `services/host/internal/confirm` (dialog agent in the desktop session).
 - Design note `docs/design/computer-use.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0078; `docs/decisions.d/CU-01.md`; `docs/security/threat-model.md` 5.18 and 6.10.
 
 ## Fixed requirements that apply
@@ -55,8 +55,8 @@ Product requirements implemented here:
 20. Lock and secure desktop: `state` with `locked` on lock, screen saver, user switch and display sleep, `secure_desktop` on Windows; every `do` and `capture` while locked answers `screen_locked` and injects nothing; an operating system refusal answers `os_refused`.
 21. App identity: bundle ID and team ID (macOS), executable name and signer subject (Windows) of the frontmost app in every `done`.
 22. Permissions (macOS): `CGPreflightScreenCaptureAccess` and `AXIsProcessTrusted` reported in `hello` and `state`; a menu item opens the matching pane of the system settings; the helper never grants itself a permission.
-23. Packaging (normal host mode only; the owner account mode does not support computer use, 27 9.4): macOS app bundle with `Info.plist` usage texts, hardened runtime, no sandbox, LaunchAgent in the GUI domain, inside the host `.pkg` as an optional component; Windows executable with `uiAccess=true` in its manifest under `Program Files`, start entry at login, inside the host MSI as an optional component; selecting the component sets `host_service.computer_use = true`.
-24. Signing: `build-apple` signs the helper with the Developer ID identity and the hardened runtime and notarizes it with the host package; `build-windows` signs it with the publisher certificate and checks it with `signtool verify /pa`; a release test compares the macOS designated requirement with the one of the previous release and fails on a change; a build without a signing identity marks itself as a development build (`signature: development`).
+23. Packaging (normal host mode only; the owner account mode does not support computer use, 27 9.4): macOS app bundle with `Info.plist` usage texts, hardened runtime, no sandbox, LaunchAgent in the GUI domain, inside a host `.pkg` with the helper as an optional component; Windows executable with `uiAccess=true` in its manifest under `Program Files`, start entry at login, inside a host MSI with the helper as an optional component; selecting the component sets `host_service.computer_use = true`. These packages are built on the owner's machine from the signed helper (D-CU-01-29); the packages of `release.yml` stay without a helper.
+24. Signing (D-CU-01-29, replacing the release jobs and their secrets): a `services/host/Makefile` target signs the macOS helper on the owner's Mac with the owner's Developer ID Application identity and the hardened runtime, as a one-shot job in the owner's GUI session (the login keychain is open there; nothing unlocks it), without notarization; a `hostdist.py` step signs the Windows helper on the owner's Windows computer with a self-signed code signing certificate trusted only there and checks it with `signtool verify /pa`; the macOS signing step compares the designated requirement with the one of the previous signed build and fails on a change; a helper without a signature that verifies marks itself as a development build (`signature: development`). No signing secret goes to GitHub, and `release.yml` neither builds nor signs a helper.
 25. CI: first a probe job in `host-platform.yml` on `macos-15` and `windows-2025` that opens a test window, captures it and injects a click and a key, and records whether it worked; then native jobs that run the helper against a fixture window with a fake host channel (click, type, image check, lock state where the runner allows). A platform whose probe fails keeps build, signature and doctor-free tests only, and the result goes into 27 section 16 and the report.
 
 ## Scope
@@ -69,7 +69,7 @@ Create:
 
 Change:
 
-- `services/host/Makefile` (targets that build the helpers into the packages), `tools/distribution/hostdist.py` and its tests, `infra/host/` package definitions, `.github/workflows/release.yml` (`build-apple`, `build-windows`), `.github/workflows/host-platform.yml` (probe and native jobs), `services/host/README.md`, `docs/spec/27-computer-use.md` section 16 (probe results) and section 9 where the code needs a precise name.
+- `services/host/Makefile` (targets that build and sign the helpers and build the packages with the helper component), `tools/distribution/hostdist.py` and its tests, `infra/host/` package definitions, `.github/workflows/host-platform.yml` (probe and native jobs) and its workflow tests in `tools/ci/tests`, `services/host/README.md`, `docs/spec/27-computer-use.md` section 16 (probe results) and section 9 where the code needs a precise name.
 
 ## Out of scope
 
@@ -117,7 +117,7 @@ make check
 ## Acceptance criteria
 
 - [ ] Both helpers read every channel vector and pass their unit tests on their platform; the macOS test runs on macOS, the Windows test in the CI job (cross-checking the C++ code locally only where a Windows toolchain exists).
-- [ ] The packages carry the helper as an optional component; selecting it sets `host_service.computer_use`; release signing covers it.
+- [ ] The locally built packages carry the helper as an optional component; selecting it sets `host_service.computer_use`; the local signing steps of D-CU-01-29 cover it; `release.yml` publishes no helper.
 - [ ] The probe job and the native jobs exist; their result after the stage's CI round is in 27 section 16.
 - [ ] No app, key or setting is refused by the helper (CU-T15).
 - [ ] `make check` is green.
