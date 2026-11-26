@@ -1,0 +1,170 @@
+{
+  "description": "Conformance vectors of the stop contract of the computer helpers (docs/spec/27-computer-use.md 9.6, docs/decisions.d/CU-02.md D-CU-02-16). Both helper controllers (Swift HelperCore, C++ helper_core) run every case against their fakes. A case starts with a fresh controller: enablement as given, a connected fake channel, nothing shown. Its events run in order. {\"host\": <frame>} hands one host frame to the controller and lets it finish. {\"interrupt\": <kind>, \"before_unit\": k} arms the fake injector: when the next do is about to perform its unit number k (0 is before the first unit), the interrupt is raised from outside the controller, as the Esc tap, the stop button, the lock monitor or the channel reader do on their own threads; kinds: escape (a real Esc), stop_button, lock, hide (the host's hide of the shown session), channel_broken. {\"esc\": \"down\"|\"up\", \"injected\": bool, \"swallow\": bool} is one Esc key event at the tap; swallow is the expected answer of the tap (swallowed or passed on). A unit is one step of an action: one press and release of the combination per repeat of key, one character of type (a line break included), one line of scroll, one click of a click action (two for double_click, three for triple_click), one move. expect.units is the number of units the fake injector performed in the case's last do; expect.released_after says every key and button was released after that do ended; expect.sent lists, in order, the stop and done frames the helper sent after the last show (other frames such as state are ignored), each compared on the members given. frame_max_bytes, when present, is host_service.computer_frame_max_bytes for the case. 50 is the default of computer.key_repeat_max (27 section 18).",
+  "key_repeat_max": 50,
+  "cases": [
+    {
+      "name": "a long repeat runs to its end without an interrupt",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"host": {"op": "do", "seq": 1, "action": "key", "keys": "a", "repeat": 50}}
+      ],
+      "expect": {"units": 50, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "ok"}]}
+    },
+    {
+      "name": "an Esc pending before the first unit runs nothing",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "escape", "before_unit": 0},
+        {"host": {"op": "do", "seq": 1, "action": "key", "keys": "a", "repeat": 5}}
+      ],
+      "expect": {
+        "units": 0,
+        "released_after": true,
+        "sent": [
+          {"op": "stop", "session_id": "s1", "detail": "local_escape"},
+          {"op": "done", "seq": 1, "code": "invalid_action"}
+        ]
+      }
+    },
+    {
+      "name": "an Esc in the middle of a key repeat stops it",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "escape", "before_unit": 3},
+        {"host": {"op": "do", "seq": 1, "action": "key", "keys": "ctrl+a", "repeat": 50}}
+      ],
+      "expect": {
+        "units": 3,
+        "released_after": true,
+        "sent": [
+          {"op": "stop", "session_id": "s1", "detail": "local_escape"},
+          {"op": "done", "seq": 1, "code": "invalid_action"}
+        ]
+      }
+    },
+    {
+      "name": "the stop button in the middle of typed text stops it",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "stop_button", "before_unit": 4},
+        {"host": {"op": "do", "seq": 1, "action": "type", "text": "Alex at example.com"}}
+      ],
+      "expect": {
+        "units": 4,
+        "released_after": true,
+        "sent": [
+          {"op": "stop", "session_id": "s1", "detail": "indicator_stop"},
+          {"op": "done", "seq": 1, "code": "invalid_action"}
+        ]
+      }
+    },
+    {
+      "name": "a lock in the middle of a scroll answers screen_locked",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "lock", "before_unit": 2},
+        {"host": {"op": "do", "seq": 1, "action": "scroll", "x": 10, "y": 20, "direction": "down", "amount": 10}}
+      ],
+      "expect": {"units": 2, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "screen_locked"}]}
+    },
+    {
+      "name": "a lock pending before the first unit injects nothing",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "lock", "before_unit": 0},
+        {"host": {"op": "do", "seq": 1, "action": "left_click", "x": 10, "y": 20}}
+      ],
+      "expect": {"units": 0, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "screen_locked"}]}
+    },
+    {
+      "name": "a hide in the middle of a triple click ends it",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "hide", "before_unit": 1},
+        {"host": {"op": "do", "seq": 1, "action": "triple_click", "x": 10, "y": 20}}
+      ],
+      "expect": {"units": 1, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "invalid_action"}]}
+    },
+    {
+      "name": "a broken channel in the middle of a key repeat ends it",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"interrupt": "channel_broken", "before_unit": 2},
+        {"host": {"op": "do", "seq": 1, "action": "key", "keys": "Down", "repeat": 20}}
+      ],
+      "expect": {"units": 2, "released_after": true, "sent": []}
+    },
+    {
+      "name": "a repeat above key_repeat_max injects nothing",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"host": {"op": "do", "seq": 1, "action": "key", "keys": "a", "repeat": 51}}
+      ],
+      "expect": {"units": 0, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "invalid_action"}]}
+    },
+    {
+      "name": "a text longer than one frame injects nothing",
+      "enabled": true,
+      "frame_max_bytes": 64,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"host": {"op": "do", "seq": 1, "action": "type", "text": "Alex, Sam and Robin write to each other at example.com every day"}}
+      ],
+      "expect": {"units": 0, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "invalid_action"}]}
+    },
+    {
+      "name": "the Esc filter starts fresh with every show",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"esc": "down", "injected": false, "swallow": true},
+        {"host": {"op": "show", "session_id": "s2", "agent_name": "Alex"}},
+        {"esc": "down", "injected": false, "swallow": true}
+      ],
+      "expect": {"units": 0, "released_after": true, "sent": [{"op": "stop", "session_id": "s2", "detail": "local_escape"}]}
+    },
+    {
+      "name": "the Esc filter starts fresh after a hide",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"esc": "down", "injected": false, "swallow": true},
+        {"host": {"op": "hide", "session_id": "s1"}},
+        {"host": {"op": "show", "session_id": "s2", "agent_name": "Alex"}},
+        {"esc": "down", "injected": false, "swallow": true}
+      ],
+      "expect": {"units": 0, "released_after": true, "sent": [{"op": "stop", "session_id": "s2", "detail": "local_escape"}]}
+    },
+    {
+      "name": "the auto-repeat of one held Esc stops once",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"esc": "down", "injected": false, "swallow": true},
+        {"esc": "down", "injected": false, "swallow": true},
+        {"esc": "up", "injected": false, "swallow": true}
+      ],
+      "expect": {"units": 0, "released_after": true, "sent": [{"op": "stop", "session_id": "s1", "detail": "local_escape"}]}
+    },
+    {
+      "name": "an injected Esc passes and stops nothing",
+      "enabled": true,
+      "events": [
+        {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
+        {"esc": "down", "injected": true, "swallow": false},
+        {"esc": "up", "injected": true, "swallow": false},
+        {"host": {"op": "do", "seq": 1, "action": "key", "keys": "Escape", "repeat": 1}}
+      ],
+      "expect": {"units": 1, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "ok"}]}
+    }
+  ]
+}

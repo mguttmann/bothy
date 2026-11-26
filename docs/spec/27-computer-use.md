@@ -491,6 +491,26 @@ row is unverified for this helper and is probed by CU-02 (16):
 | Windows | the UAC prompt on the secure desktop and the secure attention sequence are out of reach of the user session; the helper reports `secure_desktop` (D-CU-01-12) |
 | both | input into a locked session (8.2) |
 
+### 9.6 Stop contract of the helpers
+
+Both helpers keep one contract, held by the conformance vectors
+`services/host/testdata/computer/stop-vectors.json`, which the Swift and the C++ controller tests
+both run (D-CU-02-16):
+
+1. Every action with steps (a press and release per `repeat` of `key`, a character of `type`, a
+   line of `scroll`, a click of a click action, a move) runs one step at a time. Before the first
+   step and before every later one the helper checks one interrupt flag, which the Esc tap, the
+   stop button, the lock monitor and the channel reader (`hide`, `disable`, a broken channel) set
+   directly on their own threads.
+2. When the flag is set, the helper performs no further step, releases every key and button, and
+   answers: `screen_locked` for a lock (the session stays), `invalid_action` after the `stop`
+   frame for a real Esc (`local_escape`) or the stop button (`indicator_stop`), `invalid_action`
+   for `hide` or `disable`, nothing on a broken channel.
+3. A `repeat` above the default of `computer.key_repeat_max` and a `text` longer than one frame of
+   `host_service.computer_frame_max_bytes` are `invalid_action` before any step.
+4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts or stops;
+   one held Esc stops once; an injected Esc passes and stops nothing.
+
 ## 10. Runner integration
 
 ### 10.1 When the tool is loaded
