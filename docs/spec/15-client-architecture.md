@@ -573,12 +573,14 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   through the Win32 WebAuthn API that the runner serves on the method channel `bothy/webauthn`,
   for any instance; the app writes the client data with the origin of the address the person
   connected to, so it needs no domain of the build; that origin must be one of
-  `auth.webauthn_origins`, as for a browser. The Mac app has no passkey port
+  `auth.webauthn_origins`, as for a browser, and the instance must have passkeys at all (an RP ID
+  and a secure context, [08](08-identity.md) 2.5). The Mac app has no passkey port
   (docs/decisions.d/M4-18.md D-M4-18-9).
 - **Step-up:** native apps sign a server challenge with a second device key that
   requires user confirmation (biometrics or PIN); a device without that key (Windows, section 9)
-  confirms with a passkey of the person when the app has a passkey port (V1-14), else sends
-  password and TOTP (`StepUpPrompt.askPassword`, [08](08-identity.md) 6.2) and
+  confirms with a passkey of the person when the app has a passkey port and the challenge
+  carries `passkey_options` (V1-14); without them, and when the platform gives no assertion (a
+  passkey stored on another device), it sends password and TOTP (`StepUpPrompt.askPassword`, [08](08-identity.md) 6.2) and
   stops asking when the password path is locked (reason `password_locked`); the web
   console uses WebAuthn passkeys. For
   `terminal.open` and `terminal.attach` the step-up is fresh and is consumed (08, section

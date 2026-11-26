@@ -8542,7 +8542,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleTerminalPasskeySetup =>
-      'Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Füge auf der Seite Anmeldung der Konsole einen Passkey hinzu und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
+      'Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Füge auf der Seite Anmeldung der Konsole einen Passkey hinzu und öffne das Terminal danach erneut. Die Apps auf macOS, iPhone und Android öffnen das Terminal stattdessen mit dem Geräteschlüssel; die Windows-App braucht ebenfalls einen Passkey.';
 
   @override
   String get consoleTerminalPasskeyClose => 'Schließen';

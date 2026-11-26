@@ -64,7 +64,8 @@ Done means:
    has a passkey); otherwise, and when the platform gives no assertion (a passkey stored on
    another device), password and TOTP as before (08 6.2). The terminal's fresh step-up
    takes the passkey too, because the server counts a passkey as fresh outside the console (08
-   6.3 item 2); without a passkey it ends before any request with `StepUpUnavailable`, and the
+   6.3 item 2); without a passkey it ends after the probing challenge and before the terminal's
+   open or attach request with `StepUpUnavailable`, and the
    terminal shows the hint to add a passkey under Settings, Sign-in.
 7. **Linking in the apps reuses the login's redirect.** `LoginService.linkIdentity` runs
    `beginIdentityLink` with the redirect URI and PKCE of the login ports, waits for the redirect

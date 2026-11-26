@@ -600,7 +600,8 @@ password with TOTP. The operations for the last two methods come with the consol
 (PLAN M6-01), spec first. A native app whose device has no active `step_up` key (Windows, 6.1,
 D-M4-11-2; a Mac without a Secure Enclave in the login keychain) confirms with a passkey when the
 app has a passkey port and `createStepUpChallenge` carries `passkey_options` (the Windows app over
-Windows Hello, V1-14), and otherwise with password and TOTP as well
+Windows Hello, V1-14), and otherwise, also when the platform gives no assertion (a passkey stored
+on another device), with password and TOTP as well
 (docs/decisions.d/FIX-stepup-macos.md); every other native app confirms with its `step_up` key and
 never with the password.
 

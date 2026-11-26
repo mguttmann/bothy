@@ -120,6 +120,7 @@ class _MySignInViewState extends State<MySignInView> {
   bool _loadFailed = false;
   bool _busy = false;
   SelfNotice? _notice;
+  int _loads = 0;
 
   @override
   void initState() {
@@ -128,16 +129,19 @@ class _MySignInViewState extends State<MySignInView> {
     _load();
   }
 
+  /// Loads the overview; only the answer of the latest load is shown, so an older answer that
+  /// arrives late does not replace a newer one.
   Future<void> _load() async {
+    final load = ++_loads;
     try {
       final c = await widget.repository.credentials();
-      if (!mounted) return;
+      if (!mounted || load != _loads) return;
       setState(() {
         _credentials = c;
         _loadFailed = false;
       });
     } on Object {
-      if (!mounted) return;
+      if (!mounted || load != _loads) return;
       setState(() => _loadFailed = true);
     }
   }
@@ -169,9 +173,13 @@ class _MySignInViewState extends State<MySignInView> {
       repository: widget.repository,
       mode: mode,
     );
-    if (notice == null || !mounted) return;
-    setState(() => _notice = notice);
-    widget.onChanged?.call();
+    if (!mounted) return;
+    // A cancel after the first step leaves a saved password with an unconfirmed code, so the
+    // overview loads again after every close.
+    if (notice != null) {
+      setState(() => _notice = notice);
+      widget.onChanged?.call();
+    }
     await _load();
   }
 

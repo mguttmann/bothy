@@ -405,7 +405,6 @@ class ConsoleController extends ChangeNotifier {
     environment.flowStore.delete(nameKey);
     final verifier = _takeVerifier(OidcFlowKind.link, query);
     if (_state is! ConsoleSignedIn) return;
-    _route = ConsoleRoute.ofPage(ConsolePage.signIn);
     final code = query['login_code'];
     final error = query['error'];
     var outcome = IdentityLinkOutcome.failed;
@@ -425,7 +424,9 @@ class ConsoleController extends ChangeNotifier {
         // A refused, expired or foreign identity: the page says the link was not made.
       }
     }
+    // The page reads the result once when it mounts, so it shows only after the result is set.
     _linkResult = (outcome: outcome, provider: provider);
+    _route = ConsoleRoute.ofPage(ConsolePage.signIn);
     notifyListeners();
   }
 

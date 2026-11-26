@@ -13633,7 +13633,7 @@ abstract class AppLocalizations {
   /// Web console terminal (ADR 0070 item 1, 08 section 6.3 item 3): the way to a passkey for a person without one; no other step-up opens a terminal in the console.
   ///
   /// In en, this message translates to:
-  /// **'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Add a passkey on the page Sign-in of the console, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.'**
+  /// **'Opening a terminal in the console needs a passkey with user verification, and your account has none yet. Add a passkey on the page Sign-in of the console, then open the terminal again. The apps on macOS, iPhone and Android open the terminal with the device key instead; the Windows app needs a passkey as well.'**
   String get consoleTerminalPasskeySetup;
 
   /// Web console terminal: button that closes the passkey notice.

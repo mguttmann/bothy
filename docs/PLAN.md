@@ -1327,7 +1327,7 @@ whose cause is read on the day; V1-10 to V1-12 depend on the state after A1-10. 
 starts one of them reads its row, the design note and `AGENTS.md`. V1-13 comes from the audit of
 2026-11-11 and runs from its row in the same way; it belongs to the maintainers of
 `services/host` (`.github/CODEOWNERS`), and a session that starts it reads the rulings of
-AUD-misc-misc-01 first. V1-14 comes from the owner decision of 2026-11-25 on issues #1426 and
+AUD-misc-misc-01 first. V1-14 comes from the owner decision on issues #1426 and
 #677 and runs from its row with the design note [sign-in-methods.md](design/sign-in-methods.md).
 
 ## 16. V2 Multi-user dev environment

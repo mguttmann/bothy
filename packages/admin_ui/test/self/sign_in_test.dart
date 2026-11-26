@@ -244,6 +244,20 @@ void main() {
     },
   );
 
+  testWidgets('a cancel after the first step shows the saved password', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tap(tester, 'signIn.password.set');
+    await type(tester, 'signIn.password.new', 'correct horse');
+    await type(tester, 'signIn.password.repeat', 'correct horse');
+    await tap(tester, 'signIn.password.submit');
+    expect(find.byKey(const ValueKey('signIn.totp.qr')), findsOneWidget);
+    await tap(tester, 'signIn.password.cancel');
+    expect(find.text('Local password set'), findsOneWidget);
+    expect(find.byKey(const ValueKey('signIn.totp.finish')), findsOneWidget);
+  });
+
   testWidgets('no password part without a local identity or local passwords', (
     tester,
   ) async {
