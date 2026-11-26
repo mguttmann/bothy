@@ -1948,7 +1948,7 @@ stage (D-CU-01-9).
 
 ### Exit criteria
 
-1. CU-T01 to CU-T24 of 27 section 15 are green; CU-T24 runs in Compose with the Linux test backend
+1. CU-T01 to CU-T25 of 27 section 15 are green; CU-T24 runs in Compose with the Linux test backend
    in CI.
 2. The native jobs on `macos-15` and `windows-2025` are green, or the probe of CU-02 showed that a
    hosted runner cannot prove capture and input on a platform and the gap stands in 27 section 16
@@ -1959,8 +1959,9 @@ stage (D-CU-01-9).
 
 ### Test strategy
 
-Host and MCP server: Go unit tests with fakes behind `Capturer`, `Injector`, `AppInspector`,
-`LockState` and `Enablement`, the frame and token tests, the race between the lock check and an
+Host and MCP server: Go unit tests with fakes behind the channel to the helper (the native
+helpers have their own fakes behind `Capturer`, `Injector`, `AppInspector`, `LockMonitor` and
+`EnablementStore`, CU-02), the frame and token tests, the race between the lock check and an
 action, chunking at the Noise limit, key release on every end. Server: one test per refusal of
 SR13 and per end path against PostgreSQL, the sentinel test. Runner: the per-turn MCP file, the
 request folder, the end of the Claude Code session against the recorded layout of the pinned CLI.
@@ -2004,8 +2005,8 @@ depends on the pinned CLI's layout. RISKS.md is updated at the close of the stag
 |---|---|---|---|---|---|
 | CU-01 | Specification, ADR, decisions and briefs | Chapter 27, 07 2.15 and SR13, the tables of 03, the threat model, the `never` rows of 01 and SPEC sections 4 to 6 per OR-1; ADR 0078; the rulings; briefs CU-02 to CU-07; the brief and configuration tools accept stage CU. | `docs/`, `tools/docs/`, `tools/configdoc/`, `services/server/architecture/modules.yaml`, `services/server/internal/wire` (retention coverage) | `make docs`, `make catalog-check`, `make config-doc-check`, `make diagrams`, `make register-check` and the brief tests green | none |
 | CU-02 | Computer helpers for macOS and Windows | Swift helper and C++ helper: capture, input, app identity, lock state, keeping awake, Esc tap, indicator with stop, enablement switch with generation, the helper side of the local channel, packaging into the host `.pkg` and MSI, signing in `release.yml`, the probe job and native jobs in `host-platform.yml` (27 4, 9). | `services/host/desktop/`, `services/host/Makefile`, `tools/distribution/`, `.github/workflows/release.yml`, `.github/workflows/host-platform.yml` | the helper tests of CU-T13 to CU-T16 against the fake channel; native jobs or the recorded probe result | none |
-| CU-03 | Host service: computer sessions and frames | The frame types of 27 6.3, the session kind `computer` with the checks of 5.3, enablement report, controller lock, pause, coordinate mapping, chunking, the local channel with the peer rule of 9.4, `hd12_computer_helper`, the Linux test backend. | `services/host/internal/frame`, `services/host/internal/computer`, `services/host/internal/session`, `services/host/internal/control`, `services/host/internal/doctor`, `services/host/test/` | CU-T07 to CU-T16, CU-T23 | none |
-| CU-04 | Server: computer sessions | Catalogue rows, operations, host ops and events of 27 12; migrations for `computer_sessions` and the `hosts` columns; SR13; the attach token; relay pairing; enablement mirror and remote disable; run binding and revocation in the transaction; audit; the sentinel test. | `services/server/internal/terminal`, `internal/runs` (end hook), `internal/authz`, migrations, `docs/api/`, `docs/spec/actions.yaml`, `services/server/api/operations.yaml` | CU-T01 to CU-T06, CU-T16 to CU-T18 server parts | none |
+| CU-03 | Host service: computer sessions and frames | The frame types of 27 6.3, the session kind `computer` with the checks of 5.3, enablement report, controller lock, pause, coordinate mapping, chunking, the local channel with the peer rule of 9.4, the doctor section `computer`, the refusal of the owner account mode, the Linux test backend. | `services/host/internal/frame`, `services/host/internal/computer`, `services/host/internal/session`, `services/host/internal/control`, `services/host/internal/doctor`, `services/host/test/` | CU-T07 to CU-T16, CU-T23 | none |
+| CU-04 | Server: computer sessions | Catalogue rows, operations, host ops and events of 27 12; migrations for `computer_sessions` and the `hosts` columns; SR13; the attach token; relay pairing; enablement mirror and remote disable; run binding and revocation in the transaction; audit; the sentinel test. | `services/server/internal/terminal`, `internal/runs` (end hook), `internal/authz`, migrations, `docs/api/`, `docs/spec/actions.yaml`, `services/server/api/operations.yaml` | CU-T01 to CU-T06, CU-T16 to CU-T18 server parts, CU-T25 | none |
 | CU-05 | MCP server `bothy-computer-mcp` | `stdio` MCP server with the tools of 27 7, Noise initiator with per-runner pinning, image reassembly, the request folder client, codes and the data line. | `services/host/cmd/bothy-computer-mcp/`, `services/host/internal/computermcp/` | CU-T19, CU-T20 | CU-03, CU-04 |
 | CU-06 | Runner integration and end to end | `runner.computer_use`, the per-turn MCP file, the request folder with nonce, the system prompt block, the end of the Claude Code session after a computer run, the probes of 27 16 for the CLI, the Compose end-to-end test with the Linux backend. | `plugins/claude-code-runner`, `infra/compose/`, `tests/e2e/` | CU-T21, CU-T22, CU-T24 | CU-05 |
 | CU-07 | Clients: status, stop and desktops | Status chip with pause state and stop, the desktop list with "Switch enablement off", the tray entry; desktop, phone and console where 01 3.9 names them. | `apps/client/lib/computer/`, `apps/client/lib/desktop/tray.dart`, `packages/admin_ui`, Dart client | widget and integration tests per platform against the Dart fake server | CU-04 |
@@ -2025,4 +2026,3 @@ Launch arguments for the build workflow (brief files as in the [brief index](bri
   ]
 }
 ```
-

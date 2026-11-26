@@ -4,7 +4,7 @@ Status: ready | Depends on: none (specification merged) | Milestone: CU
 
 ## Goal
 
-After this ticket `bothy-host` conducts computer sessions: the frame types of `docs/spec/27-computer-use.md` 6.3 with their directions, the session kind `computer` with the Noise prologue `bothy-computer/1` and the host checks of 5.3, the host control ops `computer.open`, `computer.close`, `computer.disable`, `computer.started`, `computer.state`, `computer.ended` and the `computer` object of `report`, the enablement mirror, one controller per host, the pause while locked, the coordinate mapping with scale IDs, image chunking at the Noise limit, the local channel to the helper with the peer rule of 9.4, the doctor check `hd12_computer_helper`, and a Linux test backend of the helper (Python, Xlib and XTest) for the end-to-end test.
+After this ticket `bothy-host` conducts computer sessions: the frame types of `docs/spec/27-computer-use.md` 6.3 with their directions, the session kind `computer` with the Noise prologue `bothy-computer/1` and the host checks of 5.3, the host control ops `computer.open`, `computer.close`, `computer.disable`, `computer.started`, `computer.state`, `computer.ended` and the `computer` object of `report`, the enablement mirror, one controller per host, the pause while locked, the coordinate mapping with scale IDs, image chunking at the Noise limit, the local channel to the helper with the peer rule of 9.4, the doctor section `computer`, and a Linux test backend of the helper (Python, Xlib and XTest) for the end-to-end test.
 
 ## Read first
 
@@ -47,16 +47,16 @@ Product requirements implemented here:
 
 13. `frame.Decode` takes the session kind: on a `computer` session it accepts exactly `close` and the types `0x20` to `0x25` with their directions and contents; on a terminal session it refuses them, and the reverse (CU-T09). The terminal behaviour is unchanged byte for byte (the existing frame and recording tests stay green).
 14. Session kind `computer`: the data connection `/api/v1/hosts/computer-sessions/{session_id}/stream` after `computer.open`, the checks of 5.3 in their order with their close codes and details, `cu_state` after message 2, `computer.started`, `computer.state`, `computer.ended` with action counts, app identities (bounded by the server value it got) and `paused_ms`; the attach token verified with the JWKS of purpose `terminal` and `typ = computer-session+jwt`.
-15. Enablement: the helper's `hello` and `state` become the `report` object `computer` (27 12.3); `computer.disable` goes to the helper as `disable`; with `host_service.computer_use` off nothing listens and `report` says `helper: absent`.
+15. Enablement: the helper's `hello` and `state` become the `report` object `computer` (27 12.3, with `locked`, and `helper: refused` after a refused peer); `computer.disable` goes to the helper as `disable`; with `host_service.computer_use` off nothing listens and `report` says `helper: absent`. `computer.state` carries `action_count` and `front_app`, sent on every state change and at most every `computer.status_interval` (from `settings`) while actions run.
 16. One controller per host: a lock held for the life of a session; a second `computer.open` answers `computer.ended` `open_failed` with `busy`.
 17. Pause: `locked` from the helper sets `paused`, drops pending actions, sends `release`, `cu_state` and `computer.state`; actions answer `screen_locked`; the unlock resumes.
 18. Coordinates: a `scale_id` per distinct geometry from `done.screen`, kept for the session; actions map back with the factor and round inside the screen; an unknown or outdated `scale_id` answers `stale_screenshot`, a point outside the image `invalid_action` (CU-T11, CU-T12). `wait` and `cursor_position` are answered by the host service itself (`wait` up to `computer.wait_max`, then a capture).
 19. Images: `cu_result`, then `cu_image_begin`, `cu_image_data` frames of at most 65518 bytes and `cu_image_end` (CU-T10); images only in memory, never on disk; the automatic image after `computer.settle` when `auto_screenshot` is on.
 20. Ends: every end path of 27 8.3 that the host sees (`done`, Esc, indicator stop, `computer.close`, disable, local switch-off, lost connection, stream fault, helper crash) sends `release` and `hide`, `cu_state` `stopped` and `computer.ended` once (CU-T16 host part).
-21. Local channel (27 9.4): endpoint only with `host_service.computer_use`, created by `install`; the peer rule (console user, not the service user or a session user, executable at the installed helper path whose file and folder chain belong to a trusted owner as in HD10, and the code signing requirement of the build when it carries one); refused peers are logged with `computer_peer_refused` (CU-T23); the codec reads every channel vector and refuses frames above `host_service.computer_frame_max_bytes`.
-22. Doctor `hd12_computer_helper` with codes for: not installed, untrusted path, unsigned development build, not connected, switched off, a permission missing; reported in `report` like the other checks; HD1 to HD11 unchanged.
+21. Local channel (27 9.4): endpoint only with `host_service.computer_use`, created by `install`; the configuration is refused with `host_service.computer_use` and `host_service.owner_account` together; on Linux only the test peer of `host_service.computer_test_peer` (empty admits nobody); the peer rule (console user, not the service user or a session user, executable at the installed helper path whose file and folder chain belong to a trusted owner as in HD10, and the code signing requirement of the build when it carries one); refused peers are logged with `computer_peer_refused` (CU-T23); the codec reads every channel vector and refuses frames above `host_service.computer_frame_max_bytes`.
+22. `bothy-host doctor` prints a section `computer` (installed, trusted path, signed or development build, connected, switched on, each permission); it is no HD check, because the server accepts exactly HD1 to HD11 in `report` (24 3.5), and the same state reaches the server only in the `report` object `computer`.
 23. Linux test backend `services/host/test/computer_backend/` in Python with Xlib and XTest (python-xlib), speaking the channel protocol over the same endpoint as the helper, plus a fixture app with known buttons; used by the Compose end-to-end test of CU-06.
-24. Configuration keys `host_service.computer_use` and `host_service.computer_frame_max_bytes` in the host configuration with their defaults of 27 section 18.
+24. Configuration keys `host_service.computer_use`, `host_service.computer_frame_max_bytes` and `host_service.computer_test_peer` in the host configuration with their defaults of 27 section 18.
 ## Scope
 
 All paths under `services/host/` unless they start with `docs/` or `tools/`.
@@ -68,7 +68,7 @@ Create:
 
 Change:
 
-- `internal/frame` (computer types, kind-aware decode), `internal/session` and `internal/control` (the new ops and data path), `internal/config` (the two keys), `internal/doctor` (`hd12_computer_helper`), `internal/install` (endpoint folder), `cmd/bothy-host`, `services/host/README.md`, `docs/spec/27-computer-use.md` where the code needs a precise name, `docs/operations/configuration.md` through `make config-reference`.
+- `internal/frame` (computer types, kind-aware decode), `internal/session` and `internal/control` (the new ops and data path), `internal/config` (the two keys), `internal/doctor` (section `computer`), `internal/install` (endpoint folder), `cmd/bothy-host`, `services/host/README.md`, `docs/spec/27-computer-use.md` where the code needs a precise name, `docs/operations/configuration.md` through `make config-reference`.
 
 ## Out of scope
 
@@ -100,7 +100,7 @@ Change:
 
 ## Tests (write them first)
 
-- Go unit tests: frame encode, decode and directions per kind (CU-T09); chunking edges (CU-T10); scale mapping with factors 1, 2, 1.25, 1.5 and a non-zero origin (CU-T11); `stale_screenshot` and `invalid_action` (CU-T12); pause and resume with key release (CU-T13); the host checks of 5.3 one by one with close code and detail (CU-T07), the terminal token on a computer connection and the reverse (CU-T08); every end path with `release`, `hide` and exactly one `computer.ended` (CU-T16 host part); the peer rule with a fake process table (CU-T23); the channel vectors; `hd12_computer_helper` codes.
+- Go unit tests: frame encode, decode and directions per kind (CU-T09); chunking edges (CU-T10); scale mapping with factors 1, 2, 1.25, 1.5 and a non-zero origin (CU-T11); `stale_screenshot` and `invalid_action` (CU-T12); pause and resume with key release (CU-T13); the host checks of 5.3 one by one with close code and detail (CU-T07), the terminal token on a computer connection and the reverse (CU-T08); every end path with `release`, `hide` and exactly one `computer.ended` (CU-T16 host part); the peer rule with a fake process table (CU-T23); the channel vectors; the doctor section `computer`; the refused combination with `host_service.owner_account`.
 - An integration test of the host service against the test server of `internal/control` tests with a fake helper on the real endpoint in a temporary folder.
 - Python tests of the Linux backend against Xvfb where available in CI.
 

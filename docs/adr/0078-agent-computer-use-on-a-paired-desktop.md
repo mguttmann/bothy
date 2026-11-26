@@ -83,7 +83,7 @@ action, key, app or setting is refused by Bothy; what the operating system refus
 
 ### Confirmation
 
-- Tests CU-T01 to CU-T24 of 27 section 15: guards of `computer.open` and `computer.attach`
+- Tests CU-T01 to CU-T25 of 27 section 15: guards of `computer.open` and `computer.attach`
   (not an owner run, a wake or team run, a disabled or foreign desktop, a revoked owner, an ended
   run, a replayed token), frames and directions, coordinate mapping, chunking at the Noise limit,
   pause and resume, every stop path with no key left pressed, the sentinel test that finds no image

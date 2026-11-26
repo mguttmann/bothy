@@ -166,14 +166,17 @@ session tokens.
 | `own` | `true`; the server issues no token otherwise |
 | `gen` | the enablement generation the server listed the desktop with |
 
-The token reaches only C1, never the model and never the turn's environment (section 10.2). It is
-used once; the session lives on after `exp` (section 8.1).
+The runner hands the token only to C1, never into the model's context or the turn's environment
+(section 10.2). A `host` turn runs as the same operating system user and could read C1's answer
+files; the single use, the `cek` binding and the run binding keep such a copy worthless once C1
+attached. The session lives on after `exp` (section 8.1).
 
 ### 5.3 Checks on the host
 
 For message 1 of a computer data connection the host service runs these steps; the first failure
 wins, nothing after it runs, and it closes the data connection with the close code and
-`close_detail` of 24 5.3 (`4101` for `token_expired` and `token_replayed`, `4104` otherwise):
+`close_detail` of 24 5.3: `4101` for `token_expired`, `token_replayed`, `helper_absent`,
+`not_enabled` and `busy` (no tampering; the agent may open again later), `4104` otherwise:
 
 | Step | Check | `close_detail` |
 |---|---|---|
@@ -274,7 +277,7 @@ retrieved 2026-11-26 [unverified in detail]) where it has the action.
 
 | Tool | Parameters and behaviour |
 |---|---|
-| `list_desktops` | the desktops of the run's owner: name, host ID, platform, online, locked, busy |
+| `list_desktops` | the desktops of the run's owner: name, host ID, platform, online, `locked` (from `report.computer`), busy |
 | `open_session` | `desktop` (name or host ID); opens the session of this run (5.1) |
 | `screenshot`, `zoom`, `left_click`, `right_click`, `middle_click`, `double_click`, `triple_click`, `mouse_move`, `cursor_position`, `scroll`, `type`, `key`, `wait` | the actions of 6.4 with the same arguments |
 | `batch` | a list of actions run in order; the first failure stops it, every later item answers "Not executed: an earlier computer action in this turn failed."; one image at the end |
@@ -337,15 +340,16 @@ limit on actions (D-CU-01-8).
 
 1. Every end is final. In the same transaction the server writes `closed`, the reason and the audit
    entry, ends the relay (`4100` with the reason) and sends `computer.close` to the host; a host
-   that was offline gets it with its next `identify` (its `live_sessions` no longer name the
-   session, 24 6.2).
+   that was offline still names the session in the `live_sessions` of its next `identify`, and the
+   server answers with `computer.close` (24 6.2).
 2. The helper drops pending input, releases every pressed key and mouse button, hides the indicator
    and stops keeping the display awake; it does the same when its channel to C3 breaks and when it
    starts (a helper that crashed leaves nothing pressed after its restart).
-3. Revocations reach computer sessions through the same three in-transaction subscriptions of the
-   module as terminal sessions (24 8.3, M2-46): `authorize.AccessChanged` (lost owner role),
-   `identity.SessionEnded` with `user_disabled`; the end of a run comes from the module `runs` in
-   the transaction that ends the run; host state changes from `terminal` itself.
+3. Revocations reach computer sessions through the in-transaction subscriptions of the module of
+   24 8.3 (M2-46): `authorize.AccessChanged` (lost owner role) and `identity.SessionEnded` with
+   `user_disabled`; `identity.DeviceRevoked` ends nothing, because no device holds the session. The
+   end of a run reaches them through a new port that `runs` calls in the transaction that ends the
+   run (CU-04); host state changes come from `terminal` itself.
 4. Esc: the helper swallows a real Esc, ends the session and reports `local_escape`. An Esc the
    helper sends itself on behalf of the agent never stops (macOS: the event's source state;
    Windows: `LLKHF_INJECTED`; 9.5 marks both unverified with the helper).
@@ -375,7 +379,7 @@ session on the same host is no conflict.
   release test compares the designated requirement of the signed helper with the previous release,
   because a changed requirement silently voids the grants.
 - Indicator: a border window around the screen with a stop button, a menu bar item "Agent <name>
-  controls this Mac, Esc to stop", and the system's own recording indicator.
+  controls this computer, Esc to stop", and the system's own recording indicator.
 
 ### 9.2 Windows
 
@@ -397,18 +401,32 @@ session on the same host is no conflict.
 
 The helper ships with the host service's packages: macOS in the host `.pkg` (`release-apple` of
 `services/host/Makefile`), Windows in the host MSI (`release-windows`). Both packages set
-`host_service.computer_use` only when the person installing selects the helper component. A new
-doctor check `hd12_computer_helper` of `bothy-host doctor` reports: helper installed and trusted
-(9.4), connected, enabled, the permissions of 9.1 granted, signed or a development build. A build
+`host_service.computer_use` only when the person installing selects the helper component. `bothy-host
+doctor` prints a section `computer` (no HD check: the doctor list of 24 3.5 stays HD1 to HD11 and the
+server refuses another): helper installed and trusted (9.4), connected, enabled, the permissions of
+9.1 granted, signed or a development build; the same state goes to the server in the `report` object
+`computer` (12.3). A build
 without a signing identity is for development only and says so in the doctor and in the report
 (D-CU-01-22).
 
 ### 9.4 Local channel between host service and helper
 
+Not in the owner account mode (24 2.4, ADR 0073): there the host service runs as the console user,
+which the peer rule below must refuse, and its `install` runs without root, so it cannot create the
+endpoint folder. The host service refuses to start with `host_service.computer_use` and
+`host_service.owner_account` together (a configuration error naming both keys); computer use needs
+the normal mode with a service user (D-CU-01-26).
+
+
 - Endpoint, opened only with `host_service.computer_use`: macOS
   `/Library/Application Support/bothy-host/computer/computer.sock` (folder created by `install`,
   owned by the service user, socket mode `0666`); Windows the named pipe
   `\\.\pipe\bothy-host-computer` with `PIPE_REJECT_REMOTE_CLIENTS`. Never a TCP or UDP listener.
+  Linux has no helper; for the test backend of CU-03 only, the host service opens
+  `/run/bothy-host-computer/computer.sock` and admits exactly the peer user named in
+  `host_service.computer_test_peer` (empty by default, so Linux admits nobody); the path and
+  signature parts of the peer rule do not apply there, and the doctor reports the key as a test
+  setting.
 - Peer rule (D-CU-01-24), at the connection and again before every session: the peer is the user of
   the active console session (the rule of the confirmation agent, 24 6.4), not the service user and
   not a session user of `host_service.session_users`; its executable is the installed helper path,
@@ -466,19 +484,34 @@ starts a `stdio` server from `--mcp-config` in a background session is a probe o
 
 The per-turn file `<runner.state_dir>/turns/<run_id>.computer.mcp.json` (mode `0600`, removed when
 the turn ends and swept at start) names one server `bothy_computer` with `type` `stdio`, the
-absolute path of `runner.computer_mcp_bin`, no arguments, and in `env` only `BOTHY_COMPUTER_DIR` and
-`BOTHY_COMPUTER_NONCE`.
+absolute path of `runner.computer_mcp_bin`, no arguments, and in `env` exactly
+`BOTHY_COMPUTER_DIR` (the request folder of 10.2), `BOTHY_COMPUTER_NONCE` (the run's nonce),
+`BOTHY_COMPUTER_TIMEOUT_MS` (`runner.computer_request_timeout` in milliseconds) and
+`BOTHY_COMPUTER_PINS` (the absolute path of the pin file of 10.4).
 
 ### 10.2 Requests through the runner
 
-The pattern of `bothy-wake` (09 18.19.8): C1 writes a request file into
-`<runner.state_dir>/computer-requests/<run_id>/` (mode `0700`, outside every working folder) with a
-fresh UUID as name, the request (`list` or `open` with host ID and `client_ephemeral_key_hash`) and
-the run's nonce; the runner accepts it only when the nonce equals the one it generated for this run,
-calls `computer.desktops.list` or `computer.open` with the run's agent token and invocation token,
-and writes the answer next to the request. C1 waits at most `runner.computer_request_timeout`. The
-agent token, the DPoP key and the invocation token never reach C1 or the turn; only the single-use
-attach token and the host's key data do.
+The pattern of `bothy-wake` (09 18.19.8), with this file contract:
+
+1. Folder `<runner.state_dir>/computer-requests/<run_id>/` (mode `0700`, outside every working
+   folder), created by the runner before the turn and removed when the run left the runner.
+2. C1 writes `<uuid>.request.json` atomically (a file `<uuid>.request.json.tmp`, then a rename in
+   the same folder; `<uuid>` a fresh UUID): `{"v": 1, "nonce": ..., "op": "list"}` or
+   `{"v": 1, "nonce": ..., "op": "open", "host_id": ..., "client_ephemeral_key_hash": ...,
+   "pin_changed": true|false}`. Unknown members or another `v` are refused.
+3. The runner accepts a request only when `nonce` equals the run's nonce, calls
+   `computer.desktops.list` or `computer.open` with the run's agent token, DPoP proof and
+   invocation token, and writes `<uuid>.answer.json` atomically the same way: on success
+   `{"v": 1, "ok": true, "result": <the answer body of 12.2>}`, on a refusal
+   `{"v": 1, "ok": false, "status": <HTTP status>, "code": <problem code>, "reason": <reason or
+   null>}`, on a wrong nonce or a malformed request `{"v": 1, "ok": false, "status": 0, "code":
+   "request_refused", "reason": null}`.
+4. C1 waits for the answer file at most `BOTHY_COMPUTER_TIMEOUT_MS`, reads it and deletes both
+   files; a timeout answers the tool call with `host_offline` and leaves the files for the runner's
+   sweep.
+
+The agent token, the DPoP key and the invocation token never reach C1 or the turn; only the
+single-use attach token and the host's key data do.
 
 ### 10.3 System prompt block
 
@@ -499,11 +532,15 @@ with `host_key_mismatch` before message 1 (D-CU-01-18).
 
 ### 10.5 End of a computer run
 
-After a run that opened at least one computer session, the runner ends the thread's Claude Code
-session once the turn's process is gone (print mode) or the background session is stopped and
-removed (`claude stop`, `claude rm`): it deletes the session's transcript and its tool result files
-under the CLI's configuration folder, reports the session as ended (`agent_session.report`), and the
-thread's next run starts a new session with the thread context of 09 4.6 (D-CU-01-20). A failure to
+After a run that opened at least one computer session:
+
+1. The server, in the transaction that ends the run, ends the thread's current agent session with
+   `end_reason = 'computer_use'` (03 `agent_sessions`) and writes `agent_session.changed`, so the
+   thread's next run gets `session.mode = new` and starts a new Claude Code session with the
+   thread context of 09 4.6 (CU-04).
+2. The runner, once the turn's process is gone (print mode) or the background session is stopped
+   and removed (`claude stop`, `claude rm`), deletes that session's transcript and its tool result
+   files under the CLI's configuration folder (D-CU-01-20, CU-06). A failure to
 delete is logged with `computer_transcript_left` and named in the next run's live box; it never
 blocks the next run. The exact file layout of the pinned CLI is recorded by CU-06 (16).
 
@@ -553,12 +590,12 @@ WebSocket channels: `computerAttach` at `/api/v1/computer/sessions/{session_id}/
 
 | Op | Direction | Content |
 |---|---|---|
-| `report` | host to server | gains `computer`: `{helper: "connected" or "absent", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development"}`; each permission `granted`, `denied` or `unknown` |
-| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, data_path, expires_at, settings}`; `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max` |
+| `report` | host to server | gains `computer`: `{helper: "connected", "absent" or "refused", enabled, generation, os_account, permissions: {capture, input}, helper_version, signature: "verified" or "development", locked}`; each permission `granted`, `denied` or `unknown`; this object, not a doctor check, carries the helper state (the doctor list of 24 3.5 stays HD1 to HD11) |
+| `computer.open` | server to host | `{session_id, run_id, agent_id, agent_name, user_id, data_path, expires_at, settings}`; `user_id` is the triggering owner (`sub` of the token); `settings` carries `image_max_edge`, `jpeg_quality`, `settle_ms`, `auto_screenshot`, `wait_max_ms`, `key_repeat_max`, `audit_apps_max` |
 | `computer.close` | server to host | `{session_id, reason}` |
 | `computer.disable` | server to host | `{generation}` |
 | `computer.started` | host to server | `{session_id, state}` with `active` or `paused` |
-| `computer.state` | host to server | `{session_id, state, reason}` |
+| `computer.state` | host to server | `{session_id, state, reason, action_count, front_app}`; sent on every state change and at most every `computer.status_interval` while actions run, so the chip shows the frontmost app and the count |
 | `computer.ended` | host to server | `{session_id, close_reason, close_detail, action_counts, apps, paused_ms}` |
 
 The host service sends only the close reasons `done`, `stopped_by_user`, `device_disabled`,
@@ -573,7 +610,9 @@ The host service sends only the close reasons `done`, `stopped_by_user`, `device
 - Refusals: `403 forbidden` with `reason` `computer_not_owner_run` (SR13), `computer_tool_class`
   (SR2), `computer_not_enabled` (section 4 item 3); `409 conflict` with `reason` `computer_busy`
   or `computer_run_busy`; `409 host_unavailable`; `404 not_found`; `invocation_token_invalid` as SR9.
-  C1 maps them to `not_owner_run`, `not_enabled`, `busy` and `host_offline`.
+  C1 maps `computer_not_owner_run`, `computer_tool_class` and `invocation_token_invalid` to
+  `not_owner_run`, `computer_not_enabled` and `404 not_found` to `not_enabled`, `computer_busy` and
+  `computer_run_busy` to `busy`, and `host_unavailable` to `host_offline`.
 
 ## 13. Audit, events, privacy
 
@@ -636,6 +675,7 @@ the thread (the agent reports it).
 | CU-T22 | Runner: end of a computer run against the recorded layout of the pinned CLI | transcript and tool result files of the session removed, the next run in a new session |
 | CU-T23 | Peer rule of 9.4: the service user, a session user, a process of another user, a copy of the helper outside the installed path, an unsigned helper when a requirement is set | refused with `computer_peer_refused` |
 | CU-T24 | End to end in Compose with the Linux test backend (Xvfb, XTest) and a fixture app: open, click, type, zoom, pixel check, a simulated lock with pause and resume, stop | green without a model, scripted agent |
+| CU-T25 | A follow-up of another person into a run before it opens a session, and while it holds one (`followups = steer`) | open refused with `computer_not_owner_run`; the follow-up is not delivered while the session is open and stays `deferred` |
 
 ## 16. Points the build probes
 
@@ -686,8 +726,10 @@ Claude Code runner; Host service = configuration of `bothy-host` on the host.
 | `computer.wait_max` | Server | `60s` | longest `wait` of one action (6.4) |
 | `computer.key_repeat_max` | Server | `50` | highest `repeat` of one `key` action (6.4) |
 | `computer.audit_apps_max` | Server | `32` | most app identities in the audit entry of an end (13.1) |
+| `computer.status_interval` | Server | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) |
 | `host_service.computer_frame_max_bytes` | Host service | `67108864` | longest frame on the helper channel, an image included (9.4); the host service closes a channel that sends a longer one |
 | `runner.computer_use` | Runner | `false` | load `bothy-computer-mcp` in `host` turns (10.1) |
 | `runner.computer_mcp_bin` | Runner | empty | absolute path of `bothy-computer-mcp`; required with `runner.computer_use` (10.1) |
-| `runner.computer_request_timeout` | Runner | `30s` | longest wait of the MCP server for the runner's answer (10.2) |
-| `host_service.computer_use` | Host service | `false` | open the helper channel and accept computer sessions (4, 9.4) |
+| `runner.computer_request_timeout` | Runner | `30s` | longest wait of the MCP server for the runner's answer, passed as `BOTHY_COMPUTER_TIMEOUT_MS` (10.1, 10.2) |
+| `host_service.computer_use` | Host service | `false` | open the helper channel and accept computer sessions (4, 9.4); refused together with `host_service.owner_account` |
+| `host_service.computer_test_peer` | Host service | empty | Linux only, tests only: the user whose process may act as the helper (9.4); empty admits nobody |

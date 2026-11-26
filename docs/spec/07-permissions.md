@@ -330,8 +330,11 @@ Normative together with [27-computer-use.md](27-computer-use.md) (stage CU, owne
    switches the enablement of any host off (`computer.device.disable`), from any device, without
    step-up: both only end or prevent control. Switching on is no action of the API; it happens
    only at the machine (27 4).
-5. The triggering owner reads the own computer sessions (`computer.session.read`); every reader of
-   the host sees its listed state through `host.read`.
+5. The triggering owner reads the own computer sessions (`computer.session.read`); the enablement
+   state and the reported `computer` object of a host go only to active owners with `host.read`
+   (the host assignee and grant holders see the host without them).
+6. `computer.attach` carries no agent token: the attach token is its credential, and the server
+   applies SR9's run check and SR13 to the run and agent named in the token's claims.
 
 The actions below enter `docs/spec/actions.yaml` with CU-04, which builds them, with exactly these
 values (R-AZ-38).
@@ -428,6 +431,9 @@ reveals nothing (never with `404`).
 | `i6_violation` | `invariant_violation` | the change would violate I6; problem code `i6_violation` (`409`) |
 | `terminal_no_session_user` | `forbidden` | SR12: the person has no valid mapping on the host to an own session user that the host reports, even as an owner; problem code `terminal_denied` with `reason: no_session_user` |
 | `terminal_owner_account_owner_only` | `forbidden` | SR12 with ADR 0073: the person's session user on the host is the owner account (the instance owner's own account with administrator rights), and the person is no active owner; problem code `terminal_denied` with `reason: owner_account_owner_only` |
+| `computer_not_owner_run` | `forbidden` | SR13 items 1 to 3 and 5: not an active owner's own `message` or `command` run, or fed by another person; problem code `forbidden` with `reason: computer_not_owner_run` |
+| `computer_tool_class` | `forbidden` | SR13 item 1: the run's tool class is not `host`; `reason: computer_tool_class` |
+| `computer_not_enabled` | `forbidden` | SR13 item 4: the host is no enabled desktop of that owner; `reason: computer_not_enabled` |
 | `terminal_profile_unknown` | `forbidden` | profile not in `hosts.reported_profiles`, or an index of no working directory of the own session user (`hosts.reported_session_users`); problem code `terminal_denied` with `reason: profile_unknown` |
 | `terminal_session_limit` | `forbidden` | `terminal.max_sessions_per_person` or `terminal.max_sessions_per_host` reached; problem code `terminal_denied` with `reason: session_limit` |
 | `terminal_step_up_not_fresh` | `step_up_required` | step-up older than `terminal.step_up_max_age`, already consumed or (console) not by passkey; in the console the quick reattach without step-up never applies |
@@ -981,22 +987,28 @@ session user would make every subscription login in it usable for all terminal u
 hold at the moment of the check (owner ruling OR-1 of 2026-11-26, [27-computer-use.md](27-computer-use.md)):
 
 1. The run is active and bound by SR9, and its tool class is `host` (SR2).
-2. The run's `trigger_kind` is `message` or `command`, and its trigger is a message with
-   `origin = 'human'` written by the run's `triggered_by`. Wake runs, team runs, runs from an
-   interaction and runs of an app or another agent never qualify.
+2. The run's `trigger_kind` is `message` with a triggering message of `origin = 'human'` written by
+   the run's `triggered_by`, or `command` with a command that `triggered_by` invoked in a session
+   (`triggering_command_id`). Wake runs, team runs, runs from an interaction and runs of an app or
+   another agent never qualify.
+5. Every input the run took so far was given by `triggered_by` (03 `run_feeders`): a run that a
+   follow-up, interaction or deferred follow-up of another person fed never opens or attaches a
+   session. While a run has a non-closed computer session, a follow-up of any other person is not
+   delivered into it (it stays `queued`, then `deferred`, 09 7), whatever `followups` says.
 3. `triggered_by` is an active owner, with the owner status from the current owner list (the check
    without a request, R-AZ-29).
 4. For `computer.open` and `computer.attach`: the host is a desktop of that owner (27 4 item 3:
    active, connected, enabled by the helper with a generation above
    `hosts.computer_disabled_generation`, `assigned_user_id` NULL or the owner).
 
-Otherwise `403 forbidden` with `reason: computer_not_owner_run` (items 1 to 3; item 1's tool class
-as `reason: computer_tool_class`) or `reason: computer_not_enabled` (item 4). Checked at every
+Otherwise `403 forbidden` with `reason: computer_not_owner_run` (items 1 to 3 and 5; item 1's tool
+class as `reason: computer_tool_class`) or `reason: computer_not_enabled` (item 4); a host that is
+not `active` or not connected is `409 host_unavailable` before item 4. Checked at every
 request; a lost owner status ends the person's computer sessions in the transaction of the change
 (`access_revoked`), the end of the run ends its session in the transaction that ends the run
 (`run_ended`). Reason: the owner's order is the consent (OR-1); a prompt injection in any other
 run (another trigger, an automatic input, another agent, another person) must never reach a
-desktop (T-CU-01, T-TM-09).
+desktop (T-CU-01, T-TM-09). A follow-up is the other way a person could type into such a run, hence item 5.
 
 ## 6. Read horizon of agents
 
@@ -1530,8 +1542,9 @@ DM between Alex and Sam. The clock is controllable in tests.
 | AZ-M63 | Runner agent in a wake run of Alex | desktop R1 enabled | `computer.open` | `trigger_kind = 'wake'` | `forbidden` `computer_not_owner_run` |
 | AZ-M64 | Runner agent in Sam's run (Sam no owner) | desktop R1 enabled | `computer.open` | | `forbidden` `computer_not_owner_run` |
 | AZ-M65 | Runner agent in Alex's run | desktop R1 | `computer.open` | enablement disabled remotely, same generation reported | `forbidden` `computer_not_enabled` |
-| AZ-M66 | Runner agent in Alex's ended run | desktop R1 enabled | `computer.open` | run `succeeded` | `invocation_token_invalid` `run_inactive` |
+| AZ-M66 | Runner agent in Alex's ended run | desktop R1 enabled | `computer.open` | run `completed` | `invocation_token_invalid` `run_inactive` |
 | AZ-M67 | Owner | computer session of another owner's run | `computer.stop` | | `allow`, session ends `stopped_by_user` |
+| AZ-M68 | Runner agent in Alex's run that took a follow-up of Sam | desktop R1 enabled | `computer.open` | `run_feeders` names Sam | `forbidden` `computer_not_owner_run`; Sam's later follow-up is not delivered while a session is open |
 
 ### 11.2 Required tests
 

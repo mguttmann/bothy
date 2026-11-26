@@ -101,12 +101,14 @@ KNOWN_UNNAMED: dict[str, str] = {
     "CU-T22": _CU_OPEN,
     "CU-T23": _CU_OPEN,
     "CU-T24": _CU_OPEN,
+    "CU-T25": _CU_OPEN,
     "AZ-M62": _CU_OPEN,
     "AZ-M63": _CU_OPEN,
     "AZ-M64": _CU_OPEN,
     "AZ-M65": _CU_OPEN,
     "AZ-M66": _CU_OPEN,
     "AZ-M67": _CU_OPEN,
+    "AZ-M68": _CU_OPEN,
 }
 
 

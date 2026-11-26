@@ -221,8 +221,9 @@ relay; numbers are promised only after a measurement.
   and audit make it visible and stoppable (T-CU-01, T-CU-02).
 - **A stolen owner session starts work from afar** without a step-up (T-CU-08).
 - **Classifiers** probably do not run on MCP images (unverified).
-- **Owner account mode (T-TM-16):** on a machine whose host service runs in the owner's account,
-  the agent reaches the host service itself through a terminal window.
+- **Owner account mode (T-TM-16):** computer use is refused there (D-CU-01-26), because the host
+  service runs as the console user and its install has no root; such a machine needs the normal
+  mode with a service user for computer use.
 - **Absence:** a display kept awake shows everyone in the room what the agent does.
 - **Esc under Secure Input** is probably blind; the stop button and every client remain.
 - **Signing:** a changed signature or designated requirement silently voids the macOS grants; the

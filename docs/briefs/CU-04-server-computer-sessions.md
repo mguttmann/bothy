@@ -47,10 +47,10 @@ Product requirements implemented here:
 13. Catalogue: the seven actions of 07 2.15 and the event `computer_session.changed` in `docs/spec/actions.yaml` with exactly those columns, then `make catalog`, `make event-catalog` and every generated copy; the actions and event in `modules.yaml` under `terminal`.
 14. API documents: the five operations of 27 12.2 in `openapi.yaml` (with `x-authz-action`, the rate-limit class and the `Invocation-Token` header where named), the channels `computerAttach` and `hostComputerData` and the host ops of 27 12.3 in `asyncapi.yaml`, the operations under `enabled` in `operations.yaml`, `make contract-documents`; refusals only with registered problem codes and the reasons of 27 12.4.
 15. Migrations (expand only): `computer_sessions` and the `hosts` columns `reported_computer` and `computer_disabled_generation` exactly as 03 says, with their checks and unique indexes; migration tests column by column; existing rows unchanged.
-16. SR13 in `authz` at `computer.desktops.list`, `computer.open` and `computer.attach` with the order of 27 5.1 step 5 and the reasons `computer_not_owner_run`, `computer_tool_class`, `computer_not_enabled`; SR9's run binding with `run_inactive`; `404` before `403` (R-AZ-01); every denial audited (R-AZ-04).
+16. SR13 in `authz` at `computer.desktops.list`, `computer.open` and `computer.attach` with the order of 27 5.1 step 5 and the reasons `computer_not_owner_run`, `computer_tool_class`, `computer_not_enabled`, all five items including `run_feeders` (item 5) and the `command` form of item 2 (`triggering_command_id` invoked by `triggered_by`); a follow-up of any other person is not delivered into a run with a non-closed session (it stays `queued`, then `deferred`, CU-T25); SR9's run binding with `run_inactive`; `404` before `403` (R-AZ-01); every denial audited (R-AZ-04).
 17. Open in one transaction (row, audit, event), then `computer.open` to the host after the commit; the attach token of 27 5.2 signed with a key of purpose `terminal`; `computer.open_timeout` as in 24 6.1 step 6; `computer.attach` once per session with the checks of 27 5.4; pairing in the relay and across nodes as for terminal streams (24 9).
-18. Enablement: `report.computer` validated and stored in `hosts.reported_computer`, a change audited under `host.connect`; the listed state of 27 4 item 3; `computer.device.disable` sets `computer_disabled_generation`, ends the session (`device_disabled`) and sends `computer.disable`; `host.updated` carries both.
-19. Ends: one end function for computer sessions like the terminal's (M2-46): `computer.stop`, `computer.ended` from the host, `run_ended` from the module `runs` in the transaction that ends the run, `access_revoked` from `authorize.AccessChanged` and `identity.SessionEnded` with `user_disabled`, host state changes, lost connections; the first committed end wins; `computer.terminate` audited with the details of 27 13.1; `close_detail` only from the list of 27 8.3 and only with `open_failed`, `stopped_by_user` and `error`.
+18. Enablement: `report.computer` validated and stored in `hosts.reported_computer` (with `locked`; the doctor list of `report` stays HD1 to HD11), a change audited under `host.connect`; the listed state of 27 4 item 3; `computer.device.disable` sets `computer_disabled_generation`, ends the session (`device_disabled`) and sends `computer.disable`; `host.updated` carries both.
+19. Ends: `computer.state` updates `action_count` and `front_app` and the event; in the transaction that ends a run with a computer session the thread's current agent session ends with `end_reason = 'computer_use'` (03, a migration widens the check) and `agent_session.changed` is written; one end function for computer sessions like the terminal's (M2-46): `computer.stop`, `computer.ended` from the host, `run_ended` from the module `runs` in the transaction that ends the run, `access_revoked` from `authorize.AccessChanged` and `identity.SessionEnded` with `user_disabled`, host state changes, lost connections; the first committed end wins; `computer.terminate` audited with the details of 27 13.1; `close_detail` only from the list of 27 8.3 and only with `open_failed`, `stopped_by_user` and `error`.
 20. The table `computer_sessions` gets its retention participant (class `security`) and the entry `ticket:CU-04` leaves `handledElsewhere` in `internal/wire/retention_coverage_test.go`.
 21. The relay counts only lengths and times; no frame content enters a log, metric, audit entry or event (sentinel test CU-T18 with a known byte pattern through the relay, then a scan of every table, the captured logs and the telemetry export of the test).
 22. Server configuration keys `computer.*` of 27 section 18 in the server schema; `tools/configdoc/planned.yaml` loses the rule `computer.` once they are in it; `make config-reference`.
@@ -66,7 +66,7 @@ Create:
 
 Change:
 
-- `internal/authz` (SR13 and the new actions), `internal/runs` (the end hook into `terminal` through a port), `internal/terminal/README.md`, `internal/wire` (schema keys, retention), `architecture/modules.yaml`, `docs/api/openapi.yaml`, `docs/api/asyncapi.yaml`, `api/operations.yaml`, `docs/spec/actions.yaml` with `make catalog`, `make event-catalog`, `make contract-documents` and every generated copy of `make codegen-check`, `tools/configdoc/planned.yaml`, `docs/operations/configuration.md`, `docs/observability/signals.md` (relay counters of computer sessions without content), `docs/spec/27-computer-use.md` where the code needs a precise name.
+- `internal/authz` (SR13 and the new actions), `internal/runs` (the end hook into `terminal` through a port, the follow-up rule of SR13 item 5), `internal/agents` (the session end with `computer_use`), `internal/terminal/README.md`, `internal/wire` (schema keys, retention), `architecture/modules.yaml`, `docs/api/openapi.yaml`, `docs/api/asyncapi.yaml`, `api/operations.yaml`, `docs/spec/actions.yaml` with `make catalog`, `make event-catalog`, `make contract-documents` and every generated copy of `make codegen-check`, `tools/configdoc/planned.yaml`, `docs/operations/configuration.md`, `docs/observability/signals.md` (relay counters of computer sessions without content), `docs/spec/27-computer-use.md` where the code needs a precise name.
 
 ## Out of scope
 
@@ -98,7 +98,7 @@ Change:
 
 ## Tests (write them first)
 
-- Go unit and integration tests (container runtime): CU-T01 to CU-T06 with one test per refusal of SR13 and SR9; CU-T16 server part, one test per end path with the reason, the relay closed, `computer.close` sent and the audit; CU-T17; the attach token claims; the enablement mirror and the disabled generation; the migrations; the sentinel CU-T18.
+- Go unit and integration tests (container runtime): CU-T01 to CU-T06, CU-T25 with one test per refusal of SR13 and SR9; CU-T16 server part, one test per end path with the reason, the relay closed, `computer.close` sent and the audit; CU-T17; the attach token claims; the enablement mirror and the disabled generation; the migrations; the sentinel CU-T18.
 - The catalogue, enable-list and contract tests stay green with the new rows (`TestEnableListComplete`, `TestAZP1_RoutesNeedKnownActionAndClass`, the retention coverage).
 
 ```sh
@@ -111,7 +111,7 @@ make check
 
 ## Acceptance criteria
 
-- [ ] Every refusal and end path of 27 is tested; CU-T01 to CU-T06, CU-T16 to CU-T18 (server parts) are green.
+- [ ] Every refusal and end path of 27 is tested; CU-T01 to CU-T06, CU-T16 to CU-T18 (server parts) and CU-T25 are green.
 - [ ] Catalogue, API documents, enable list, configuration reference and every generated copy are current.
 - [ ] Existing hosts and terminal sessions are unchanged by the migrations (a test with rows from before).
 - [ ] `make check` is green.

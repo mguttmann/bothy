@@ -47,7 +47,7 @@ Product requirements implemented here:
 14. Desktops in the host settings (desktop app and console): per host the reported enablement, the operating system account, the permission state, and "Switch enablement off" (`computer.device.disable`) with a short explanation that switching on happens only at the machine; no switch to turn it on.
 15. Tray of the desktop app (macOS and Windows): an entry while a session of the owner is live, with stop; gone when no session is live.
 16. R-CL-18: no screenshot, no cache of status data beyond the local database rows the sync engine keeps for events, app identities not in crash reports or metrics; accessibility labels and keyboard operation for chip, stop and the switch-off.
-17. Owner only: the views show nothing to a person who is not an owner; the API refuses them anyway.
+17. Owner only: the views show nothing to a person who is not an owner; the server sends the computer state of a host only to owners (07 2.15 item 5) and refuses the actions.
 ## Scope
 
 Create:

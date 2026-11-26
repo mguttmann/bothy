@@ -1278,7 +1278,7 @@ thread are the earlier session references. Module: `agents`.
 | `dev_environment_id` | `uuid` | yes | | dev environment in which the first run of the session ran; NULL outside dev isolation (milestone, SR3) |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `ended_at` | `timestamptz` | yes | | set when the session ends or was never current |
-| `end_reason` | `text` | yes | | `CHECK (end_reason IN ('reset','rebind','import','agent_changed'))`, meaning below |
+| `end_reason` | `text` | yes | | `CHECK (end_reason IN ('reset','rebind','import','agent_changed','computer_use'))`, meaning below |
 | `version` | `bigint` | no | `1` | compare-and-swap on rebinding and on `agent_session.report` |
 
 PK: `id`. FK: `thread_id` -> `threads(id)` ON DELETE RESTRICT; `agent_id` ->
@@ -1298,6 +1298,7 @@ Meaning of `end_reason`:
 | `rebind` | replaced by `agent_session.bind`, or because resuming a bound session failed and the adapter reported a new one |
 | `import` | earlier session reference from an import; was never current in this product. On the first trigger without a current session, the server binds it exactly once as a new current row with `started = true` ([22-import-migration.md](22-import-migration.md), section 9) |
 | `agent_changed` | operator change in the main thread; the session ends at the next run |
+| `computer_use` | the run that ended had opened a computer session; the server ends the session in the transaction that ends the run, so no screenshot of it is resumed ([27-computer-use.md](27-computer-use.md) 10.5, addendum of 2026-11-26, stage CU) |
 
 ### 4.6 Messages (`messaging`)
 
@@ -2775,7 +2776,7 @@ LLM login (I6) and its reported state. Module: `terminal`.
 | `disabled_at` | `timestamptz` | yes | | |
 | `disabled_reason` | `text` | yes | | `CHECK (disabled_reason IN ('owner','duplicate_connection'))`; the server sets `duplicate_connection` on a second live control connection (24, section 3.4) |
 | `retired_at` | `timestamptz` | yes | | |
-| `reported_computer` | `jsonb` | yes | | schema `host_computer.v1` of the last `report` (27 12.3): `helper` (`connected`, `absent`), `enabled`, `generation` (integer from 0), `os_account`, `permissions` (`capture`, `input`, each `granted`, `denied`, `unknown`), `helper_version`, `signature` (`verified`, `development`); NULL while the host service reports no `computer` object (stage CU) |
+| `reported_computer` | `jsonb` | yes | | schema `host_computer.v1` of the last `report` (27 12.3): `helper` (`connected`, `absent`), `enabled`, `generation` (integer from 0), `os_account`, `permissions` (`capture`, `input`, each `granted`, `denied`, `unknown`), `helper_version`, `signature` (`verified`, `development`), `locked`; `helper` also `refused` (a peer the rule of 27 9.4 refused); NULL while the host service reports no `computer` object (stage CU) |
 | `computer_disabled_generation` | `integer` | yes | | the enablement generation that `computer.device.disable` switched off; the host is a desktop only while `reported_computer.generation` is higher (27 4, stage CU) |
 | `version` | `bigint` | no | `1` | optimistic lock |
 
@@ -2903,8 +2904,8 @@ a coordinate, typed text or a key name. Module: `terminal`. Stage CU (addendum o
 | `stopped_by` | `uuid` | yes | | person for `stopped_by_user` with `client_stop`; otherwise NULL |
 | `close_reason` | `text` | yes | | `CHECK (close_reason IN ('done','stopped_by_user','device_disabled','run_ended','access_revoked','host_disabled','host_retired','host_rekeyed','host_restarted','connection_lost','open_failed','error'))` (27 8.3) |
 | `close_detail` | `text` | yes | | code from the closed list of 27 8.3; never free text |
-| `action_count` | `integer` | no | `0` | actions reported at the end or by `computer.state` |
-| `front_app` | `text` | yes | | identity of the frontmost app of the last report (bundle ID or executable name), at most `host.name_max_chars` characters, without control and bidi characters; for the status chip |
+| `action_count` | `integer` | no | `0` | actions of the last `computer.state` or of `computer.ended` |
+| `front_app` | `text` | yes | | identity of the frontmost app of the last `computer.state` (bundle ID or executable name), at most `host.name_max_chars` characters, without control and bidi characters; for the status chip |
 | `version` | `bigint` | no | `1` | |
 
 PK: `id`. FK: `host_id` -> `hosts(id)` ON DELETE RESTRICT; `user_id` -> `users(principal_id)` ON
@@ -2914,7 +2915,8 @@ Checks: `(state = 'closed') = (closed_at IS NOT NULL)`; `(state = 'closed') = (c
 NULL)`; `close_detail IS NULL OR state = 'closed'`; `(state = 'paused') = (pause_reason IS NOT
 NULL)`; `(state = 'paused') = (paused_at IS NOT NULL)`.
 Unique: `token_jti`; `(host_id) WHERE state <> 'closed'` (one controller per host, 27 8.5);
-`(run_id) WHERE state <> 'closed'` (one session per run).
+`(run_id) WHERE state <> 'closed'` (one session per run). A run with a row here ends its thread's
+agent session with `end_reason = 'computer_use'` (`agent_sessions`).
 Indexes: `(user_id) WHERE state <> 'closed'` for ending sessions on revocation and for the status
 chip; BRIN `(opened_at)` for retention; `(closed_at, id) WHERE closed_at IS NOT NULL` for the
 candidates of the retention job.
