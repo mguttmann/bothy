@@ -450,7 +450,10 @@ the normal mode with a service user (D-CU-01-26).
   by neither group nor others, the endpoint folder owned by root or the service user with the same
   rule, and the socket itself (`lstat`) owned by the peer. On Windows the pipe server's process
   (`GetNamedPipeServerProcessId`) runs exactly as `NT SERVICE\bothy-host` or `LocalSystem` and not
-  as the helper's own user; a process or token that cannot be read is refused.
+  as the helper's own user; a standard user cannot read a service's token, so the helper then takes
+  the pipe's owner, which must be one of the two (the host service creates the pipe with its own
+  account as owner, `O:SY` or the service SID), and requires the server to run in session 0; an
+  owner or process that cannot be read is refused.
   Otherwise the helper disconnects and tries again later. A development build (signature
   `development`) takes its endpoint from the environment variable `BOTHY_COMPUTER_HELPER_CHANNEL`
   instead and skips this check, for the CI jobs of section 16; a verified build ignores the
