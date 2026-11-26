@@ -438,7 +438,11 @@ flowchart LR
        below the table of checks).
     4. The helper protects its memory against other processes of the same user: under Linux
        `PR_SET_DUMPABLE = 0`, under macOS Hardened Runtime without `get-task-allow`, under Windows a
-       process DACL without access permissions for the session user. Verified for Linux: A process
+       process DACL without access permissions for the session user. The Hardened Runtime holds
+       only while System Integrity Protection is on: with it off (`csrutil status`), a debugger of
+       the session user attached to its helper on a hosted macOS runner, so HD10 then reports
+       `helper_unprotected` and the start is refused (a warning only in the build of the platform
+       suite, AUD-PKG-R2-06/7). Verified for Linux: A process
        of the same user may attach only to a process that is "dumpable"
        (https://www.kernel.org/doc/html/latest/admin-guide/LSM/Yama.html, retrieved 2026-10-10
        [verified]); for macOS and Windows [assumed], the build ticket proves it with TM-T26.

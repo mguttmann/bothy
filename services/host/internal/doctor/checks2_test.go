@@ -302,7 +302,10 @@ func TestHD10(t *testing.T) {
 		t.Errorf(".cmd: %v", codes(r, HD10))
 	}
 	// macOS: the hardened runtime flag and get-task-allow.
-	for name, info := range map[string]CodesignInfo{"adhoc,linker-signed": {Runtime: false}, "get-task-allow": {Runtime: true, GetTaskAllow: true}} {
+	for name, info := range map[string]CodesignInfo{
+		"adhoc,linker-signed": {Runtime: false}, "get-task-allow": {Runtime: true, GetTaskAllow: true},
+		"SIP disabled": {Runtime: true, SIPDisabled: true},
+	} {
 		x := newTW(t)
 		x.env.GOOS = "darwin"
 		x.env.Codesign = func(context.Context, string) (CodesignInfo, error) { return info, nil }
@@ -545,5 +548,47 @@ func TestHD6LoginShellConfigDir(t *testing.T) {
 	r := x.run()
 	if !has(codes(r, HD6), CodeSubscriptionLogin+"@"+alex) {
 		t.Errorf("auth status with the exported folder: %v", codes(r, HD6))
+	}
+}
+
+func TestParseSIPStatus(t *testing.T) {
+	for out, want := range map[string]bool{
+		"System Integrity Protection status: enabled.\n":                        true,
+		"System Integrity Protection status: disabled.\n":                       false,
+		"System Integrity Protection status: unknown (Custom Configuration).\n": false,
+		"": false,
+	} {
+		if got := ParseSIPStatus([]byte(out)); got != want {
+			t.Errorf("%q: %v, want %v", out, got, want)
+		}
+	}
+}
+
+// TestSIPOffIsAWarningOnlyInTheSuiteBuild: without System Integrity Protection the hardened
+// runtime does not keep a debugger of the session user out, so the start is refused; only the
+// build of the platform suite, which runs on hosted macOS runners without it, warns.
+func TestSIPOffIsAWarningOnlyInTheSuiteBuild(t *testing.T) {
+	for suite, want := range map[bool]Status{false: Fail, true: Warn} {
+		x := newTW(t)
+		x.env.GOOS = "darwin"
+		x.env.PlatformSuite = suite
+		x.env.Codesign = func(context.Context, string) (CodesignInfo, error) {
+			return CodesignInfo{Runtime: true, SIPDisabled: true}, nil
+		}
+		r := x.run()
+		found := false
+		for _, c := range r.Checks {
+			for _, e := range c.Entries {
+				if e.Code == CodeHelperUnprotected {
+					found = true
+					if e.Status != want {
+						t.Errorf("suite %v: status %v, want %v", suite, e.Status, want)
+					}
+				}
+			}
+		}
+		if !found {
+			t.Errorf("suite %v: no helper_unprotected", suite)
+		}
 	}
 }

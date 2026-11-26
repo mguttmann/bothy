@@ -49,6 +49,17 @@ type CodesignInfo struct {
 	Runtime bool
 	// GetTaskAllow tells that the entitlements contain com.apple.security.get-task-allow.
 	GetTaskAllow bool
+	// SIPDisabled tells that System Integrity Protection is not reported as enabled ("csrutil
+	// status"). The hardened runtime keeps a debugger of the same user out only while it is on:
+	// on a hosted macOS runner with it off, lldb of the session user attached to its helper
+	// (TM-T26, docs/decisions.d/AUD-PKG-R2-06-host-platform-ci.md).
+	SIPDisabled bool
+}
+
+// ParseSIPStatus reads the output of "csrutil status" and reports whether System Integrity
+// Protection is enabled; any other or unreadable answer counts as not enabled.
+func ParseSIPStatus(out []byte) bool {
+	return strings.Contains(string(out), "System Integrity Protection status: enabled.")
 }
 
 // Env is everything the service-side checks read.
@@ -87,6 +98,11 @@ type Env struct {
 	DockerSocket string
 	// PeerCheckProven tells that the platform run of TM-T26 proved the peer check here.
 	PeerCheckProven bool
+	// PlatformSuite tells that this is the build of the platform suite (buildinfo.PlatformSuite):
+	// System Integrity Protection switched off, which the hosted macOS runners have, then makes
+	// helper_unprotected a warning, so the suite measures everything else there; every other
+	// build refuses the start (AUD-PKG-R2-06/7).
+	PlatformSuite bool
 	// Codesign reads the signature flags of a macOS binary.
 	Codesign func(ctx context.Context, binary string) (CodesignInfo, error)
 	// HelperGrace is added to the bound of every helper call (zero means helperGrace): a helper
@@ -540,7 +556,12 @@ func (r *run) hd10(ctx context.Context) {
 	}
 	if r.env.GOOS == hostos.Darwin && r.env.Codesign != nil {
 		info, err := r.env.Codesign(ctx, r.env.HelperBinary)
-		if err != nil || !info.Runtime || info.GetTaskAllow {
+		switch {
+		case err != nil || !info.Runtime || info.GetTaskAllow:
+			r.fail(HD10, CodeHelperUnprotected)
+		case info.SIPDisabled && r.env.PlatformSuite:
+			r.add(HD10, Entry{Status: Warn, Code: CodeHelperUnprotected})
+		case info.SIPDisabled:
 			r.fail(HD10, CodeHelperUnprotected)
 		}
 	}

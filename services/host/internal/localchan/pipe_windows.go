@@ -167,7 +167,9 @@ func tokenUser(tok windows.Token) string {
 	return u.User.Sid.String()
 }
 
-func dialPipe(ctx context.Context, path string) (*pipeConn, error) {
+// dialPipe opens the pipe at path; it waits while all instances are busy and, with waitMissing,
+// while the pipe does not exist yet, until ctx ends.
+func dialPipe(ctx context.Context, path string, waitMissing bool) (*pipeConn, error) {
 	name, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return nil, err
@@ -180,7 +182,8 @@ func dialPipe(ctx context.Context, path string) (*pipeConn, error) {
 		if err == nil {
 			return &pipeConn{f: os.NewFile(uintptr(h), path), h: h}, nil
 		}
-		if !errors.Is(err, windows.ERROR_PIPE_BUSY) || ctx.Err() != nil {
+		missing := waitMissing && errors.Is(err, windows.ERROR_FILE_NOT_FOUND)
+		if !errors.Is(err, windows.ERROR_PIPE_BUSY) && !missing || ctx.Err() != nil {
 			return nil, fmt.Errorf("localchan: dial: %w", err)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -189,8 +192,15 @@ func dialPipe(ctx context.Context, path string) (*pipeConn, error) {
 
 // DialHelper connects to the pipe of a helper and compares the server process (its token user
 // and its process ID) with expect; on a mismatch it sends nothing (ErrPeerMismatch).
+//
+// A helper service reports itself running before its pipe exists, and the service control manager
+// starts the host service and the helpers in no fixed order (at boot, and install starts the host
+// right after the helpers). DialHelper therefore waits for a missing pipe within ctx, the bound of
+// the check; a helper that never creates it stays unreachable. Before, the start of the host service
+// often met a missing pipe, reported helper_unreachable and was refused (run 45776803209,
+// AUD-PKG-R2-06/8).
 func DialHelper(ctx context.Context, endpoint string, expect func() (Expect, error)) (*Conn, error) {
-	c, err := dialPipe(ctx, endpoint)
+	c, err := dialPipe(ctx, endpoint, true)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +281,7 @@ func ServeAdmin(ctx context.Context, l net.Listener, _ string, h Handler) error 
 // DialAdmin connects to the admin pipe and checks that its server runs as serviceUID; a pipe
 // created first by another account gets nothing.
 func DialAdmin(ctx context.Context, _ string, serviceUID string) (*Conn, error) {
-	c, err := dialPipe(ctx, AdminPipe)
+	c, err := dialPipe(ctx, AdminPipe, false)
 	if err != nil {
 		return nil, err
 	}

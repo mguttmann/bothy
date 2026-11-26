@@ -51,7 +51,10 @@ func codesignInfo(ctx context.Context, r hostos.Runner, binary string) (doctor.C
 		return doctor.CodesignInfo{}, errors.New("codesign failed")
 	}
 	// codesign prints its display on standard error.
-	return doctor.ParseCodesign(append(disp.Stdout, disp.Stderr...), ent.Stdout), nil
+	info := doctor.ParseCodesign(append(disp.Stdout, disp.Stderr...), ent.Stdout)
+	sip, err := r.Run(ctx, hostos.Cmd{Path: "/usr/bin/csrutil", Args: []string{"status"}})
+	info.SIPDisabled = err != nil || sip.ExitCode != 0 || !doctor.ParseSIPStatus(sip.Stdout)
+	return info, nil
 }
 
 // Exit codes of the commands (D-M2-42-2).
@@ -192,6 +195,7 @@ func (a *app) doctorEnv(c *config.Config, st *state.Dir) doctor.Env {
 		SystemSearchDirs:   []string{"/usr/bin", "/bin"},
 		DockerSocket:       "/var/run/docker.sock",
 		PeerCheckProven:    buildinfo.PeerCheckProven(a.goos),
+		PlatformSuite:      buildinfo.PlatformSuite == "1",
 		Codesign: func(ctx context.Context, b string) (doctor.CodesignInfo, error) {
 			return codesignInfo(ctx, a.runner, b)
 		},

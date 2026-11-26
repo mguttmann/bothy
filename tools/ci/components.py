@@ -538,10 +538,10 @@ def ci_plan(
         return _pr_plan(files or [], public=public)
     if stage == "queue":
         every = ci_plan(selected=["all"], public=public).jobs
-        jobs = {*every, *_trial_jobs(files or [])}
+        queued = {*every, *_trial_jobs(files or [])}
         if not public:
-            jobs.difference_update(HOST_PLATFORM_JOBS)
-        return CIPlan(components=["all"], jobs=sorted(jobs))
+            queued.difference_update(HOST_PLATFORM_JOBS)
+        return CIPlan(components=["all"], jobs=sorted(queued))
     if files is not None:
         names = changed(files) if files else ["all"]
         full = names == ["all"] or any(f.startswith(API_PREFIX) for f in files)

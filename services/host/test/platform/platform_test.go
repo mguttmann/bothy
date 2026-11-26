@@ -147,9 +147,25 @@ func TestPlatform_TMT26(t *testing.T) {
 	if c != 1 || !strings.Contains(out, "HD10 FAIL peer_mismatch session_user="+userB) && !strings.Contains(out, "HD10 FAIL helper_unreachable session_user="+userB) {
 		t.Errorf("replaced helper:\n%s", out)
 	}
+	if runtime.GOOS == "darwin" && sipDisabled() {
+		// The hardened runtime keeps a debugger of the same user out only under System Integrity
+		// Protection, which the hosted macOS runner has switched off: there doctor must name the
+		// unprotected helper instead (24 2.2 point 4, AUD-PKG-R2-06/7). Run on a Mac with it on,
+		// the attach below is the check.
+		if out, _ := doctor(t); !strings.Contains(out, "HD10 WARN helper_unprotected") {
+			t.Errorf("System Integrity Protection is off, but doctor does not warn:\n%s", out)
+		}
+		return
+	}
 	if attachSucceeds(t, userA) {
 		t.Error("a process of the session user attached to its helper")
 	}
+}
+
+// sipDisabled reports whether System Integrity Protection is off on this Mac.
+func sipDisabled() bool {
+	out, _ := try("/usr/bin/csrutil", "status")
+	return !strings.Contains(out, "System Integrity Protection status: enabled.")
 }
 
 func TestPlatform_TMT27(t *testing.T) {
