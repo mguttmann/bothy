@@ -22,7 +22,7 @@ final class StopVectorTests: XCTestCase {
 
     func testEveryCase() throws {
         let cases = try XCTUnwrap(Self.load()["cases"]?.arrayValue)
-        XCTAssertGreaterThanOrEqual(cases.count, 20)
+        XCTAssertGreaterThanOrEqual(cases.count, 22)
         for item in cases {
             try run(item)
         }
@@ -49,6 +49,8 @@ final class StopVectorTests: XCTestCase {
                     rig.injector.onUnit = nil
                     Self.raise(kind, on: rig)
                 }
+            } else if event["stop_button"]?.boolValue == true {
+                rig.indicator.clickStop()
             } else if let kind = event["raise"]?.stringValue {
                 // Another thread sets the flag before the controller handles the next event.
                 Self.raise(kind, on: rig)

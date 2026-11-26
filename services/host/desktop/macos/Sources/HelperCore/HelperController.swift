@@ -270,6 +270,9 @@ public final class HelperController {
     /// Ends a session by the person at the machine: everything is undone before the `stop`
     /// frame goes out (D-CU-02-6), so the person never waits for the host service.
     private func stopByPerson(_ detail: StopDetail) {
+        // The platform raised the flag before handing the stop here; acting on it consumes it,
+        // whether a session is still shown or a refused show already answered it.
+        interrupt.consumePersonStop()
         guard let current = session else { return }
         endLocally()
         send(["op": "stop", "session_id": .string(current.id), "detail": .string(detail.rawValue)])

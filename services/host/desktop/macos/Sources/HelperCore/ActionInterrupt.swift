@@ -58,6 +58,14 @@ public final class ActionInterrupt: @unchecked Sendable {
         lock.withLock { if stop == nil { stop = .person(detail) } }
     }
 
+    /// The controller acted on the person's stop: it no longer applies, so it can never refuse
+    /// a later session (27 9.6 item 6). Weaker reasons stay. Called by the controller.
+    func consumePersonStop() {
+        lock.withLock {
+            if case .person = stop { stop = nil }
+        }
+    }
+
     /// The session ends by the host (`hide`, `disable`). Any thread.
     public func requestEnd() {
         lock.withLock { if stop == nil { stop = .ended } }
