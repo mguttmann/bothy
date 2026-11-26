@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"math/big"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unsafe"
@@ -63,13 +64,47 @@ func (o *OSOps) Run(ctx context.Context, argv []string) error {
 // Mkdir implements Ops; the DACL comes from a win.acl step, the owner is Administrators
 // (adminOwner).
 func (o *OSOps) Mkdir(path string, _ fs.FileMode, owner string) error {
-	if err := refuseSquatted(path); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(path, 0o700); err != nil {
+	// The folder itself is created in one call with its owner and a protected DACL, so no other
+	// account can own it or write into it between its creation and the next step. A folder that
+	// is already there (from an earlier install, or created by someone else in advance; the
+	// parent C:\ProgramData lets every user create folders) is checked instead of taken over.
+	created, err := createAdminDir(path)
+	if err != nil {
 		return err
+	}
+	if !created {
+		if err := refuseSquatted(path); err != nil {
+			return err
+		}
 	}
 	return adminOwner(path, owner)
+}
+
+// newDirSDDL is the security descriptor of a folder install creates: owner Administrators, a
+// protected DACL for SYSTEM and Administrators with full access and read and execute for Users
+// (the session users run the binary in the program folder). A win.acl step replaces the DACL of
+// the state directory right after.
+const newDirSDDL = "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)"
+
+// createAdminDir creates path with newDirSDDL; false (no error) when path already exists.
+func createAdminDir(path string) (bool, error) {
+	sd, err := windows.SecurityDescriptorFromString(newDirSDDL)
+	if err != nil {
+		return false, err
+	}
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return false, err
+	}
+	sa := &windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), SecurityDescriptor: sd}
+	err = windows.CreateDirectory(p, sa)
+	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // Write implements Ops; the file inherits the DACL of its folder, the owner is Administrators.

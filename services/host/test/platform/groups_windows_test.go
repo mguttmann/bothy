@@ -6,6 +6,7 @@ package platform
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -56,5 +57,17 @@ func TestPlatform_SquattedStateDir(t *testing.T) {
 	}
 	if out := sh(t, "powershell", "-NoProfile", "-Command", "(Get-Acl -LiteralPath '"+stateDir()+"').Owner"); !strings.Contains(strings.ToLower(out), personUser) {
 		t.Errorf("the squatted folder changed its owner: %s", out)
+	}
+	// Without the squatter install creates the folder itself, owned by Administrators.
+	if err := os.RemoveAll(stateDir()); err != nil {
+		t.Fatal(err)
+	}
+	if out, c := host("install", "--drive-root-confirm", "yes"); c != 0 {
+		t.Fatalf("install: %d\n%s", c, out)
+	}
+	for _, p := range []string{stateDir(), filepath.Dir(installedBinary())} {
+		if out := sh(t, "powershell", "-NoProfile", "-Command", "(Get-Acl -LiteralPath '"+p+"').Owner"); !strings.Contains(out, `BUILTIN\Administrators`) {
+			t.Errorf("owner of %s after install: %s", p, out)
+		}
 	}
 }
