@@ -84,7 +84,7 @@ final class AuthSession {
        ) {
     proofs = DpopProofFactory(keys.dpop, _core.nonces, clock, ids);
     refresh = RefreshCoordinator(_core, deadline: refreshDeadline);
-    stepUp = StepUpService(_core, stepUpPrompt);
+    stepUp = StepUpService(_core, stepUpPrompt, passkeys);
     login = LoginService(
       _core,
       device,

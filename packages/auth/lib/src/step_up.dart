@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Step-up with the step-up device key, or with password and TOTP on a device without one (08
-/// 6.2, 6.3, 14.3; 06 3.3; brief M4-09 Design note 6).
+/// Step-up with the step-up device key, or on a device without one with a passkey or with
+/// password and TOTP (08 6.2, 6.3, 14.3; 06 3.3; brief M4-09 Design note 6; V1-14).
 library;
 
 import 'dart:async';
@@ -11,6 +11,8 @@ import 'package:auth/src/errors.dart';
 import 'package:auth/src/jose.dart';
 import 'package:auth/src/ports.dart';
 import 'package:auth/src/session_core.dart';
+import 'package:built_collection/built_collection.dart';
+import 'package:built_value/json_object.dart';
 import 'package:dio/dio.dart';
 
 /// Explains a step-up to the person before the operating system asks for biometrics or the
@@ -52,7 +54,14 @@ typedef StepUpCredentials = ({String password, String totpCode});
 /// and gets its result, because one confirmation counts for every request of the session for
 /// `auth.step_up_max_age`. [confirmFresh] never joins.
 ///
-/// A device without a step-up key (Windows, D-M4-11-2) confirms with password and TOTP (08
+/// A device without a step-up key (Windows, D-M4-11-2) whose app has a [PasskeyAuthenticator]
+/// confirms with a passkey when the person has one (V1-14, design note
+/// docs/design/sign-in-methods.md item 6): `createStepUpChallenge` tells by its
+/// `passkey_options`, then [StepUpPrompt.ask], a new challenge, the platform's assertion over its
+/// options and `completeStepUpWithPasskey`. The server counts a passkey as fresh for the terminal
+/// outside the console (08 6.3 item 2), so [confirmFresh] takes the same way.
+///
+/// Otherwise such a device confirms with password and TOTP (08
 /// 6.2): `createStepUpChallenge`, [StepUpPrompt.askPassword], then `stepUpWithPassword`. A
 /// wrong password or code (`401 step_up_required`, counted by the server) asks again with a new
 /// challenge until the person cancels or the server ends the session at
@@ -65,11 +74,13 @@ typedef StepUpCredentials = ({String password, String totpCode});
 /// await session.stepUp.confirm(purposeText: l10n.stepUpOpenTerminal);
 /// ```
 final class StepUpService {
-  /// Internal: created by the session over its [SessionCore].
-  StepUpService(this._core, this._prompt);
+  /// Internal: created by the session over its [SessionCore]; [passkeys] is the passkey port of
+  /// the app, null where the platform has none.
+  StepUpService(this._core, this._prompt, [this._passkeys]);
 
   final SessionCore _core;
   final StepUpPrompt _prompt;
+  final PasskeyAuthenticator? _passkeys;
 
   static const Map<String, Object?> _internal = {internalRequestExtra: true};
 
@@ -100,19 +111,73 @@ final class StepUpService {
 
   Future<void> _confirm(String purposeText) async {
     final key = _core.keys.stepUp;
-    if (key == null) return _confirmWithPassword(purposeText);
-    await _confirmWithKey(key, purposeText);
+    if (key != null) return _confirmWithKey(key, purposeText);
+    if (await _confirmWithPasskey(purposeText)) return;
+    await _confirmWithPassword(purposeText);
   }
 
-  /// Runs the fresh step-up of the terminal (08 6.3), which only the step-up key can give.
+  /// Runs the fresh step-up of the terminal (08 6.3), which only the step-up key or a passkey
+  /// can give.
   ///
-  /// Throws [StepUpUnavailable] before any request on a device without a step-up key, because
-  /// the server never counts a step-up with password and TOTP as fresh; otherwise as
-  /// [confirm].
+  /// On a device without a step-up key it takes the passkey of the person ([confirm]); it
+  /// throws [StepUpUnavailable] when the app has no passkey port (before any request) or the
+  /// person has no passkey, because the server never counts a step-up with password and TOTP
+  /// as fresh. Otherwise as [confirm].
   Future<void> confirmFresh({required String purposeText}) async {
     final key = _core.keys.stepUp;
-    if (key == null) throw const StepUpUnavailable();
-    await _confirmWithKey(key, purposeText);
+    if (key != null) return _confirmWithKey(key, purposeText);
+    if (!await _confirmWithPasskey(purposeText)) {
+      throw const StepUpUnavailable();
+    }
+  }
+
+  /// The step-up with a passkey of a device without a step-up key; false, after at most one
+  /// `createStepUpChallenge`, when the app has no passkey port or the challenge carries no
+  /// `passkey_options` (the person has no passkey, or the instance has passkeys off).
+  ///
+  /// The first challenge only tells whether a passkey can answer; the one the passkey signs is
+  /// created after the prompt, because a challenge lives only `auth.step_up_challenge_ttl`. A
+  /// refused or cancelled platform prompt is [StepUpCancelled]; a refused assertion is the
+  /// server's answer (`401 step_up_required`, counted).
+  Future<bool> _confirmWithPasskey(String purposeText) async {
+    final passkeys = _passkeys;
+    if (passkeys == null) return false;
+    if (_core.tokens.state?.session == null) throw const NotSignedIn();
+    final auth = _core.api.getAuthApi();
+    final probe = (await auth.createStepUpChallenge(extra: _internal)).data!;
+    if (probe.passkeyOptions == null) return false;
+    if (!await _prompt.ask(purposeText)) throw const StepUpCancelled();
+    final challenge = (await auth.createStepUpChallenge(extra: _internal))
+        .data!;
+    final options = challenge.passkeyOptions;
+    // The passkey was revoked between the two challenges: nothing can answer any more.
+    if (options == null) throw const StepUpCancelled();
+    final Map<String, Object?> credential;
+    try {
+      credential = await passkeys.getAssertion({
+        for (final e in options.entries) e.key: e.value?.value,
+      });
+    } on AuthException {
+      rethrow;
+    } on Object {
+      // The platform's prompt (Windows Hello) was refused or cancelled, or no passkey answered.
+      throw const StepUpCancelled();
+    }
+    await auth.completeStepUpWithPasskey(
+      stepUpPasskeyRequest: StepUpPasskeyRequest(
+        (b) => b
+          ..challengeId = challenge.challengeId
+          ..credential.replace(
+            BuiltMap<String, JsonObject?>.of({
+              for (final e in credential.entries)
+                e.key: e.value == null ? null : JsonObject(e.value),
+            }),
+          ),
+      ),
+      extra: _internal,
+    );
+    _core.log('step-up confirmed with a passkey');
+    return true;
   }
 
   Future<void> _confirmWithKey(DeviceKeySigner key, String purposeText) async {

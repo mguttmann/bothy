@@ -138,8 +138,9 @@ void main() {
   group('a device without a step-up key (Windows, D-M4-11-2)', () {
     const passwordPath = '/auth/step-up/password';
 
+    // An app without a passkey port; the passkey way of such a device has its own group.
     setUp(() async {
-      h = Harness(withStepUpKey: false);
+      h = Harness(withStepUpKey: false, withPasskeys: false);
       await h.signIn();
       h.server.routes['POST /auth/step-up/challenge'] = (_) =>
           const FakeReply(200, {
@@ -363,7 +364,7 @@ void main() {
   });
 
   test('the fresh step-up of the terminal needs the step-up key and asks no password', () async {
-    h = Harness(withStepUpKey: false);
+    h = Harness(withStepUpKey: false, withPasskeys: false);
     await h.signIn();
     await expectLater(
       h.session.stepUp.confirmFresh(purposeText: 'Open the terminal'),
@@ -549,6 +550,127 @@ void main() {
       );
       expect(h.server.to('/devices/${h.deviceId}/revoke'), hasLength(2));
       expect(h.server.to('/auth/step-up/device-key'), hasLength(1));
+    },
+  );
+
+  group(
+    'a device without a step-up key with a passkey port (Windows Hello, V1-14)',
+    () {
+      const passkeyPath = '/auth/step-up/passkey';
+      const passwordPath = '/auth/step-up/password';
+      late int challenges;
+      late bool withPasskey;
+
+      setUp(() async {
+        h = Harness(withStepUpKey: false);
+        await h.signIn();
+        challenges = 0;
+        withPasskey = true;
+        h.server.routes['POST /auth/step-up/challenge'] = (_) {
+          challenges++;
+          return FakeReply(200, {
+            'challenge_id': '0192f4a0-7b1c-7000-8000-0000000000c$challenges',
+            'challenge': 'Y2hhbGxlbmdl',
+            if (withPasskey)
+              'passkey_options': {
+                'challenge': 'Y2hhbGxlbmdl$challenges',
+                'rpId': 'chat.example.com',
+                'userVerification': 'required',
+              },
+            'expires_at': '2026-10-15T10:05:00.000Z',
+          });
+        };
+        h.server.routes['POST $passkeyPath'] = (_) => const FakeReply(200, {
+          'step_up_at': '2026-10-15T10:00:00.000Z',
+          'valid_until': '2026-10-15T10:05:00.000Z',
+        });
+        h.server.routes['POST $passwordPath'] = (_) => const FakeReply(200, {
+          'step_up_at': '2026-10-15T10:00:00.000Z',
+          'valid_until': '2026-10-15T10:05:00.000Z',
+        });
+      });
+
+      test(
+        'the fresh step-up of the terminal confirms with the passkey',
+        () async {
+          await h.session.stepUp.confirmFresh(purposeText: 'Open the terminal');
+          expect(h.prompt.asked, ['Open the terminal']);
+          expect(h.prompt.askedPassword, isEmpty);
+          expect(h.server.requests.map((r) => r.path), [
+            '/auth/step-up/challenge',
+            '/auth/step-up/challenge',
+            passkeyPath,
+          ]);
+          // The passkey signs the challenge created after the prompt.
+          expect(h.passkeys.options.single['challenge'], 'Y2hhbGxlbmdl2');
+          expect(h.server.to(passkeyPath).single.body, {
+            'challenge_id': '0192f4a0-7b1c-7000-8000-0000000000c2',
+            'credential': {'id': 'cred-1', 'type': 'public-key'},
+          });
+        },
+      );
+
+      test('without a passkey of the person the terminal ends with StepUpUnavailable', () async {
+        withPasskey = false;
+        await expectLater(
+          h.session.stepUp.confirmFresh(purposeText: 'Open the terminal'),
+          throwsA(isA<StepUpUnavailable>()),
+        );
+        expect(h.prompt.asked, isEmpty);
+        expect(h.prompt.askedPassword, isEmpty);
+        expect(h.server.to(passkeyPath), isEmpty);
+      });
+
+      test('a cancelled Windows Hello prompt is StepUpCancelled', () async {
+        h.passkeys.assertionError = StateError('cancelled');
+        await expectLater(
+          h.session.stepUp.confirmFresh(purposeText: 'Open the terminal'),
+          throwsA(isA<StepUpCancelled>()),
+        );
+        expect(h.server.to(passkeyPath), isEmpty);
+      });
+
+      test('a declined prompt creates no second challenge', () async {
+        h.prompt.answer = false;
+        await expectLater(
+          h.session.stepUp.confirm(purposeText: 'Assign the runner'),
+          throwsA(isA<StepUpCancelled>()),
+        );
+        expect(challenges, 1);
+      });
+
+      test(
+        'an ordinary step-up takes the passkey, without one the password',
+        () async {
+          await h.session.stepUp.confirm(purposeText: 'Assign the runner');
+          expect(h.server.to(passkeyPath), hasLength(1));
+          expect(h.prompt.askedPassword, isEmpty);
+
+          withPasskey = false;
+          h.prompt.passwordAnswers.add((
+            password: 'correct horse',
+            totpCode: '123456',
+          ));
+          await h.session.stepUp.confirm(purposeText: 'Assign the runner');
+          expect(h.server.to(passwordPath), hasLength(1));
+          expect(h.server.to(passkeyPath), hasLength(1));
+        },
+      );
+
+      test('a refused assertion is the answer of the server', () async {
+        h.server.routes['POST $passkeyPath'] = (_) =>
+            FakeReply.problem(401, 'step_up_required');
+        await expectLater(
+          h.session.stepUp.confirmFresh(purposeText: 'Open the terminal'),
+          throwsA(
+            isA<DioException>().having(
+              (e) => ApiProblem.of(e)?.code,
+              'code',
+              'step_up_required',
+            ),
+          ),
+        );
+      });
     },
   );
 }
