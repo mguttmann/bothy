@@ -84,6 +84,7 @@ void main() {
         await signIn(app);
         await tester.tap(find.byKey(const ValueKey('phone.tab.me')));
         await tester.pumpAndSettle();
+        await app.showMeEntry('phone.me.emergency');
         await tap('phone.me.emergency');
         await tap('emergency.person.$sam');
         await app.waitFor(find.byKey(ValueKey('device.$pixel.revoke')));

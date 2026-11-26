@@ -117,6 +117,31 @@ class TestApp {
   /// The device ID of this app's session.
   String get deviceId => state.services!.auth.session!.deviceId.value;
 
+  /// Brings the entry [key] of the phone's Me page into view: the list builds its rows lazily
+  /// and is longer than a phone window (M5-12, V1-14 added Sign-in), and entries such as
+  /// Emergency come only after `getMe`, so it scrolls down until the row is built, then makes
+  /// it visible; fails after [timeout].
+  Future<void> showMeEntry(
+    String key, {
+    Duration timeout = testPatience,
+  }) async {
+    final entry = find.byKey(ValueKey(key));
+    final list = find.descendant(
+      of: find.byKey(const ValueKey('phone.me')),
+      matching: find.byType(Scrollable),
+    );
+    final end = DateTime.now().add(timeout);
+    while (entry.evaluate().isEmpty) {
+      if (DateTime.now().isAfter(end)) fail('timed out waiting for $entry');
+      if (list.evaluate().isNotEmpty) {
+        await tester.drag(list.first, const Offset(0, -200));
+      }
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.ensureVisible(entry.first);
+    await tester.pumpAndSettle();
+  }
+
   /// Pumps until [finder] finds something; fails after [timeout].
   Future<void> waitFor(Finder finder, {Duration timeout = testPatience}) async {
     final end = DateTime.now().add(timeout);
