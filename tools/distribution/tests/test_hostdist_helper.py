@@ -27,7 +27,11 @@ from fakes import FakeRun, ok
 VERSION = hostdist.component_version()
 SET_SCRIPT = hostdist.INFRA / "set-computer-use.sh"
 SET_SCRIPT_PS1 = hostdist.INFRA / "windows" / "set-computer-use.ps1"
-DR = 'designated => identifier "com.example.bothy-computer-helper" and anchor apple generic'
+TEAM = "TEAM123456"
+DR = (
+    'designated => identifier "com.example.bothy-computer-helper" and anchor apple generic and '
+    'certificate leaf[subject.OU] = "TEAM123456"'
+)
 
 
 # ---- the configuration script ---------------------------------------------------------------
@@ -121,7 +125,10 @@ def _sign_run(
     *, runtime: bool = True, authority: str = "Developer ID Application", dr: str = DR
 ) -> FakeRun:
     flags = "flags=0x10000(runtime)" if runtime else "flags=0x0(none)"
-    details = f"Identifier=com.example.bothy-computer-helper\n{flags}\nAuthority={authority}: x\n"
+    details = (
+        f"Identifier=com.example.bothy-computer-helper\n{flags}\nAuthority={authority}: x\n"
+        f"TeamIdentifier={TEAM}\n"
+    )
     return FakeRun(
         {
             "codesign -dv": lambda a, o: subprocess.CompletedProcess(a, 0, "", details),
@@ -137,19 +144,24 @@ def test_helper_sign_macos_signs_verifies_and_records_the_requirement(tmp_path: 
     checks = hostdist.helper_sign_macos(
         run, app=app, identity="Developer ID Application: X", requirement_file=req
     )
+    # Sign, read identifier and team, sign again with the team requirement, then check.
     assert run.programs() == [
+        "codesign --force",
+        "codesign -dv",
         "codesign --force",
         "codesign --verify",
         "codesign -dv",
         "codesign -d",
     ]
+    second = run.calls[2]
+    assert second[second.index("--requirements") + 1] == "=" + DR
     sign = run.calls[0]
     assert sign[sign.index("--options") + 1] == "runtime"
     assert sign[sign.index("--sign") + 1] == "Developer ID Application: X"
     assert "--timestamp=none" in sign
     assert "--deep" not in sign
     assert sign[-1] == str(app)
-    assert "--strict" in run.calls[1]
+    assert "--strict" in run.calls[3]
     assert req.read_text(encoding="utf-8") == DR + "\n"
     assert any("recorded" in c for c in checks)
     # The same requirement again passes.
@@ -172,7 +184,7 @@ def test_helper_sign_macos_stops_on_a_changed_requirement(tmp_path: Path) -> Non
     ("kwargs", "match"),
     [
         ({"runtime": False}, "no hardened runtime"),
-        ({"authority": "Apple Development"}, "not signed by a Developer ID"),
+        ({"authority": "Apple Distribution"}, "not signed by a Developer ID or Apple Development"),
         ({"dr": "nothing"}, "no designated requirement"),
     ],
 )
@@ -473,3 +485,27 @@ def test_helper_sign_macos_names_one_keychain(tmp_path: Path) -> None:
         run, app=tmp_path / "a.app", identity="X", requirement_file=tmp_path / "r", keychain=other
     )
     assert run.calls[0][run.calls[0].index("--keychain") + 1] == str(other)
+
+
+def test_helper_sign_macos_takes_an_apple_development_identity(tmp_path: Path) -> None:
+    # D-CU-01-29 as amended: the owner's login keychain holds an Apple Development identity only.
+    run = _sign_run(authority="Apple Development")
+    checks = hostdist.helper_sign_macos(
+        run, app=tmp_path / "a.app", identity="AB" * 20, requirement_file=tmp_path / "r"
+    )
+    assert any("Apple Development" in c for c in checks)
+    assert (tmp_path / "r").read_text(encoding="utf-8") == DR + "\n"
+
+
+def test_helper_sign_macos_needs_a_team(tmp_path: Path) -> None:
+    run = FakeRun(
+        {
+            "codesign -dv": lambda a, o: subprocess.CompletedProcess(
+                a, 0, "", "Identifier=x\nTeamIdentifier=not set\n"
+            )
+        }
+    )
+    with pytest.raises(common.StepError, match="team"):
+        hostdist.helper_sign_macos(
+            run, app=tmp_path / "a.app", identity="X", requirement_file=tmp_path / "r"
+        )

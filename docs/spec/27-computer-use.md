@@ -364,8 +364,11 @@ session on the same host is no conflict.
 
 ### 9.1 macOS
 
-- Swift app with a Developer ID signature and the hardened runtime, without sandbox, signed on the
-  owner's own Mac and not notarized (D-CU-01-29); registered as a LaunchAgent in the GUI domain of
+- Swift app with the hardened runtime, without sandbox, signed on the owner's own Mac with the
+  owner's Developer ID Application identity or, where the login keychain holds none, the owner's
+  Apple Development identity, and not notarized (D-CU-01-29, D-CU-02-22); its designated
+  requirement is `identifier "<bundle ID>" and anchor apple generic and certificate
+  leaf[subject.OU] = "<team>"`, so a renewed certificate of the same team keeps the grants; registered as a LaunchAgent in the GUI domain of
   the user; the usage texts stand in the helper's `Info.plist`.
 - Capture: ScreenCaptureKit (`SCScreenshotManager`, macOS 14 or later), the indicator window
   excluded with `SCContentFilter`. Input: `CGEvent`. App identity:

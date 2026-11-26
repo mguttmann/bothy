@@ -144,6 +144,10 @@ HELPER_PKG_IDENTIFIER = HELPER_BUNDLE_ID
 DARWIN_HELPER_DIR = DARWIN_PROGRAM_DIR  # D-CU-03-7: next to bothy-host
 HELPER_LAUNCH_AGENT = Path(f"/Library/LaunchAgents/{HELPER_BUNDLE_ID}.plist")
 HELPER_CERT_SUBJECT = "CN=bothy-computer-helper (local)"
+# The identities helper-sign-macos accepts (D-CU-01-29 as amended): a Developer ID, or the Apple
+# Development identity of the owner's login keychain; the helper is never published.
+HELPER_SIGNING_KINDS = ("Developer ID Application", "Apple Development")
+_TEAM = re.compile(r"^[A-Z0-9]{10}$")
 # The one keychain helper-sign-macos signs from (D-CU-02-21): never the search list.
 LOGIN_KEYCHAIN = Path.home() / "Library" / "Keychains" / "login.keychain-db"
 _THUMBPRINT = re.compile(r"^[0-9A-Fa-f]{40}$")
@@ -897,6 +901,16 @@ def designated_requirement(run: Runner, app: Path) -> str:
     raise StepError(f"codesign prints no designated requirement for {app.name}")
 
 
+def _signing_fields(text: str) -> dict[str, str]:
+    """Return the `Key=value` lines of `codesign -dv` output."""
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key not in out:
+            out[key.strip()] = value.strip()
+    return out
+
+
 def helper_sign_macos(
     run: Runner,
     *,
@@ -905,7 +919,7 @@ def helper_sign_macos(
     requirement_file: Path,
     keychain: Path = LOGIN_KEYCHAIN,
 ) -> list[str]:
-    """Sign the helper bundle `app` with a Developer ID identity; return the checks.
+    """Sign the helper bundle `app` with an identity of one keychain; return the checks.
 
     The signature carries the hardened runtime and no timestamp (the helper is not notarized and
     never leaves the machine, D-CU-01-29). Screen recording and accessibility grants follow the
@@ -915,9 +929,10 @@ def helper_sign_macos(
     Args:
         run: the command runner.
         app: `bothy-computer-helper.app` as `bundle.sh` assembled it.
-        identity: name or SHA-1 of a Developer ID Application identity in the keychains of the
-            session (on the owner's Mac a job in the GUI session, where the login keychain is
-            open).
+        identity: name or SHA-1 of a Developer ID Application or Apple Development identity
+            in `keychain` (on the owner's Mac a job in the GUI session, where the login keychain
+            is open). The step signs twice: the second signature carries a designated requirement
+            of the bundle ID and the team of the leaf certificate (D-CU-02-22).
         requirement_file: the designated requirement of the previous signed build.
         keychain: the only keychain codesign looks in (`--keychain`), the login keychain unless
             named; the search list may hold keychains of other projects that would ask for their
@@ -935,28 +950,39 @@ def helper_sign_macos(
                           identity="Developer ID Application: Example (TEAM123456)",
                           requirement_file=Path("signing/requirement.txt"))
     """
-    run(
-        [
-            "codesign",
-            "--force",
-            "--options",
-            "runtime",
-            "--timestamp=none",
-            "--keychain",
-            keychain,
-            "--sign",
-            identity,
-            app,
-        ]
+    sign: list[str | Path] = [
+        "codesign",
+        "--force",
+        "--options",
+        "runtime",
+        "--timestamp=none",
+        "--keychain",
+        keychain,
+        "--sign",
+        identity,
+    ]
+    run([*sign, app])
+    first = run(["codesign", "-dv", "--verbose=2", app], capture=True)
+    found = _signing_fields(first.stdout + first.stderr)
+    team, ident = found.get("TeamIdentifier", ""), found.get("Identifier", "")
+    if not _TEAM.match(team) or not ident:
+        raise StepError(f"{app.name}: the identity names no team; the requirement needs one")
+    # The designated requirement names the bundle ID and the team of the leaf certificate, not
+    # the certificate itself, so a renewed certificate of the same team keeps the grants.
+    requirement = (
+        f'designated => identifier "{ident}" and anchor apple generic and '
+        f'certificate leaf[subject.OU] = "{team}"'
     )
+    run([*sign, "--requirements", "=" + requirement, app])
     run(["codesign", "--verify", "--strict", "--verbose=2", app])
     details = run(["codesign", "-dv", "--verbose=2", app], capture=True)
     text = details.stdout + details.stderr
     if "flags=0x10000(runtime)" not in text:
         raise StepError(f"{app.name} carries no hardened runtime")
-    if "Authority=Developer ID Application" not in text:
-        raise StepError(f"{app.name} is not signed by a Developer ID Application identity")
-    checks = ["codesign --verify --strict passes, hardened runtime, Developer ID Application"]
+    kind = next((k for k in HELPER_SIGNING_KINDS if f"Authority={k}" in text), None)
+    if kind is None:
+        raise StepError(f"{app.name} is not signed by a Developer ID or Apple Development identity")
+    checks = [f"codesign --verify --strict passes, hardened runtime, {kind} of team {team}"]
     requirement = designated_requirement(run, app)
     if requirement_file.is_file():
         before = requirement_file.read_text(encoding="utf-8").strip()
