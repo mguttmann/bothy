@@ -514,10 +514,12 @@ def test_host_release_files_are_binaries_and_linux_packages() -> None:
     names = trial.host_release_files("1.2.3")
     assert "bothy-host_1.2.3_windows_amd64.exe" in names
     assert "bothy-host_1.2.3_darwin_arm64" in names
+    assert "bothy-computer-mcp_1.2.3_windows_amd64.exe" in names
+    assert "bothy-computer-mcp_1.2.3_linux_arm64" in names
     assert {n for n in names if n.endswith((".deb", ".rpm"))} == {
         f"bothy-host_1.2.3_linux_{a}.{k}" for k in ("deb", "rpm") for a in ("amd64", "arm64")
     }
-    assert len(names) == 9
+    assert len(names) == 14
 
 
 def test_host_trial_builds_installs_signs_and_verifies(tmp_path: Path) -> None:

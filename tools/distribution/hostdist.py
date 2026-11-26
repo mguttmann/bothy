@@ -5,7 +5,10 @@ Builds the binaries and the installation packages of the component `host` (tag `
 
 * `build` (`make -C services/host release-build`, release.yml job build): the release binaries
   `bothy-host_<v>_<os>_<arch>[.exe]` for darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 and
-  windows/amd64, and the Linux packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` from
+  windows/amd64, the binaries of the MCP server of computer use
+  `bothy-computer-mcp_<v>_<os>_<arch>[.exe]` for the same platforms (docs/spec/27-computer-use.md
+  C1, run next to the Claude Code runner), and the Linux packages
+  `bothy-host_<v>_linux_<arch>.deb` and `.rpm` from
   `infra/host/linux/nfpm.yaml` with nfpm (pinned in tools/bin/tools.lock.json). Every binary is
   built without cgo from `services/host/VERSION` (`-trimpath -buildvcs=false`, the version and the
   package kind with `-ldflags -X`, internal/buildinfo); a package carries its own build with the
@@ -71,6 +74,8 @@ from common import REPO, Runner, StepError, fail, require_env
 HOST = REPO / "services" / "host"
 INFRA = REPO / "infra" / "host"
 MODULE = "github.com/OWNER/bothy/services/host"
+# The MCP server of computer use (docs/spec/27-computer-use.md C1), shipped with the host release.
+MCP_PROGRAM = "bothy-computer-mcp"
 # The five platforms of docs/spec/18-release.md 2 (row host).
 PLATFORMS = (
     ("darwin", "arm64"),
@@ -120,9 +125,12 @@ _SEMVER = re.compile(
 # ---- names and the Go build -----------------------------------------------------------------
 
 
-def binary_name(version: str, goos: str, goarch: str) -> str:
-    """Return the file name of a release binary, for example `bothy-host_1.2.3_linux_amd64`."""
-    return f"bothy-host_{version}_{goos}_{goarch}" + (".exe" if goos == "windows" else "")
+def binary_name(version: str, goos: str, goarch: str, program: str = "bothy-host") -> str:
+    """Return the file name of a release binary, for example `bothy-host_1.2.3_linux_amd64`.
+
+    `program` is `bothy-host` or `bothy-computer-mcp` (MCP_PROGRAM).
+    """
+    return f"{program}_{version}_{goos}_{goarch}" + (".exe" if goos == "windows" else "")
 
 
 def package_name(version: str, goos: str, goarch: str, kind: str) -> str:
@@ -155,8 +163,16 @@ def ldflags(version: str, kind: str) -> str:
     )
 
 
-def go_build(run: Runner, goos: str, goarch: str, version: str, kind: str, out: Path) -> Path:
-    """Build `cmd/bothy-host` for goos/goarch without cgo into `out`; return `out`.
+def go_build(
+    run: Runner,
+    goos: str,
+    goarch: str,
+    version: str,
+    kind: str,
+    out: Path,
+    program: str = "bothy-host",
+) -> Path:
+    """Build `cmd/<program>` for goos/goarch without cgo into `out`; return `out`.
 
     The build depends only on the source and `version` (`-trimpath -buildvcs=false`), so the
     same commit and version give the same binary with the same Go (brief requirement 13).
@@ -172,7 +188,7 @@ def go_build(run: Runner, goos: str, goarch: str, version: str, kind: str, out: 
             ldflags(version, kind),
             "-o",
             out,
-            "./cmd/bothy-host",
+            f"./cmd/{program}",
         ],
         cwd=HOST,
         env={
@@ -196,6 +212,18 @@ def build(run: Runner, version: str, out: Path, nfpm: str) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     written = [
         go_build(run, goos, goarch, version, "", out / binary_name(version, goos, goarch))
+        for goos, goarch in PLATFORMS
+    ]
+    written += [
+        go_build(
+            run,
+            goos,
+            goarch,
+            version,
+            "",
+            out / binary_name(version, goos, goarch, MCP_PROGRAM),
+            MCP_PROGRAM,
+        )
         for goos, goarch in PLATFORMS
     ]
     with tempfile.TemporaryDirectory(prefix="bothy-host-packages-") as tmp:

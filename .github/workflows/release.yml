@@ -1147,8 +1147,8 @@ jobs:
       # Every file the three jobs wrote, named once: the binaries and packages of the release.
       - name: Files of the release
         run: |
-          find dist -maxdepth 1 -type f -name 'bothy-host_*' -print | sort > "$RUNNER_TEMP/files.txt"
-          [ "$(wc -l < "$RUNNER_TEMP/files.txt")" -eq 12 ] || { echo "::error::expected 5 binaries and 7 packages, found:"; cat "$RUNNER_TEMP/files.txt"; exit 1; }
+          find dist -maxdepth 1 -type f \( -name 'bothy-host_*' -o -name 'bothy-computer-mcp_*' \) -print | sort > "$RUNNER_TEMP/files.txt"
+          [ "$(wc -l < "$RUNNER_TEMP/files.txt")" -eq 17 ] || { echo "::error::expected 10 binaries (5 bothy-host, 5 bothy-computer-mcp) and 7 packages, found:"; cat "$RUNNER_TEMP/files.txt"; exit 1; }
           sed 's/^/--binary /' "$RUNNER_TEMP/files.txt" | tr '\n' ' ' > "$RUNNER_TEMP/binary-args.txt"
       - name: SBOMs (SPDX and CycloneDX) of every binary and package
         env:
