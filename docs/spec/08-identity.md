@@ -241,12 +241,19 @@ Password with TOTP (table `local_credentials` in 03):
 - There are no recovery codes. Recovery runs through a new enrollment code from the
   owner. Reason: a second permanent set of secrets would be a further attack path.
 
-Views (as built, docs/decisions.d/AUD-client-settings-01.md): no app and no console view calls
-`setMyLocalCredential`, `getMyCredentials`, `beginPasskeyRegistration` or `beginIdentityLink`
-(section 3.3). A person sets up a password with TOTP, a further passkey or a further identity
-through the API only; a first passkey also comes into being when an enrollment code is redeemed
-in a phone app whose build names a public domain (section 3.2). The area "Sign-in" of the
-settings and of the console is not built.
+Views (V1-14, design note [sign-in-methods.md](../design/sign-in-methods.md)): the section
+"Sign-in" of the settings of the apps (01 D8) and the page "Sign-in" of the console (01 5.5) show
+`getMyCredentials` and set up a password with TOTP in the two steps above (`setMyLocalCredential`
+with `password` and `totp_enroll`, the otpauth URI as a QR code and as text, then `totp_code`), a
+passkey (`beginPasskeyRegistration`, `completePasskeyRegistration`) where the platform can create
+one (the browser in the console, Windows Hello in the Windows app, the system in a phone build with
+a public domain; the Mac app has no passkey port, docs/decisions.d/M4-18.md D-M4-18-9) and a
+further identity (section 3.3). The password part shows only for a person with a local identity
+while `auth.local_password_enabled` is true. Revoking an own passkey and unlinking an identity have
+no view. A first passkey also comes into being when an enrollment code is redeemed in a phone app
+whose build names a public domain (section 3.2). The Windows app creates its passkeys through the
+Win32 WebAuthn API and writes the client data itself with the origin of `server.public_url`, so
+`auth.webauthn_origins` needs no entry for it.
 
 ### 2.6 Configuration per driver
 
@@ -354,7 +361,11 @@ Table `enrollment_codes` (03). Properties:
 ### 3.3 Linking and unlinking another identity
 
 - `identity.link` (05): a person with step-up starts a login flow in the mode "link". The
-  subject must not already be linked.
+  subject must not already be linked. A console session (section 7.5) links back to
+  `/console/sign-in/callback` on the origin of `server.public_url`: `beginIdentityLink` from the
+  console takes exactly that `app_redirect_uri` (else `400 validation_failed`) and needs no entry
+  in the provider's `app_redirect_uris`, as the console login (V1-14); an app session names its
+  redirect as at the login.
 - `identity.unlink`: rejected with `409 conflict` and `reason: no_login_method_left` if no login
   method remains afterwards (no identity at an enabled driver, no passkey, no active device for
   device pairing). The check locks the identities of the person, so that two parallel unlinks
@@ -542,7 +553,7 @@ Both keys are non-exportable and, where the platform offers it, hardware-backed:
 |---|---|---|---|
 | iOS, iPadOS, macOS | Secure Enclave | `ES256` | step-up key bound to the currently enrolled biometrics, so that newly added fingerprints invalidate it |
 | Android | Android Keystore, StrongBox if available | `ES256` | step-up key with mandatory user authentication; on API 26 to 29 strong biometrics only, from API 30 biometrics or the device credential ([15](15-client-architecture.md) 9) |
-| Windows | `dpop`: TPM via the Platform Crypto Provider, without P-256 or TPM a software key, marked as not hardware-bound on the device only (the registration carries no such field) | `ES256` | settled by M4-11 (D-M4-11-2): Windows has no system-enforced confirmation per use for an `ES256` key (strong key protection is a password the process can supply and that is cached per process; Windows Hello keys are RSA), so Windows clients have no `step_up` key and confirm with password and TOTP (section 6.2, docs/decisions.d/FIX-stepup-macos.md); the terminal, which needs a step-up with `passkey` or `device_key` (section 6.3), stays unavailable on them. A Windows Hello step-up key would need `RS256` or `PS256` in `device_keys.alg` (03) and in the JOSE profile (ADR 0067), a core contract change (section 17) |
+| Windows | `dpop`: TPM via the Platform Crypto Provider, without P-256 or TPM a software key, marked as not hardware-bound on the device only (the registration carries no such field) | `ES256` | settled by M4-11 (D-M4-11-2): Windows has no system-enforced confirmation per use for an `ES256` key (strong key protection is a password the process can supply and that is cached per process; Windows Hello keys are RSA), so Windows clients have no `step_up` key and confirm with a passkey over Windows Hello or with password and TOTP (section 6.2, docs/decisions.d/FIX-stepup-macos.md); the terminal, which needs a step-up with `passkey` or `device_key` (section 6.3), opens on them only with a passkey (V1-14). A Windows Hello step-up key would need `RS256` or `PS256` in `device_keys.alg` (03) and in the JOSE profile (ADR 0067), a core contract change (section 17) |
 | Web console | no device key | | session by cookie (section 7.5), step-up by passkey |
 
 Without attestation the server cannot check whether a key really is hardware-backed.
@@ -586,9 +597,11 @@ person. Without a passkey: a new OIDC login with `prompt=login` and `max_age=0`;
 requires an `auth_time` after the start of the challenge. Local accounts without a passkey:
 password with TOTP. The operations for the last two methods come with the console session
 (PLAN M6-01), spec first. A native app whose device has no active `step_up` key (Windows, 6.1,
-D-M4-11-2; a Mac without a Secure Enclave in the login keychain) confirms with password and TOTP
-as well (docs/decisions.d/FIX-stepup-macos.md); every other native app confirms with its
-`step_up` key and never with the password.
+D-M4-11-2; a Mac without a Secure Enclave in the login keychain) confirms with a passkey when the
+app has a passkey port and `createStepUpChallenge` carries `passkey_options` (the Windows app over
+Windows Hello, V1-14), and otherwise with password and TOTP as well
+(docs/decisions.d/FIX-stepup-macos.md); every other native app confirms with its `step_up` key and
+never with the password.
 
 Console step-up operations (M6-01, docs/DECISIONS.md D-M6-01-6): every console step-up starts with
 `createStepUpChallenge`. The passkey uses `completeStepUpWithPasskey` as for apps (every passkey

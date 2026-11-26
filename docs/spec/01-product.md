@@ -169,6 +169,7 @@ built in several milestones, the remark names the build milestones from the
 | Send offline with a queue, states visible | core | D, M | | section 6.6 |
 | Read state, drafts, settings, sidebar in sync | core | D, M | | |
 | Approve, revoke a device; end sessions | core | D, M, W | `device.approve`, `device.revoke`, `session.revoke` | new devices wait |
+| Own sign-in methods: password with one-time code, passkeys, linked login services | core | D, M, W | `identity.read`, `local_credential.set`, `passkey.register`, `identity.link` | Settings, Sign-in (D8) and the console page "Sign-in" (5.5); a passkey where the platform can create one (the console, the Windows app over Windows Hello, a phone build with a public domain); revoking an own passkey and unlinking an identity have no view and stay with the API ([08-identity.md](08-identity.md) 2.5, 3.3) |
 | Export of the own data: request, state, archive | core | D, M | `gdpr.request.create`, `gdpr.request.read`, `gdpr.export.download` | step-up; Settings, Privacy (D8); the archive is saved on the desktop, a phone shows the state; a deletion or rectification request and the decision of an owner have no view and stay with the API ([20-privacy.md](20-privacy.md) 5.1) |
 | End-to-end encryption of chat content | never | | | agents must read (Baseline 4); the terminal stream, by contrast, is end-to-end encrypted (3.8) |
 | Chat in the browser | never | | | web only for the console (ADR 0028) |
@@ -507,9 +508,16 @@ it, and a refused one names the wait.
 +--------------------------+------------------------------------------------------------------------+
 ```
 
-**D8 Settings.** Appearance, notifications, language, keyboard, devices and sessions, privacy,
-about (version, licenses). Under "Devices and sessions" the person confirms a waiting device with
-its code (E4) and adds a device with a pairing code (E5), both with step-up. Under "Privacy" the
+**D8 Settings.** Appearance, notifications, language, keyboard, devices and sessions, sign-in,
+privacy, about (version, licenses). Under "Devices and sessions" the person confirms a waiting
+device with its code (E4) and adds a device with a pairing code (E5), both with step-up. Under
+"Sign-in" the person sees their linked login services, passkeys and the state of the password and
+the one-time code, sets a password with a one-time code (two steps: the password typed twice, then
+a QR code of the one-time code with its key as text and a code to confirm), adds a passkey where
+the platform can create one (the Windows app over Windows Hello, a phone build with a public
+domain; elsewhere a hint names the web console) and links a further login service; each change
+asks for the step-up the server requires ([08-identity.md](08-identity.md) 2.5, 3.3; design note
+[sign-in-methods.md](../design/sign-in-methods.md)). The phone has the same section. Under "Privacy" the
 person requests the export of their own data, reads where the request stands and saves the
 archive of a completed one, both with step-up ([20-privacy.md](20-privacy.md) 5.1); a phone has
 no dialog to save a file, so it shows the state and names the desktop app for the download. A
@@ -1361,7 +1369,10 @@ history of D12 (addendum of 2026-11-04, 25 6.7) is part of the console with its 
 tree, as the owner asked for every client that shows the live topology; its jumps show "Open in
 the app". The terminal
 opens only after confirmation with a passkey with user verification; other step-up methods of the
-console do not count for it ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
+console do not count for it ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)). The page
+"Sign-in" at the end of the navigation is the section "Sign-in" of D8 in the console: the passkey
+comes from the browser, and a link with a further login service returns on
+`/console/sign-in/callback`.
 
 ```text
 +--------------------------+------------------------------------------------------------------------+
@@ -1379,6 +1390,7 @@ console do not count for it ([ADR 0070](../adr/0070-terminal-in-the-web-console.
 |   Import                 |                                                                        |
 |   Instance, branding     |                                                                        |
 |   Status                 |                                                                        |
+|   Sign-in                |                                                                        |
 +--------------------------+------------------------------------------------------------------------+
 ```
 
@@ -1485,10 +1497,12 @@ Desktop: the same card in the center; the sidebar stays empty until the login su
 ```
 
 **E3 Redeem enrollment code.** For the first device and for recovery (08, section 3.2).
-First the code, then the method that the instance offers: "Create passkey", "Set up password and
-one-time code" (two steps with a QR code of the one-time code and confirmation, 08, section 2.5) or
-"Link with login service" (OIDC or proxy). A redeemed code makes this device
-`active` immediately; the app goes straight to the main view.
+First the code, then the method that the instance offers: "Create passkey" (where the app can
+create one), "Use this device" or "Link with login service" (OIDC or proxy). A redeemed code makes
+this device `active` immediately; the app goes straight to the main view. A password with a
+one-time code is set afterwards under Settings, Sign-in (D8), because the API sets no password
+while a code is redeemed (docs/decisions.d/M4-18.md D-M4-18-9); on a device with nothing to
+confirm with yet it needs no step-up (08, section 2.5).
 
 ```text
 +--------------------------------------+
@@ -1499,7 +1513,7 @@ one-time code" (two steps with a QR code of the one-time code and confirmation, 
 |                                      |
 |   How do you want to log in?         |
 |   (x) Create passkey                 |
-|   ( ) Password and one-time code     |
+|   ( ) Use this device                |
 |   ( ) Link with Company SSO          |
 |                                      |
 |   [          Continue           ]    |

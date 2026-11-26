@@ -17,7 +17,7 @@ workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
 
-The same screens serve the desktop app (Settings, Devices and sessions), the console (M6-01)
+The same screens serve the desktop app (Settings, Devices and sessions, and Sign-in), the console (M6-01)
 and the emergency actions on mobile (M5, R-PR-07). They talk REST only and use no local
 database, because the console has neither a gateway nor a local store (15 3.1).
 
@@ -26,6 +26,7 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `SelfRepository`, `ApiSelfRepository` | the own devices (`listMyDevices`, `getMe` for "this device") and sessions (`listMySessions`), `approveDevice`, `approvePairing`, `revokeDevice`, `revokeSession` through the client of the signed-in `AuthSession`; failures as `SelfActionFailed` with the server's `ApiProblem` (null without an answer), a cancelled step-up as `StepUpCancelled` |
 | `MyDevicesView`, `DeviceTile` | the device list with platform, name, app version, last activity and "This device"; "Enter code" for a waiting device, "Add device" with the pairing code, "Revoke" with one confirmation; no hardware label, because `Device` has no hardware field |
 | `MySessionsView` | the sessions with device, login method and last use; "End session" with one confirmation and never a step-up |
+| `MySignInView`, `PasswordDialog`, `TotpQrCode`, `SignInRepository`, `ApiSignInRepository` | the own sign-in methods of Settings, Sign-in and the console page Sign-in (V1-14): `getMyCredentials`, a password with a one-time code in two steps (`setMyLocalCredential`, the otpauth URI as a QR code from the package `qr` and as text), "Add passkey" over the host's `PasskeyCreator` (`beginPasskeyRegistration`, `completePasskeyRegistration`) and "Link with" over the host's `IdentityLinker` |
 | `ConfirmDeviceDialog`, `AddDeviceDialog`, `RevokeConfirmDialog` | the code dialogs (digits only; pairing codes normalized like `normalizeCode` of `auth`) and the one confirmation of a destructive action (01 6.7) |
 | `StepUpDialog`, `StepUpPasswordDialog`, `StepUpDialogPrompt` | the explanation before the system asks for biometrics or the device password, and on a device without a step-up key (Windows) the dialog for password and the 6-digit code; `StepUpDialogPrompt` is the `StepUpPrompt` of `auth` that the apps pass to their `AuthSession` |
 
