@@ -41,7 +41,8 @@ macOS, on the owner's Mac, with the owner's Developer ID Application identity:
 ```sh
 make -C services/host helper-macos OUT=<folder>
 make -C services/host helper-sign-macos APP="<folder>/bothy-computer-helper.app" \
-  SIGN_IDENTITY="Developer ID Application: <name> (<team>)" REQUIREMENT_FILE=<file kept between builds>
+  SIGN_IDENTITY="Developer ID Application: <name> (<team>)" REQUIREMENT_FILE=<file kept between builds> \
+  [KEYCHAIN=<keychain that holds the identity, default the login keychain>]
 make -C services/host helper-package-macos APP="<folder>/bothy-computer-helper.app" OUT=<folder>
 sudo installer -pkg <folder>/bothy-host-computer_<version>_darwin_<arch>.pkg -target /
 ```

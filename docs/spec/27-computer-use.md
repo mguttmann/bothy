@@ -742,7 +742,10 @@ the thread (the agent reports it).
 Unverified until the named ticket probes them; each has its fallback. The CU-02 rows are probed by
 the jobs `helper-macos` and `helper-windows` of `.github/workflows/host-platform.yml` (the probe
 records, the native jobs `helper-macos-native` and `helper-windows-native` test only where it
-passed); the job results land here after the stage's CI round, which has not run yet.
+passed); the job results land here after the stage's CI round, which has not run yet. On a real
+Windows 11 computer the helper built with MSVC, its unit tests passed and its signature with the
+machine certificate of D-CU-01-29 verified (D-CU-02-21); capture, input and `uiAccess` were not run
+there.
 
 | Point | Probed by | Fallback when it does not hold |
 |---|---|---|

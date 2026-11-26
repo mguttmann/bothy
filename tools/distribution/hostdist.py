@@ -144,6 +144,8 @@ HELPER_PKG_IDENTIFIER = HELPER_BUNDLE_ID
 DARWIN_HELPER_DIR = DARWIN_PROGRAM_DIR  # D-CU-03-7: next to bothy-host
 HELPER_LAUNCH_AGENT = Path(f"/Library/LaunchAgents/{HELPER_BUNDLE_ID}.plist")
 HELPER_CERT_SUBJECT = "CN=bothy-computer-helper (local)"
+# The one keychain helper-sign-macos signs from (D-CU-02-21): never the search list.
+LOGIN_KEYCHAIN = Path.home() / "Library" / "Keychains" / "login.keychain-db"
 _THUMBPRINT = re.compile(r"^[0-9A-Fa-f]{40}$")
 _SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
@@ -896,7 +898,12 @@ def designated_requirement(run: Runner, app: Path) -> str:
 
 
 def helper_sign_macos(
-    run: Runner, *, app: Path, identity: str, requirement_file: Path
+    run: Runner,
+    *,
+    app: Path,
+    identity: str,
+    requirement_file: Path,
+    keychain: Path = LOGIN_KEYCHAIN,
 ) -> list[str]:
     """Sign the helper bundle `app` with a Developer ID identity; return the checks.
 
@@ -912,6 +919,9 @@ def helper_sign_macos(
             session (on the owner's Mac a job in the GUI session, where the login keychain is
             open).
         requirement_file: the designated requirement of the previous signed build.
+        keychain: the only keychain codesign looks in (`--keychain`), the login keychain unless
+            named; the search list may hold keychains of other projects that would ask for their
+            password (D-CU-02-21).
 
     Returns:
         The checks that passed, for the log of the step.
@@ -932,6 +942,8 @@ def helper_sign_macos(
             "--options",
             "runtime",
             "--timestamp=none",
+            "--keychain",
+            keychain,
             "--sign",
             identity,
             app,
@@ -1240,6 +1252,7 @@ def _add_helper_parsers(sub: Any) -> None:
     hs.add_argument("--app", type=Path, required=True)
     hs.add_argument("--identity", required=True)
     hs.add_argument("--requirement-file", type=Path, required=True)
+    hs.add_argument("--keychain", type=Path, default=LOGIN_KEYCHAIN)
     hp = sub.add_parser("helper-package-macos", help="host .pkg with the computer helper")
     hp.add_argument("--version", required=True)
     hp.add_argument("--out", type=Path, required=True)
@@ -1267,6 +1280,7 @@ def _helper_command(runner: Runner, args: argparse.Namespace) -> None:
             app=args.app.resolve(),
             identity=args.identity,
             requirement_file=args.requirement_file.resolve(),
+            keychain=args.keychain,
         ):
             print(f"helper-sign-macos: {line}")
     elif args.command == "helper-package-macos":

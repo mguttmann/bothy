@@ -60,9 +60,9 @@ HELPER_OUT ?= $(CURDIR)/.helper
 helper-macos: ## Build the macOS computer helper bundle (development build): make helper-macos [OUT=<dir>]
 	@out="$${OUT:-$(HELPER_OUT)}"; mkdir -p "$$out" && bash desktop/macos/bundle.sh "$$(cd "$$out" && pwd)" "$$(tr -d '[:space:]' < VERSION)"
 
-helper-sign-macos: ## Sign the helper with a Developer ID: make helper-sign-macos APP=<.app> SIGN_IDENTITY=<name> REQUIREMENT_FILE=<file>
+helper-sign-macos: ## Sign the helper with a Developer ID: make helper-sign-macos APP=<.app> SIGN_IDENTITY=<name> REQUIREMENT_FILE=<file> [KEYCHAIN=<file>]
 	@[ -n "$${APP:-}" ] && [ -n "$${SIGN_IDENTITY:-}" ] && [ -n "$${REQUIREMENT_FILE:-}" ] || { echo "usage: make helper-sign-macos APP=<.app> SIGN_IDENTITY=<name> REQUIREMENT_FILE=<file>"; exit 2; }
-	@$(HOSTDIST) helper-sign-macos --app "$$APP" --identity "$$SIGN_IDENTITY" --requirement-file "$$REQUIREMENT_FILE"
+	@$(HOSTDIST) helper-sign-macos --app "$$APP" --identity "$$SIGN_IDENTITY" --requirement-file "$$REQUIREMENT_FILE" $${KEYCHAIN:+--keychain "$$KEYCHAIN"}
 
 helper-package-macos: ## Host .pkg with the helper as an optional choice: make helper-package-macos APP=<.app> OUT=<dir> [REQUIREMENT_FILE=<file>]
 	@[ -n "$${APP:-}" ] && [ -n "$${OUT:-}" ] || { echo "usage: make helper-package-macos APP=<.app> OUT=<dir>"; exit 2; }

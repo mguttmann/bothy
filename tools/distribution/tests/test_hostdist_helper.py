@@ -457,3 +457,19 @@ def test_the_windows_package_builds_the_host_with_the_publisher(
         workdir=tmp_path / "work",
     )
     assert _requirement_flag(run) == want
+
+
+def test_helper_sign_macos_names_one_keychain(tmp_path: Path) -> None:
+    # Never the search list: another project's keychain in it asked the owner for its password.
+    run = _sign_run()
+    hostdist.helper_sign_macos(
+        run, app=tmp_path / "a.app", identity="X", requirement_file=tmp_path / "r"
+    )
+    sign = run.calls[0]
+    assert sign[sign.index("--keychain") + 1] == str(hostdist.LOGIN_KEYCHAIN)
+    other = tmp_path / "k.keychain-db"
+    run = _sign_run()
+    hostdist.helper_sign_macos(
+        run, app=tmp_path / "a.app", identity="X", requirement_file=tmp_path / "r", keychain=other
+    )
+    assert run.calls[0][run.calls[0].index("--keychain") + 1] == str(other)
