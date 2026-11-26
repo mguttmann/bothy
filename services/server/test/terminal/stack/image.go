@@ -112,13 +112,34 @@ const HostAptFallback = "/etc/termsuite-apt-fallback"
 // of the build log, because the last line names only the RUN instruction and is cut; a failed
 // check for the marker.
 func HostImage(ctx context.Context, d *Docker, root string, warn io.Writer) (string, error) {
+	return HostImageWith(ctx, d, root, warn, nil)
+}
+
+// HostImageWith is HostImage for a variant of the host image with the Debian packages pkgs added
+// (the build argument EXTRA_PACKAGES of the Dockerfile; computer use adds Xvfb, Python and Tk for
+// the Linux test backend, CU-T24). Without packages it is HostImage; with them the tag is the first
+// 12 hex of the SHA-256 of the Dockerfile, a NUL byte and the packages joined by spaces, so a
+// variant never takes the tag of the plain image.
+//
+// Errors: those of HostImage.
+func HostImageWith(ctx context.Context, d *Docker, root string, warn io.Writer, pkgs []string) (string, error) {
 	file := filepath.Join(root, HostDockerfile)
-	sum, err := fileSHA256(file)
+	raw, err := os.ReadFile(file) //nolint:gosec // G304: a fixed file of the repository
 	if err != nil {
 		return "", err
 	}
+	extra := strings.Join(pkgs, " ")
+	if extra != "" {
+		raw = append(append(raw, 0), extra...)
+	}
+	s := sha256.Sum256(raw)
+	sum := hex.EncodeToString(s[:])
 	tag := "termsuite-host:" + sum[:12]
-	args := []string{"buildx", "build", "--load", "--tag", tag, "--file", file, filepath.Dir(file)}
+	args := []string{"buildx", "build", "--load", "--tag", tag}
+	if extra != "" {
+		args = append(args, "--build-arg", "EXTRA_PACKAGES="+extra)
+	}
+	args = append(args, "--file", file, filepath.Dir(file))
 	if r, err := d.run(ctx, nil, nil, "image", "inspect", "--format", "{{.Id}}", tag); err == nil && r.code == 0 {
 		fallback, err := hostAptFallback(ctx, d, tag)
 		if err != nil {

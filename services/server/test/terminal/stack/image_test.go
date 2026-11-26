@@ -218,3 +218,38 @@ func TestAptErrorsWithoutAptErrors(t *testing.T) {
 		t.Errorf("aptErrors = %q, want empty", got)
 	}
 }
+
+// TestHostImageWithPackages proves the host image variant of computer use (CU-T24): the packages
+// reach the build as the argument EXTRA_PACKAGES, and the tag is the first 12 hex of the SHA-256 of
+// the Dockerfile and the package list, so it never equals the tag of the plain host image.
+func TestHostImageWithPackages(t *testing.T) {
+	root, err := RepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin, log := recordingDocker(t)
+	d := &Docker{Bin: bin, Env: []string{"PATH=/usr/bin:/bin"}}
+	pkgs := []string{"xvfb", "python3-tk"}
+	tag, err := HostImageWith(t.Context(), d, root, io.Discard, pkgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := fileSHA256(filepath.Join(root, "infra/compose/test/host/Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(tag, "termsuite-host:") || tag == "termsuite-host:"+plain[:12] {
+		t.Errorf("tag = %q, want a termsuite-host tag other than the plain image's", tag)
+	}
+	again, err := HostImageWith(t.Context(), d, root, io.Discard, pkgs)
+	if err != nil || again != tag {
+		t.Errorf("the tag is not stable: %q then %q (%v)", tag, again, err)
+	}
+	calls, err := os.ReadFile(log) //nolint:gosec // G304: the log of the fake in a temp dir
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(calls), "buildx build --load --tag "+tag+" --build-arg EXTRA_PACKAGES=xvfb python3-tk") {
+		t.Errorf("the variant is not built with its packages:\n%s", calls)
+	}
+}

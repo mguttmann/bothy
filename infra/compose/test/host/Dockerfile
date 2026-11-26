@@ -20,9 +20,14 @@
 # (services/host/test/platform, run by e2e/hostplatform): the system call trace of TM-T25, the
 # attach attempt and the impostor on the helper endpoint of TM-T26, and the connect attempt on the
 # admin endpoint. Without them those checks fail or prove nothing.
+# EXTRA_PACKAGES (empty by default) adds Debian packages for a variant of the image: the end-to-end
+# test of computer use (CU-T24, services/server/test/terminal/e2e/computer) adds Xvfb, Python with
+# python-xlib, Pillow and Tk for the Linux test backend and the runner; stack.HostImageWith tags
+# the variant by the Dockerfile and the package list.
 FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 ARG SNAPSHOT=20261015T000000Z
+ARG EXTRA_PACKAGES=""
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf 'deb http://snapshot.debian.org/archive/debian/%s trixie main\ndeb http://snapshot.debian.org/archive/debian/%s trixie-updates main\ndeb http://snapshot.debian.org/archive/debian-security/%s trixie-security main\n' "$SNAPSHOT" "$SNAPSHOT" "$SNAPSHOT" > /etc/apt/sources.list \
     && printf 'Acquire::Check-Valid-Until "false";\nAcquire::Retries "0";\n' > /etc/apt/apt.conf.d/99snapshot \
@@ -35,7 +40,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
          apt-get update -qq --error-on=any \
          && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
               systemd systemd-sysv dbus sudo cron procps acl iproute2 ca-certificates passwd util-linux \
-              strace gdb python3-minimal netcat-openbsd \
+              strace gdb python3-minimal netcat-openbsd $EXTRA_PACKAGES \
          && break; \
          [ "$attempt" = 6 ] && exit 1; sleep $((attempt * 10)); \
        done \
