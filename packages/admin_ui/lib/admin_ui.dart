@@ -116,6 +116,12 @@
 /// the changed parts ([definitionChanges]) and save with `If-Match` and step-up; "Versions"
 /// ([AgentVersionsDialog]), "Change runner" ([ChangeRunnerDialog]), "Disable" and "Continue
 /// setup" complete it.
+///
+/// V1-14 adds the own sign-in methods for the settings of the apps and the console page
+/// "Sign-in" (01 5.1 D8, 5.5; 08 2.5, 3.3): the [MySignInView] with the [PasswordDialog] (the
+/// password and the one-time code in two steps, the secret as [TotpQrCode] and as text), "Add
+/// passkey" over a [PasskeyCreator] and "Link with" over an [IdentityLinker] of the host, and
+/// the data source [SignInRepository] ([ApiSignInRepository]).
 library;
 
 export 'src/access/source_chain.dart';
@@ -179,6 +185,7 @@ export 'src/data/apps_repository.dart';
 export 'src/data/hosts_repository.dart';
 export 'src/data/instance_repository.dart';
 export 'src/data/self_repository.dart';
+export 'src/data/sign_in_repository.dart';
 export 'src/devices/approve_device_dialog.dart';
 export 'src/devices/waiting_devices.dart';
 export 'src/emergency/emergency_home.dart';
@@ -242,8 +249,11 @@ export 'src/self/confirm_device_dialog.dart';
 export 'src/self/device_tile.dart';
 export 'src/self/my_devices_view.dart';
 export 'src/self/my_sessions_view.dart';
+export 'src/self/my_sign_in_view.dart';
+export 'src/self/password_dialog.dart';
 export 'src/self/revoke_confirm.dart';
 export 'src/self/self_feedback.dart' show SelfFailure, SelfNotice;
+export 'src/self/totp_qr.dart';
 export 'src/shell/admin_body.dart';
 export 'src/shell/admin_routes.dart';
 export 'src/shell/admin_shell.dart';
