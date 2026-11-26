@@ -107,6 +107,13 @@ type Env struct {
 // ownerMode reports the owner account mode.
 func (e Env) ownerMode() bool { return e.OwnerAccount != "" }
 
+// computerOnly reports a computer-use-only host (D-CU-03-13): host_service.computer_use on and no
+// session users. It gives no terminal session, so HD1 and HD10 name the missing terminal as a
+// warning instead of refusing the start; with session users every rule stays as it was.
+func (e Env) computerOnly() bool {
+	return e.Config.ComputerUse && len(e.Config.SessionUsers) == 0 && !e.ownerMode()
+}
+
 // helperGrace is the default HelperGrace, a protocol constant of the channel, not a product
 // window; it also covers the sudo probe of the helper.
 const helperGrace = 30 * time.Second
@@ -220,7 +227,11 @@ func foldEq(a, b string) bool { return strings.EqualFold(a, b) }
 
 func (r *run) hd1() {
 	c := r.env.Config
-	if len(c.SessionUsers) == 0 {
+	switch {
+	case len(c.SessionUsers) > 0:
+	case r.env.computerOnly():
+		r.add(HD1, Entry{Status: Warn, Code: CodeSessionUsersEmpty})
+	default:
 		r.fail(HD1, CodeSessionUsersEmpty)
 	}
 	for _, n := range privilegedNames {
@@ -530,7 +541,13 @@ func (r *run) hd10(ctx context.Context) {
 	r.helperIntegrity()
 	r.claudeBin = r.checkClaudeBin()
 	r.facts.claudeBinEmpty = r.claudeBin == ""
-	if !r.env.PeerCheckProven {
+	switch {
+	case r.env.PeerCheckProven:
+	case r.env.computerOnly():
+		// The peer check guards the terminal helpers of the session users; without them there is
+		// no terminal to protect (D-CU-03-13).
+		r.add(HD10, Entry{Status: Warn, Code: CodePeerCheckUnavailable})
+	default:
 		r.fail(HD10, CodePeerCheckUnavailable)
 	}
 	if r.env.GOOS == hostos.Linux {

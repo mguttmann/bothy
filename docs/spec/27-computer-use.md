@@ -454,7 +454,10 @@ Not in the owner account mode (24 2.4, ADR 0073): there the host service runs as
 which the peer rule below must refuse, and its `install` runs without root, so it cannot create the
 endpoint folder. The host service refuses to start with `host_service.computer_use` and
 `host_service.owner_account` together (a configuration error naming both keys); computer use needs
-the normal mode with a service user (D-CU-01-26).
+the normal mode with a service user (D-CU-01-26). The owner, who is the console user, is no session
+user; a host may enable computer use without any session user (owner ruling D-CU-03-13): the
+doctor then reports `session_users_empty` and `peer_check_unavailable` as warnings (24 2.2), the
+start is not refused, and the host gives no terminal session.
 
 
 - Endpoint, opened only with `host_service.computer_use`: macOS

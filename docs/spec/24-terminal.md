@@ -661,6 +661,12 @@ check passed.
 
 `peer_mismatch` and `helper_unreachable` name the session user of that channel.
 
+A computer-use-only host (`host_service.computer_use` on, no session users, not the owner account
+mode; 27 9.4, D-CU-03-13) gives no terminal session: there `session_users_empty` (HD1) and
+`peer_check_unavailable` (HD10) are warnings and refuse no start, and the report names them, so the
+server shows the terminal as unavailable. With at least one session user every rule above applies
+unchanged.
+
 ### 2.3 Server host
 
 If the host service runs on the host that runs the server, a shell there reaches the
