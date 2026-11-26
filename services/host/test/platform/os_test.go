@@ -197,7 +197,7 @@ func uninstall(t *testing.T, users []string) {
 			}
 			out, _ = try("powershell", "-NoProfile", "-Command",
 				"Get-WinEvent -LogName Application -MaxEvents 300 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -eq 'bothy-host' } | "+
-					"Select-Object -First 8 | ForEach-Object { $_.TimeCreated.ToString('s') + ' ' + ($_.Message -replace '\\s+', ' ') }")
+					"Select-Object -First 8 | ForEach-Object { $_.TimeCreated.ToString('s') + ' ' + (($_.Properties | ForEach-Object { $_.Value }) -join ' ' -replace '\\s+', ' ') }")
 			for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 				t.Log("application log: " + l)
 			}
