@@ -401,8 +401,10 @@ session on the same host is no conflict.
   `IOPMAssertion` against display sleep while a session is `active` or `paused`.
 - Esc tap: an event tap that swallows a real Esc while a session is live.
 - Permissions: screen recording and accessibility for the helper's bundle ID; detected with
-  `CGPreflightScreenCaptureAccess` and `AXIsProcessTrusted`; the helper offers a link that opens the
-  right pane of the system settings, never grants itself anything and uses no MDM profile. The
+  `CGPreflightScreenCaptureAccess` and `AXIsProcessTrusted`; the helper offers a link that, after
+  the person's click, registers a missing permission with the system (`CGRequestScreenCaptureAccess`,
+  `AXIsProcessTrustedWithOptions` with the prompt), so the helper is listed in the pane, and opens
+  the right pane of the system settings; it never grants itself anything and uses no MDM profile. The
   signing step compares the designated requirement of the signed helper with the one of the
   previous signed build and fails on a change, because a changed requirement silently voids the
   grants.
