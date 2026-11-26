@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/OWNER/bothy/services/host/internal/localchan"
@@ -97,4 +98,25 @@ func (a *app) doctorOnceWindows(ctx context.Context, stdout, stderr io.Writer) i
 	}
 	_, _ = fmt.Fprintln(stderr, "bothy-host doctor: no answer of the host service")
 	return exitFailed
+}
+
+// eventSource is the event log source of the lines a Windows service of bothy-host writes to its
+// standard error, which the service control manager discards.
+const eventSource = "bothy-host"
+
+// serviceStderr returns w plus the Application event log: a PTY helper runs as a Windows service
+// without a console and without the log file of the host service (its account may not write the
+// state directory), so the reason it stopped was lost (the open minor of AUD-host-01; it hid
+// why every helper ended in the platform runs, AUD-PKG-R2-06/8). The lines carry codes and error
+// texts of the system, no content.
+func serviceStderr(w io.Writer) io.Writer { return eventWriter{w: w} }
+
+type eventWriter struct{ w io.Writer }
+
+func (e eventWriter) Write(p []byte) (int, error) {
+	if l, err := eventlog.Open(eventSource); err == nil {
+		_ = l.Error(1, string(p))
+		_ = l.Close()
+	}
+	return e.w.Write(p)
 }
