@@ -114,10 +114,10 @@
     {
       "name": "a text longer than one frame injects nothing",
       "enabled": true,
-      "frame_max_bytes": 64,
+      "frame_max_bytes": 200,
       "events": [
         {"host": {"op": "show", "session_id": "s1", "agent_name": "Alex"}},
-        {"host": {"op": "do", "seq": 1, "action": "type", "text": "Alex, Sam and Robin write to each other at example.com every day"}}
+        {"host": {"op": "do", "seq": 1, "action": "type", "text": "Alex, Sam and Robin write to each other at example.com every day, and this line goes on with more words about their plans for the week so that it is longer than one frame of the limit this case sets for the channel"}}
       ],
       "expect": {"units": 0, "released_after": true, "sent": [{"op": "done", "seq": 1, "code": "invalid_action"}]}
     },

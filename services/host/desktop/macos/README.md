@@ -35,7 +35,11 @@ What it does:
   refuses no key and no app.
 - **Stopping a running action.** The Esc tap, the stop button, the lock monitor and the channel
   reader (`hide`, `disable`, a broken channel) set a shared flag (`ActionInterrupt`) on their own
-  threads; an action checks it before every event, releases every key and button and ends.
+  threads; an action runs in units (a press and release per `repeat`, a character, a line of
+  scroll, a click, a move) and checks it before every unit, releases every key and button and
+  ends (27 9.6). One held Esc stops once; its auto-repeat and key up are swallowed; the Esc
+  state (`EscFilter`) starts fresh with every show. `StopVectorTests` runs the shared vectors
+  `services/host/testdata/computer/stop-vectors.json`.
   `repeat` above the default of `computer.key_repeat_max` and a `text` longer than one frame of
   `host_service.computer_frame_max_bytes` are `invalid_action` before anything is injected.
 - **Lock.** Lock, screen saver, user switch and display sleep count as locked: the helper

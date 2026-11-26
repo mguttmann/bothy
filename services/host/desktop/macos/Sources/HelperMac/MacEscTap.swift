@@ -2,29 +2,32 @@ import CoreGraphics
 import Foundation
 import HelperCore
 
-/// The Esc tap (27 8.4 item 4, 9.1): an active `CGEventTap` on the session that swallows the key
-/// down and key up of a real Esc while a session is shown and lets every other event pass.
+/// The Esc tap (27 8.4 item 4, 9.1, 9.6 item 4): an active `CGEventTap` on the session that
+/// swallows a real Esc while a session is shown and lets every other event pass.
 ///
 /// An Esc counts as injected when it carries `MacInjector.marker` in `eventSourceUserData` or
-/// the state ID of the helper's own event source; such an Esc passes and stops nothing. The tap
-/// answers at once on its own thread with `HelperController.escDecision(injected:)` and hands the
-/// end of the session to the controller's context, because a slow tap is disabled by macOS.
-/// While Secure Input is on, macOS shows the tap no keys (27 9.5); the stop button stays.
+/// the state ID of the helper's own event source; such an Esc passes and stops nothing. Which
+/// real Esc events are swallowed and which one stops the session is decided by the shared
+/// `EscFilter`: one held Esc stops once, its auto-repeat and key up are swallowed, and the state
+/// starts fresh with every start. A stop while an Esc is still held keeps the tap until that
+/// key up, so the rest of the held Esc never reaches the app. The tap answers at once on its own
+/// thread, sets the interrupt flag and hands the end of the session to the controller's context,
+/// because a slow tap is disabled by macOS. While Secure Input is on, macOS shows the tap no
+/// keys (27 9.5); the stop button stays.
 public final class MacEscTap: EscTap {
     private let dispatch: (@escaping () -> Void) -> Void
     private let ownSourceStateID: Int64?
     private let interrupt: ActionInterrupt
-    private var thread: Thread?
+    private let filter = EscFilter()
+    private let lock = NSLock()
     private var runLoop: CFRunLoop?
     private var tap: CFMachPort?
-    fileprivate var handler: ((Bool) -> EscDecision)?
-    /// Whether the key down of the current real Esc was swallowed, so its key up is too.
-    fileprivate var swallowingUp = false
+    private var handler: ((Bool) -> EscDecision)?
 
     /// Creates the tap.
     /// - Parameters:
     ///   - ownSourceStateID: the state ID of `MacInjector`'s event source.
-    ///   - interrupt: set at once on a real Esc, so a running action stops between two steps.
+    ///   - interrupt: set at once on a real Esc, so a running action stops between two units.
     ///   - dispatch: runs a closure asynchronously in the controller's context.
     public init(
         ownSourceStateID: Int64?, interrupt: ActionInterrupt,
@@ -36,49 +39,60 @@ public final class MacEscTap: EscTap {
     }
 
     public func start(handler: @escaping (Bool) -> EscDecision) throws {
-        stop()
-        self.handler = handler
-        let mask =
-            (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+        tearDown()
+        filter.start()
+        let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
         guard
             let port = CGEvent.tapCreate(
                 tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                 eventsOfInterest: CGEventMask(mask), callback: escTapCallback,
                 userInfo: Unmanaged.passUnretained(self).toOpaque())
         else {
-            self.handler = nil
+            filter.stop()
             throw EscTapError.refused
         }
-        tap = port
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [weak self] in
             guard let self, let source = CFMachPortCreateRunLoopSource(nil, port, 0) else {
                 ready.signal()
                 return
             }
-            self.runLoop = CFRunLoopGetCurrent()
+            self.lock.withLock {
+                self.runLoop = CFRunLoopGetCurrent()
+                self.tap = port
+                self.handler = handler
+            }
             CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
             CGEvent.tapEnable(tap: port, enable: true)
             ready.signal()
             CFRunLoopRun()
         }
         thread.name = "esc-tap"
-        self.thread = thread
         thread.start()
         ready.wait()
     }
 
     public func stop() {
-        if let tap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            CFMachPortInvalidate(tap)
+        filter.stop()
+        lock.withLock { handler = nil }
+        // A held Esc keeps the tap until its key up (EscFilter.draining).
+        if !filter.draining { tearDown() }
+    }
+
+    private func tearDown() {
+        let (port, loop) = lock.withLock { () -> (CFMachPort?, CFRunLoop?) in
+            defer {
+                tap = nil
+                runLoop = nil
+                handler = nil
+            }
+            return (tap, runLoop)
         }
-        if let runLoop { CFRunLoopStop(runLoop) }
-        tap = nil
-        runLoop = nil
-        thread = nil
-        handler = nil
-        swallowingUp = false
+        if let port {
+            CGEvent.tapEnable(tap: port, enable: false)
+            CFMachPortInvalidate(port)
+        }
+        if let loop { CFRunLoopStop(loop) }
     }
 
     /// Whether an event comes from the helper itself.
@@ -93,17 +107,20 @@ public final class MacEscTap: EscTap {
     }
 
     fileprivate func reenable() {
-        if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+        if let port = lock.withLock({ tap }) { CGEvent.tapEnable(tap: port, enable: true) }
     }
 
-    fileprivate func escapeDown(injected: Bool) -> EscDecision {
-        let decision = HelperController.escDecision(injected: injected)
-        if decision == .swallow, let handler {
+    /// Judges one Esc event on the tap's thread.
+    fileprivate func escape(down: Bool, injected: Bool) -> EscDecision {
+        let verdict = filter.handle(down: down, injected: injected)
+        if verdict.stopsSession, let handler = lock.withLock({ handler }) {
             // The controller's queue may be busy with a long action; the flag stops it now.
             interrupt.requestStop(.localEscape)
             dispatch { _ = handler(false) }
         }
-        return decision
+        // The key up that ends a held Esc after a stop lets the tap go.
+        if !down, lock.withLock({ handler == nil }), !filter.draining { tearDown() }
+        return verdict.decision
     }
 }
 
@@ -125,20 +142,11 @@ private func escTapCallback(
         tap.reenable()
         return Unmanaged.passUnretained(event)
     case .keyDown, .keyUp:
-        guard event.getIntegerValueField(.keyboardEventKeycode) == escapeKeyCode,
-            !tap.isInjected(event)
-        else { return Unmanaged.passUnretained(event) }
-        if type == .keyDown {
-            if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 { return nil }
-            tap.swallowingUp = true
-            return tap.escapeDown(injected: false) == .swallow ? nil : Unmanaged.passUnretained(event)
+        guard event.getIntegerValueField(.keyboardEventKeycode) == escapeKeyCode else {
+            return Unmanaged.passUnretained(event)
         }
-        // The key up of a swallowed Esc must not reach the app alone.
-        if tap.swallowingUp {
-            tap.swallowingUp = false
-            return nil
-        }
-        return Unmanaged.passUnretained(event)
+        let decision = tap.escape(down: type == .keyDown, injected: tap.isInjected(event))
+        return decision == .swallow ? nil : Unmanaged.passUnretained(event)
     default:
         return Unmanaged.passUnretained(event)
     }

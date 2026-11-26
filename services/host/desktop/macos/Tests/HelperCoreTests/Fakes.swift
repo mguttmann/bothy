@@ -35,41 +35,61 @@ final class FakeInjector: Injector {
     var cursor = Point(x: 640.5, y: 400)
     /// Called after every key down, so a test can feed the event to the fake Esc tap.
     var onKeyDown: ((Key) -> Void)?
+    /// Units of 27 9.6 that performed at least one event, counted since the last reset.
+    var units = 0
+    private var unitHasEvent = true
+    /// Called right before the controller checks the interrupt for unit `index`; a stop vector
+    /// raises its armed interrupt here, from outside the controller.
+    var onUnit: ((Int) -> Void)?
 
     init(journal: Journal) { self.journal = journal }
 
     func permissionGranted() -> Bool { granted }
     func supports(_ key: Key) -> Bool { !unsupported.contains(key) }
 
+    func willStartUnit(_ index: Int) {
+        unitHasEvent = false
+        onUnit?(index)
+    }
+
+    /// Counts the unit the event belongs to once.
+    private func record(_ event: InjectedEvent) {
+        if !unitHasEvent {
+            units += 1
+            unitHasEvent = true
+        }
+        events.append(event)
+    }
+
     func keyDown(_ key: Key) throws {
-        events.append(.keyDown(key))
+        record(.keyDown(key))
         pressedKeys.insert(key)
         onKeyDown?(key)
     }
 
     func keyUp(_ key: Key) throws {
-        events.append(.keyUp(key))
+        record(.keyUp(key))
         pressedKeys.remove(key)
     }
 
-    func move(to point: Point) throws { events.append(.move(point)) }
+    func move(to point: Point) throws { record(.move(point)) }
 
     func mouseDown(_ button: MouseButton, at point: Point, clickCount: Int) throws {
         if failOnMouseDown { throw FakeError.refused }
-        events.append(.mouseDown(button, point, clickCount))
+        record(.mouseDown(button, point, clickCount))
         pressedButtons.insert(button)
     }
 
     func mouseUp(_ button: MouseButton, at point: Point, clickCount: Int) throws {
-        events.append(.mouseUp(button, point, clickCount))
+        record(.mouseUp(button, point, clickCount))
         pressedButtons.remove(button)
     }
 
     func scroll(at point: Point, direction: ScrollDirection, lines: Int) throws {
-        events.append(.scroll(point, direction, lines))
+        record(.scroll(point, direction, lines))
     }
 
-    func typeText(_ text: String) throws { events.append(.text(text)) }
+    func typeText(_ text: String) throws { record(.text(text)) }
 
     func cursorPosition() throws -> Point { cursor }
 
@@ -137,26 +157,39 @@ final class FakeWaker: Waker {
     }
 }
 
+/// Fake Esc tap with the shared `EscFilter` of the platform tap, so the held-Esc and
+/// auto-repeat rules of 27 9.6 item 4 run as in the app.
 final class FakeEscTap: EscTap {
     let journal: Journal
     var handler: ((Bool) -> EscDecision)?
+    let filter = EscFilter()
     init(journal: Journal) { self.journal = journal }
     var running: Bool { handler != nil }
 
     func start(handler: @escaping (Bool) -> EscDecision) throws {
         self.handler = handler
+        filter.start()
         journal.add("tap.start")
     }
 
     func stop() {
         handler = nil
+        filter.stop()
         journal.add("tap.stop")
     }
 
-    /// Feeds an Esc key down to the tap; without a running tap the event passes untouched.
+    /// Feeds one Esc key event to the tap and returns its answer. A real Esc that the filter
+    /// counts as a new press reaches the controller as the platform tap's handler does.
+    func key(down: Bool, injected: Bool) -> EscDecision {
+        let verdict = filter.handle(down: down, injected: injected)
+        if verdict.stopsSession, let handler { _ = handler(false) }
+        return verdict.decision
+    }
+
+    /// Feeds an Esc key down to the tap.
     func press(injected: Bool) -> EscDecision {
-        guard let handler else { return .pass }
-        return handler(injected)
+        if injected, let handler { return handler(true) }
+        return key(down: true, injected: injected)
     }
 }
 

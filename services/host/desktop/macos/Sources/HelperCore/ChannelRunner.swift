@@ -67,7 +67,7 @@ public final class ChannelRunner {
                 break reading
             }
         }
-        controller.interrupt.requestEnd()
+        controller.interrupt.requestChannelBroken()
         channel.close()
         perform { self.controller.channelBroken() }
         log("channel closed")

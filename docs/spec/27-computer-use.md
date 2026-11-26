@@ -508,8 +508,9 @@ both run (D-CU-02-16):
    for `hide` or `disable`, nothing on a broken channel.
 3. A `repeat` above the default of `computer.key_repeat_max` and a `text` longer than one frame of
    `host_service.computer_frame_max_bytes` are `invalid_action` before any step.
-4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts or stops;
-   one held Esc stops once; an injected Esc passes and stops nothing.
+4. The Esc tap's state (a held Esc, its auto-repeat) starts fresh whenever the tap starts; a stop
+   keeps only the rest of the Esc that is still held, so its auto-repeat and key up are swallowed
+   and stop nothing more; one held Esc stops once; an injected Esc passes and stops nothing.
 
 ## 10. Runner integration
 
