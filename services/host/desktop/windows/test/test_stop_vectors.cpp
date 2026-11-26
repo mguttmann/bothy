@@ -105,6 +105,10 @@ void run_case(const Value& c, std::int64_t key_repeat_max, std::int64_t scroll_a
       rig.injector.after_send = nullptr;
     } else if (const Value* kind = ev.find("interrupt")) {
       armed = std::make_pair(kind->as_string(), ev.find("before_unit")->as_integer());
+    } else if (ev.find("stop_button") != nullptr) {
+      // As the platform indicator does: raise the interrupt, then hand the stop to the controller.
+      rig.interrupt.raise(Interrupt::Kind::StopButton);
+      rig.controller.on_stop_button();
     } else if (const Value* r = ev.find("raise")) {
       raise(rig, r->as_string());  // another thread, before the next event (27 9.6 item 6)
     } else if (const Value* td = ev.find("tap_teardown")) {
@@ -117,7 +121,7 @@ void run_case(const Value& c, std::int64_t key_repeat_max, std::int64_t scroll_a
       te.down = esc->as_string() == "down";
       te.injected = ev.find("injected")->as_bool();
       te.extra_info = te.injected ? kInjectedMarker : 0;
-      TapDecision d = filter.decide(te, rig.tap.started);
+      TapDecision d = tap_decide(rig.tap.generations, rig.tap.generation, filter, te, rig.tap.started);
       bool swallowed = d != TapDecision::Pass;
       if (swallowed != ev.find("swallow")->as_bool())
         check::fail(__FILE__, __LINE__, name + ": Esc swallow differs");
@@ -125,6 +129,7 @@ void run_case(const Value& c, std::int64_t key_repeat_max, std::int64_t scroll_a
         rig.interrupt.raise_escape();
         rig.controller.on_escape();  // the UI thread's answer to the tap's message
       }
+      rig.tap.after_event();
     }
   }
 

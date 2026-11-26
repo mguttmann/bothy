@@ -259,3 +259,22 @@ CHECK_TEST(tap_generation_lets_only_the_current_tap_end) {
   CHECK_EQ(ended, 1);
   CHECK(!g.current(second));  // ended: no tap is current
 }
+
+CHECK_TEST(a_stale_tap_never_changes_the_filter) {
+  // A hook of an older tap generation decides nothing and leaves the held state alone, so the next
+  // real Esc of the current tap still stops (27 9.6 item 5).
+  TapGeneration gens;
+  EscFilter filter(kInjectedMarker);
+  std::uint64_t old_tap = gens.begin();
+  std::uint64_t new_tap = gens.begin();
+  TapEvent real{true, true, false, 0};
+  CHECK(tap_decide(gens, old_tap, filter, real, true) == TapDecision::Pass);
+  CHECK(!filter.holding());
+  CHECK(tap_decide(gens, new_tap, filter, real, true) == TapDecision::SwallowAndStop);
+  CHECK(filter.holding());
+  // An ended tap decides nothing either.
+  CHECK(gens.end(new_tap, [] {}));
+  EscFilter fresh(kInjectedMarker);
+  CHECK(tap_decide(gens, new_tap, fresh, real, true) == TapDecision::Pass);
+  CHECK(!fresh.holding());
+}
