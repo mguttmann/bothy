@@ -11,9 +11,10 @@ T = TypeVar("T", bound="HostComputerDisable")
 
 @_attrs_define
 class HostComputerDisable:
-    """
+    """The server switches the enablement of the host off (`computer.disable`, 27 12.3).
+
     Attributes:
-        generation (int):
+        generation (int): The enablement generation that is switched off.
     """
 
     generation: int

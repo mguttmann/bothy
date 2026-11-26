@@ -13,10 +13,11 @@ T = TypeVar("T", bound="HostComputerStarted")
 
 @_attrs_define
 class HostComputerStarted:
-    """
+    """The host service started a computer session (`computer.started`, 27 12.3).
+
     Attributes:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        state (HostComputerStartedState):
+        state (HostComputerStartedState): State at the start; `paused` while the screen is locked.
     """
 
     session_id: UUID

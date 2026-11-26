@@ -32,7 +32,7 @@ class ComputerSessionChangedEvent:
         occurred_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         scope (EventScope): Location of the event. Members are absent where not applicable.
         resource (EventResource):
-        type_ (ComputerSessionChangedEventType):
+        type_ (ComputerSessionChangedEventType): The event type.
         payload (ComputerSession): Metadata of a computer session (03 `computer_sessions`) with the name of its desktop.
             Never an image, a coordinate, typed text, a key name, the attach token or its `jti`.
         seq (int | Unset): Global commit-ordered sequence; absent for ephemeral events.

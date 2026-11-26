@@ -9,18 +9,20 @@ import 'package:built_value/serializer.dart';
 
 part 'host_computer_permissions.g.dart';
 
-/// HostComputerPermissions
+/// The operating system permissions of the computer helper (27 12.3).
 ///
 /// Properties:
-/// * [capture]
-/// * [input]
+/// * [capture] - Permission to capture the screen.
+/// * [input] - Permission to send mouse and keyboard input.
 @BuiltValue()
 abstract class HostComputerPermissions
     implements Built<HostComputerPermissions, HostComputerPermissionsBuilder> {
+  /// Permission to capture the screen.
   @BuiltValueField(wireName: r'capture')
   HostComputerPermissionsCaptureEnum get capture;
   // enum captureEnum {  granted,  denied,  unknown,  };
 
+  /// Permission to send mouse and keyboard input.
   @BuiltValueField(wireName: r'input')
   HostComputerPermissionsInputEnum get input;
   // enum inputEnum {  granted,  denied,  unknown,  };
@@ -135,6 +137,7 @@ class _$HostComputerPermissionsSerializer
   }
 }
 
+/// Permission to capture the screen.
 class HostComputerPermissionsCaptureEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'granted')
   static const HostComputerPermissionsCaptureEnum granted =
@@ -160,6 +163,7 @@ class HostComputerPermissionsCaptureEnum extends EnumClass {
       _$hostComputerPermissionsCaptureEnumValueOf(name);
 }
 
+/// Permission to send mouse and keyboard input.
 class HostComputerPermissionsInputEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'granted')
   static const HostComputerPermissionsInputEnum granted =

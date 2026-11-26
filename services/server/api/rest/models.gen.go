@@ -10060,6 +10060,7 @@ type ComponentUpdateState string
 
 // ComputerAttachHello First text frame of the computer attach connection; `identify` follows, then binary Noise frames only.
 type ComputerAttachHello struct {
+	// ProtocolVersions Versions of the attach protocol the server speaks.
 	ProtocolVersions []int `json:"protocol_versions"`
 
 	// ServerTime RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -10068,9 +10069,13 @@ type ComputerAttachHello struct {
 
 // ComputerAttachIdentify The single-use attach token of the session (27 5.4); the connection carries no agent token.
 type ComputerAttachIdentify struct {
-	// ProtocolVersion Examples: 1
-	ProtocolVersion int    `json:"protocol_version"`
-	Token           string `json:"token"`
+	// ProtocolVersion The version of the attach protocol `bothy-computer-mcp` chose from `protocol_versions`.
+	//
+	// Examples: 1
+	ProtocolVersion int `json:"protocol_version"`
+
+	// Token The attach token of `ComputerSessionGrant`, valid once.
+	Token string `json:"token"`
 }
 
 // ComputerCloseDetail Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`, `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`, `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error` (`stream_fault`, `helper_crashed`).
@@ -10079,7 +10084,7 @@ type ComputerCloseDetail string
 // ComputerCloseReason Why a computer session ended (docs/spec/27-computer-use.md 8.3).
 type ComputerCloseReason string
 
-// ComputerDesktop defines model for ComputerDesktop.
+// ComputerDesktop A host of the owner that carries a computer helper, as `computer.desktops.list` shows it to the agent (27 5.1).
 type ComputerDesktop struct {
 	// Busy Another computer session on the host is not closed.
 	Busy bool `json:"busy"`
@@ -10090,19 +10095,25 @@ type ComputerDesktop struct {
 	// Locked The screen is locked (`report.computer.locked`).
 	Locked bool `json:"locked"`
 
-	// Name Examples: Desk
-	Name     string       `json:"name"`
+	// Name The name of the host (`hosts.name`), by which the owner names the desktop.
+	//
+	// Examples: Desk
+	Name string `json:"name"`
+
+	// Online The host service holds a control connection to the server.
 	Online   bool         `json:"online"`
 	Platform HostPlatform `json:"platform"`
 }
 
-// ComputerDesktopList defines model for ComputerDesktopList.
+// ComputerDesktopList The desktops of the owner of the run (`computer.desktops.list`).
 type ComputerDesktopList struct {
+	// Items The desktops.
 	Items []ComputerDesktop `json:"items"`
 }
 
 // ComputerSession Metadata of a computer session (03 `computer_sessions`) with the name of its desktop. Never an image, a coordinate, typed text, a key name, the attach token or its `jti`.
 type ComputerSession struct {
+	// ActionCount Number of actions the session carried out.
 	ActionCount int `json:"action_count"`
 
 	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -10137,16 +10148,22 @@ type ComputerSession struct {
 	HostId Uuid `json:"host_id"`
 
 	// Id UUIDv7 (RFC 9562), lowercase canonical form.
-	Id            Uuid `json:"id"`
-	KeyGeneration int  `json:"key_generation"`
+	Id Uuid `json:"id"`
+
+	// KeyGeneration Generation of the host key the Noise handshake of the session used.
+	KeyGeneration int `json:"key_generation"`
 
 	// OpenedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-	OpenedAt    Timestamp                   `json:"opened_at"`
+	OpenedAt Timestamp `json:"opened_at"`
+
+	// PauseReason Why the session is paused; set only in state `paused`.
 	PauseReason *ComputerSessionPauseReason `json:"pause_reason,omitempty"`
 
 	// PausedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	PausedAt *Timestamp `json:"paused_at,omitempty"`
-	PausedMs int64      `json:"paused_ms"`
+
+	// PausedMs Time in milliseconds the session spent paused.
+	PausedMs int64 `json:"paused_ms"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
@@ -10161,11 +10178,13 @@ type ComputerSession struct {
 	StoppedBy *Uuid `json:"stopped_by,omitempty"`
 
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
-	UserId  Uuid  `json:"user_id"`
+	UserId Uuid `json:"user_id"`
+
+	// Version Version of the session row, raised by every change.
 	Version int64 `json:"version"`
 }
 
-// ComputerSessionPauseReason defines model for ComputerSession.PauseReason.
+// ComputerSessionPauseReason Why the session is paused; set only in state `paused`.
 type ComputerSessionPauseReason string
 
 // ComputerSessionChangedEvent Durable personal event `computer_session.changed` to the triggering owner (27 12.4); never an image.
@@ -10219,26 +10238,36 @@ type ComputerSessionChangedEvent struct {
 	TraceContext *string `json:"trace_context,omitempty"`
 
 	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
-	Truncated *bool                           `json:"truncated,omitempty"`
-	Type      ComputerSessionChangedEventType `json:"type"`
+	Truncated *bool `json:"truncated,omitempty"`
+
+	// Type The event type.
+	Type ComputerSessionChangedEventType `json:"type"`
 }
 
 // ComputerSessionChangedEventAudience defines model for ComputerSessionChangedEvent.Audience.
 type ComputerSessionChangedEventAudience string
 
-// ComputerSessionChangedEventType defines model for ComputerSessionChangedEvent.Type.
+// ComputerSessionChangedEventType The event type.
 type ComputerSessionChangedEventType string
 
 // ComputerSessionGrant Everything `bothy-computer-mcp` needs to attach and run the Noise handshake (27 5.1 step 6). The token is valid once and for `computer.attach_token_ttl`.
 type ComputerSessionGrant struct {
-	// AttachPath Examples: /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach
+	// AttachPath Path of the attach connection (`computer.attach`).
+	//
+	// Examples: /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach
 	AttachPath string `json:"attach_path"`
 
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-	ExpiresAt      Timestamp `json:"expires_at"`
-	KeyFingerprint string    `json:"key_fingerprint"`
-	KeyGeneration  int       `json:"key_generation"`
-	NoisePublicKey string    `json:"noise_public_key"`
+	ExpiresAt Timestamp `json:"expires_at"`
+
+	// KeyFingerprint Fingerprint of `noise_public_key`.
+	KeyFingerprint string `json:"key_fingerprint"`
+
+	// KeyGeneration Generation of the host key.
+	KeyGeneration int `json:"key_generation"`
+
+	// NoisePublicKey The static Noise public key of the host that `bothy-computer-mcp` checks in the handshake (27 10.4).
+	NoisePublicKey string `json:"noise_public_key"`
 
 	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
 	SessionId Uuid `json:"session_id"`
@@ -10247,12 +10276,13 @@ type ComputerSessionGrant struct {
 	Token string `json:"token"`
 }
 
-// ComputerSessionList defines model for ComputerSessionList.
+// ComputerSessionList Computer sessions of the owner (`computer.session.read`).
 type ComputerSessionList struct {
+	// Items The sessions.
 	Items []ComputerSession `json:"items"`
 }
 
-// ComputerSessionOpen defines model for ComputerSessionOpen.
+// ComputerSessionOpen Request of `computer.open`: the desktop and the hash of the ephemeral key of `bothy-computer-mcp` (27 5.1).
 type ComputerSessionOpen struct {
 	// ClientEphemeralKeyHash SHA-256 of the ephemeral X25519 public key that `bothy-computer-mcp` sends in Noise message 1, base64url without padding; becomes the claim `cek`.
 	ClientEphemeralKeyHash string `json:"client_ephemeral_key_hash"`
@@ -12379,20 +12409,35 @@ type HostChannelHello struct {
 
 // HostComputer The state of the computer helper of a host (schema `host_computer.v1`, docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in `hosts.reported_computer`. Never a path, a key or screen content.
 type HostComputer struct {
-	Enabled       bool                    `json:"enabled"`
-	Generation    int                     `json:"generation"`
-	Helper        HostComputerHelper      `json:"helper"`
-	HelperVersion string                  `json:"helper_version"`
-	Locked        bool                    `json:"locked"`
-	OsAccount     string                  `json:"os_account"`
-	Permissions   HostComputerPermissions `json:"permissions"`
-	Signature     HostComputerSignature   `json:"signature"`
+	// Enabled The switch "Allow computer control" of the helper is on.
+	Enabled bool `json:"enabled"`
+
+	// Generation The enablement generation of the host (27 4).
+	Generation int `json:"generation"`
+
+	// Helper The computer helper is connected, absent, or refused by the peer rule (27 9.4).
+	Helper HostComputerHelper `json:"helper"`
+
+	// HelperVersion Version of the computer helper.
+	HelperVersion string `json:"helper_version"`
+
+	// Locked The screen of the desktop is locked.
+	Locked bool `json:"locked"`
+
+	// OsAccount The operating system account of the desktop session the helper runs in.
+	OsAccount string `json:"os_account"`
+
+	// Permissions The operating system permissions of the computer helper (27 12.3).
+	Permissions HostComputerPermissions `json:"permissions"`
+
+	// Signature `verified` when the build of the host service carries a code signing requirement for the helper, else `development`.
+	Signature HostComputerSignature `json:"signature"`
 }
 
-// HostComputerHelper defines model for HostComputer.Helper.
+// HostComputerHelper The computer helper is connected, absent, or refused by the peer rule (27 9.4).
 type HostComputerHelper string
 
-// HostComputerSignature defines model for HostComputer.Signature.
+// HostComputerSignature `verified` when the build of the host service carries a code signing requirement for the helper, else `development`.
 type HostComputerSignature string
 
 // HostComputerApp Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path.
@@ -12409,7 +12454,7 @@ type HostComputerApp struct {
 	Signer string `json:"signer"`
 }
 
-// HostComputerClose defines model for HostComputerClose.
+// HostComputerClose The server ends a computer session on the host (`computer.close`, 27 12.3).
 type HostComputerClose struct {
 	// Reason Why a computer session ended (docs/spec/27-computer-use.md 8.3).
 	Reason ComputerCloseReason `json:"reason"`
@@ -12418,12 +12463,13 @@ type HostComputerClose struct {
 	SessionId Uuid `json:"session_id"`
 }
 
-// HostComputerDisable defines model for HostComputerDisable.
+// HostComputerDisable The server switches the enablement of the host off (`computer.disable`, 27 12.3).
 type HostComputerDisable struct {
+	// Generation The enablement generation that is switched off.
 	Generation int `json:"generation"`
 }
 
-// HostComputerEnded defines model for HostComputerEnded.
+// HostComputerEnded A computer session ended on the host (`computer.ended`, 27 12.3).
 type HostComputerEnded struct {
 	// ActionCounts A count per action kind of 27 6.4.
 	ActionCounts map[string]int `json:"action_counts"`
@@ -12436,7 +12482,9 @@ type HostComputerEnded struct {
 
 	// CloseReason The host service sends only these reasons (27 12.3).
 	CloseReason HostComputerEndedCloseReason `json:"close_reason"`
-	PausedMs    int64                        `json:"paused_ms"`
+
+	// PausedMs Time in milliseconds the session spent paused.
+	PausedMs int64 `json:"paused_ms"`
 
 	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
 	SessionId Uuid `json:"session_id"`
@@ -12448,10 +12496,14 @@ type HostComputerEndedCloseReason string
 // HostComputerOpen The server asks the host service to open the computer data connection of a session (27 5.1 step 7); `user_id` is the triggering owner (`sub` of the attach token).
 type HostComputerOpen struct {
 	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
-	AgentId   Uuid   `json:"agent_id"`
+	AgentId Uuid `json:"agent_id"`
+
+	// AgentName Name of the agent that opens the session.
 	AgentName string `json:"agent_name"`
 
-	// DataPath Examples: /api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream
+	// DataPath Path of the computer data connection of the host service.
+	//
+	// Examples: /api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream
 	DataPath string `json:"data_path"`
 
 	// ExpiresAt Without both sides paired and the handshake done until then the session ends `open_failed` with `open_timeout` (`computer.open_timeout`).
@@ -12470,43 +12522,66 @@ type HostComputerOpen struct {
 	UserId Uuid `json:"user_id"`
 }
 
-// HostComputerPermissions defines model for HostComputerPermissions.
+// HostComputerPermissions The operating system permissions of the computer helper (27 12.3).
 type HostComputerPermissions struct {
+	// Capture Permission to capture the screen.
 	Capture HostComputerPermissionsCapture `json:"capture"`
-	Input   HostComputerPermissionsInput   `json:"input"`
+
+	// Input Permission to send mouse and keyboard input.
+	Input HostComputerPermissionsInput `json:"input"`
 }
 
-// HostComputerPermissionsCapture defines model for HostComputerPermissions.Capture.
+// HostComputerPermissionsCapture Permission to capture the screen.
 type HostComputerPermissionsCapture string
 
-// HostComputerPermissionsInput defines model for HostComputerPermissions.Input.
+// HostComputerPermissionsInput Permission to send mouse and keyboard input.
 type HostComputerPermissionsInput string
 
 // HostComputerSettings The server values of a computer session (27 18), sent with `computer.open`.
 type HostComputerSettings struct {
-	AuditAppsMax     int   `json:"audit_apps_max"`
-	AutoScreenshot   bool  `json:"auto_screenshot"`
-	ImageMaxEdge     int   `json:"image_max_edge"`
-	JpegQuality      int   `json:"jpeg_quality"`
-	KeyRepeatMax     int   `json:"key_repeat_max"`
-	ScrollAmountMax  int   `json:"scroll_amount_max"`
-	SettleMs         int64 `json:"settle_ms"`
+	// AuditAppsMax Value of `computer.audit_apps_max`.
+	AuditAppsMax int `json:"audit_apps_max"`
+
+	// AutoScreenshot Value of `computer.auto_screenshot`.
+	AutoScreenshot bool `json:"auto_screenshot"`
+
+	// ImageMaxEdge Value of `computer.image_max_edge`.
+	ImageMaxEdge int `json:"image_max_edge"`
+
+	// JpegQuality Value of `computer.jpeg_quality`.
+	JpegQuality int `json:"jpeg_quality"`
+
+	// KeyRepeatMax Value of `computer.key_repeat_max`.
+	KeyRepeatMax int `json:"key_repeat_max"`
+
+	// ScrollAmountMax Value of `computer.scroll_amount_max`.
+	ScrollAmountMax int `json:"scroll_amount_max"`
+
+	// SettleMs Value of `computer.settle` in milliseconds.
+	SettleMs int64 `json:"settle_ms"`
+
+	// StatusIntervalMs Value of `computer.status_interval` in milliseconds.
 	StatusIntervalMs int64 `json:"status_interval_ms"`
-	WaitMaxMs        int64 `json:"wait_max_ms"`
+
+	// WaitMaxMs Value of `computer.wait_max` in milliseconds.
+	WaitMaxMs int64 `json:"wait_max_ms"`
 }
 
-// HostComputerStarted defines model for HostComputerStarted.
+// HostComputerStarted The host service started a computer session (`computer.started`, 27 12.3).
 type HostComputerStarted struct {
 	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
-	SessionId Uuid                     `json:"session_id"`
-	State     HostComputerStartedState `json:"state"`
+	SessionId Uuid `json:"session_id"`
+
+	// State State at the start; `paused` while the screen is locked.
+	State HostComputerStartedState `json:"state"`
 }
 
-// HostComputerStartedState defines model for HostComputerStarted.State.
+// HostComputerStartedState State at the start; `paused` while the screen is locked.
 type HostComputerStartedState string
 
-// HostComputerState defines model for HostComputerState.
+// HostComputerState State report of a running computer session (`computer.state`), at most one per `computer.status_interval` (27 12.3).
 type HostComputerState struct {
+	// ActionCount Number of actions so far.
 	ActionCount int `json:"action_count"`
 
 	// FrontApp Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path.
@@ -12516,14 +12591,16 @@ type HostComputerState struct {
 	Reason HostComputerStateReason `json:"reason"`
 
 	// SessionId UUIDv7 (RFC 9562), lowercase canonical form.
-	SessionId Uuid                   `json:"session_id"`
-	State     HostComputerStateState `json:"state"`
+	SessionId Uuid `json:"session_id"`
+
+	// State State of the session.
+	State HostComputerStateState `json:"state"`
 }
 
 // HostComputerStateReason `locked` exactly with `paused`, empty otherwise.
 type HostComputerStateReason string
 
-// HostComputerStateState defines model for HostComputerState.State.
+// HostComputerStateState State of the session.
 type HostComputerStateState string
 
 // HostConfirm defines model for HostConfirm.

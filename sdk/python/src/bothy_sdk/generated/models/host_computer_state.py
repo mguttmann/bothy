@@ -18,12 +18,13 @@ T = TypeVar("T", bound="HostComputerState")
 
 @_attrs_define
 class HostComputerState:
-    """
+    """State report of a running computer session (`computer.state`), at most one per `computer.status_interval` (27 12.3).
+
     Attributes:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        state (HostComputerStateState):
+        state (HostComputerStateState): State of the session.
         reason (HostComputerStateReason): `locked` exactly with `paused`, empty otherwise.
-        action_count (int):
+        action_count (int): Number of actions so far.
         front_app (HostComputerApp): Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper
             named one. Never a window title or a path.
     """

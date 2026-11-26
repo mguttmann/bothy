@@ -11,7 +11,7 @@ import 'package:built_value/serializer.dart';
 
 part 'host_computer_ended.g.dart';
 
-/// HostComputerEnded
+/// A computer session ended on the host (`computer.ended`, 27 12.3).
 ///
 /// Properties:
 /// * [sessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
@@ -19,7 +19,7 @@ part 'host_computer_ended.g.dart';
 /// * [closeDetail]
 /// * [actionCounts] - A count per action kind of 27 6.4.
 /// * [apps] - Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry.
-/// * [pausedMs]
+/// * [pausedMs] - Time in milliseconds the session spent paused.
 @BuiltValue()
 abstract class HostComputerEnded
     implements Built<HostComputerEnded, HostComputerEndedBuilder> {
@@ -44,6 +44,7 @@ abstract class HostComputerEnded
   @BuiltValueField(wireName: r'apps')
   BuiltList<HostComputerApp> get apps;
 
+  /// Time in milliseconds the session spent paused.
   @BuiltValueField(wireName: r'paused_ms')
   int get pausedMs;
 

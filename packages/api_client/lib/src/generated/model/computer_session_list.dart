@@ -10,13 +10,14 @@ import 'package:built_value/serializer.dart';
 
 part 'computer_session_list.g.dart';
 
-/// ComputerSessionList
+/// Computer sessions of the owner (`computer.session.read`).
 ///
 /// Properties:
-/// * [items]
+/// * [items] - The sessions.
 @BuiltValue()
 abstract class ComputerSessionList
     implements Built<ComputerSessionList, ComputerSessionListBuilder> {
+  /// The sessions.
   @BuiltValueField(wireName: r'items')
   BuiltList<ComputerSession> get items;
 

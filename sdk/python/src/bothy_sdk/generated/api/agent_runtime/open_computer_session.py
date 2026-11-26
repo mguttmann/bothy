@@ -105,7 +105,8 @@ def sync_detailed(
     Key`. Allows and denials are audited.
 
     Args:
-        body (ComputerSessionOpen):
+        body (ComputerSessionOpen): Request of `computer.open`: the desktop and the hash of the
+            ephemeral key of `bothy-computer-mcp` (27 5.1).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,7 +149,8 @@ def sync(
     Key`. Allows and denials are audited.
 
     Args:
-        body (ComputerSessionOpen):
+        body (ComputerSessionOpen): Request of `computer.open`: the desktop and the hash of the
+            ephemeral key of `bothy-computer-mcp` (27 5.1).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -186,7 +188,8 @@ async def asyncio_detailed(
     Key`. Allows and denials are audited.
 
     Args:
-        body (ComputerSessionOpen):
+        body (ComputerSessionOpen): Request of `computer.open`: the desktop and the hash of the
+            ephemeral key of `bothy-computer-mcp` (27 5.1).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -227,7 +230,8 @@ async def asyncio(
     Key`. Allows and denials are audited.
 
     Args:
-        body (ComputerSessionOpen):
+        body (ComputerSessionOpen): Request of `computer.open`: the desktop and the hash of the
+            ephemeral key of `bothy-computer-mcp` (27 5.1).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

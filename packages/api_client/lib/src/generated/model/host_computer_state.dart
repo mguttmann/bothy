@@ -10,13 +10,13 @@ import 'package:built_value/serializer.dart';
 
 part 'host_computer_state.g.dart';
 
-/// HostComputerState
+/// State report of a running computer session (`computer.state`), at most one per `computer.status_interval` (27 12.3).
 ///
 /// Properties:
 /// * [sessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [state]
+/// * [state] - State of the session.
 /// * [reason] - `locked` exactly with `paused`, empty otherwise.
-/// * [actionCount]
+/// * [actionCount] - Number of actions so far.
 /// * [frontApp]
 @BuiltValue()
 abstract class HostComputerState
@@ -25,6 +25,7 @@ abstract class HostComputerState
   @BuiltValueField(wireName: r'session_id')
   String get sessionId;
 
+  /// State of the session.
   @BuiltValueField(wireName: r'state')
   HostComputerStateStateEnum get state;
   // enum stateEnum {  active,  paused,  };
@@ -34,6 +35,7 @@ abstract class HostComputerState
   HostComputerStateReasonEnum get reason;
   // enum reasonEnum {  ,  locked,  };
 
+  /// Number of actions so far.
   @BuiltValueField(wireName: r'action_count')
   int get actionCount;
 
@@ -182,6 +184,7 @@ class _$HostComputerStateSerializer
   }
 }
 
+/// State of the session.
 class HostComputerStateStateEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'active')
   static const HostComputerStateStateEnum active =

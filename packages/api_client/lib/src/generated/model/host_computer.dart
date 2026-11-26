@@ -13,40 +13,47 @@ part 'host_computer.g.dart';
 /// The state of the computer helper of a host (schema `host_computer.v1`, docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in `hosts.reported_computer`. Never a path, a key or screen content.
 ///
 /// Properties:
-/// * [helper]
-/// * [enabled]
-/// * [generation]
-/// * [osAccount]
+/// * [helper] - The computer helper is connected, absent, or refused by the peer rule (27 9.4).
+/// * [enabled] - The switch \"Allow computer control\" of the helper is on.
+/// * [generation] - The enablement generation of the host (27 4).
+/// * [osAccount] - The operating system account of the desktop session the helper runs in.
 /// * [permissions]
-/// * [helperVersion]
-/// * [signature]
-/// * [locked]
+/// * [helperVersion] - Version of the computer helper.
+/// * [signature] - `verified` when the build of the host service carries a code signing requirement for the helper, else `development`.
+/// * [locked] - The screen of the desktop is locked.
 @BuiltValue()
 abstract class HostComputer
     implements Built<HostComputer, HostComputerBuilder> {
+  /// The computer helper is connected, absent, or refused by the peer rule (27 9.4).
   @BuiltValueField(wireName: r'helper')
   HostComputerHelperEnum get helper;
   // enum helperEnum {  connected,  absent,  refused,  };
 
+  /// The switch \"Allow computer control\" of the helper is on.
   @BuiltValueField(wireName: r'enabled')
   bool get enabled;
 
+  /// The enablement generation of the host (27 4).
   @BuiltValueField(wireName: r'generation')
   int get generation;
 
+  /// The operating system account of the desktop session the helper runs in.
   @BuiltValueField(wireName: r'os_account')
   String get osAccount;
 
   @BuiltValueField(wireName: r'permissions')
   HostComputerPermissions get permissions;
 
+  /// Version of the computer helper.
   @BuiltValueField(wireName: r'helper_version')
   String get helperVersion;
 
+  /// `verified` when the build of the host service carries a code signing requirement for the helper, else `development`.
   @BuiltValueField(wireName: r'signature')
   HostComputerSignatureEnum get signature;
   // enum signatureEnum {  verified,  development,  };
 
+  /// The screen of the desktop is locked.
   @BuiltValueField(wireName: r'locked')
   bool get locked;
 
@@ -225,6 +232,7 @@ class _$HostComputerSerializer implements PrimitiveSerializer<HostComputer> {
   }
 }
 
+/// The computer helper is connected, absent, or refused by the peer rule (27 9.4).
 class HostComputerHelperEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'connected')
   static const HostComputerHelperEnum connected =
@@ -249,6 +257,7 @@ class HostComputerHelperEnum extends EnumClass {
       _$hostComputerHelperEnumValueOf(name);
 }
 
+/// `verified` when the build of the host service carries a code signing requirement for the helper, else `development`.
 class HostComputerSignatureEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'verified')
   static const HostComputerSignatureEnum verified =

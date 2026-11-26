@@ -15,9 +15,10 @@ T = TypeVar("T", bound="ComputerDesktopList")
 
 @_attrs_define
 class ComputerDesktopList:
-    """
+    """The desktops of the owner of the run (`computer.desktops.list`).
+
     Attributes:
-        items (list[ComputerDesktop]):
+        items (list[ComputerDesktop]): The desktops.
     """
 
     items: list[ComputerDesktop]

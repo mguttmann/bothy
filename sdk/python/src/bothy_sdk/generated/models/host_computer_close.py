@@ -14,7 +14,8 @@ T = TypeVar("T", bound="HostComputerClose")
 
 @_attrs_define
 class HostComputerClose:
-    """
+    """The server ends a computer session on the host (`computer.close`, 27 12.3).
+
     Attributes:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         reason (ComputerCloseReason): Why a computer session ended (docs/spec/27-computer-use.md 8.3).

@@ -10,13 +10,14 @@ import 'package:built_value/serializer.dart';
 
 part 'computer_desktop_list.g.dart';
 
-/// ComputerDesktopList
+/// The desktops of the owner of the run (`computer.desktops.list`).
 ///
 /// Properties:
-/// * [items]
+/// * [items] - The desktops.
 @BuiltValue()
 abstract class ComputerDesktopList
     implements Built<ComputerDesktopList, ComputerDesktopListBuilder> {
+  /// The desktops.
   @BuiltValueField(wireName: r'items')
   BuiltList<ComputerDesktop> get items;
 

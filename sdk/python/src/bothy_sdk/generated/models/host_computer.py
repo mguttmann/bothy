@@ -22,14 +22,15 @@ class HostComputer:
     content.
 
         Attributes:
-            helper (HostComputerHelper):
-            enabled (bool):
-            generation (int):
-            os_account (str):
-            permissions (HostComputerPermissions):
-            helper_version (str):
-            signature (HostComputerSignature):
-            locked (bool):
+            helper (HostComputerHelper): The computer helper is connected, absent, or refused by the peer rule (27 9.4).
+            enabled (bool): The switch "Allow computer control" of the helper is on.
+            generation (int): The enablement generation of the host (27 4).
+            os_account (str): The operating system account of the desktop session the helper runs in.
+            permissions (HostComputerPermissions): The operating system permissions of the computer helper (27 12.3).
+            helper_version (str): Version of the computer helper.
+            signature (HostComputerSignature): `verified` when the build of the host service carries a code signing
+                requirement for the helper, else `development`.
+            locked (bool): The screen of the desktop is locked.
     """
 
     helper: HostComputerHelper

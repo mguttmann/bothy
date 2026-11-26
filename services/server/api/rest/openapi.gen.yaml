@@ -36302,12 +36302,14 @@ components:
         state:
           $ref: '#/components/schemas/ComputerSessionState'
         pause_reason:
+          description: 'Why the session is paused; set only in state `paused`.'
           type: string
           enum: [locked]
         generation:
           type: integer
           description: The enablement generation the session was opened with (claim `gen`).
         key_generation:
+          description: 'Generation of the host key the Noise handshake of the session used.'
           type: integer
         attached_at:
           $ref: '#/components/schemas/Timestamp'
@@ -36318,6 +36320,7 @@ components:
         paused_at:
           $ref: '#/components/schemas/Timestamp'
         paused_ms:
+          description: 'Time in milliseconds the session spent paused.'
           type: integer
           format: int64
         closed_at:
@@ -36329,23 +36332,28 @@ components:
         close_detail:
           $ref: '#/components/schemas/ComputerCloseDetail'
         action_count:
+          description: 'Number of actions the session carried out.'
           type: integer
         front_app:
           type: string
           description: Identity of the frontmost app of the last `computer.state` (bundle ID or executable name); never a window title.
           examples: [com.example.editor]
         version:
+          description: 'Version of the session row, raised by every change.'
           type: integer
           format: int64
     ComputerSessionList:
+      description: 'Computer sessions of the owner (`computer.session.read`).'
       type: object
       required: [items]
       properties:
         items:
+          description: 'The sessions.'
           type: array
           items:
             $ref: '#/components/schemas/ComputerSession'
     ComputerSessionOpen:
+      description: 'Request of `computer.open`: the desktop and the hash of the ephemeral key of `bothy-computer-mcp` (27 5.1).'
       type: object
       additionalProperties: false
       required: [host_id, client_ephemeral_key_hash]
@@ -36371,28 +36379,35 @@ components:
           type: string
           description: Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2.
         attach_path:
+          description: 'Path of the attach connection (`computer.attach`).'
           type: string
           examples: [/api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach]
         noise_public_key:
+          description: 'The static Noise public key of the host that `bothy-computer-mcp` checks in the handshake (27 10.4).'
           type: string
         key_fingerprint:
+          description: 'Fingerprint of `noise_public_key`.'
           type: string
         key_generation:
+          description: 'Generation of the host key.'
           type: integer
         expires_at:
           $ref: '#/components/schemas/Timestamp'
     ComputerDesktop:
+      description: 'A host of the owner that carries a computer helper, as `computer.desktops.list` shows it to the agent (27 5.1).'
       type: object
       required: [host_id, name, platform, online, locked, busy]
       properties:
         host_id:
           $ref: '#/components/schemas/Uuid'
         name:
+          description: 'The name of the host (`hosts.name`), by which the owner names the desktop.'
           type: string
           examples: [Desk]
         platform:
           $ref: '#/components/schemas/HostPlatform'
         online:
+          description: 'The host service holds a control connection to the server.'
           type: boolean
         locked:
           type: boolean
@@ -36401,10 +36416,12 @@ components:
           type: boolean
           description: Another computer session on the host is not closed.
     ComputerDesktopList:
+      description: 'The desktops of the owner of the run (`computer.desktops.list`).'
       type: object
       required: [items]
       properties:
         items:
+          description: 'The desktops.'
           type: array
           items:
             $ref: '#/components/schemas/ComputerDesktop'
@@ -36415,33 +36432,43 @@ components:
       required: [helper, enabled, generation, os_account, permissions, helper_version, signature, locked]
       properties:
         helper:
+          description: 'The computer helper is connected, absent, or refused by the peer rule (27 9.4).'
           type: string
           enum: [connected, absent, refused]
         enabled:
+          description: 'The switch "Allow computer control" of the helper is on.'
           type: boolean
         generation:
+          description: 'The enablement generation of the host (27 4).'
           type: integer
           minimum: 0
         os_account:
+          description: 'The operating system account of the desktop session the helper runs in.'
           type: string
         permissions:
           $ref: '#/components/schemas/HostComputerPermissions'
         helper_version:
+          description: 'Version of the computer helper.'
           type: string
         signature:
+          description: '`verified` when the build of the host service carries a code signing requirement for the helper, else `development`.'
           type: string
           enum: [verified, development]
         locked:
+          description: 'The screen of the desktop is locked.'
           type: boolean
     HostComputerPermissions:
+      description: 'The operating system permissions of the computer helper (27 12.3).'
       type: object
       additionalProperties: false
       required: [capture, input]
       properties:
         capture:
+          description: 'Permission to capture the screen.'
           type: string
           enum: [granted, denied, unknown]
         input:
+          description: 'Permission to send mouse and keyboard input.'
           type: string
           enum: [granted, denied, unknown]
     HostComputerSettings:
@@ -36450,24 +36477,33 @@ components:
       required: [image_max_edge, jpeg_quality, settle_ms, auto_screenshot, wait_max_ms, key_repeat_max, scroll_amount_max, audit_apps_max, status_interval_ms]
       properties:
         image_max_edge:
+          description: 'Value of `computer.image_max_edge`.'
           type: integer
         jpeg_quality:
+          description: 'Value of `computer.jpeg_quality`.'
           type: integer
         settle_ms:
+          description: 'Value of `computer.settle` in milliseconds.'
           type: integer
           format: int64
         auto_screenshot:
+          description: 'Value of `computer.auto_screenshot`.'
           type: boolean
         wait_max_ms:
+          description: 'Value of `computer.wait_max` in milliseconds.'
           type: integer
           format: int64
         key_repeat_max:
+          description: 'Value of `computer.key_repeat_max`.'
           type: integer
         scroll_amount_max:
+          description: 'Value of `computer.scroll_amount_max`.'
           type: integer
         audit_apps_max:
+          description: 'Value of `computer.audit_apps_max`.'
           type: integer
         status_interval_ms:
+          description: 'Value of `computer.status_interval` in milliseconds.'
           type: integer
           format: int64
     HostComputerOpen:
@@ -36482,10 +36518,12 @@ components:
         agent_id:
           $ref: '#/components/schemas/Uuid'
         agent_name:
+          description: 'Name of the agent that opens the session.'
           type: string
         user_id:
           $ref: '#/components/schemas/Uuid'
         data_path:
+          description: 'Path of the computer data connection of the host service.'
           type: string
           examples: [/api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream]
         expires_at:
@@ -36494,6 +36532,7 @@ components:
         settings:
           $ref: '#/components/schemas/HostComputerSettings'
     HostComputerClose:
+      description: 'The server ends a computer session on the host (`computer.close`, 27 12.3).'
       type: object
       required: [session_id, reason]
       properties:
@@ -36502,13 +36541,16 @@ components:
         reason:
           $ref: '#/components/schemas/ComputerCloseReason'
     HostComputerDisable:
+      description: 'The server switches the enablement of the host off (`computer.disable`, 27 12.3).'
       type: object
       required: [generation]
       properties:
         generation:
+          description: 'The enablement generation that is switched off.'
           type: integer
           minimum: 0
     HostComputerStarted:
+      description: 'The host service started a computer session (`computer.started`, 27 12.3).'
       type: object
       additionalProperties: false
       required: [session_id, state]
@@ -36516,6 +36558,7 @@ components:
         session_id:
           $ref: '#/components/schemas/Uuid'
         state:
+          description: 'State at the start; `paused` while the screen is locked.'
           type: string
           enum: [active, paused]
     HostComputerApp:
@@ -36535,6 +36578,7 @@ components:
           type: string
           description: Team ID or subject of the signer.
     HostComputerState:
+      description: 'State report of a running computer session (`computer.state`), at most one per `computer.status_interval` (27 12.3).'
       type: object
       additionalProperties: false
       required: [session_id, state, reason, action_count, front_app]
@@ -36542,6 +36586,7 @@ components:
         session_id:
           $ref: '#/components/schemas/Uuid'
         state:
+          description: 'State of the session.'
           type: string
           enum: [active, paused]
         reason:
@@ -36549,11 +36594,13 @@ components:
           enum: ['', locked]
           description: '`locked` exactly with `paused`, empty otherwise.'
         action_count:
+          description: 'Number of actions so far.'
           type: integer
           minimum: 0
         front_app:
           $ref: '#/components/schemas/HostComputerApp'
     HostComputerEnded:
+      description: 'A computer session ended on the host (`computer.ended`, 27 12.3).'
       type: object
       additionalProperties: false
       required: [session_id, close_reason, action_counts, apps, paused_ms]
@@ -36578,6 +36625,7 @@ components:
           items:
             $ref: '#/components/schemas/HostComputerApp'
         paused_ms:
+          description: 'Time in milliseconds the session spent paused.'
           type: integer
           format: int64
           minimum: 0
@@ -36587,6 +36635,7 @@ components:
       required: [protocol_versions, server_time]
       properties:
         protocol_versions:
+          description: 'Versions of the attach protocol the server speaks.'
           type: array
           items:
             type: integer
@@ -36600,9 +36649,11 @@ components:
       required: [protocol_version, token]
       properties:
         protocol_version:
+          description: 'The version of the attach protocol `bothy-computer-mcp` chose from `protocol_versions`.'
           type: integer
           examples: [1]
         token:
+          description: 'The attach token of `ComputerSessionGrant`, valid once.'
           type: string
     ComputerSessionChangedEvent:
       description: Durable personal event `computer_session.changed` to the triggering owner (27 12.4); never an image.
@@ -36612,6 +36663,7 @@ components:
         required: [type, payload]
         properties:
           type:
+            description: 'The event type.'
             type: string
             enum: [computer_session.changed]
           payload:

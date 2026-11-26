@@ -19,10 +19,11 @@ class ComputerSessionGrant:
         Attributes:
             session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
             token (str): Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2.
-            attach_path (str):
-            noise_public_key (str):
-            key_fingerprint (str):
-            key_generation (int):
+            attach_path (str): Path of the attach connection (`computer.attach`).
+            noise_public_key (str): The static Noise public key of the host that `bothy-computer-mcp` checks in the
+                handshake (27 10.4).
+            key_fingerprint (str): Fingerprint of `noise_public_key`.
+            key_generation (int): Generation of the host key.
             expires_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
 

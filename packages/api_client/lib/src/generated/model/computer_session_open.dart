@@ -8,7 +8,7 @@ import 'package:built_value/serializer.dart';
 
 part 'computer_session_open.g.dart';
 
-/// ComputerSessionOpen
+/// Request of `computer.open`: the desktop and the hash of the ephemeral key of `bothy-computer-mcp` (27 5.1).
 ///
 /// Properties:
 /// * [hostId] - UUIDv7 (RFC 9562), lowercase canonical form.

@@ -9,7 +9,7 @@ import 'package:built_value/serializer.dart';
 
 part 'host_computer_close.g.dart';
 
-/// HostComputerClose
+/// The server ends a computer session on the host (`computer.close`, 27 12.3).
 ///
 /// Properties:
 /// * [sessionId] - UUIDv7 (RFC 9562), lowercase canonical form.

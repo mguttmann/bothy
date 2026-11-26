@@ -24,9 +24,9 @@ class HostComputerOpen:
             session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
             run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
             agent_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-            agent_name (str):
+            agent_name (str): Name of the agent that opens the session.
             user_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-            data_path (str):
+            data_path (str): Path of the computer data connection of the host service.
             expires_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
             settings (HostComputerSettings): The server values of a computer session (27 18), sent with `computer.open`.
     """

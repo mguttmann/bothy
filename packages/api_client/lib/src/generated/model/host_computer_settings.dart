@@ -11,42 +11,51 @@ part 'host_computer_settings.g.dart';
 /// The server values of a computer session (27 18), sent with `computer.open`.
 ///
 /// Properties:
-/// * [imageMaxEdge]
-/// * [jpegQuality]
-/// * [settleMs]
-/// * [autoScreenshot]
-/// * [waitMaxMs]
-/// * [keyRepeatMax]
-/// * [scrollAmountMax]
-/// * [auditAppsMax]
-/// * [statusIntervalMs]
+/// * [imageMaxEdge] - Value of `computer.image_max_edge`.
+/// * [jpegQuality] - Value of `computer.jpeg_quality`.
+/// * [settleMs] - Value of `computer.settle` in milliseconds.
+/// * [autoScreenshot] - Value of `computer.auto_screenshot`.
+/// * [waitMaxMs] - Value of `computer.wait_max` in milliseconds.
+/// * [keyRepeatMax] - Value of `computer.key_repeat_max`.
+/// * [scrollAmountMax] - Value of `computer.scroll_amount_max`.
+/// * [auditAppsMax] - Value of `computer.audit_apps_max`.
+/// * [statusIntervalMs] - Value of `computer.status_interval` in milliseconds.
 @BuiltValue()
 abstract class HostComputerSettings
     implements Built<HostComputerSettings, HostComputerSettingsBuilder> {
+  /// Value of `computer.image_max_edge`.
   @BuiltValueField(wireName: r'image_max_edge')
   int get imageMaxEdge;
 
+  /// Value of `computer.jpeg_quality`.
   @BuiltValueField(wireName: r'jpeg_quality')
   int get jpegQuality;
 
+  /// Value of `computer.settle` in milliseconds.
   @BuiltValueField(wireName: r'settle_ms')
   int get settleMs;
 
+  /// Value of `computer.auto_screenshot`.
   @BuiltValueField(wireName: r'auto_screenshot')
   bool get autoScreenshot;
 
+  /// Value of `computer.wait_max` in milliseconds.
   @BuiltValueField(wireName: r'wait_max_ms')
   int get waitMaxMs;
 
+  /// Value of `computer.key_repeat_max`.
   @BuiltValueField(wireName: r'key_repeat_max')
   int get keyRepeatMax;
 
+  /// Value of `computer.scroll_amount_max`.
   @BuiltValueField(wireName: r'scroll_amount_max')
   int get scrollAmountMax;
 
+  /// Value of `computer.audit_apps_max`.
   @BuiltValueField(wireName: r'audit_apps_max')
   int get auditAppsMax;
 
+  /// Value of `computer.status_interval` in milliseconds.
   @BuiltValueField(wireName: r'status_interval_ms')
   int get statusIntervalMs;
 

@@ -14,15 +14,15 @@ class HostComputerSettings:
     """The server values of a computer session (27 18), sent with `computer.open`.
 
     Attributes:
-        image_max_edge (int):
-        jpeg_quality (int):
-        settle_ms (int):
-        auto_screenshot (bool):
-        wait_max_ms (int):
-        key_repeat_max (int):
-        scroll_amount_max (int):
-        audit_apps_max (int):
-        status_interval_ms (int):
+        image_max_edge (int): Value of `computer.image_max_edge`.
+        jpeg_quality (int): Value of `computer.jpeg_quality`.
+        settle_ms (int): Value of `computer.settle` in milliseconds.
+        auto_screenshot (bool): Value of `computer.auto_screenshot`.
+        wait_max_ms (int): Value of `computer.wait_max` in milliseconds.
+        key_repeat_max (int): Value of `computer.key_repeat_max`.
+        scroll_amount_max (int): Value of `computer.scroll_amount_max`.
+        audit_apps_max (int): Value of `computer.audit_apps_max`.
+        status_interval_ms (int): Value of `computer.status_interval` in milliseconds.
     """
 
     image_max_edge: int

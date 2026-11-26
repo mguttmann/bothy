@@ -15,9 +15,9 @@ part 'host_computer_open.g.dart';
 /// * [sessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [agentName]
+/// * [agentName] - Name of the agent that opens the session.
 /// * [userId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [dataPath]
+/// * [dataPath] - Path of the computer data connection of the host service.
 /// * [expiresAt] - Without both sides paired and the handshake done until then the session ends `open_failed` with `open_timeout` (`computer.open_timeout`).
 /// * [settings]
 @BuiltValue()
@@ -35,6 +35,7 @@ abstract class HostComputerOpen
   @BuiltValueField(wireName: r'agent_id')
   String get agentId;
 
+  /// Name of the agent that opens the session.
   @BuiltValueField(wireName: r'agent_name')
   String get agentName;
 
@@ -42,6 +43,7 @@ abstract class HostComputerOpen
   @BuiltValueField(wireName: r'user_id')
   String get userId;
 
+  /// Path of the computer data connection of the host service.
   @BuiltValueField(wireName: r'data_path')
   String get dataPath;
 

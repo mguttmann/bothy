@@ -13418,33 +13418,47 @@ export interface components {
             agent_id: components["schemas"]["Uuid"];
             run_id: components["schemas"]["Uuid"];
             state: components["schemas"]["ComputerSessionState"];
-            /** @enum {string} */
+            /**
+             * @description Why the session is paused; set only in state `paused`.
+             * @enum {string}
+             */
             pause_reason?: "locked";
             /** @description The enablement generation the session was opened with (claim `gen`). */
             generation: number;
+            /** @description Generation of the host key the Noise handshake of the session used. */
             key_generation: number;
             attached_at?: components["schemas"]["Timestamp"];
             opened_at: components["schemas"]["Timestamp"];
             started_at?: components["schemas"]["Timestamp"];
             paused_at?: components["schemas"]["Timestamp"];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Time in milliseconds the session spent paused.
+             */
             paused_ms: number;
             closed_at?: components["schemas"]["Timestamp"];
             stopped_by?: components["schemas"]["Uuid"];
             close_reason?: components["schemas"]["ComputerCloseReason"];
             close_detail?: components["schemas"]["ComputerCloseDetail"];
+            /** @description Number of actions the session carried out. */
             action_count: number;
             /**
              * @description Identity of the frontmost app of the last `computer.state` (bundle ID or executable name); never a window title.
              * @example com.example.editor
              */
             front_app?: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Version of the session row, raised by every change.
+             */
             version: number;
         };
+        /** @description Computer sessions of the owner (`computer.session.read`). */
         ComputerSessionList: {
+            /** @description The sessions. */
             items: components["schemas"]["ComputerSession"][];
         };
+        /** @description Request of `computer.open`: the desktop and the hash of the ephemeral key of `bothy-computer-mcp` (27 5.1). */
         ComputerSessionOpen: {
             host_id: components["schemas"]["Uuid"];
             /** @description SHA-256 of the ephemeral X25519 public key that `bothy-computer-mcp` sends in Noise message 1, base64url without padding; becomes the claim `cek`. */
@@ -13460,59 +13474,105 @@ export interface components {
             session_id: components["schemas"]["Uuid"];
             /** @description Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2. */
             token: string;
-            /** @example /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach */
+            /**
+             * @description Path of the attach connection (`computer.attach`).
+             * @example /api/v1/computer/sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/attach
+             */
             attach_path: string;
+            /** @description The static Noise public key of the host that `bothy-computer-mcp` checks in the handshake (27 10.4). */
             noise_public_key: string;
+            /** @description Fingerprint of `noise_public_key`. */
             key_fingerprint: string;
+            /** @description Generation of the host key. */
             key_generation: number;
             expires_at: components["schemas"]["Timestamp"];
         };
+        /** @description A host of the owner that carries a computer helper, as `computer.desktops.list` shows it to the agent (27 5.1). */
         ComputerDesktop: {
             host_id: components["schemas"]["Uuid"];
-            /** @example Desk */
+            /**
+             * @description The name of the host (`hosts.name`), by which the owner names the desktop.
+             * @example Desk
+             */
             name: string;
             platform: components["schemas"]["HostPlatform"];
+            /** @description The host service holds a control connection to the server. */
             online: boolean;
             /** @description The screen is locked (`report.computer.locked`). */
             locked: boolean;
             /** @description Another computer session on the host is not closed. */
             busy: boolean;
         };
+        /** @description The desktops of the owner of the run (`computer.desktops.list`). */
         ComputerDesktopList: {
+            /** @description The desktops. */
             items: components["schemas"]["ComputerDesktop"][];
         };
         /** @description The state of the computer helper of a host (schema `host_computer.v1`, docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in `hosts.reported_computer`. Never a path, a key or screen content. */
         HostComputer: {
-            /** @enum {string} */
+            /**
+             * @description The computer helper is connected, absent, or refused by the peer rule (27 9.4).
+             * @enum {string}
+             */
             helper: "connected" | "absent" | "refused";
+            /** @description The switch "Allow computer control" of the helper is on. */
             enabled: boolean;
+            /** @description The enablement generation of the host (27 4). */
             generation: number;
+            /** @description The operating system account of the desktop session the helper runs in. */
             os_account: string;
             permissions: components["schemas"]["HostComputerPermissions"];
+            /** @description Version of the computer helper. */
             helper_version: string;
-            /** @enum {string} */
+            /**
+             * @description `verified` when the build of the host service carries a code signing requirement for the helper, else `development`.
+             * @enum {string}
+             */
             signature: "verified" | "development";
+            /** @description The screen of the desktop is locked. */
             locked: boolean;
         };
+        /** @description The operating system permissions of the computer helper (27 12.3). */
         HostComputerPermissions: {
-            /** @enum {string} */
+            /**
+             * @description Permission to capture the screen.
+             * @enum {string}
+             */
             capture: "granted" | "denied" | "unknown";
-            /** @enum {string} */
+            /**
+             * @description Permission to send mouse and keyboard input.
+             * @enum {string}
+             */
             input: "granted" | "denied" | "unknown";
         };
         /** @description The server values of a computer session (27 18), sent with `computer.open`. */
         HostComputerSettings: {
+            /** @description Value of `computer.image_max_edge`. */
             image_max_edge: number;
+            /** @description Value of `computer.jpeg_quality`. */
             jpeg_quality: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Value of `computer.settle` in milliseconds.
+             */
             settle_ms: number;
+            /** @description Value of `computer.auto_screenshot`. */
             auto_screenshot: boolean;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Value of `computer.wait_max` in milliseconds.
+             */
             wait_max_ms: number;
+            /** @description Value of `computer.key_repeat_max`. */
             key_repeat_max: number;
+            /** @description Value of `computer.scroll_amount_max`. */
             scroll_amount_max: number;
+            /** @description Value of `computer.audit_apps_max`. */
             audit_apps_max: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Value of `computer.status_interval` in milliseconds.
+             */
             status_interval_ms: number;
         };
         /** @description The server asks the host service to open the computer data connection of a session (27 5.1 step 7); `user_id` is the triggering owner (`sub` of the attach token). */
@@ -13520,24 +13580,35 @@ export interface components {
             session_id: components["schemas"]["Uuid"];
             run_id: components["schemas"]["Uuid"];
             agent_id: components["schemas"]["Uuid"];
+            /** @description Name of the agent that opens the session. */
             agent_name: string;
             user_id: components["schemas"]["Uuid"];
-            /** @example /api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream */
+            /**
+             * @description Path of the computer data connection of the host service.
+             * @example /api/v1/hosts/computer-sessions/0192f4a0-7b1c-7c33-8e5f-6a7b8c9d0e1f/stream
+             */
             data_path: string;
             /** @description Without both sides paired and the handshake done until then the session ends `open_failed` with `open_timeout` (`computer.open_timeout`). */
             expires_at: components["schemas"]["Timestamp"];
             settings: components["schemas"]["HostComputerSettings"];
         };
+        /** @description The server ends a computer session on the host (`computer.close`, 27 12.3). */
         HostComputerClose: {
             session_id: components["schemas"]["Uuid"];
             reason: components["schemas"]["ComputerCloseReason"];
         };
+        /** @description The server switches the enablement of the host off (`computer.disable`, 27 12.3). */
         HostComputerDisable: {
+            /** @description The enablement generation that is switched off. */
             generation: number;
         };
+        /** @description The host service started a computer session (`computer.started`, 27 12.3). */
         HostComputerStarted: {
             session_id: components["schemas"]["Uuid"];
-            /** @enum {string} */
+            /**
+             * @description State at the start; `paused` while the screen is locked.
+             * @enum {string}
+             */
             state: "active" | "paused";
         };
         /** @description Identity of a frontmost app (27 12.3 and 13.1); empty strings before the helper named one. Never a window title or a path. */
@@ -13552,18 +13623,24 @@ export interface components {
             /** @description Team ID or subject of the signer. */
             signer: string;
         };
+        /** @description State report of a running computer session (`computer.state`), at most one per `computer.status_interval` (27 12.3). */
         HostComputerState: {
             session_id: components["schemas"]["Uuid"];
-            /** @enum {string} */
+            /**
+             * @description State of the session.
+             * @enum {string}
+             */
             state: "active" | "paused";
             /**
              * @description `locked` exactly with `paused`, empty otherwise.
              * @enum {string}
              */
             reason: "" | "locked";
+            /** @description Number of actions so far. */
             action_count: number;
             front_app: components["schemas"]["HostComputerApp"];
         };
+        /** @description A computer session ended on the host (`computer.ended`, 27 12.3). */
         HostComputerEnded: {
             session_id: components["schemas"]["Uuid"];
             /**
@@ -13578,23 +13655,34 @@ export interface components {
             };
             /** @description Identities of the frontmost apps; the server keeps at most `computer.audit_apps_max` in its audit entry. */
             apps: components["schemas"]["HostComputerApp"][];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Time in milliseconds the session spent paused.
+             */
             paused_ms: number;
         };
         /** @description First text frame of the computer attach connection; `identify` follows, then binary Noise frames only. */
         ComputerAttachHello: {
+            /** @description Versions of the attach protocol the server speaks. */
             protocol_versions: number[];
             server_time: components["schemas"]["Timestamp"];
         };
         /** @description The single-use attach token of the session (27 5.4); the connection carries no agent token. */
         ComputerAttachIdentify: {
-            /** @example 1 */
+            /**
+             * @description The version of the attach protocol `bothy-computer-mcp` chose from `protocol_versions`.
+             * @example 1
+             */
             protocol_version: number;
+            /** @description The attach token of `ComputerSessionGrant`, valid once. */
             token: string;
         };
         /** @description Durable personal event `computer_session.changed` to the triggering owner (27 12.4); never an image. */
         ComputerSessionChangedEvent: components["schemas"]["EventEnvelope"] & {
-            /** @enum {string} */
+            /**
+             * @description The event type.
+             * @enum {string}
+             */
             type: "computer_session.changed";
             payload: components["schemas"]["ComputerSession"];
         } & {

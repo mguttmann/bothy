@@ -13,7 +13,8 @@ T = TypeVar("T", bound="ComputerSessionOpen")
 
 @_attrs_define
 class ComputerSessionOpen:
-    """
+    """Request of `computer.open`: the desktop and the hash of the ephemeral key of `bothy-computer-mcp` (27 5.1).
+
     Attributes:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         client_ephemeral_key_hash (str): SHA-256 of the ephemeral X25519 public key that `bothy-computer-mcp` sends in

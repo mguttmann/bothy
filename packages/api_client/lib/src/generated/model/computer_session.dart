@@ -22,21 +22,21 @@ part 'computer_session.g.dart';
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
-/// * [pauseReason]
+/// * [pauseReason] - Why the session is paused; set only in state `paused`.
 /// * [generation] - The enablement generation the session was opened with (claim `gen`).
-/// * [keyGeneration]
+/// * [keyGeneration] - Generation of the host key the Noise handshake of the session used.
 /// * [attachedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [openedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [startedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [pausedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-/// * [pausedMs]
+/// * [pausedMs] - Time in milliseconds the session spent paused.
 /// * [closedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [stoppedBy] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [closeReason]
 /// * [closeDetail]
-/// * [actionCount]
+/// * [actionCount] - Number of actions the session carried out.
 /// * [frontApp] - Identity of the frontmost app of the last `computer.state` (bundle ID or executable name); never a window title.
-/// * [version]
+/// * [version] - Version of the session row, raised by every change.
 @BuiltValue()
 abstract class ComputerSession
     implements Built<ComputerSession, ComputerSessionBuilder> {
@@ -68,6 +68,7 @@ abstract class ComputerSession
   ComputerSessionState get state;
   // enum stateEnum {  opening,  active,  paused,  closed,  };
 
+  /// Why the session is paused; set only in state `paused`.
   @BuiltValueField(wireName: r'pause_reason')
   ComputerSessionPauseReasonEnum? get pauseReason;
   // enum pauseReasonEnum {  locked,  };
@@ -76,6 +77,7 @@ abstract class ComputerSession
   @BuiltValueField(wireName: r'generation')
   int get generation;
 
+  /// Generation of the host key the Noise handshake of the session used.
   @BuiltValueField(wireName: r'key_generation')
   int get keyGeneration;
 
@@ -95,6 +97,7 @@ abstract class ComputerSession
   @BuiltValueField(wireName: r'paused_at')
   DateTime? get pausedAt;
 
+  /// Time in milliseconds the session spent paused.
   @BuiltValueField(wireName: r'paused_ms')
   int get pausedMs;
 
@@ -114,6 +117,7 @@ abstract class ComputerSession
   ComputerCloseDetail? get closeDetail;
   // enum closeDetailEnum {  local_escape,  indicator_stop,  client_stop,  token_invalid,  token_expired,  token_replayed,  handshake_failed,  helper_absent,  helper_untrusted,  not_enabled,  busy,  open_timeout,  stream_fault,  helper_crashed,  };
 
+  /// Number of actions the session carried out.
   @BuiltValueField(wireName: r'action_count')
   int get actionCount;
 
@@ -121,6 +125,7 @@ abstract class ComputerSession
   @BuiltValueField(wireName: r'front_app')
   String? get frontApp;
 
+  /// Version of the session row, raised by every change.
   @BuiltValueField(wireName: r'version')
   int get version;
 
@@ -499,6 +504,7 @@ class _$ComputerSessionSerializer
   }
 }
 
+/// Why the session is paused; set only in state `paused`.
 class ComputerSessionPauseReasonEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'locked')
   static const ComputerSessionPauseReasonEnum locked =

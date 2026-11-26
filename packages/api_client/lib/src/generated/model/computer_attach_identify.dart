@@ -11,14 +11,16 @@ part 'computer_attach_identify.g.dart';
 /// The single-use attach token of the session (27 5.4); the connection carries no agent token.
 ///
 /// Properties:
-/// * [protocolVersion]
-/// * [token]
+/// * [protocolVersion] - The version of the attach protocol `bothy-computer-mcp` chose from `protocol_versions`.
+/// * [token] - The attach token of `ComputerSessionGrant`, valid once.
 @BuiltValue()
 abstract class ComputerAttachIdentify
     implements Built<ComputerAttachIdentify, ComputerAttachIdentifyBuilder> {
+  /// The version of the attach protocol `bothy-computer-mcp` chose from `protocol_versions`.
   @BuiltValueField(wireName: r'protocol_version')
   int get protocolVersion;
 
+  /// The attach token of `ComputerSessionGrant`, valid once.
   @BuiltValueField(wireName: r'token')
   String get token;
 

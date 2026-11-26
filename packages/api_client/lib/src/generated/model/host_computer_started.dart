@@ -9,11 +9,11 @@ import 'package:built_value/serializer.dart';
 
 part 'host_computer_started.g.dart';
 
-/// HostComputerStarted
+/// The host service started a computer session (`computer.started`, 27 12.3).
 ///
 /// Properties:
 /// * [sessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [state]
+/// * [state] - State at the start; `paused` while the screen is locked.
 @BuiltValue()
 abstract class HostComputerStarted
     implements Built<HostComputerStarted, HostComputerStartedBuilder> {
@@ -21,6 +21,7 @@ abstract class HostComputerStarted
   @BuiltValueField(wireName: r'session_id')
   String get sessionId;
 
+  /// State at the start; `paused` while the screen is locked.
   @BuiltValueField(wireName: r'state')
   HostComputerStartedStateEnum get state;
   // enum stateEnum {  active,  paused,  };
@@ -134,6 +135,7 @@ class _$HostComputerStartedSerializer
   }
 }
 
+/// State at the start; `paused` while the screen is locked.
 class HostComputerStartedStateEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'active')
   static const HostComputerStartedStateEnum active =

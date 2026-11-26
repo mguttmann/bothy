@@ -13,10 +13,10 @@ part 'computer_session_grant.g.dart';
 /// Properties:
 /// * [sessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [token] - Compact JWS, `typ = computer-session+jwt`, `alg = EdDSA`, with the claims of 27 5.2.
-/// * [attachPath]
-/// * [noisePublicKey]
-/// * [keyFingerprint]
-/// * [keyGeneration]
+/// * [attachPath] - Path of the attach connection (`computer.attach`).
+/// * [noisePublicKey] - The static Noise public key of the host that `bothy-computer-mcp` checks in the handshake (27 10.4).
+/// * [keyFingerprint] - Fingerprint of `noise_public_key`.
+/// * [keyGeneration] - Generation of the host key.
 /// * [expiresAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
 abstract class ComputerSessionGrant
@@ -29,15 +29,19 @@ abstract class ComputerSessionGrant
   @BuiltValueField(wireName: r'token')
   String get token;
 
+  /// Path of the attach connection (`computer.attach`).
   @BuiltValueField(wireName: r'attach_path')
   String get attachPath;
 
+  /// The static Noise public key of the host that `bothy-computer-mcp` checks in the handshake (27 10.4).
   @BuiltValueField(wireName: r'noise_public_key')
   String get noisePublicKey;
 
+  /// Fingerprint of `noise_public_key`.
   @BuiltValueField(wireName: r'key_fingerprint')
   String get keyFingerprint;
 
+  /// Generation of the host key.
   @BuiltValueField(wireName: r'key_generation')
   int get keyGeneration;
 

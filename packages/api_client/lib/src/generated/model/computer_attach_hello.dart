@@ -12,11 +12,12 @@ part 'computer_attach_hello.g.dart';
 /// First text frame of the computer attach connection; `identify` follows, then binary Noise frames only.
 ///
 /// Properties:
-/// * [protocolVersions]
+/// * [protocolVersions] - Versions of the attach protocol the server speaks.
 /// * [serverTime] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
 abstract class ComputerAttachHello
     implements Built<ComputerAttachHello, ComputerAttachHelloBuilder> {
+  /// Versions of the attach protocol the server speaks.
   @BuiltValueField(wireName: r'protocol_versions')
   BuiltList<int> get protocolVersions;
 

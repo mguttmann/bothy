@@ -13,8 +13,8 @@ class ComputerAttachIdentify:
     """The single-use attach token of the session (27 5.4); the connection carries no agent token.
 
     Attributes:
-        protocol_version (int):
-        token (str):
+        protocol_version (int): The version of the attach protocol `bothy-computer-mcp` chose from `protocol_versions`.
+        token (str): The attach token of `ComputerSessionGrant`, valid once.
     """
 
     protocol_version: int

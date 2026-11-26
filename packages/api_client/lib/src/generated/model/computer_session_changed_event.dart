@@ -34,7 +34,7 @@ part 'computer_session_changed_event.g.dart';
 /// * [invocationToken] - Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
 /// * [redelivered] - Set on redelivery to an agent consumer after `agent.ack_timeout`.
 /// * [syncEpoch] - Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
-/// * [type]
+/// * [type] - The event type.
 /// * [payload]
 @BuiltValue()
 abstract class ComputerSessionChangedEvent
@@ -44,6 +44,7 @@ abstract class ComputerSessionChangedEvent
   @BuiltValueField(wireName: r'payload')
   ComputerSession get payload;
 
+  /// The event type.
   @BuiltValueField(wireName: r'type')
   ComputerSessionChangedEventTypeEnum get type;
   // enum typeEnum {  computer_session.changed,  };
@@ -417,6 +418,7 @@ class ComputerSessionChangedEventAudienceEnum extends EnumClass {
       _$computerSessionChangedEventAudienceEnumValueOf(name);
 }
 
+/// The event type.
 class ComputerSessionChangedEventTypeEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'computer_session.changed')
   static const ComputerSessionChangedEventTypeEnum

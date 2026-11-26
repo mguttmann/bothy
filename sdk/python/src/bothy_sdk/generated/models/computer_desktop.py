@@ -14,12 +14,13 @@ T = TypeVar("T", bound="ComputerDesktop")
 
 @_attrs_define
 class ComputerDesktop:
-    """
+    """A host of the owner that carries a computer helper, as `computer.desktops.list` shows it to the agent (27 5.1).
+
     Attributes:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        name (str):
+        name (str): The name of the host (`hosts.name`), by which the owner names the desktop.
         platform (HostPlatform):
-        online (bool):
+        online (bool): The host service holds a control connection to the server.
         locked (bool): The screen is locked (`report.computer.locked`).
         busy (bool): Another computer session on the host is not closed.
     """

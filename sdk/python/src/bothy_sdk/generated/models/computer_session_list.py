@@ -15,9 +15,10 @@ T = TypeVar("T", bound="ComputerSessionList")
 
 @_attrs_define
 class ComputerSessionList:
-    """
+    """Computer sessions of the owner (`computer.session.read`).
+
     Attributes:
-        items (list[ComputerSession]):
+        items (list[ComputerSession]): The sessions.
     """
 
     items: list[ComputerSession]

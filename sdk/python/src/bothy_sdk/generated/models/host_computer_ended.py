@@ -20,14 +20,15 @@ T = TypeVar("T", bound="HostComputerEnded")
 
 @_attrs_define
 class HostComputerEnded:
-    """
+    """A computer session ended on the host (`computer.ended`, 27 12.3).
+
     Attributes:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         close_reason (HostComputerEndedCloseReason): The host service sends only these reasons (27 12.3).
         action_counts (HostComputerEndedActionCounts): A count per action kind of 27 6.4.
         apps (list[HostComputerApp]): Identities of the frontmost apps; the server keeps at most
             `computer.audit_apps_max` in its audit entry.
-        paused_ms (int):
+        paused_ms (int): Time in milliseconds the session spent paused.
         close_detail (ComputerCloseDetail | Unset): Closed list of 27 8.3: only with `stopped_by_user` (`local_escape`,
             `indicator_stop`, `client_stop`), `open_failed` (`token_invalid`, `token_expired`, `token_replayed`,
             `handshake_failed`, `helper_absent`, `helper_untrusted`, `not_enabled`, `busy`, `open_timeout`) and `error`

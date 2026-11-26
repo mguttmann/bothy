@@ -13,10 +13,11 @@ T = TypeVar("T", bound="HostComputerPermissions")
 
 @_attrs_define
 class HostComputerPermissions:
-    """
+    """The operating system permissions of the computer helper (27 12.3).
+
     Attributes:
-        capture (HostComputerPermissionsCapture):
-        input_ (HostComputerPermissionsInput):
+        capture (HostComputerPermissionsCapture): Permission to capture the screen.
+        input_ (HostComputerPermissionsInput): Permission to send mouse and keyboard input.
     """
 
     capture: HostComputerPermissionsCapture

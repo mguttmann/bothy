@@ -8,13 +8,14 @@ import 'package:built_value/serializer.dart';
 
 part 'host_computer_disable.g.dart';
 
-/// HostComputerDisable
+/// The server switches the enablement of the host off (`computer.disable`, 27 12.3).
 ///
 /// Properties:
-/// * [generation]
+/// * [generation] - The enablement generation that is switched off.
 @BuiltValue()
 abstract class HostComputerDisable
     implements Built<HostComputerDisable, HostComputerDisableBuilder> {
+  /// The enablement generation that is switched off.
   @BuiltValueField(wireName: r'generation')
   int get generation;
 

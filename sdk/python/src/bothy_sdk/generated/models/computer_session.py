@@ -31,12 +31,12 @@ class ComputerSession:
             run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
             state (ComputerSessionState): State of a computer session (docs/spec/27-computer-use.md 8.1).
             generation (int): The enablement generation the session was opened with (claim `gen`).
-            key_generation (int):
+            key_generation (int): Generation of the host key the Noise handshake of the session used.
             opened_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-            paused_ms (int):
-            action_count (int):
-            version (int):
-            pause_reason (ComputerSessionPauseReason | Unset):
+            paused_ms (int): Time in milliseconds the session spent paused.
+            action_count (int): Number of actions the session carried out.
+            version (int): Version of the session row, raised by every change.
+            pause_reason (ComputerSessionPauseReason | Unset): Why the session is paused; set only in state `paused`.
             attached_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
             started_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
             paused_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.

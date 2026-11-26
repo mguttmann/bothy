@@ -9,13 +9,13 @@ import 'package:built_value/serializer.dart';
 
 part 'computer_desktop.g.dart';
 
-/// ComputerDesktop
+/// A host of the owner that carries a computer helper, as `computer.desktops.list` shows it to the agent (27 5.1).
 ///
 /// Properties:
 /// * [hostId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [name]
+/// * [name] - The name of the host (`hosts.name`), by which the owner names the desktop.
 /// * [platform]
-/// * [online]
+/// * [online] - The host service holds a control connection to the server.
 /// * [locked] - The screen is locked (`report.computer.locked`).
 /// * [busy] - Another computer session on the host is not closed.
 @BuiltValue()
@@ -25,6 +25,7 @@ abstract class ComputerDesktop
   @BuiltValueField(wireName: r'host_id')
   String get hostId;
 
+  /// The name of the host (`hosts.name`), by which the owner names the desktop.
   @BuiltValueField(wireName: r'name')
   String get name;
 
@@ -32,6 +33,7 @@ abstract class ComputerDesktop
   HostPlatform get platform;
   // enum platformEnum {  macos,  linux,  windows,  };
 
+  /// The host service holds a control connection to the server.
   @BuiltValueField(wireName: r'online')
   bool get online;
 

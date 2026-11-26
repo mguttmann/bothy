@@ -15,7 +15,7 @@ class ComputerAttachHello:
     """First text frame of the computer attach connection; `identify` follows, then binary Noise frames only.
 
     Attributes:
-        protocol_versions (list[int]):
+        protocol_versions (list[int]): Versions of the attach protocol the server speaks.
         server_time (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
 
