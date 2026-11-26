@@ -958,8 +958,19 @@ class RunTurn:
         else:
             ensure_private_dir(paths.request_dir)
         call = server_call(self.handle.client, self.handle.bound)
-        self.computer = RequestFolder(paths, nonce, call, poll=self.cfg.poll_interval, ids=self.ids)
+        self.computer = RequestFolder(
+            paths, nonce, call, poll=self.cfg.poll_interval, ids=self.ids, mark=self._computer_mark
+        )
         self._computer_task = asyncio.ensure_future(self.computer.serve())
+
+    def _computer_mark(self) -> dict[str, str]:
+        """What the mark of an open names: the session whose files hold the screenshots."""
+        config_dir = self._config_dir()
+        return {
+            "config_dir": str(config_dir) if config_dir is not None else "",
+            "session": self.session.ref,
+            "thread_id": str(self.state.thread_id),
+        }
 
     async def _computer_finish(self, *, kept: bool = False) -> None:
         """The end of the run's computer use (27 10.5 item 2, CU-T22).
@@ -980,8 +991,7 @@ class RunTurn:
         self.computer = self._computer_task = None
         if task is not None:
             task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+            await asyncio.wait({task})  # never swallows a cancellation of the run itself
         if kept or self.handed_over or self._handing_over():
             return
         process = self.process or self.adopted_group
