@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Computer helper (docs/spec/27-computer-use.md 9.1, docs/decisions.d/CU-02.md D-CU-02-3): a
+     LaunchAgent in the GUI (Aqua) session of every user who logs in at the console, so the helper
+     runs in the desktop session it captures and controls. The helper package installs it to
+     /Library/LaunchAgents with its postinstall script; KeepAlive restarts the helper after a
+     crash, and the helper releases every key and button when it starts (27 8.4 item 2). -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.example.bothy-computer-helper</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Library/Application Support/bothy-host/desktop/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper</string>
+	</array>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+</dict>
+</plist>
