@@ -165,6 +165,8 @@ final class FakeEscTap: EscTap {
     let journal: Journal
     let filter = EscFilter()
     let generations = TapGeneration<(Bool) -> EscDecision>()
+    /// The controller's flag; like the platform tap, a stopping Esc raises it before the handler.
+    var interrupt: ActionInterrupt?
     init(journal: Journal) { self.journal = journal }
     var running: Bool { generations.currentValue != nil }
 
@@ -191,6 +193,7 @@ final class FakeEscTap: EscTap {
     func key(down: Bool, injected: Bool, generation: Int) -> EscDecision {
         let verdict = filter.handle(down: down, injected: injected)
         if verdict.stopsSession, let handler = generations.value(for: generation) {
+            interrupt?.requestStop(.localEscape)
             _ = handler(false)
         }
         return verdict.decision
@@ -213,6 +216,8 @@ final class FakeIndicator: Indicator {
     var shownAgent: String?
     var onStop: (() -> Void)?
     var lastStatus: HelperStatus?
+    /// The controller's flag; like the platform indicator, a click raises it before the handler.
+    var interrupt: ActionInterrupt?
     init(journal: Journal) { self.journal = journal }
 
     func show(agentName: String, onStop: @escaping () -> Void) {
@@ -230,7 +235,11 @@ final class FakeIndicator: Indicator {
     func update(status: HelperStatus) { lastStatus = status }
 
     /// Simulates a click on the stop button.
-    func clickStop() { onStop?() }
+    func clickStop() {
+        guard let onStop else { return }
+        interrupt?.requestStop(.indicatorStop)
+        onStop()
+    }
 }
 
 final class MemoryStore: EnablementStore {
@@ -315,6 +324,8 @@ final class Rig {
     ) {
         self.frameMaxBytes = frameMaxBytes
         store = MemoryStore(EnablementState(enabled: enabled, generation: generation))
+        tap.interrupt = controller.interrupt
+        indicator.interrupt = controller.interrupt
         controller.start()
         if connect { controller.channelOpened(channel) }
     }
