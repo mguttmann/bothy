@@ -18,8 +18,15 @@ public final class MacCapturer: Capturer {
     public init() {}
 
     public func permissionGranted() -> Bool {
-        // Preflight only: the helper never asks for or grants itself a permission (brief item 22).
+        // Preflight only: checking never asks; the helper never grants itself a permission
+        // (brief item 22).
         CGPreflightScreenCaptureAccess()
+    }
+
+    public func registerForPermission() {
+        // Only after the person's click: lists the helper in the Screen Recording pane, which a
+        // preflight never does; the switch there stays the person's.
+        _ = MainThread.sync { CGRequestScreenCaptureAccess() }
     }
 
     public func activeScreen() throws -> ScreenGeometry {

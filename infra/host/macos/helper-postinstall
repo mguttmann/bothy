@@ -19,7 +19,6 @@ install -m 0644 -o root -g wheel "$share/$agent.plist" "/Library/LaunchAgents/$a
 
 console="$(stat -f %u /dev/console)"
 if [ "$console" -ne 0 ]; then
-  launchctl bootout "gui/$console/$agent" 2>/dev/null || true
-  launchctl bootstrap gui/"$console" "/Library/LaunchAgents/$agent.plist" || true
+  sh "$(dirname "$0")/start-computer-helper.sh" "$console" "/Library/LaunchAgents/$agent.plist" || true
 fi
 exit 0

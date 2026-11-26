@@ -47,6 +47,8 @@ final class FakeInjector: Injector {
     init(journal: Journal) { self.journal = journal }
 
     func permissionGranted() -> Bool { granted }
+    var registered = 0
+    func registerForPermission() { registered += 1 }
     func supports(_ key: Key) -> Bool { !unsupported.contains(key) }
 
     func willStartUnit(_ index: Int) {
@@ -114,6 +116,8 @@ final class FakeCapturer: Capturer {
     var requests: [(region: Rect?, width: Int, height: Int, format: ImageFormat, quality: Int)] = []
 
     func permissionGranted() -> Bool { granted }
+    var registered = 0
+    func registerForPermission() { registered += 1 }
     func activeScreen() throws -> ScreenGeometry { screen }
 
     func capture(

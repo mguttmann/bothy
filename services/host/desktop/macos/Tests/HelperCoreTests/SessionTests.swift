@@ -78,6 +78,25 @@ final class EnablementTests: XCTestCase {
         XCTAssertEqual(rig.channel.messages.count, count, "no state without a change")
     }
 
+    // Live finding 26.11.: a preflight alone never puts the helper into the Screen Recording
+    // list, so the owner switched on the Bothy app there instead. A click on a permission item
+    // registers the helper with the system (the person still decides) before the pane opens.
+    func testPermissionLinkRegistersAMissingPermissionOnly() {
+        let rig = Rig()
+        rig.capturer.granted = false
+        rig.controller.permissionLinkClicked(.capture)
+        XCTAssertEqual(rig.capturer.registered, 1)
+        XCTAssertEqual(rig.injector.registered, 0)
+        rig.injector.granted = false
+        rig.controller.permissionLinkClicked(.input)
+        XCTAssertEqual(rig.injector.registered, 1)
+        XCTAssertEqual(
+            rig.last, ["op": "state", "permissions": ["capture": "denied", "input": "denied"]])
+        rig.capturer.granted = true
+        rig.controller.permissionLinkClicked(.capture)
+        XCTAssertEqual(rig.capturer.registered, 1, "a granted permission is not asked again")
+    }
+
     func testFileStoreKeepsSwitchAndGenerationPrivately() throws {
         let base = FileManager.default.temporaryDirectory
             .appendingPathComponent("helper-store-\(UUID().uuidString)")

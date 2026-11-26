@@ -145,6 +145,14 @@ public enum PermissionState: String, Sendable {
     case denied
 }
 
+/// An operating system permission the helper needs (27 9.1).
+public enum PermissionKind: Sendable {
+    /// Screen Recording, for capture.
+    case capture
+    /// Accessibility, for input.
+    case input
+}
+
 /// Whether the helper's own code signature verifies against the Developer ID requirement.
 public enum SignatureState: String, Sendable {
     /// A Developer ID signature that verifies.

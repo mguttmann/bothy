@@ -9,8 +9,9 @@ import HelperCore
 /// While a session is shown: a borderless, click-through border window on every screen in the
 /// fixed color `#FF6A00` (D-CU-02-9), a stop button panel, and the menu text "Agent <name>
 /// controls this computer, Esc to stop" with a stop item. Always: the switch "Allow computer
-/// control", which only a click in the menu toggles, and items that open the Screen Recording and
-/// Accessibility panes of the system settings (the helper never grants itself anything).
+/// control", which only a click in the menu toggles, and items that register a missing permission
+/// with the system and open the Screen Recording and Accessibility panes of the system settings
+/// (the helper never grants itself anything).
 ///
 /// Every window of this process is excluded from capture by `MacCapturer`'s content filter;
 /// `sharingType = .none` is set as well for capture paths outside ScreenCaptureKit.
@@ -30,6 +31,7 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
     private let interrupt: ActionInterrupt
     private let onToggle: () -> Void
     private let onMenuOpen: () -> Void
+    private let onPermissionLink: (PermissionKind) -> Void
     private var onStop: (() -> Void)?
     private var statusItem: NSStatusItem?
     private var borders: [NSWindow] = []
@@ -50,14 +52,18 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
     ///   - interrupt: set at once by the stop button, so a running action stops between steps.
     ///   - onToggle: the person clicked "Allow computer control"; runs in the controller's context.
     ///   - onMenuOpen: the menu opens; runs in the controller's context, to refresh permissions.
+    ///   - onPermissionLink: a permission item was clicked; runs in the controller's context
+    ///     before the pane opens, to register a missing permission with the system.
     public init(
         dispatch: @escaping (@escaping () -> Void) -> Void, interrupt: ActionInterrupt,
-        onToggle: @escaping () -> Void, onMenuOpen: @escaping () -> Void
+        onToggle: @escaping () -> Void, onMenuOpen: @escaping () -> Void,
+        onPermissionLink: @escaping (PermissionKind) -> Void
     ) {
         self.dispatch = dispatch
         self.interrupt = interrupt
         self.onToggle = onToggle
         self.onMenuOpen = onMenuOpen
+        self.onPermissionLink = onPermissionLink
         super.init()
     }
 
@@ -135,11 +141,21 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
     }
 
     @objc private func openScreenRecording() {
-        NSWorkspace.shared.open(Self.screenRecordingPane)
+        openPane(Self.screenRecordingPane, for: .capture)
     }
 
     @objc private func openAccessibility() {
-        NSWorkspace.shared.open(Self.accessibilityPane)
+        openPane(Self.accessibilityPane, for: .input)
+    }
+
+    /// Registers the permission in the controller's context, then opens the pane, so the helper
+    /// is already in the pane's list when it shows.
+    private func openPane(_ pane: URL, for kind: PermissionKind) {
+        let link = onPermissionLink
+        dispatch {
+            link(kind)
+            DispatchQueue.main.async { NSWorkspace.shared.open(pane) }
+        }
     }
 
     private func refreshMenu() {

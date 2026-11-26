@@ -190,6 +190,21 @@ public final class HelperController {
         indicator.update(status: status)
     }
 
+    /// The person clicked the menu item of a permission, which then opens its pane of the
+    /// system settings. A missing permission is registered with the system first: a preflight
+    /// alone never lists the helper in the Screen Recording pane, so the person could only add
+    /// it by hand or switch on another app (live finding 26.11.). The person still decides.
+    /// - Parameter kind: the permission of the clicked item.
+    public func permissionLinkClicked(_ kind: PermissionKind) {
+        switch kind {
+        case .capture:
+            if !capturer.permissionGranted() { capturer.registerForPermission() }
+        case .input:
+            if !injector.permissionGranted() { injector.registerForPermission() }
+        }
+        refreshStatus()
+    }
+
     // MARK: Host messages
 
     /// Handles one frame from the host service.

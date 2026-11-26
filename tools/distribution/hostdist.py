@@ -1093,6 +1093,8 @@ def helper_component(run: Runner, version: str, app: Path, workdir: Path) -> Pat
     (scripts / "postinstall").chmod(0o755)
     shutil.copy2(INFRA / "set-computer-use.sh", scripts / "set-computer-use.sh")
     (scripts / "set-computer-use.sh").chmod(0o755)
+    shutil.copy2(INFRA / "macos" / "start-computer-helper.sh", scripts / "start-computer-helper.sh")
+    (scripts / "start-computer-helper.sh").chmod(0o755)
     component_plist = base / "component.plist"
     component_plist.write_bytes(plistlib.dumps(_COMPONENT))
     component = base / f"{HELPER_PKG_IDENTIFIER}.pkg"

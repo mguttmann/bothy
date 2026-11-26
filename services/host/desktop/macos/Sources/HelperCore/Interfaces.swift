@@ -12,6 +12,10 @@ public protocol Capturer: AnyObject {
     /// Whether screen recording is granted; checked without asking the person.
     func permissionGranted() -> Bool
 
+    /// Puts the helper into the system's Screen Recording list (with the system's own prompt
+    /// the first time), so the person can switch it on there. Grants nothing.
+    func registerForPermission()
+
     /// The screen that holds the frontmost window, else the main screen.
     /// - Returns: its geometry in the global display space.
     /// - Throws: when the operating system reports no screen.
@@ -40,6 +44,10 @@ public protocol Capturer: AnyObject {
 public protocol Injector: AnyObject {
     /// Whether accessibility is granted, without which macOS drops synthetic events.
     func permissionGranted() -> Bool
+
+    /// Puts the helper into the system's Accessibility list (with the system's own prompt),
+    /// so the person can switch it on there. Grants nothing.
+    func registerForPermission()
 
     /// Whether the platform has a key for `key` (D-CU-02-7: a name without a key is
     /// `invalid_action`). Checked for every key of a request before the first event.

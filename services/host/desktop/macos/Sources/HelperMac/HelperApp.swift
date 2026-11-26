@@ -44,7 +44,8 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         var controllerRef: HelperController?
         let indicator = MacIndicator(
             dispatch: dispatch, interrupt: interrupt, onToggle: { controllerRef?.toggleEnablementByClick() },
-            onMenuOpen: { controllerRef?.refreshStatus() })
+            onMenuOpen: { controllerRef?.refreshStatus() },
+            onPermissionLink: { controllerRef?.permissionLinkClicked($0) })
         indicator.install()
         let logger = self.logger
         let controller = HelperController(

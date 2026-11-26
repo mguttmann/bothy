@@ -52,8 +52,10 @@ What it does:
   injects nothing.
 - **Permissions.** Screen Recording and Accessibility are only checked
   (`CGPreflightScreenCaptureAccess`, `AXIsProcessTrusted`) and reported in `hello` and `state`;
-  the menu opens the matching pane of the system settings. The helper never asks for or grants
-  itself a permission.
+  a click on a permission item in the menu registers a missing permission with the system
+  (`CGRequestScreenCaptureAccess`, `AXIsProcessTrustedWithOptions` with the prompt), so the helper
+  is listed in the pane, and then opens the matching pane of the system settings. The helper never
+  grants itself a permission and asks only after that click.
 
 ## Layout
 

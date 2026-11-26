@@ -28,6 +28,7 @@ VERSION = hostdist.component_version()
 SET_SCRIPT = hostdist.INFRA / "set-computer-use.sh"
 SET_SCRIPT_PS1 = hostdist.INFRA / "windows" / "set-computer-use.ps1"
 START_SCRIPT_PS1 = hostdist.INFRA / "windows" / "start-computer-helper.ps1"
+START_SCRIPT_SH = hostdist.INFRA / "macos" / "start-computer-helper.sh"
 TEAM = "TEAM123456"
 DR = (
     'designated => identifier "com.example.bothy-computer-helper" and anchor apple generic and '
@@ -245,6 +246,8 @@ def test_helper_package_macos(tmp_path: Path) -> None:
     scripts = Path(helper[helper.index("--scripts") + 1])
     assert os.access(scripts / "postinstall", os.X_OK)
     assert (scripts / "set-computer-use.sh").read_bytes() == SET_SCRIPT.read_bytes()
+    assert (scripts / "start-computer-helper.sh").read_bytes() == START_SCRIPT_SH.read_bytes()
+    assert os.access(scripts / "start-computer-helper.sh", os.X_OK)
     component = plistlib.loads(Path(helper[helper.index("--component-plist") + 1]).read_bytes())
     assert component == [
         {
@@ -300,7 +303,87 @@ def test_the_postinstall_sets_the_key_and_loads_the_agent() -> None:
     assert '"/Library/Application Support/bothy-host/config.yaml"' in text
     assert "set-computer-use.sh" in text
     assert "/Library/LaunchAgents/" in text
-    assert "launchctl bootstrap gui/" in text
+    assert 'start-computer-helper.sh" "$console"' in text
+
+
+# A fake launchctl for start-computer-helper.sh: `linger` is how many more `print` calls still see
+# the service after a bootout (launchd removes it asynchronously); a bootstrap while the service
+# is still there fails with 5, as on the Mac on 26.11.
+_FAKE_LAUNCHCTL = r"""#!/bin/sh
+d=$FAKE_DIR
+echo "$*" >> $d/calls
+case $1 in
+  bootout) [ -e $d/loaded ] && { rm -f $d/loaded; echo $LINGER > $d/linger; }; exit 0 ;;
+  print)
+    n=$(cat $d/linger 2>/dev/null || echo 0)
+    if [ "$n" -gt 0 ]; then echo $((n - 1)) > $d/linger; exit 0; fi
+    [ -e $d/loaded ] && exit 0; exit 113 ;;
+  bootstrap)
+    n=$(cat $d/linger 2>/dev/null || echo 0)
+    if [ "$n" -gt 0 ] || [ -e $d/stuck ]; then
+      echo "Bootstrap failed: 5: Input/output error" >&2; exit 5
+    fi
+    touch $d/loaded; exit 0 ;;
+  kickstart) exit 0 ;;
+esac
+exit 64
+"""
+
+
+def _run_start(
+    tmp_path: Path, *, loaded: bool, linger: int, stuck: bool = False
+) -> tuple[int, str, list[str]]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "launchctl").write_text(_FAKE_LAUNCHCTL, encoding="utf-8")
+    (bin_dir / "launchctl").chmod(0o755)
+    (bin_dir / "sleep").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    (bin_dir / "sleep").chmod(0o755)
+    if loaded:
+        (tmp_path / "loaded").touch()
+    if stuck:
+        (tmp_path / "loaded").touch()
+        (tmp_path / "stuck").touch()
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "FAKE_DIR": str(tmp_path),
+        "LINGER": str(10**6 if stuck else linger),
+    }
+    done = subprocess.run(
+        ["/bin/sh", str(START_SCRIPT_SH), "501", "/Library/LaunchAgents/x.plist"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    calls = (tmp_path / "calls").read_text(encoding="utf-8").splitlines()
+    return done.returncode, done.stdout, calls
+
+
+def test_start_helper_waits_until_the_old_helper_is_gone(tmp_path: Path) -> None:
+    code, out, calls = _run_start(tmp_path, loaded=True, linger=3)
+    assert code == 0, out
+    assert "started in gui/501" in out
+    assert calls[0] == "bootout gui/501/com.example.bothy-computer-helper"
+    # the bootstrap comes only after print no longer sees the service, so it succeeds at once
+    assert [c for c in calls if c.startswith("bootstrap")] == [
+        "bootstrap gui/501 /Library/LaunchAgents/x.plist"
+    ]
+    assert calls.index("bootstrap gui/501 /Library/LaunchAgents/x.plist") > 3
+
+
+def test_start_helper_starts_a_helper_that_was_not_loaded(tmp_path: Path) -> None:
+    code, out, _ = _run_start(tmp_path, loaded=False, linger=0)
+    assert code == 0, out
+    assert (tmp_path / "loaded").exists()
+
+
+def test_start_helper_restarts_a_service_that_never_goes_away(tmp_path: Path) -> None:
+    code, out, calls = _run_start(tmp_path, loaded=True, linger=0, stuck=True)
+    assert code == 0, out
+    assert "restarted in gui/501" in out
+    assert calls[-1] == "kickstart -k gui/501/com.example.bothy-computer-helper"
 
 
 # ---- Windows --------------------------------------------------------------------------------

@@ -36,6 +36,13 @@ public final class MacInjector: Injector {
         AXIsProcessTrusted()
     }
 
+    public func registerForPermission() {
+        // Only after the person's click: lists the helper in the Accessibility pane with the
+        // system's prompt; the switch there stays the person's.
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = MainThread.sync { AXIsProcessTrustedWithOptions(options) }
+    }
+
     public func supports(_ key: Key) -> Bool {
         switch key {
         case .modifier: return true
