@@ -46,3 +46,11 @@ Collected minors without a reproduced harm; the next run in this area reads and 
   starts before `ConnectNamedPipe`; a helper that connects first makes Windows answer
   `ERROR_PIPE_CONNECTED` (535), which the probe reports as "the helper did not connect". Treat
   winerror 535 as connected (not reproduced).
+- (27.11., review of the Sonar fix round) `services/host/cmd/bothy-host/computer_test.go`: the
+  doctor check with computer use on stats the real helper path of the test machine; with an
+  installed helper it would run `TrustedPath` with a nil resolver.
+- (27.11., same review) `services/host/internal/computer/actions_test.go`: the zoom of an unknown
+  scale ID asserts only that it is not ok, not its code.
+- (27.11., same review) `plugins/claude-code-runner/tests/unit/test_computer.py`
+  `test_a_request_link_is_not_followed`: the fixed wait before the "not answered" check can only
+  let the test pass wrongly on a slow machine, never fail it.

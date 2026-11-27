@@ -198,3 +198,38 @@ func TestComputerParse(t *testing.T) {
 		t.Errorf("StateBody = %+v, %v", s, err)
 	}
 }
+
+// TestComputerBodies: the body readers return the decoded body of their own type and refuse
+// another type or a body that breaks the rules of its type, and a constructor refuses a body the
+// decode rules would refuse.
+func TestComputerBodies(t *testing.T) {
+	res, err := NewResult(Result{Seq: 3, Code: "ok", Width: 1280, Height: 831, ScaleID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, err := res.ResultBody(); err != nil || r.Seq != 3 || r.Code != "ok" || r.ScaleID != 1 {
+		t.Errorf("ResultBody %+v %v", r, err)
+	}
+	begin, err := NewImageBegin(ImageBegin{Format: FormatPNG, Width: 10, Height: 20, ScaleID: 2, Bytes: 99})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, err := begin.ImageBeginBody(); err != nil || b.Format != FormatPNG || b.Bytes != 99 {
+		t.Errorf("ImageBeginBody %+v %v", b, err)
+	}
+	if _, err := res.ImageBeginBody(); !errors.Is(err, ErrMalformed) {
+		t.Errorf("a cu_result read as cu_image_begin: %v", err)
+	}
+	if _, err := (Frame{Type: TypeCUResult, Data: []byte(`{"seq":-1,"code":"ok"}`)}).ResultBody(); !errors.Is(err, ErrMalformed) {
+		t.Errorf("a cu_result with seq -1: %v", err)
+	}
+	if _, err := (Frame{Type: TypeCUImageBegin, Data: []byte(`{"format":"gif","width":1,"height":1,"bytes":1}`)}).ImageBeginBody(); !errors.Is(err, ErrMalformed) {
+		t.Errorf("a cu_image_begin as gif: %v", err)
+	}
+	if _, err := NewImageBegin(ImageBegin{Format: FormatJPEG}); !errors.Is(err, ErrMalformed) {
+		t.Errorf("NewImageBegin without a size: %v", err)
+	}
+	if _, err := NewResult(Result{Seq: 1}); !errors.Is(err, ErrMalformed) {
+		t.Errorf("NewResult without a code: %v", err)
+	}
+}

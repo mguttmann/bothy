@@ -302,6 +302,31 @@ async def test_folder_answers_list_open_and_refuses_a_wrong_nonce(tmp_path: Path
 
 
 @pytest.mark.anyio
+async def test_a_request_link_is_not_followed(tmp_path: Path) -> None:
+    """The request file is read off the event loop with O_NOFOLLOW: a link in the request folder
+    is never answered and never reaches the server, the next plain request still is."""
+    paths = _paths(tmp_path)
+    write_turn_file(paths, mcp_document(MCP_BIN, paths, NONCE, 30.0, SERVER))
+    server = _Server({"list": {"v": 1, "ok": True, "result": {"items": []}}})
+    folder = RequestFolder(paths, NONCE, server, poll=0.01)
+    task = asyncio.ensure_future(folder.serve())
+    try:
+        target = tmp_path / "elsewhere.json"
+        target.write_bytes(_request())
+        linked, plain = str(uuid.uuid4()), str(uuid.uuid4())
+        (paths.request_dir / f"{linked}.request.json").symlink_to(target)
+        _write_request(paths.request_dir, plain, _request())
+        assert (await _answer(paths.request_dir, plain))["ok"] is True
+        await asyncio.sleep(0.05)
+        assert not (paths.request_dir / f"{linked}.answer.json").exists()
+        assert len(server.calls) == 1
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+@pytest.mark.anyio
 async def test_a_refused_open_does_not_count_and_names_ignored(tmp_path: Path) -> None:
     paths = _paths(tmp_path)
     write_turn_file(paths, mcp_document(MCP_BIN, paths, NONCE, 30.0, SERVER))

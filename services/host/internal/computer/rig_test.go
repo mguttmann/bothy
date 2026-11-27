@@ -70,8 +70,12 @@ type fakeHelper struct {
 	imgH int64
 	// doCode is the code of every do; empty means ok.
 	doCode string
-	cursor XY
-	gotOp  chan string
+	// capCode and posCode are the codes of every capture and position; empty means ok. noCursor
+	// leaves the cursor out of the done of a position.
+	capCode, posCode string
+	noCursor         bool
+	cursor           XY
+	gotOp            chan string
 }
 
 // connect attaches a new fake helper with hello h to the rig's helper channel.
@@ -128,10 +132,15 @@ func (f *fakeHelper) loop() {
 		f.mu.Lock()
 		f.ops = append(f.ops, msg)
 		scr, img, w, h, code, cur := f.scr, f.img, f.imgW, f.imgH, f.doCode, f.cursor
+		capCode, posCode, noCursor := f.capCode, f.posCode, f.noCursor
 		f.mu.Unlock()
 		app := AppID{ID: "com.example.editor", Name: "Editor", Signer: "EXAMPLE123"}
 		switch m := msg.(type) {
 		case *Capture:
+			if capCode != "" {
+				f.send(Done{Op: OpDone, Seq: m.Seq, Code: capCode, App: app, Screen: scr})
+				break
+			}
 			f.send(Done{Op: OpDone, Seq: m.Seq, Code: CodeOK, App: app, Screen: scr, Image: &ImageInfo{Format: m.Format, Width: w, Height: h, Bytes: int64(len(img))}})
 			f.sendImage(img)
 		case *Do:
@@ -140,7 +149,14 @@ func (f *fakeHelper) loop() {
 			}
 			f.send(Done{Op: OpDone, Seq: m.Seq, Code: code, App: app, Screen: scr})
 		case *Position:
-			f.send(Done{Op: OpDone, Seq: m.Seq, Code: CodeOK, App: app, Screen: scr, Cursor: &cur})
+			switch {
+			case posCode != "":
+				f.send(Done{Op: OpDone, Seq: m.Seq, Code: posCode, App: app, Screen: scr})
+			case noCursor:
+				f.send(Done{Op: OpDone, Seq: m.Seq, Code: CodeOK, App: app, Screen: scr})
+			default:
+				f.send(Done{Op: OpDone, Seq: m.Seq, Code: CodeOK, App: app, Screen: scr, Cursor: &cur})
+			}
 		}
 		select {
 		case f.gotOp <- op:

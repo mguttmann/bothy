@@ -177,6 +177,17 @@ You can operate a desktop of the owner with the tools `mcp__bothy_computer__*`: 
 it locks nothing (OR-1)."""
 
 
+def _read_request(path: Path) -> bytes:
+    """Read at most 64 KiB of the request file at path without following a link (27 10.2).
+
+    Raises:
+        OSError: the file is gone, a link or unreadable.
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as file:
+        return file.read(64 * 1024)
+
+
 @dataclass(frozen=True)
 class ComputerPaths:
     """The files of one run's computer use (27 10.1, 10.2, 10.4).
@@ -599,9 +610,7 @@ class RequestFolder:
     async def _answer(self, request_id: str) -> None:
         folder = self.paths.request_dir
         try:
-            fd = os.open(folder / f"{request_id}{REQUEST_SUFFIX}", os.O_RDONLY | os.O_NOFOLLOW)
-            with os.fdopen(fd, "rb") as file:
-                raw = file.read(64 * 1024)
+            raw = await asyncio.to_thread(_read_request, folder / f"{request_id}{REQUEST_SUFFIX}")
         except OSError:
             return  # taken back by C1 meanwhile
         request = parse_request(request_id, raw, self.nonce)
