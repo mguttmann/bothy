@@ -42,3 +42,7 @@ Collected minors without a reproduced harm; the next run in this area reads and 
 - (27.11., same review) The comment of `fakehost.DialStream` names the M1-67 rule as "dials out of
   _test.go files"; the rule is about gateway dials through the harness, and these streams are no
   gateway streams.
+- (27.11., review of the probe pipe fix) `tools/ci/computer_probe.py` `PipeEndpoint`: the helper
+  starts before `ConnectNamedPipe`; a helper that connects first makes Windows answer
+  `ERROR_PIPE_CONNECTED` (535), which the probe reports as "the helper did not connect". Treat
+  winerror 535 as connected (not reproduced).

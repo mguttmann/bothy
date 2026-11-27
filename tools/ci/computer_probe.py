@@ -310,6 +310,18 @@ class UnixEndpoint(Endpoint):
             Path(self._dir).rmdir()
 
 
+def pipe_mode(winapi: Any) -> int:
+    """The mode of a byte pipe that waits (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT).
+
+    Python's _winapi does not export the two byte names; all three Win32 values are 0.
+    """
+    return (
+        getattr(winapi, "PIPE_TYPE_BYTE", 0)
+        | getattr(winapi, "PIPE_READMODE_BYTE", 0)
+        | getattr(winapi, "PIPE_WAIT", 0)
+    )
+
+
 class PipeEndpoint(Endpoint):
     """A Windows named pipe in byte mode; blocking calls run in a thread to keep the waits."""
 
@@ -323,7 +335,7 @@ class PipeEndpoint(Endpoint):
         self._handle = _winapi.CreateNamedPipe(
             self.name,
             _winapi.PIPE_ACCESS_DUPLEX,
-            _winapi.PIPE_TYPE_BYTE | _winapi.PIPE_READMODE_BYTE | _winapi.PIPE_WAIT,
+            pipe_mode(_winapi),
             1,
             1 << 16,
             1 << 16,

@@ -206,3 +206,16 @@ def test_the_helper_starts_with_the_endpoint() -> None:
     ]
     assert cp.helper_command(Path("h.exe"), r"\\.\pipe\x") == ["h.exe"]
     assert cp.helper_env("e")["BOTHY_COMPUTER_HELPER_CHANNEL"] == "e"
+
+
+def test_the_pipe_mode_needs_no_byte_names_of_winapi() -> None:
+    """Python's _winapi has no PIPE_TYPE_BYTE or PIPE_READMODE_BYTE (the probe of the Windows job
+    failed with AttributeError); with PIPE_WAIT all three Win32 values are 0, so a byte pipe that
+    waits has mode 0 with or without the names."""
+    import types
+
+    assert cp.pipe_mode(types.SimpleNamespace()) == 0
+    assert (
+        cp.pipe_mode(types.SimpleNamespace(PIPE_TYPE_BYTE=0, PIPE_READMODE_BYTE=0, PIPE_WAIT=0))
+        == 0
+    )
