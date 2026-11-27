@@ -364,6 +364,17 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"component.default_ttl = 1d  # default\n" +
 		"component.form_max_fields = 10  # default\n" +
 		"component.max_per_message = 25  # default\n" +
+		"computer.attach_token_ttl = 30s  # default\n" +
+		"computer.audit_apps_max = 32  # default\n" +
+		"computer.auto_screenshot = true  # default\n" +
+		"computer.image_max_edge = 1280  # default\n" +
+		"computer.jpeg_quality = 80  # default\n" +
+		"computer.key_repeat_max = 50  # default\n" +
+		"computer.open_timeout = 20s  # default\n" +
+		"computer.scroll_amount_max = 50  # default\n" +
+		"computer.settle = 500ms  # default\n" +
+		"computer.status_interval = 2s  # default\n" +
+		"computer.wait_max = 1m  # default\n" +
 		"console.assets_dir =   # default\n" +
 		"console.csp_report_max_records = 20  # default\n" +
 		"console.grafana_embed_url =   # default\n" +

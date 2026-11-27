@@ -63,7 +63,7 @@ func TestComputerSessions(t *testing.T) {
 			Settings map[string]any `json:"settings"`
 		}
 		if err := json.Unmarshal(open, &op); err != nil || op.UserID != w.owner.PrincipalID ||
-			op.DataPath != "/api/v1/hosts/computer-sessions/"+first.SessionID+"/stream" || len(op.Settings) != 8 {
+			op.DataPath != "/api/v1/hosts/computer-sessions/"+first.SessionID+"/stream" || len(op.Settings) != 9 {
 			t.Fatalf("computer.open %s", open)
 		}
 	})

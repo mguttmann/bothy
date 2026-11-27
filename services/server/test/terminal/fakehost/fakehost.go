@@ -1135,3 +1135,18 @@ func ControlAttempt(ctx context.Context, baseURL string, id ids.ID, key hosttest
 	_ = json.Unmarshal(b, &next)
 	return next.Op, 0, "", nil
 }
+
+// DialStream opens a WebSocket to url without a handshake of its own and lifts the read limit:
+// the tests of computer use speak the data and attach connections themselves (CU-04), and the
+// gateway rule of M1-67 keeps dials out of _test.go files.
+func DialStream(ctx context.Context, url string) (*websocket.Conn, error) {
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled})
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	ws.SetReadLimit(-1)
+	return ws, nil
+}

@@ -585,14 +585,10 @@ func (h *host) dialData(session string) *conn {
 	w := h.w
 	w.t.Helper()
 	url := "ws" + strings.TrimPrefix(w.s.PublicURL, "http") + "/api/v1/hosts/computer-sessions/" + session + "/stream"
-	ws, resp, err := websocket.Dial(w.ctx(), url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled})
-	if resp != nil && resp.Body != nil {
-		_ = resp.Body.Close()
-	}
+	ws, err := fakehost.DialStream(w.ctx(), url)
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	ws.SetReadLimit(-1)
 	_, b, err := ws.Read(w.ctx())
 	if err != nil {
 		w.t.Fatal(err)
@@ -618,14 +614,10 @@ func (h *host) dialData(session string) *conn {
 func (w *world) attach(path, token string) *conn {
 	w.t.Helper()
 	url := "ws" + strings.TrimPrefix(w.s.PublicURL, "http") + path
-	ws, resp, err := websocket.Dial(w.ctx(), url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled})
-	if resp != nil && resp.Body != nil {
-		_ = resp.Body.Close()
-	}
+	ws, err := fakehost.DialStream(w.ctx(), url)
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	ws.SetReadLimit(-1)
 	if typ, _, err := ws.Read(w.ctx()); err != nil || typ != websocket.MessageText {
 		w.t.Fatalf("hello of the attach: %v", err)
 	}

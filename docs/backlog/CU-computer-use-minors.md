@@ -35,3 +35,10 @@ Collected minors without a reproduced harm; the next run in this area reads and 
 - (27.11., review of the helper job fix) `host-platform.yml`, Windows helper job: the helper the
   install started is found by name only; a check of its path (`$started.Path`) would log whether
   it runs from Program Files.
+- (27.11., review of the server suite fixes) `services/server/test/canary/scenario_terminal.go`: the
+  canary step of computer use drives only refusal paths; no computer session opens or carries data
+  in the canary run (the content proof stays with CU-T18). A canary computer session needs a fake
+  desktop helper.
+- (27.11., same review) The comment of `fakehost.DialStream` names the M1-67 rule as "dials out of
+  _test.go files"; the rule is about gateway dials through the harness, and these streams are no
+  gateway streams.
