@@ -13,8 +13,8 @@ import (
 // DACL (docs/spec/27-computer-use.md 9.4): a client's CreateFile asks for no right that pipeSDDL
 // grants interactive users (IU) not, or Windows refuses it with ERROR_ACCESS_DENIED. The computer
 // helper asked for GENERIC_READ | GENERIC_WRITE, which includes FILE_APPEND_DATA (on a pipe
-// FILE_CREATE_PIPE_INSTANCE), FILE_WRITE_EA and FILE_WRITE_ATTRIBUTES; on a Windows 11 test machine it never
-// connected and the host reported it absent. The test reads the sources
+// FILE_CREATE_PIPE_INSTANCE), FILE_WRITE_EA and FILE_WRITE_ATTRIBUTES; on a Windows 11
+// test machine it never connected and the host reported it absent. The test reads the sources
 // themselves, so it runs on every platform: the Windows file of this package and the helper's
 // header that its pipe client uses.
 func TestPipeClientsAskOnlyForTheInteractiveGrant(t *testing.T) {

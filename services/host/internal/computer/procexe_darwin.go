@@ -134,7 +134,7 @@ func (darwinProc) Close() error { return nil }
 // PROC_PIDPATHINFO), which reads the path of a process of any user; the path is resolved (no
 // symbolic link in it), and the installed helper path has none. kern.procargs2 is readable
 // only for root and the process's own user, and the host service (bothy-host) reads the helper of
-// the person at the console, so it refused every helper.
+// the person at the console, so it refused every helper (seen on a macOS test machine).
 func exePath(pid int) (string, error) {
 	buf := make([]byte, procPidPathInfoMaxSize)
 	_, _, e := syscall.Syscall6(sysProcInfo, procInfoCallPidinfo, uintptr(pid), procPidPathInfo, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) //nolint:gosec // G103,G115: proc_info writes at most len(buf) bytes of the path into buf

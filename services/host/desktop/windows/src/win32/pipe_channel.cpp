@@ -79,9 +79,9 @@ std::string pipe_owner_sid(HANDLE pipe) {
 
 // The channel log `%LOCALAPPDATA%\bothy-computer-helper\channel.log`: one line per change of the
 // channel (connected, closed, an open that fails with a new error, a refused server), so a helper
-// that never reaches the host service can be diagnosed on the machine (on a test machine: the
-// pipe refused GENERIC_WRITE with error 5 and nothing said so). It holds no message content and
-// starts over above kChannelLogMax bytes.
+// that never reaches the host service can be diagnosed on the machine (on a Windows 11 test
+// machine the pipe refused GENERIC_WRITE with error 5 and nothing said so). It holds no message
+// content and starts over above kChannelLogMax bytes.
 constexpr LONGLONG kChannelLogMax = 256 * 1024;
 
 void note(const std::wstring& text) {
@@ -119,7 +119,8 @@ constexpr ULONGLONG kShortMs = 5000;
 // process. The host service binds every helper connection to a handle of the client process
 // (D-CU-03-12) and reads its executable through it; the default DACL of a person's process admits
 // only that person, the logon session and SYSTEM, so the service account NT SERVICE\bothy-host
-// got "access denied" and refused every helper (a Windows 11 test machine, computer_peer_refused reason no_binding).
+// got "access denied" and refused every helper (a Windows 11 test machine,
+// computer_peer_refused reason no_binding).
 // Returns 0 or the Win32 error.
 DWORD grant_service_query() {
   DWORD size = 0, domain_size = 0;

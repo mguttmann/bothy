@@ -61,8 +61,8 @@ func TestLoginctlConsoleOwner(t *testing.T) {
 }
 
 // TestFirstOwner: the console owner comes from the first source that names a SID; the session
-// query that a virtual service account may not make (a Windows 11 test machine: access denied) falls through to the
-// LogonUI session data, and a value that is no SID never counts.
+// query that a virtual service account may not make (access denied on a Windows 11 test machine)
+// falls through to the LogonUI session data, and a value that is no SID never counts.
 func TestFirstOwner(t *testing.T) {
 	const sid = "S-1-5-21-3458425980-4001700-720649186-1001"
 	denied := func() (string, error) { return "", errors.New("access denied") }

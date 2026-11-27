@@ -308,9 +308,9 @@ def test_the_postinstall_sets_the_key_and_loads_the_agent() -> None:
 
 # A fake launchctl for start-computer-helper.sh: `linger` is how many more `print` calls still see
 # the service after a bootout (launchd removes it asynchronously); a bootstrap while the service
-# is still there fails with 5, as on the Mac on 26.11. The helper processes are real detached
-# sleeps, listed with their uid and executable path in $FAKE_DIR/procs, which the fake ps reads:
-# a bootstrap or kickstart starts one for launchd, a bootout ends launchd's one.
+# is still there fails with 5, as on a macOS test machine on 2026-11-26. The helper processes are
+# real detached sleeps, listed with their uid and executable path in $FAKE_DIR/procs, which the
+# fake ps reads: a bootstrap or kickstart starts one for launchd, a bootout ends launchd's one.
 _FAKE_LAUNCHCTL = r"""#!/bin/sh
 d=$FAKE_DIR
 echo "$*" >> $d/calls
@@ -471,10 +471,10 @@ def test_start_helper_restarts_a_service_that_never_goes_away(procs_dir: Path) -
 
 
 def test_start_helper_ends_helpers_started_outside_launchd(procs_dir: Path) -> None:
-    # The Mac on 26.11.: a helper started by hand with `open` (not by launchd) kept running
-    # next to the one the update started; the two took the host's channel from each other and
-    # every computer session ended at once. Only the new launchd helper may be left, and only
-    # processes of the console user that run the helper's exact path are ended.
+    # A macOS test machine on 2026-11-26: a helper started by hand with `open` (not by launchd)
+    # kept running next to the one the update started; the two took the host's channel from each
+    # other and every computer session ended at once. Only the new launchd helper may be left, and
+    # only processes of the console user that run the helper's exact path are ended.
     by_open = _spawn(procs_dir, 501, HELPER_EXE)
     stubborn = _spawn(procs_dir, 501, HELPER_EXE, ignore_term=True)
     other_user = _spawn(procs_dir, 502, HELPER_EXE)
@@ -626,8 +626,8 @@ def test_the_msi_has_the_helper_only_with_its_define() -> None:
 def test_the_msi_starts_the_helper_after_install() -> None:
     """The helper runs right after the install in the console session, not only after a login:
     a deferred action as the system account (it needs SeTcbPrivilege for uiAccess), after the
-    files, only when the feature is installed, and never failing the install (on a test machine:
-    the helper was absent until it was started by hand)."""
+    files, only when the feature is installed, and never failing the install (on a Windows 11
+    test machine the helper was absent until it was started by hand)."""
     wxs = (hostdist.INFRA / "windows" / "bothy-host.wxs").read_text(encoding="utf-8")
     action = re.search(r'<CustomAction Id="StartComputerHelper"[^>]*/>', wxs)
     assert action

@@ -26,3 +26,9 @@ Collected minors without a reproduced harm; the next run in this area reads and 
 - (26.11., live) Windows tray icon of the helper is the generic application icon and lands in the overflow ("^"); the owner did not find the switch "Allow computer control". An own icon would make it findable.
 - (26.11., review of the duplicate-helper fix) `start-computer-helper.sh` matches `ps` `comm`, which is argv[0], not the real executable: a helper started by hand with a relative path or through a symlink is not ended (the `open` and launchd starts are). The comment, README and spec say "exact path".
 - (26.11., review of the duplicate-helper fix) The fake `ps` and `_alive` in `test_hostdist_helper.py` use `kill -0`, which also succeeds for a zombie not yet reaped by launchd; a theoretical flake under heavy load (not seen in 9 runs).
+- (27.11., red team of the CU branch) `actions.go` `input` with quick discards the result of
+  `s.sleep(min(settle, quickPause))`: when the session ends within those 50 ms, the item is still
+  reported ok.
+- (27.11., red team of the CU branch) `console_windows.go` `sessionDataOwner`: the fallback through
+  `LoggedOnUserSID` is not checked against a stale subkey of a reused session id; a Windows test
+  would show it.

@@ -13,7 +13,8 @@ import (
 // form the signature check compares: hostdist bakes HELPER_CERT_SUBJECT ("CN=...") into
 // buildinfo.ComputerHelperRequirement, and signerSubjectIs reads the signer's subject as an X.500
 // string. Comparing the simple display name ("bothy-computer-helper (local)") refused every helper
-// on a Windows 11 test machine (reason signature). The test reads both sources, so it runs on every platform.
+// on a Windows 11 test machine (reason signature). The test reads both sources, so it runs on
+// every platform.
 func TestWindowsRequirementIsTheSubjectDN(t *testing.T) {
 	py, err := os.ReadFile("../../../../tools/distribution/hostdist.py")
 	if err != nil {

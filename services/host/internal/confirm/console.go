@@ -61,9 +61,9 @@ var sidPattern = regexp.MustCompile(`^S-1-[0-9]+(-[0-9]+)+$`)
 
 // firstOwner returns the console owner from the first source that names one: Windows asks the
 // session (WTSQuerySessionInformationW), which a virtual service account such as
-// NT SERVICE\bothy-host may not do ("access denied", a Windows 11 test machine), and then the LogonUI session data,
-// which every user may read and only administrators and SYSTEM may write. A value that is no SID
-// does not count. It returns errNoConsole when no source names one.
+// NT SERVICE\bothy-host may not do ("access denied" on a Windows 11 test machine), and then the
+// LogonUI session data, which every user may read and only administrators and SYSTEM may write.
+// A value that is no SID does not count. It returns errNoConsole when no source names one.
 func firstOwner(sources ...func() (string, error)) (string, error) {
 	for _, s := range sources {
 		if sid, err := s(); err == nil && sidPattern.MatchString(sid) {

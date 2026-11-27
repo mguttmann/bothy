@@ -112,7 +112,7 @@ func TestDefaultBindExecAfterConnect(t *testing.T) {
 // TestExePathOfAnotherUsersProcess: the host service reads the executable of a helper that runs as
 // another user (the service user bothy-host, the helper as the person at the console). The
 // earlier kern.procargs2 refuses that to everyone but root and the process's own user, so every
-// helper on the Mac was refused (report helper "refused"). launchd (PID 1)
+// helper on a macOS test machine was refused (report helper "refused"). launchd (PID 1)
 // runs as root; the test runs as an ordinary user and needs no privilege.
 func TestExePathOfAnotherUsersProcess(t *testing.T) {
 	if os.Geteuid() == 0 {
