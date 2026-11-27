@@ -32,3 +32,6 @@ Collected minors without a reproduced harm; the next run in this area reads and 
 - (27.11., red team of the CU branch) `console_windows.go` `sessionDataOwner`: the fallback through
   `LoggedOnUserSID` is not checked against a stale subkey of a reused session id; a Windows test
   would show it.
+- (27.11., review of the helper job fix) `host-platform.yml`, Windows helper job: the helper the
+  install started is found by name only; a check of its path (`$started.Path`) would log whether
+  it runs from Program Files.

@@ -336,10 +336,20 @@ jobs:
           $run = (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run').'bothy-computer-helper'
           if ($run -ne ('"' + $helper + '"')) { throw "start entry $run" }
           if (-not ((Get-Content (Join-Path $dir 'config.yaml')) -contains '  computer_use: true')) { throw 'computer_use not set' }
+          # The install action StartComputerHelper starts the helper in the console session; a
+          # second start there ends at once with 0 (one helper per session). End that one first,
+          # so the start below still proves that Windows grants uiAccess to the signed helper.
+          $started = Get-Process -Name 'bothy-computer-helper' -ErrorAction SilentlyContinue
+          if ($started) {
+            $started | Stop-Process -Force -ErrorAction SilentlyContinue
+            $started | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+            Write-Output 'the install started the helper'
+          }
           $h = Start-Process -FilePath $helper -PassThru
           Start-Sleep -Seconds 5
           if ($h.HasExited) { throw "the signed uiAccess helper ended with $($h.ExitCode)" }
           Stop-Process -Id $h.Id
+          Wait-Process -Id $h.Id -Timeout 10 -ErrorAction SilentlyContinue
           Write-Output 'the signed uiAccess helper starts from Program Files'
       - name: Probe capture and input
         id: probe
