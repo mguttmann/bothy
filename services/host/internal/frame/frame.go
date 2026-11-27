@@ -189,7 +189,7 @@ func encodeData(f Frame, otherFields bool) ([]byte, error) {
 	if len(f.Data) == 0 || otherFields {
 		return nil, encodeMalformed(f.Type)
 	}
-	if 1+len(f.Data) > MaxLen {
+	if len(f.Data) >= MaxLen {
 		return nil, fmt.Errorf("frame: encode type 0x%02x: %d bytes, limit %d: %w", byte(f.Type), 1+len(f.Data), MaxLen, ErrTooLong)
 	}
 	out := make([]byte, 1+len(f.Data))

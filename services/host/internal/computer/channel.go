@@ -218,10 +218,10 @@ func ReadFrame(r io.Reader, maxBytes int) (byte, []byte, error) {
 // EncodeFrame returns the wire form of one channel frame; a frame above maxBytes wraps
 // ErrFrameTooLong.
 func EncodeFrame(kind byte, body []byte, maxBytes int) ([]byte, error) {
-	n := 1 + len(body)
-	if n > maxBytes {
-		return nil, fmt.Errorf("%w: %d bytes", ErrFrameTooLong, n)
+	if len(body) >= maxBytes {
+		return nil, fmt.Errorf("%w: %d bytes", ErrFrameTooLong, 1+len(body))
 	}
+	n := 1 + len(body)
 	out := make([]byte, lenSize+n)
 	binary.BigEndian.PutUint32(out, uint32(n)) //nolint:gosec // G115: n is at most maxBytes, an int of the configuration
 	out[lenSize] = kind

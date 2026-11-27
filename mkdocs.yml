@@ -130,10 +130,12 @@ validation:
     unrecognized_links: warn
 
 # Deliberately outside the navigation: single ADRs (linked from the ADR index) and the ruling
-# files of the tickets (linked from the generated page decisions.d/index.md).
+# files of the tickets (linked from the generated page decisions.d/index.md) and the open minors
+# under backlog/ (working lists, not documentation).
 not_in_nav: |
   /adr/0*.md
   /decisions.d/*.md
+  /backlog/*.md
   /api/dart/
 
 nav:

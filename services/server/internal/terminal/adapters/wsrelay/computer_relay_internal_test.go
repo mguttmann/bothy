@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
@@ -46,22 +47,12 @@ func TestComputerRelay_ExpectationWithoutSideEndsNothing(t *testing.T) {
 	}
 	id := ids.New()
 	r.ExpectComputer(app.ComputerExpectation{SessionID: id, HostID: ids.New(), Deadline: time.Now().Add(20 * time.Millisecond)})
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	testkit.Until(t, "the slot without a side is dropped at its deadline", func() bool {
 		r.mu.Lock()
+		defer r.mu.Unlock()
 		_, held := r.slots[id]
-		r.mu.Unlock()
-		if !held {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	r.mu.Lock()
-	_, held := r.slots[id]
-	r.mu.Unlock()
-	if held {
-		t.Fatal("the slot outlived its deadline")
-	}
+		return !held
+	})
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	if len(rec.ends) != 0 {

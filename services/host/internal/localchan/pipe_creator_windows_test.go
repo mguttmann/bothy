@@ -3,13 +3,13 @@
 package localchan
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // TestListenPipeServesASecondConnection: a pipe with the helper DACL serves two connections one
@@ -26,8 +26,7 @@ func TestListenPipeServesASecondConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	accepted := make(chan error, 2)
 	go func() {
 		for range 2 {

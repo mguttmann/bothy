@@ -3,13 +3,13 @@
 package confirm
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // TestListenSetsTheTokenUserAsPipeOwner holds the owner rule of docs/spec/27-computer-use.md 9.4:
@@ -49,8 +49,7 @@ func TestListenServesASecondConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	accepted := make(chan error, 2)
 	go func() {
 		for range 2 {

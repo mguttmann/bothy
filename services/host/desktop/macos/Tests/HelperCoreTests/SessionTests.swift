@@ -79,7 +79,7 @@ final class EnablementTests: XCTestCase {
     }
 
     // Live finding 26.11.: a preflight alone never puts the helper into the Screen Recording
-    // list, so the owner switched on the Bothy app there instead. A click on a permission item
+    // list, so the owner switched on the client app there instead. A click on a permission item
     // registers the helper with the system (the person still decides) before the pane opens.
     func testPermissionLinkRegistersAMissingPermissionOnly() {
         let rig = Rig()

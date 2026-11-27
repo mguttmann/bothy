@@ -21,7 +21,7 @@ $source = @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class BothyHelperStart {
+public static class ComputerHelperStart {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct StartupInfo {
         public int cb; public string lpReserved; public string lpDesktop; public string lpTitle;
@@ -84,7 +84,7 @@ public static class BothyHelperStart {
 
 try {
     Add-Type -TypeDefinition $source
-    'start-computer-helper: ' + [BothyHelperStart]::Start($Helper, (Split-Path -Parent $Helper))
+    'start-computer-helper: ' + [ComputerHelperStart]::Start($Helper, (Split-Path -Parent $Helper))
 } catch {
     'start-computer-helper: ' + $_.Exception.Message
 }

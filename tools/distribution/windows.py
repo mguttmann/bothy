@@ -390,6 +390,9 @@ def powershell(
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
+            # Started from pwsh 7, Windows PowerShell inherits pwsh's PSModulePath, loads no
+            # certificate provider and has no `Cert:` drive; the machine's path fixes that.
+            "$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); "
             "$ErrorActionPreference = 'Stop'; " + script,
         ],
         env=env,

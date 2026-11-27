@@ -224,7 +224,7 @@ jobs:
         id: probe
         shell: bash
         run: |
-          uv run --no-project --python 3.14 tools/ci/computer_probe.py --mode probe \
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode probe \
             --helper "$RUNNER_TEMP/helper/bothy-computer-helper.app" \
             --out "$RUNNER_TEMP/probe/probe-macos.json" --github-output "$GITHUB_OUTPUT"
       - name: Notice when the probe failed
@@ -267,7 +267,7 @@ jobs:
       - name: Click, type, keys and image against the fixture window
         shell: bash
         run: |
-          uv run --no-project --python 3.14 tools/ci/computer_probe.py --mode native \
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode native \
             --helper "$RUNNER_TEMP/helper/bothy-computer-helper.app" --out "$RUNNER_TEMP/probe/native-macos.json"
       - name: Keep the result
         if: always()
@@ -345,7 +345,7 @@ jobs:
         id: probe
         shell: bash
         run: |
-          uv run --no-project --python 3.14 tools/ci/computer_probe.py --mode probe \
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode probe \
             --helper "$RUNNER_TEMP/dev/Release/bothy-computer-helper.exe" \
             --out "$RUNNER_TEMP/probe/probe-windows.json" --github-output "$GITHUB_OUTPUT"
       - name: Notice when the probe failed
@@ -381,7 +381,7 @@ jobs:
       - name: Click, type, keys and image against the fixture window
         shell: bash
         run: |
-          uv run --no-project --python 3.14 tools/ci/computer_probe.py --mode native \
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode native \
             --helper "$RUNNER_TEMP/dev/Release/bothy-computer-helper.exe" --out "$RUNNER_TEMP/probe/native-windows.json"
       - name: Keep the result
         if: always()

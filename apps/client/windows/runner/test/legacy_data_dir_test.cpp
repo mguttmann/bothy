@@ -57,8 +57,8 @@ fs::path Roaming(const char* name, bool with_legacy = true) {
 
 void TestCopiesTheOldFolder() {
   const fs::path roaming = Roaming("copy");
-  const Result result = Migrate(roaming, L"Bothy", L"Bothy");
-  const fs::path target = roaming / "Bothy" / "Bothy";
+  const Result result = Migrate(roaming, L"Brand", L"Brand");
+  const fs::path target = roaming / "Brand" / "Brand";
   Expect("copy: result kCopied", result == Result::kCopied);
   Expect("copy: secure store copied", Read(target / "flutter_secure_storage.dat") == "secrets");
   Expect("copy: database and WAL copied",
@@ -68,35 +68,35 @@ void TestCopiesTheOldFolder() {
          Read(target / "instances" / "i1" / "files" / "f1" / "medium") == "image");
   Expect("copy: old folder kept",
          Read(roaming / "com.example" / "client" / "flutter_secure_storage.dat") == "secrets");
-  Expect("copy: no staging folder left", !fs::exists(roaming / "Bothy" / "Bothy.migrating"));
+  Expect("copy: no staging folder left", !fs::exists(roaming / "Brand" / "Brand.migrating"));
   // The next start finds the new folder and does nothing, even after the app changed it.
   Write(target / "flutter_secure_storage.dat", "newer");
   Expect("copy: second start leaves the new folder",
-         Migrate(roaming, L"Bothy", L"Bothy") == Result::kTargetExists &&
+         Migrate(roaming, L"Brand", L"Brand") == Result::kTargetExists &&
              Read(target / "flutter_secure_storage.dat") == "newer");
   fs::remove_all(roaming);
 }
 
 void TestNeverOverwritesAnExistingFolder() {
   const fs::path roaming = Roaming("exists");
-  Write(roaming / "Bothy" / "Bothy" / "flutter_secure_storage.dat", "paired anew");
-  Expect("exists: result kTargetExists", Migrate(roaming, L"Bothy", L"Bothy") ==
+  Write(roaming / "Brand" / "Brand" / "flutter_secure_storage.dat", "paired anew");
+  Expect("exists: result kTargetExists", Migrate(roaming, L"Brand", L"Brand") ==
                                              Result::kTargetExists);
   Expect("exists: new folder unchanged",
-         Read(roaming / "Bothy" / "Bothy" / "flutter_secure_storage.dat") == "paired anew");
+         Read(roaming / "Brand" / "Brand" / "flutter_secure_storage.dat") == "paired anew");
   fs::remove_all(roaming);
 }
 
 void TestNothingWithoutTheAppsOldFolder() {
   const fs::path none = Roaming("none", false);
-  Expect("none: result kNoLegacy", Migrate(none, L"Bothy", L"Bothy") == Result::kNoLegacy);
-  Expect("none: no new folder", !fs::exists(none / "Bothy"));
+  Expect("none: result kNoLegacy", Migrate(none, L"Brand", L"Brand") == Result::kNoLegacy);
+  Expect("none: no new folder", !fs::exists(none / "Brand"));
   fs::remove_all(none);
   // Another app of the Flutter template under com.example\client: no store of this app.
   const fs::path other = Roaming("other", false);
   Write(other / "com.example" / "client" / "settings.json", "{}");
-  Expect("other: result kNoLegacy", Migrate(other, L"Bothy", L"Bothy") == Result::kNoLegacy);
-  Expect("other: no new folder", !fs::exists(other / "Bothy"));
+  Expect("other: result kNoLegacy", Migrate(other, L"Brand", L"Brand") == Result::kNoLegacy);
+  Expect("other: no new folder", !fs::exists(other / "Brand"));
   fs::remove_all(other);
 }
 
@@ -109,10 +109,10 @@ void TestSameNamesAsBefore() {
 
 void TestStagingOfAnInterruptedStart() {
   const fs::path roaming = Roaming("staging");
-  Write(roaming / "Bothy" / "Bothy.migrating" / "half", "x");
-  Expect("staging: result kCopied", Migrate(roaming, L"Bothy", L"Bothy") == Result::kCopied);
-  Expect("staging: half copy gone", !fs::exists(roaming / "Bothy" / "Bothy" / "half") &&
-                                        !fs::exists(roaming / "Bothy" / "Bothy.migrating"));
+  Write(roaming / "Brand" / "Brand.migrating" / "half", "x");
+  Expect("staging: result kCopied", Migrate(roaming, L"Brand", L"Brand") == Result::kCopied);
+  Expect("staging: half copy gone", !fs::exists(roaming / "Brand" / "Brand" / "half") &&
+                                        !fs::exists(roaming / "Brand" / "Brand.migrating"));
   fs::remove_all(roaming);
 }
 

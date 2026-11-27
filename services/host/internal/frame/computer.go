@@ -158,7 +158,7 @@ func encodeComputer(f Frame) ([]byte, error) {
 	if f.Cols != 0 || f.Rows != 0 || f.ExitCode != 0 {
 		return nil, encodeMalformed(f.Type)
 	}
-	if 1+len(f.Data) > MaxLen {
+	if len(f.Data) >= MaxLen {
 		return nil, fmt.Errorf("frame: encode type 0x%02x: %d bytes, limit %d: %w", byte(f.Type), 1+len(f.Data), MaxLen, ErrTooLong)
 	}
 	if _, err := decodeComputer(f.Type, f.Data); err != nil {
