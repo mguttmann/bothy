@@ -106,6 +106,7 @@ EXEMPT_ROUTES: tuple[ExemptRoute, ...] = (
     ExemptRoute("POST", "/client-metrics", "telemetry"),
     ExemptRoute("POST", "/command-autocompletions/{request_id}/answer", "agent_runtime"),
     ExemptRoute("POST", "/components/{component_id}/interactions", "client_id"),
+    ExemptRoute("POST", "/computer/sessions", "auth_flow"),
     ExemptRoute("POST", "/csp-reports", "telemetry"),
     ExemptRoute("POST", "/files/{file_id}/tickets", "read_only"),
     ExemptRoute("POST", "/grants/preview", "read_only"),
