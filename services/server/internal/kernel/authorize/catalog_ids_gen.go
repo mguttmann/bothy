@@ -145,6 +145,20 @@ const (
 	ActionCommandRemove Action = "command.remove"
 	// ActionComponentUpdate is the action component.update.
 	ActionComponentUpdate Action = "component.update"
+	// ActionComputerAttach is the action computer.attach.
+	ActionComputerAttach Action = "computer.attach"
+	// ActionComputerDesktopsList is the action computer.desktops.list.
+	ActionComputerDesktopsList Action = "computer.desktops.list"
+	// ActionComputerDeviceDisable is the action computer.device.disable.
+	ActionComputerDeviceDisable Action = "computer.device.disable"
+	// ActionComputerOpen is the action computer.open.
+	ActionComputerOpen Action = "computer.open"
+	// ActionComputerSessionRead is the action computer.session.read.
+	ActionComputerSessionRead Action = "computer.session.read"
+	// ActionComputerStop is the action computer.stop.
+	ActionComputerStop Action = "computer.stop"
+	// ActionComputerTerminate is the action computer.terminate.
+	ActionComputerTerminate Action = "computer.terminate"
 	// ActionConsoleCspReport is the action console.csp_report.
 	ActionConsoleCspReport Action = "console.csp_report"
 	// ActionCostReadAggregate is the action cost.read.aggregate.
@@ -561,6 +575,13 @@ var actionByID = map[string]Action{
 	"command.register":             ActionCommandRegister,
 	"command.remove":               ActionCommandRemove,
 	"component.update":             ActionComponentUpdate,
+	"computer.attach":              ActionComputerAttach,
+	"computer.desktops.list":       ActionComputerDesktopsList,
+	"computer.device.disable":      ActionComputerDeviceDisable,
+	"computer.open":                ActionComputerOpen,
+	"computer.session.read":        ActionComputerSessionRead,
+	"computer.stop":                ActionComputerStop,
+	"computer.terminate":           ActionComputerTerminate,
 	"console.csp_report":           ActionConsoleCspReport,
 	"cost.read.aggregate":          ActionCostReadAggregate,
 	"cost.read.thread":             ActionCostReadThread,
@@ -804,6 +825,13 @@ var actionList = []Action{
 	ActionCommandRegister,
 	ActionCommandRemove,
 	ActionComponentUpdate,
+	ActionComputerAttach,
+	ActionComputerDesktopsList,
+	ActionComputerDeviceDisable,
+	ActionComputerOpen,
+	ActionComputerSessionRead,
+	ActionComputerStop,
+	ActionComputerTerminate,
 	ActionConsoleCspReport,
 	ActionCostReadAggregate,
 	ActionCostReadThread,
@@ -1035,6 +1063,8 @@ const (
 	EventCommandChanged EventType = "command.changed"
 	// EventCommandInvoked is the event type command.invoked.
 	EventCommandInvoked EventType = "command.invoked"
+	// EventComputerSessionChanged is the event type computer_session.changed.
+	EventComputerSessionChanged EventType = "computer_session.changed"
 	// EventDevicePending is the event type device.pending.
 	EventDevicePending EventType = "device.pending"
 	// EventDraftDeleted is the event type draft.deleted.
@@ -1152,6 +1182,7 @@ var eventTypeByID = map[string]EventType{
 	"command.autocomplete_requested": EventCommandAutocompleteRequested,
 	"command.changed":                EventCommandChanged,
 	"command.invoked":                EventCommandInvoked,
+	"computer_session.changed":       EventComputerSessionChanged,
 	"device.pending":                 EventDevicePending,
 	"draft.deleted":                  EventDraftDeleted,
 	"draft.updated":                  EventDraftUpdated,
@@ -1222,6 +1253,7 @@ var eventTypeList = []EventType{
 	EventCommandAutocompleteRequested,
 	EventCommandChanged,
 	EventCommandInvoked,
+	EventComputerSessionChanged,
 	EventDevicePending,
 	EventDraftDeleted,
 	EventDraftUpdated,
@@ -1421,6 +1453,8 @@ const (
 	ResourceCommand ResourceKind = "command"
 	// ResourceComponent is the resource kind component.
 	ResourceComponent ResourceKind = "component"
+	// ResourceComputerSession is the resource kind computer_session.
+	ResourceComputerSession ResourceKind = "computer_session"
 	// ResourceDevEnvironment is the resource kind dev_environment.
 	ResourceDevEnvironment ResourceKind = "dev_environment"
 	// ResourceDevice is the resource kind device.
@@ -1479,6 +1513,7 @@ var resourceKindByID = map[string]ResourceKind{
 	"channel":           ResourceChannel,
 	"command":           ResourceCommand,
 	"component":         ResourceComponent,
+	"computer_session":  ResourceComputerSession,
 	"dev_environment":   ResourceDevEnvironment,
 	"device":            ResourceDevice,
 	"draft":             ResourceDraft,
@@ -1514,6 +1549,7 @@ var resourceKindList = []ResourceKind{
 	ResourceChannel,
 	ResourceCommand,
 	ResourceComponent,
+	ResourceComputerSession,
 	ResourceDevEnvironment,
 	ResourceDevice,
 	ResourceDraft,
@@ -1558,6 +1594,32 @@ type ChannelOp string
 
 // The terminal channel ops of the catalogue.
 const (
+	// ChannelOpComputerAttachHello is the terminal channel op computer_attach/hello.
+	ChannelOpComputerAttachHello ChannelOp = "computer_attach/hello"
+	// ChannelOpComputerAttachIdentify is the terminal channel op computer_attach/identify.
+	ChannelOpComputerAttachIdentify ChannelOp = "computer_attach/identify"
+	// ChannelOpComputerAttachNoiseFrame is the terminal channel op computer_attach/noise_frame.
+	ChannelOpComputerAttachNoiseFrame ChannelOp = "computer_attach/noise_frame"
+	// ChannelOpHostComputerDataError is the terminal channel op host_computer_data/error.
+	ChannelOpHostComputerDataError ChannelOp = "host_computer_data/error"
+	// ChannelOpHostComputerDataHello is the terminal channel op host_computer_data/hello.
+	ChannelOpHostComputerDataHello ChannelOp = "host_computer_data/hello"
+	// ChannelOpHostComputerDataIdentify is the terminal channel op host_computer_data/identify.
+	ChannelOpHostComputerDataIdentify ChannelOp = "host_computer_data/identify"
+	// ChannelOpHostComputerDataNoiseFrame is the terminal channel op host_computer_data/noise_frame.
+	ChannelOpHostComputerDataNoiseFrame ChannelOp = "host_computer_data/noise_frame"
+	// ChannelOpHostControlComputerClose is the terminal channel op host_control/computer.close.
+	ChannelOpHostControlComputerClose ChannelOp = "host_control/computer.close"
+	// ChannelOpHostControlComputerDisable is the terminal channel op host_control/computer.disable.
+	ChannelOpHostControlComputerDisable ChannelOp = "host_control/computer.disable"
+	// ChannelOpHostControlComputerEnded is the terminal channel op host_control/computer.ended.
+	ChannelOpHostControlComputerEnded ChannelOp = "host_control/computer.ended"
+	// ChannelOpHostControlComputerOpen is the terminal channel op host_control/computer.open.
+	ChannelOpHostControlComputerOpen ChannelOp = "host_control/computer.open"
+	// ChannelOpHostControlComputerStarted is the terminal channel op host_control/computer.started.
+	ChannelOpHostControlComputerStarted ChannelOp = "host_control/computer.started"
+	// ChannelOpHostControlComputerState is the terminal channel op host_control/computer.state.
+	ChannelOpHostControlComputerState ChannelOp = "host_control/computer.state"
 	// ChannelOpHostControlError is the terminal channel op host_control/error.
 	ChannelOpHostControlError ChannelOp = "host_control/error"
 	// ChannelOpHostControlHeartbeat is the terminal channel op host_control/heartbeat.
@@ -1600,29 +1662,55 @@ const (
 
 // channelOpByID maps every id to its constant.
 var channelOpByID = map[string]ChannelOp{
-	"host_control/error":           ChannelOpHostControlError,
-	"host_control/heartbeat":       ChannelOpHostControlHeartbeat,
-	"host_control/heartbeat_ack":   ChannelOpHostControlHeartbeatAck,
-	"host_control/hello":           ChannelOpHostControlHello,
-	"host_control/identify":        ChannelOpHostControlIdentify,
-	"host_control/ready":           ChannelOpHostControlReady,
-	"host_control/report":          ChannelOpHostControlReport,
-	"host_control/session.close":   ChannelOpHostControlSessionClose,
-	"host_control/session.ended":   ChannelOpHostControlSessionEnded,
-	"host_control/session.open":    ChannelOpHostControlSessionOpen,
-	"host_control/session.started": ChannelOpHostControlSessionStarted,
-	"host_data/error":              ChannelOpHostDataError,
-	"host_data/hello":              ChannelOpHostDataHello,
-	"host_data/identify":           ChannelOpHostDataIdentify,
-	"host_data/noise_frame":        ChannelOpHostDataNoiseFrame,
-	"terminal_stream/error":        ChannelOpTerminalStreamError,
-	"terminal_stream/hello":        ChannelOpTerminalStreamHello,
-	"terminal_stream/identify":     ChannelOpTerminalStreamIdentify,
-	"terminal_stream/noise_frame":  ChannelOpTerminalStreamNoiseFrame,
+	"computer_attach/hello":          ChannelOpComputerAttachHello,
+	"computer_attach/identify":       ChannelOpComputerAttachIdentify,
+	"computer_attach/noise_frame":    ChannelOpComputerAttachNoiseFrame,
+	"host_computer_data/error":       ChannelOpHostComputerDataError,
+	"host_computer_data/hello":       ChannelOpHostComputerDataHello,
+	"host_computer_data/identify":    ChannelOpHostComputerDataIdentify,
+	"host_computer_data/noise_frame": ChannelOpHostComputerDataNoiseFrame,
+	"host_control/computer.close":    ChannelOpHostControlComputerClose,
+	"host_control/computer.disable":  ChannelOpHostControlComputerDisable,
+	"host_control/computer.ended":    ChannelOpHostControlComputerEnded,
+	"host_control/computer.open":     ChannelOpHostControlComputerOpen,
+	"host_control/computer.started":  ChannelOpHostControlComputerStarted,
+	"host_control/computer.state":    ChannelOpHostControlComputerState,
+	"host_control/error":             ChannelOpHostControlError,
+	"host_control/heartbeat":         ChannelOpHostControlHeartbeat,
+	"host_control/heartbeat_ack":     ChannelOpHostControlHeartbeatAck,
+	"host_control/hello":             ChannelOpHostControlHello,
+	"host_control/identify":          ChannelOpHostControlIdentify,
+	"host_control/ready":             ChannelOpHostControlReady,
+	"host_control/report":            ChannelOpHostControlReport,
+	"host_control/session.close":     ChannelOpHostControlSessionClose,
+	"host_control/session.ended":     ChannelOpHostControlSessionEnded,
+	"host_control/session.open":      ChannelOpHostControlSessionOpen,
+	"host_control/session.started":   ChannelOpHostControlSessionStarted,
+	"host_data/error":                ChannelOpHostDataError,
+	"host_data/hello":                ChannelOpHostDataHello,
+	"host_data/identify":             ChannelOpHostDataIdentify,
+	"host_data/noise_frame":          ChannelOpHostDataNoiseFrame,
+	"terminal_stream/error":          ChannelOpTerminalStreamError,
+	"terminal_stream/hello":          ChannelOpTerminalStreamHello,
+	"terminal_stream/identify":       ChannelOpTerminalStreamIdentify,
+	"terminal_stream/noise_frame":    ChannelOpTerminalStreamNoiseFrame,
 }
 
 // channelOpList holds every constant, sorted ascending.
 var channelOpList = []ChannelOp{
+	ChannelOpComputerAttachHello,
+	ChannelOpComputerAttachIdentify,
+	ChannelOpComputerAttachNoiseFrame,
+	ChannelOpHostComputerDataError,
+	ChannelOpHostComputerDataHello,
+	ChannelOpHostComputerDataIdentify,
+	ChannelOpHostComputerDataNoiseFrame,
+	ChannelOpHostControlComputerClose,
+	ChannelOpHostControlComputerDisable,
+	ChannelOpHostControlComputerEnded,
+	ChannelOpHostControlComputerOpen,
+	ChannelOpHostControlComputerStarted,
+	ChannelOpHostControlComputerState,
 	ChannelOpHostControlError,
 	ChannelOpHostControlHeartbeat,
 	ChannelOpHostControlHeartbeatAck,

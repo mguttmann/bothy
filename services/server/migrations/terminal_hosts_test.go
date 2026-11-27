@@ -92,6 +92,9 @@ func TestMigration_Hosts(t *testing.T) {
 		{"disabled_reason", "text", true, ""},
 		{"retired_at", ts, true, ""},
 		{"version", "bigint", false, "1"},
+		// The desktop enablement mirror of computer use (CU-04, 00124).
+		{"reported_computer", "jsonb", true, ""},
+		{"computer_disabled_generation", "integer", true, ""},
 	}
 	if got := principalColumns(t, conn, "hosts"); !reflect.DeepEqual(got, columns) {
 		t.Errorf("columns:\n got %+v\nwant %+v", got, columns)

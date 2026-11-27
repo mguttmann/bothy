@@ -38,7 +38,7 @@ func (h *Hosts) PairHost(ctx context.Context, req rest.PairHostRequestObject) (r
 	if b := req.Body; b != nil {
 		cmd = terminal.PairHost{
 			Code: terminal.NewSecret(b.PairingCode), NoisePublicKey: b.NoisePublicKey, AuthPublicJWK: map[string]any(b.AuthPublicJwk),
-			Platform: string(b.Platform), HostVersion: b.HostVersion,
+			Platform: string(b.Platform), HostVersion: b.HostVersion, ComputerUse: isTrue(b.ComputerUse),
 		}
 		if b.OsVersion != nil {
 			cmd.OSVersion = *b.OsVersion

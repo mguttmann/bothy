@@ -5,10 +5,16 @@ package confirm
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
+
+// sessionDataKey holds one subkey per logged-on session with the value LoggedOnUserSID
+// (LogonUI); users may read it, only administrators and SYSTEM write it.
+const sessionDataKey = `SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI\SessionData\`
 
 // noConsoleSession is the value of WTSGetActiveConsoleSessionId while no session is attached to
 // the console.
@@ -23,7 +29,9 @@ const (
 var procWTSQuerySessionInformationW = windows.NewLazySystemDLL("wtsapi32.dll").NewProc("WTSQuerySessionInformationW")
 
 // ConsoleOwner returns the SID of the user of the active console session: its user and domain
-// name from WTSQuerySessionInformationW, mapped to the SID with LookupAccountName. The service
+// name from WTSQuerySessionInformationW, mapped to the SID with LookupAccountName, or, where the
+// account may not query the session (the virtual account NT SERVICE\bothy-host gets "access
+// denied"), the value LoggedOnUserSID of the LogonUI session data of that session. The service
 // account has no SeTcbPrivilege, so WTSQueryUserToken is not available. It returns an error when
 // no session is attached to the console or nobody is logged on in it.
 func ConsoleOwner(context.Context) (string, error) {
@@ -31,6 +39,11 @@ func ConsoleOwner(context.Context) (string, error) {
 	if id == noConsoleSession {
 		return "", errNoConsole
 	}
+	return firstOwner(func() (string, error) { return wtsOwner(id) }, func() (string, error) { return sessionDataOwner(id) })
+}
+
+// wtsOwner returns the SID of the user of session id from WTSQuerySessionInformationW.
+func wtsOwner(id uint32) (string, error) {
 	user, err := sessionString(id, wtsUserName)
 	if err != nil || user == "" {
 		return "", errNoConsole
@@ -48,6 +61,17 @@ func ConsoleOwner(context.Context) (string, error) {
 		return "", fmt.Errorf("confirm: console user: %w", err)
 	}
 	return sid.String(), nil
+}
+
+// sessionDataOwner returns LoggedOnUserSID of the LogonUI session data of session id.
+func sessionDataOwner(id uint32) (string, error) {
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, sessionDataKey+strconv.FormatUint(uint64(id), 10), registry.QUERY_VALUE)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = k.Close() }()
+	sid, _, err := k.GetStringValue("LoggedOnUserSID")
+	return sid, err
 }
 
 // sessionString returns one string of WTSQuerySessionInformationW for the session id.

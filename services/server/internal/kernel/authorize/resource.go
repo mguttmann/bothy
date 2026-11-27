@@ -97,6 +97,11 @@ type Resource struct {
 	// a session (API token, agent, app) with forbidden step_up_not_possible after the visibility
 	// check. Ignored for every other action.
 	IssueTicket bool
+	// Computer describes the run and the desktop of the agent actions of computer use
+	// (computer.desktops.list, computer.open, computer.attach; CU-04, 07 SR13): required for those
+	// three, where a missing value is an internal error, ignored otherwise. The terminal module
+	// gathers it from runs (a read port in the transaction of the check) and from its own hosts.
+	Computer *ComputerFacts
 	// Event marks the descriptor of a stored event (ResourceFromEvent) and carries its full
 	// scope. When the stored resource kind is not a resource of the receive action (pin.added
 	// names a message, thread.read takes a thread), authz decides on the object of the scope the
@@ -153,6 +158,53 @@ type TerminalFacts struct {
 	// with terminal.max_sessions_per_person and terminal.max_sessions_per_host. Ignored by every
 	// other action: attaching creates no session.
 	OpenSessionsOfPerson, OpenSessionsOfHost int
+}
+
+// ComputerFeeder is one row of 03 run_feeders of the run of a computer action: the principal an
+// input of the run spoke for (zero for NULL) and its source (trigger, followup, interaction,
+// command, wake_input or context).
+type ComputerFeeder struct {
+	PrincipalID ids.ID
+	Source      string
+}
+
+// ComputerFacts are the facts of the guard rule SR13 (07 section 5, docs/spec/27-computer-use.md
+// 5.1 step 5) for one agent action of computer use. RunID must be the run of the acting-for
+// binding of the request; authz decides SR2, SR13 items 1 to 3 and 5 from the run facts and item
+// 4 from the desktop facts, which the terminal module computes from its hosts (27 section 4 item
+// 3). Every field is read fresh for the check; a zero value fails closed.
+//
+// Example:
+//
+//	r := authorize.Resource{Kind: authorize.ResourceHost, ID: hostID, Computer: &authorize.ComputerFacts{
+//		RunFound: true, RunID: run, RunAgentID: agent, TriggeredBy: alex, RunActive: true, ToolClass: "host",
+//		TriggerKind: "message", TriggerOrigin: "human", TriggerAuthorID: alex, HostConnected: true, HostListed: true}}
+type ComputerFacts struct {
+	// RunFound reports that the run exists; RunID, RunAgentID and TriggeredBy are its id, agent
+	// and runs.triggered_by.
+	RunFound                       bool
+	RunID, RunAgentID, TriggeredBy ids.ID
+	// RunActive reports a run in queued, running or waiting_input (09 5.1).
+	RunActive bool
+	// ToolClass is the tool class of the run's agent (none, read, write or host; SR2).
+	ToolClass string
+	// TriggerKind is runs.trigger_kind: message, command, interaction, team or wake.
+	TriggerKind string
+	// TriggerOrigin and TriggerAuthorID are messages.origin and the author of the triggering
+	// message of a message run; empty otherwise.
+	TriggerOrigin   string
+	TriggerAuthorID ids.ID
+	// TriggeringCommand reports runs.triggering_command_id set (the command form of SR13 item 2).
+	TriggeringCommand bool
+	// Feeders are the rows of run_feeders of the run (SR13 item 5).
+	Feeders []ComputerFeeder
+	// HostState is the state of the desktop (computer.open and computer.attach); HostConnected
+	// reports its control connection after the first report; HostListed reports a desktop of
+	// TriggeredBy after 27 section 4 item 3 (helper connected, enabled, every permission granted,
+	// generation above the disabled generation, assignee NULL or the person).
+	HostState     string
+	HostConnected bool
+	HostListed    bool
 }
 
 // EventScope is the scope of a stored event (event_log.space_id, channel_id, thread_id).
@@ -273,6 +325,9 @@ type InteractionFacts struct {
 	ComponentRunActive bool
 	// RunStarterID is runs.triggered_by of the run of ComponentRunID; zero without a run.
 	RunStarterID ids.ID
+	// ComputerHeld reports that the run of ComponentRunID has a computer session that is not
+	// closed (CU-04): only RunStarterID may then operate its components (07 SR13 item 5).
+	ComputerHeld bool
 }
 
 // CommandFacts describes a slash command for command.read, command.register and command.invoke

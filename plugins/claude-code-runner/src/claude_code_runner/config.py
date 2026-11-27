@@ -242,6 +242,16 @@ class RunnerConfig:
             code's pin (FIX-RUNNER-TESTED-CLI). ``None`` (empty, the default): only the pin.
         tested_claude_code_pin: ``runner.tested_claude_code_pin``: the pin whose recordings the
             proof used; required with ``tested_claude_code_version`` and only with it.
+        computer_use: ``runner.computer_use``: every turn under ``host`` loads
+            ``bothy-computer-mcp`` through its per-turn MCP file and the runner serves its
+            request folder (docs/spec/27-computer-use.md 10); off by default, and off the
+            argument list, the environment and the system prompt are exactly as before.
+        computer_mcp_bin: ``runner.computer_mcp_bin``: the absolute path of
+            ``bothy-computer-mcp``; required with ``computer_use``, then refused unless it is an
+            existing regular file that neither group nor others may write. ``None`` when empty.
+        computer_request_timeout: ``runner.computer_request_timeout``: the longest wait of the
+            MCP server for the runner's answer, passed as ``BOTHY_COMPUTER_TIMEOUT_MS``; above
+            zero.
     """
 
     source: Path
@@ -303,6 +313,9 @@ class RunnerConfig:
     background_status_interval: float = 2.0
     tested_claude_code_version: str | None = None
     tested_claude_code_pin: str | None = None
+    computer_use: bool = False
+    computer_mcp_bin: Path | None = None
+    computer_request_timeout: float = 30.0
 
 
 _Parse = Callable[[Any], Any]
@@ -779,6 +792,9 @@ def load_config(path: Path) -> RunnerConfig:
         background_status_interval=_positive(r, "background_status_interval", "2s"),
         tested_claude_code_version=tested[0],
         tested_claude_code_pin=tested[1],
+        computer_use=r.get("computer_use", bool, False),
+        computer_mcp_bin=_computer_mcp_bin(r),
+        computer_request_timeout=_positive(r, "computer_request_timeout", "30s"),
     )
     r.unknown()
     _check_modes(r, config)
@@ -791,6 +807,36 @@ def _check_modes(r: _Reader, config: RunnerConfig) -> None:
         _check_hosting(r, config)
     if config.launch_mode == "background":
         _check_background(r, config)
+    if config.computer_use:
+        _check_computer(r, config)
+
+
+def _computer_mcp_bin(r: _Reader) -> Path | None:
+    """``runner.computer_mcp_bin``: empty is unset; `_check_computer` checks the file."""
+    value = r.get("computer_mcp_bin", str, "")
+    return Path(value) if value else None
+
+
+def _check_computer(r: _Reader, config: RunnerConfig) -> None:
+    """The start check of ``runner.computer_use`` (docs/spec/27-computer-use.md 10.1).
+
+    Every ``host`` turn starts the binary with the run's nonce in its environment, so a file
+    another account may replace would run its code with the runner's rights.
+    """
+    name = "computer_mcp_bin"
+    path = config.computer_mcp_bin
+    if path is None:
+        raise r.fail(name, "required with runner.computer_use")
+    if not path.is_absolute():
+        raise r.fail(name, "must be an absolute path")
+    try:
+        info = path.stat()
+    except OSError:
+        raise r.fail(name, "does not exist") from None
+    if not stat.S_ISREG(info.st_mode):
+        raise r.fail(name, "is not a regular file")
+    if stat.S_IMODE(info.st_mode) & (stat.S_IWGRP | stat.S_IWOTH):
+        raise r.fail(name, "group or others may write it")
 
 
 def _check_hosting(r: _Reader, config: RunnerConfig) -> None:

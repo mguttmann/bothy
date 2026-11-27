@@ -52,6 +52,11 @@ type Host struct {
 	CreatedBy           ids.ID
 	CreatedAt           time.Time
 	Version             int64
+	// ReportedComputer is hosts.reported_computer, the helper state of the last report (27 12.3);
+	// nil while the host service reports no computer object (CU-04).
+	ReportedComputer *ReportedComputer
+	// ComputerDisabledGeneration is hosts.computer_disabled_generation (27 4 item 4); nil for NULL.
+	ComputerDisabledGeneration *int64
 }
 
 // Paired reports a host that has been paired at least once (paired_at set): only such a host has

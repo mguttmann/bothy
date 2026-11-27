@@ -270,6 +270,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.incomingWebhooks()
 	sc.hosts()
 	sc.terminalSessions()
+	sc.computerSessions()
 	sc.errorPaths()
 	sc.gatewayOps()
 	sc.FinishObservers()

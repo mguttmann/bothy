@@ -41,7 +41,7 @@ func TestRoundTrip(t *testing.T) {
 			t.Errorf("type byte 0x%02x, want 0x%02x", b[0], byte(c.f.Type))
 		}
 		for _, from := range c.from {
-			got, err := Decode(b, from)
+			got, err := Decode(b, KindTerminal, from)
 			if err != nil {
 				t.Fatalf("Decode type 0x%02x from %v: %v", byte(c.f.Type), from, err)
 			}
@@ -82,7 +82,7 @@ func TestExitCodeSigned(t *testing.T) {
 		if err != nil || !bytes.Equal(b, want) {
 			t.Errorf("Exit(%d) = % x, %v; want % x", code, b, err, want)
 		}
-		f, err := Decode(want, FromHost)
+		f, err := Decode(want, KindTerminal, FromHost)
 		if err != nil || f.ExitCode != code {
 			t.Errorf("Decode(% x) = %d, %v", want, f.ExitCode, err)
 		}
@@ -95,7 +95,7 @@ func TestDecodeUnknownType(t *testing.T) {
 			if b >= 0x01 && b <= 0x07 {
 				continue
 			}
-			if _, err := Decode([]byte{byte(b), 0, 0, 0, 0}, from); !errors.Is(err, ErrUnknownType) {
+			if _, err := Decode([]byte{byte(b), 0, 0, 0, 0}, KindTerminal, from); !errors.Is(err, ErrUnknownType) {
 				t.Errorf("type 0x%02x from %v: err = %v, want ErrUnknownType", b, from, err)
 			}
 		}
@@ -115,7 +115,7 @@ func TestDecodeWrongDirection(t *testing.T) {
 		{[]byte{0x07}, FromDevice},
 	}
 	for _, c := range cases {
-		if _, err := Decode(c.b, c.from); !errors.Is(err, ErrWrongDirection) {
+		if _, err := Decode(c.b, KindTerminal, c.from); !errors.Is(err, ErrWrongDirection) {
 			t.Errorf("type 0x%02x from %v: err = %v, want ErrWrongDirection", c.b[0], c.from, err)
 		}
 	}
@@ -146,12 +146,12 @@ var malformed = []struct {
 
 func TestDecodeMalformed(t *testing.T) {
 	for _, from := range []Sender{FromDevice, FromHost} {
-		if _, err := Decode(nil, from); !errors.Is(err, ErrEmpty) {
+		if _, err := Decode(nil, KindTerminal, from); !errors.Is(err, ErrEmpty) {
 			t.Errorf("empty input from %v: err = %v, want ErrEmpty", from, err)
 		}
 	}
 	for _, c := range malformed {
-		if _, err := Decode(c.b, c.from); !errors.Is(err, ErrMalformed) {
+		if _, err := Decode(c.b, KindTerminal, c.from); !errors.Is(err, ErrMalformed) {
 			t.Errorf("%s: err = %v, want ErrMalformed", c.name, err)
 		}
 	}
@@ -187,14 +187,14 @@ func TestFrameSizeLimit(t *testing.T) {
 	if err != nil || len(b) != MaxLen {
 		t.Fatalf("data of %d bytes: %d bytes, %v", len(big), len(b), err)
 	}
-	if f, err := Decode(b, FromHost); err != nil || len(f.Data) != len(big) {
+	if f, err := Decode(b, KindTerminal, FromHost); err != nil || len(f.Data) != len(big) {
 		t.Fatalf("decode data of %d bytes: %v", len(big), err)
 	}
 	tooBig := bytes.Repeat([]byte{0x5a}, MaxLen)
 	if _, err := Encode(Data(tooBig)); !errors.Is(err, ErrTooLong) {
 		t.Errorf("Encode data of %d bytes: err = %v, want ErrTooLong", len(tooBig), err)
 	}
-	if _, err := Decode(append([]byte{0x02}, tooBig...), FromDevice); !errors.Is(err, ErrTooLong) {
+	if _, err := Decode(append([]byte{0x02}, tooBig...), KindTerminal, FromDevice); !errors.Is(err, ErrTooLong) {
 		t.Errorf("Decode frame of %d bytes: err = %v, want ErrTooLong", len(tooBig)+1, err)
 	}
 }
@@ -216,7 +216,7 @@ func TestFrameIsInput(t *testing.T) {
 
 func TestDecodeAliasesInput(t *testing.T) {
 	b := []byte{0x02, 'a', 'b'}
-	f, err := Decode(b, FromDevice)
+	f, err := Decode(b, KindTerminal, FromDevice)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestErrorsCarryNoContent(t *testing.T) {
 		{append([]byte{0x02}, bytes.Repeat([]byte(canary), 6000)...), FromDevice},
 	}
 	for _, in := range inputs {
-		_, err := Decode(in.b, in.from)
+		_, err := Decode(in.b, KindTerminal, in.from)
 		if err == nil {
 			continue
 		}
@@ -261,7 +261,7 @@ func TestSenderString(t *testing.T) {
 }
 
 func TestDecodeUnknownSender(t *testing.T) {
-	if _, err := Decode([]byte{0x02, 'a'}, Sender(9)); !errors.Is(err, ErrWrongDirection) {
+	if _, err := Decode([]byte{0x02, 'a'}, KindTerminal, Sender(9)); !errors.Is(err, ErrWrongDirection) {
 		t.Errorf("unknown sender: err = %v, want ErrWrongDirection", err)
 	}
 }

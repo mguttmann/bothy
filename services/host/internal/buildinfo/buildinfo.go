@@ -93,3 +93,10 @@ func UpdatePath(kind, configPath string) string {
 	}
 	return "download the newer bothy-host release binary, verify it (docs/operations/release.md) and run it" + install
 }
+
+// ComputerHelperRequirement is the code signing requirement the computer helper must satisfy
+// (docs/spec/27-computer-use.md 9.4): on macOS the designated requirement with the team ID, on
+// Windows the Authenticode publisher subject. The signed release packages set it with -ldflags
+// "-X github.com/OWNER/bothy/services/host/internal/buildinfo.ComputerHelperRequirement=<value>";
+// empty means a development build, which says so in the doctor and in the report (D-CU-01-22).
+var ComputerHelperRequirement = ""

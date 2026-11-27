@@ -29,6 +29,7 @@ flowchart LR
     subgraph Z8["Zone 8: Connected hosts (semi-trusted)"]
         HOSTD["Host service bothy-host<br/>own user without admin"]
         PTY["PTY: shell or coding agent"]
+        HLP["Computer helper<br/>owner's desktop session"]
     end
 
     subgraph Z5["Zone 5: Integrations (untrusted)"]
@@ -78,3 +79,5 @@ flowchart LR
     APP -- "TB10: Noise stream end-to-end" --> PRX
     HOSTD -- "TB10: WSS outbound, login key" --> PRX
     HOSTD --> PTY
+    RT -- "TB11: bothy-computer-mcp, Noise stream end-to-end" --> PRX
+    HOSTD -- "TB11: local channel, peer rule" --> HLP

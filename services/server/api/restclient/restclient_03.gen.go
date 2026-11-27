@@ -16,6 +16,565 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewDownloadThumbnailRequest constructs an http.Request for the DownloadThumbnail method
+func NewDownloadThumbnailRequest(server string, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "variant", variant, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files/%s/thumbnails/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ticket != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ticket", *params.Ticket, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.Range != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Range", *params.Range, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Range", headerParam0)
+		}
+
+		if params.IfRange != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Range", *params.IfRange, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Range", headerParam1)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCreateFileTicketRequest calls the generic CreateFileTicket builder with application/json body
+func NewCreateFileTicketRequest(server string, fileId FileIdPath, body CreateFileTicketJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateFileTicketRequestWithBody(server, fileId, "application/json", bodyReader)
+}
+
+// NewCreateFileTicketRequestWithBody constructs an http.Request for the CreateFileTicket method, with any body, and a specified content type
+func NewCreateFileTicketRequestWithBody(server string, fileId FileIdPath, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files/%s/tickets", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRequestTranscriptionRequest constructs an http.Request for the RequestTranscription method
+func NewRequestTranscriptionRequest(server string, fileId FileIdPath, params *RequestTranscriptionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files/%s/transcribe", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetTranscriptRequest constructs an http.Request for the GetTranscript method
+func NewGetTranscriptRequest(server string, fileId FileIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files/%s/transcript", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSubmitTranscriptRequest calls the generic SubmitTranscript builder with application/json body
+func NewSubmitTranscriptRequest(server string, fileId FileIdPath, params *SubmitTranscriptParams, body SubmitTranscriptJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSubmitTranscriptRequestWithBody(server, fileId, params, "application/json", bodyReader)
+}
+
+// NewSubmitTranscriptRequestWithBody constructs an http.Request for the SubmitTranscript method, with any body, and a specified content type
+func NewSubmitTranscriptRequestWithBody(server string, fileId FileIdPath, params *SubmitTranscriptParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files/%s/transcript", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewListGdprRequestsRequest constructs an http.Request for the ListGdprRequests method
+func NewListGdprRequestsRequest(server string, params *ListGdprRequestsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/gdpr-requests")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SubjectUserId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "subject_user_id", *params.SubjectUserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateGdprRequestRequest calls the generic CreateGdprRequest builder with application/json body
+func NewCreateGdprRequestRequest(server string, params *CreateGdprRequestParams, body CreateGdprRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGdprRequestRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateGdprRequestRequestWithBody constructs an http.Request for the CreateGdprRequest method, with any body, and a specified content type
+func NewCreateGdprRequestRequestWithBody(server string, params *CreateGdprRequestParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/gdpr-requests")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetGdprRequestRequest constructs an http.Request for the GetGdprRequest method
+func NewGetGdprRequestRequest(server string, requestId RequestIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/gdpr-requests/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDecideGdprRequestRequest calls the generic DecideGdprRequest builder with application/json body
+func NewDecideGdprRequestRequest(server string, requestId RequestIdPath, params *DecideGdprRequestParams, body DecideGdprRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDecideGdprRequestRequestWithBody(server, requestId, params, "application/json", bodyReader)
+}
+
+// NewDecideGdprRequestRequestWithBody constructs an http.Request for the DecideGdprRequest method, with any body, and a specified content type
+func NewDecideGdprRequestRequestWithBody(server string, requestId RequestIdPath, params *DecideGdprRequestParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/gdpr-requests/%s/decide", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDownloadGdprExportRequest constructs an http.Request for the DownloadGdprExport method
+func NewDownloadGdprExportRequest(server string, requestId RequestIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/gdpr-requests/%s/export", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListGrantsRequest constructs an http.Request for the ListGrants method
 func NewListGrantsRequest(server string, params *ListGrantsParams) (*http.Request, error) {
 	var err error
@@ -1202,6 +1761,55 @@ func NewUpdateHostRequestWithBody(server string, hostId HostIdPath, params *Upda
 		}
 
 		req.Header.Set("If-Match", headerParam1)
+
+	}
+
+	return req, nil
+}
+
+// NewDisableComputerDeviceRequest constructs an http.Request for the DisableComputerDevice method
+func NewDisableComputerDeviceRequest(server string, hostId HostIdPath, params *DisableComputerDeviceParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/hosts/%s/computer/disable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
 
 	}
 
@@ -12855,6 +13463,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
 	CreateInteractionWithResponse(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInteractionResponse, error)
 
+	// ListComputerDesktopsWithResponse List the desktops of the run's owner
+	//
+	// The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is `active` and connected, whose last `report` has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header `Invocation-Token` to an active run under tool class `host` that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 `forbidden` with `reason: computer_not_owner_run` or `computer_tool_class`, or 403 `invocation_token_invalid` (`run_inactive` for an ended run). Denials are audited.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /computer/desktops (the `ListComputerDesktops` operationId).
+	ListComputerDesktopsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListComputerDesktopsResponse, error)
+
+	// ListComputerSessionsWithResponse List one's own computer sessions
+	//
+	// The computer sessions the caller triggered as an active owner, newest first, at most `api.page_size_max` (docs/spec/27-computer-use.md 12.2, 07 2.15 item 5). Metadata only; never an image, the token or its `jti`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /computer/sessions (the `ListComputerSessions` operationId).
+	ListComputerSessionsWithResponse(ctx context.Context, params *ListComputerSessionsParams, reqEditors ...RequestEditorFn) (*ListComputerSessionsResponse, error)
+
+	// OpenComputerSessionWithBodyWithResponse Open a computer session on a desktop for the bound run
+	//
+	// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+	OpenComputerSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OpenComputerSessionResponse, error)
+
+	// OpenComputerSessionWithResponse Open a computer session on a desktop for the bound run
+	//
+	// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+	OpenComputerSessionWithResponse(ctx context.Context, body OpenComputerSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*OpenComputerSessionResponse, error)
+
+	// StopComputerSessionWithResponse Stop a computer session
+	//
+	// Any active owner in a session stops any computer session of the instance, from any device, without step-up (docs/spec/27-computer-use.md 8.3, 07 2.15 item 4). The session ends with `stopped_by_user` and `close_detail = client_stop`; the server closes both connections and sends `computer.close` to the host service. A closed session answers unchanged. Audited.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /computer/sessions/{session_id}/stop (the `StopComputerSession` operationId).
+	StopComputerSessionWithResponse(ctx context.Context, sessionId ComputerSessionIdPath, params *StopComputerSessionParams, reqEditors ...RequestEditorFn) (*StopComputerSessionResponse, error)
+
 	// GetConsoleSessionWithResponse Read the console session
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -13547,6 +14200,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PATCH /hosts/{host_id} (the `UpdateHost` operationId).
 	UpdateHostWithResponse(ctx context.Context, hostId HostIdPath, params *UpdateHostParams, body UpdateHostJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateHostResponse, error)
+
+	// DisableComputerDeviceWithResponse Switch the computer enablement of a host off
+	//
+	// Any active owner in a session switches the enablement of a host off, from any device, without step-up (docs/spec/27-computer-use.md 4 item 4). The server stores the reported generation as the disabled generation, ends the host's computer session with `device_disabled` in the same transaction and sends `computer.disable` over the control connection; the host stays unlisted until a new local switch-on raises the generation. A host without a reported helper answers unchanged. Switching on is no operation of the API. Audited.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /hosts/{host_id}/computer/disable (the `DisableComputerDevice` operationId).
+	DisableComputerDeviceWithResponse(ctx context.Context, hostId HostIdPath, params *DisableComputerDeviceParams, reqEditors ...RequestEditorFn) (*DisableComputerDeviceResponse, error)
 
 	// ConfirmHostWithBodyWithResponse Confirm the fingerprint and declare the LLM login
 	//
@@ -23111,639 +23773,5 @@ type HandleOidcCallbackResponse struct {
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r HandleOidcCallbackResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r HandleOidcCallbackResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r HandleOidcCallbackResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r HandleOidcCallbackResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r HandleOidcCallbackResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r HandleOidcCallbackResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r HandleOidcCallbackResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r HandleOidcCallbackResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CompleteOidcLoginResponse200Headers the declared response headers of an HTTP 200 response for CompleteOidcLogin
-type CompleteOidcLoginResponse200Headers struct {
-	CorrelationId *CorrelationId
-	SetCookie     *string
-}
-
-// CompleteOidcLoginResponse201Headers the declared response headers of an HTTP 201 response for CompleteOidcLogin
-type CompleteOidcLoginResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CompleteOidcLoginResponse400Headers the declared response headers of an HTTP 400 response for CompleteOidcLogin
-type CompleteOidcLoginResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompleteOidcLoginResponse401Headers the declared response headers of an HTTP 401 response for CompleteOidcLogin
-type CompleteOidcLoginResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CompleteOidcLoginResponse409Headers the declared response headers of an HTTP 409 response for CompleteOidcLogin
-type CompleteOidcLoginResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompleteOidcLoginResponse429Headers the declared response headers of an HTTP 429 response for CompleteOidcLogin
-type CompleteOidcLoginResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CompleteOidcLoginResponseDefaultHeaders the declared response headers of an HTTP default response for CompleteOidcLogin
-type CompleteOidcLoginResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CompleteOidcLoginResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConsoleLogin
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *TokenResponse
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *CompleteOidcLoginResponse200Headers
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CompleteOidcLoginResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CompleteOidcLoginResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CompleteOidcLoginResponse401Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *CompleteOidcLoginResponse409Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CompleteOidcLoginResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CompleteOidcLoginResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CompleteOidcLoginResponse) GetJSON200() *ConsoleLogin {
-	return r.JSON200
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CompleteOidcLoginResponse) GetJSON201() *TokenResponse {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CompleteOidcLoginResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CompleteOidcLoginResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r CompleteOidcLoginResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CompleteOidcLoginResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CompleteOidcLoginResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CompleteOidcLoginResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CompleteOidcLoginResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CompleteOidcLoginResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CompleteOidcLoginResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// BeginPairingResponse201Headers the declared response headers of an HTTP 201 response for BeginPairing
-type BeginPairingResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// BeginPairingResponse400Headers the declared response headers of an HTTP 400 response for BeginPairing
-type BeginPairingResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// BeginPairingResponse401Headers the declared response headers of an HTTP 401 response for BeginPairing
-type BeginPairingResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// BeginPairingResponse429Headers the declared response headers of an HTTP 429 response for BeginPairing
-type BeginPairingResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// BeginPairingResponseDefaultHeaders the declared response headers of an HTTP default response for BeginPairing
-type BeginPairingResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type BeginPairingResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *PairingStarted
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *BeginPairingResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *BeginPairingResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *BeginPairingResponse401Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *BeginPairingResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *BeginPairingResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r BeginPairingResponse) GetJSON201() *PairingStarted {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r BeginPairingResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r BeginPairingResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r BeginPairingResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r BeginPairingResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r BeginPairingResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r BeginPairingResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r BeginPairingResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r BeginPairingResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CompletePairingResponse201Headers the declared response headers of an HTTP 201 response for CompletePairing
-type CompletePairingResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CompletePairingResponse202Headers the declared response headers of an HTTP 202 response for CompletePairing
-type CompletePairingResponse202Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CompletePairingResponse400Headers the declared response headers of an HTTP 400 response for CompletePairing
-type CompletePairingResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompletePairingResponse401Headers the declared response headers of an HTTP 401 response for CompletePairing
-type CompletePairingResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CompletePairingResponse410Headers the declared response headers of an HTTP 410 response for CompletePairing
-type CompletePairingResponse410Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompletePairingResponse429Headers the declared response headers of an HTTP 429 response for CompletePairing
-type CompletePairingResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CompletePairingResponseDefaultHeaders the declared response headers of an HTTP default response for CompletePairing
-type CompletePairingResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CompletePairingResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *TokenResponse
-	// JSON202 the response for an HTTP 202 `application/json` response
-	JSON202 *PairingStatus
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
-	ApplicationproblemJSON410 *Gone
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CompletePairingResponse201Headers
-	// Headers202 the parsed response headers for an HTTP 202 response
-	Headers202 *CompletePairingResponse202Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CompletePairingResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CompletePairingResponse401Headers
-	// Headers410 the parsed response headers for an HTTP 410 response
-	Headers410 *CompletePairingResponse410Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CompletePairingResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CompletePairingResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CompletePairingResponse) GetJSON201() *TokenResponse {
-	return r.JSON201
-}
-
-// GetJSON202 returns the response for an HTTP 202 `application/json` response
-func (r CompletePairingResponse) GetJSON202() *PairingStatus {
-	return r.JSON202
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CompletePairingResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CompletePairingResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
-func (r CompletePairingResponse) GetApplicationproblemJSON410() *Gone {
-	return r.ApplicationproblemJSON410
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CompletePairingResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CompletePairingResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CompletePairingResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CompletePairingResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CompletePairingResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CompletePairingResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// BeginPasskeyLoginResponse200Headers the declared response headers of an HTTP 200 response for BeginPasskeyLogin
-type BeginPasskeyLoginResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// BeginPasskeyLoginResponse400Headers the declared response headers of an HTTP 400 response for BeginPasskeyLogin
-type BeginPasskeyLoginResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// BeginPasskeyLoginResponse401Headers the declared response headers of an HTTP 401 response for BeginPasskeyLogin
-type BeginPasskeyLoginResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// BeginPasskeyLoginResponse429Headers the declared response headers of an HTTP 429 response for BeginPasskeyLogin
-type BeginPasskeyLoginResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// BeginPasskeyLoginResponseDefaultHeaders the declared response headers of an HTTP default response for BeginPasskeyLogin
-type BeginPasskeyLoginResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type BeginPasskeyLoginResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *WebAuthnChallenge
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *BeginPasskeyLoginResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *BeginPasskeyLoginResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *BeginPasskeyLoginResponse401Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *BeginPasskeyLoginResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *BeginPasskeyLoginResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r BeginPasskeyLoginResponse) GetJSON200() *WebAuthnChallenge {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r BeginPasskeyLoginResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r BeginPasskeyLoginResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r BeginPasskeyLoginResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r BeginPasskeyLoginResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r BeginPasskeyLoginResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r BeginPasskeyLoginResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r BeginPasskeyLoginResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r BeginPasskeyLoginResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CompletePasskeyLoginResponse200Headers the declared response headers of an HTTP 200 response for CompletePasskeyLogin
-type CompletePasskeyLoginResponse200Headers struct {
-	CorrelationId *CorrelationId
-	SetCookie     *string
-}
-
-// CompletePasskeyLoginResponse201Headers the declared response headers of an HTTP 201 response for CompletePasskeyLogin
-type CompletePasskeyLoginResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CompletePasskeyLoginResponse400Headers the declared response headers of an HTTP 400 response for CompletePasskeyLogin
-type CompletePasskeyLoginResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompletePasskeyLoginResponse401Headers the declared response headers of an HTTP 401 response for CompletePasskeyLogin
-type CompletePasskeyLoginResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CompletePasskeyLoginResponse429Headers the declared response headers of an HTTP 429 response for CompletePasskeyLogin
-type CompletePasskeyLoginResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CompletePasskeyLoginResponseDefaultHeaders the declared response headers of an HTTP default response for CompletePasskeyLogin
-type CompletePasskeyLoginResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CompletePasskeyLoginResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConsoleLogin
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *TokenResponse
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *CompletePasskeyLoginResponse200Headers
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CompletePasskeyLoginResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CompletePasskeyLoginResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CompletePasskeyLoginResponse401Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CompletePasskeyLoginResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CompletePasskeyLoginResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CompletePasskeyLoginResponse) GetJSON200() *ConsoleLogin {
-	return r.JSON200
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CompletePasskeyLoginResponse) GetJSON201() *TokenResponse {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CompletePasskeyLoginResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
 }

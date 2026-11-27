@@ -80,6 +80,7 @@ from claude_code_runner.commandline import (
     ArgumentError,
     HostedArgs,
     class_flags,
+    computer_argument,
     hosted_additions,
     hosted_class_flags,
 )
@@ -290,6 +291,7 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     hosted: HostedArgs | None = None,
     plugin_dirs: Sequence[Path] = (),
     own_messages: bool = False,
+    computer_mcp: Path | None = None,
 ) -> list[str]:
     """Build the argument list of the launch command in the order of 09 18.2.
 
@@ -320,14 +322,19 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
         own_messages: The settings file carries the hook of `claude_code_runner.sendguard`
             (`own_agent_messages`), so ``SendMessage`` is not disallowed.
+        computer_mcp: The per-turn MCP file of ``bothy-computer-mcp`` (docs/spec/27-computer-use.md
+            10.1): ``--mcp-config`` directly after the flags of the class, without
+            ``--strict-mcp-config``, only under ``host``.
 
     Returns:
         The argument list.
 
     Raises:
         ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``,
-            or a channel skill folder below ``host``.
+            a channel skill folder below ``host``, or a computer MCP file below ``host``.
     """
+    if computer_mcp is not None and tool_class != "host":  # 27 10.1: never below host
+        raise ArgumentError("invalid_argument")
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     if add_dir is not None and tool_class == "chat":
@@ -339,6 +346,7 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         argv += ["--resume", resume]
     argv += ["--bg", "--name", name, "--model", model]
     argv += background_class_flags(tool_class, tools, hosted, own_messages=own_messages)
+    argv += computer_argument(computer_mcp)
     if hosted is None:
         argv += [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
     else:

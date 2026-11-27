@@ -41,7 +41,7 @@ const pipeSDDL = "D:P(A;;GA;;;SY)(A;;0x4;;;OW)(A;;0x12008b;;;IU)"
 // FILE_FLAG_FIRST_PIPE_INSTANCE, so a pipe of this name created first by another process makes
 // Listen fail instead of sharing the name.
 func Listen(endpoint string) (net.Listener, error) {
-	sd, err := windows.SecurityDescriptorFromString(pipeSDDL)
+	sd, err := pipeSecurity()
 	if err != nil {
 		return nil, fmt.Errorf("confirm: pipe security: %w", err)
 	}
@@ -58,6 +58,23 @@ func Listen(endpoint string) (net.Listener, error) {
 	}
 	l.next = h
 	return l, nil
+}
+
+// pipeSecurity returns the security descriptor of the pipe: pipeSDDL with the user of the process
+// token as explicit owner. Without it the owner would be the token's default owner, which for
+// LocalSystem is BUILTIN\Administrators; the computer helper trusts the pipe by its owner, which
+// must be LocalSystem or the service account (docs/spec/27-computer-use.md 9.4, D-CU-02-5).
+func pipeSecurity() (*windows.SECURITY_DESCRIPTOR, error) {
+	u, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return nil, err
+	}
+	// The creator needs read and write besides FILE_CREATE_PIPE_INSTANCE to create a further
+	// instance of a duplex pipe; OWNER RIGHTS grants only the latter, so the second helper or
+	// agent connection failed with "Access is denied" (as localchan.WithCreator, which this
+	// package may not import; AUD-PKG-R2-06/8).
+	sid := u.User.Sid.String()
+	return windows.SecurityDescriptorFromString("O:" + sid + pipeSDDL + "(A;;0x12019f;;;" + sid + ")")
 }
 
 // pipeListener creates instances of the named pipe. Adapted from the pipe listener of

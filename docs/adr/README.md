@@ -90,4 +90,5 @@ if it is out of date. Do not edit it by hand.
 | [0076](0076-built-in-agents-hosted-by-the-claude-code-runner.md) | Built-in agents hosted by the Claude Code runner | accepted | 2026-11-06 |
 | [0077](0077-autonomous-runs-wake-ups-and-turn-handover.md) | Autonomous runs: wake-ups and turn handover | accepted | 2026-11-06 |
 | [0078](0078-visual-c-runtime-in-the-windows-package-from-the-toolchain-redist.md) | Visual C++ runtime in the Windows package from the toolchain redist | accepted | 2026-11-25 |
+| [0079](0079-agent-computer-use-on-a-paired-desktop.md) | Agent computer use on a paired desktop | accepted | 2026-11-26 |
 <!-- adr-index:end -->

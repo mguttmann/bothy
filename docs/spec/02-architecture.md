@@ -175,7 +175,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `importer` | import sources, batches with origin key (`import.apply`), ownership list and read-only state of mirrored channels; the dry run lives in the tool | `import_sources`, `import_items` | 22 |
 | `privacy` | privacy requests, export and deletion through the participants of all modules, deletion journal | `gdpr_requests`, `deletion_journal_state` | 20 |
 | `status` | status page, components, incidents, automatic checks, backup runs | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
-| `terminal` | hosts and pairing, declaration of the LLM login (I6), session users per person (T12), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams | `hosts`, `host_session_users`, `terminal_sessions` | 24 |
+| `terminal` | hosts and pairing, declaration of the LLM login (I6), session users per person (T12), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams; computer sessions with their attach tokens and the enablement mirror (stage CU) | `hosts`, `host_session_users`, `terminal_sessions`, `computer_sessions` | 24, 27 |
 
 Technical tables outside the modules ([03-data-model.md](03-data-model.md), section
 4.13): River creates its own tables with the prefix `river_` (among others `river_migration`, `river_job`,
@@ -316,7 +316,7 @@ table with the catalogue (section 7.3).
 | `importer` | `import.read`, `import.manage`, `import.apply` |
 | `privacy` | `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download` |
 | `status` | `status.public.read`, `status.read`, `status.manage` |
-| `terminal` | `host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate` |
+| `terminal` | `host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate`, `computer.desktops.list`, `computer.open`, `computer.attach`, `computer.session.read`, `computer.stop`, `computer.device.disable`, `computer.terminate` |
 
 Rationale for borderline cases:
 
@@ -367,7 +367,7 @@ An event type has exactly one producing module. The receive action is in 05 sect
 | `gateway` | | `typing.started` | `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop` |
 | `search` | | `search.assist_requested` | |
 | `stats` | | `stats.live` | `stats.subscribe`, `stats.unsubscribe` (through the shared WebSocket hub) |
-| `terminal` | `host.updated`, `terminal_session.changed` | `host.presence_changed` | none on the shared WebSocket; separate connections with their own ops (05, section 7) |
+| `terminal` | `host.updated`, `terminal_session.changed`, `computer_session.changed` | `host.presence_changed` | none on the shared WebSocket; separate connections with their own ops (05, section 7) |
 
 `messaging` produces `message.updated` for `trigger_state`, even when `runs` triggers the change
 (through `Messages.SetTriggerState`). Reason: one event type, one producer, one payload definition.
@@ -449,15 +449,17 @@ services/host/                host service bothy-host (own Go module, own versio
   cmd/bothy-host/             main: subcommands install, pair, doctor, run, restart, session-user,
                               pty-helper (24 section 2.2, 16 section 4.4; M2-42), confirm-agent (M2-45),
                               version (M7-23)
+  cmd/bothy-computer-mcp/     main of the stdio MCP server of computer use (27-computer-use.md C1, CU-05)
   internal/                   noise, frame, fingerprint (M2-38); buildinfo, clock (+ clocktest), config, state,
                               hostos (+ hostostest: the fake operating system), doctor (HD1 to HD11), localchan
                               (local channel, admin endpoint), helper (pty-helper), install (plans, units/),
                               startup (run, the Control port), pairing (M2-42); control (+ controltest, M2-43);
                               session (+ sessiontest: fake server and Go test device), pty, profiles, confirm
-                              (M2-45)
+                              (M2-45); computer (CU-03); computermcp (CU-05)
   test/platform/              platform suite (build tag platform), only on disposable machines (M2-42);
                               the marker guard (M2-48)
   test/noisedevice/           Noise sidecar of the Go test device of the terminal suite (M2-48)
+  test/computermcp/           end-to-end test of bothy-computer-mcp (build tag computere2e, CU-05)
   testdata/fakeclaude/        stand-in for claude auth status in the tests of HD6 (M2-42)
   testdata/noise/             test vectors, Go and Dart recordings, fingerprint vectors (24, 5.2, 14)
   .go-arch-lint.yml           maintained by hand, one component per package (no module register)

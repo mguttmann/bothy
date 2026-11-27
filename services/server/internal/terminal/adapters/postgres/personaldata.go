@@ -13,13 +13,15 @@ import (
 )
 
 // PersonalData is the participant of terminal in the privacy requests (M7-06,
-// docs/spec/20-privacy.md sections 2, 4.4 and 5.2). It exports the person's hosts, session users
-// and terminal sessions into the sections hosts, host_session_users and terminal_sessions of
-// devices.json. It erases nothing: the rows stay with the pseudonymous ID until retention.security
-// removes them (20 section 2, 24 section 2.2: no name of a session user becomes free again), and
+// docs/spec/20-privacy.md sections 2, 4.4 and 5.2). It exports the person's hosts, session users,
+// terminal sessions and computer sessions into the sections hosts, host_session_users,
+// terminal_sessions and computer_sessions of devices.json. It erases nothing: the rows stay with
+// the pseudonymous ID until retention.security removes them (20 section 2, 24 section 2.2: no name
+// of a session user becomes free again), and
 // the open sessions of the person end in step 1, when user.disable revokes the devices and login
 // sessions and the subscribers of terminal end their sessions with user_disabled in the same
-// transaction (app.Service.OnDeviceRevoked and OnSessionEnded).
+// transaction (app.Service.OnDeviceRevoked and OnSessionEnded; an open computer session ends there
+// with access_revoked).
 type PersonalData struct {
 	pool *pg.Pool
 }
@@ -35,7 +37,7 @@ func (*PersonalData) Module() string { return "terminal" }
 
 // Tables returns the tables of terminal with personal data of 20 section 2.
 func (*PersonalData) Tables() []string {
-	return []string{"hosts", "host_session_users", "terminal_sessions"}
+	return []string{"hosts", "host_session_users", "terminal_sessions", "computer_sessions"}
 }
 
 // exportHost is one entry of devices.json hosts
@@ -83,7 +85,24 @@ type exportTerminalSession struct {
 	BytesOut    int64     `json:"bytes_out"`
 }
 
-// Export implements personaldata.Participant: the three sections of devices.json, each an empty
+// exportComputerSession is one entry of devices.json computer_sessions (27, 20 section 2): the
+// token ID, the generations, the close detail and who stopped the session are left out.
+type exportComputerSession struct {
+	ID          ids.ID    `json:"id"`
+	HostID      ids.ID    `json:"host_id"`
+	AgentID     ids.ID    `json:"agent_id"`
+	RunID       ids.ID    `json:"run_id"`
+	State       string    `json:"state"`
+	OpenedAt    time.Time `json:"opened_at"`
+	StartedAt   time.Time `json:"started_at,omitzero"`
+	ClosedAt    time.Time `json:"closed_at,omitzero"`
+	CloseReason string    `json:"close_reason,omitempty"`
+	PausedMs    int64     `json:"paused_ms"`
+	ActionCount int32     `json:"action_count"`
+	FrontApp    string    `json:"front_app,omitempty"`
+}
+
+// Export implements personaldata.Participant: the four sections of devices.json, each an empty
 // array when the person has no such row, read in one read-only snapshot. Errors: those of the
 // storage and of w.
 func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w personaldata.Writer) error {
@@ -91,6 +110,7 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 		hosts []sqlcgen.PersonalDataHostsRow
 		users []sqlcgen.PersonalDataHostSessionUsersRow
 		sess  []sqlcgen.PersonalDataTerminalSessionsRow
+		comp  []sqlcgen.PersonalDataComputerSessionsRow
 	)
 	subject := pg.UUID(e.Subject)
 	err := pg.ReadSnapshot(ctx, p.pool, func(ctx context.Context, q pg.DBTX) error {
@@ -102,7 +122,10 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 		if users, err = s.PersonalDataHostSessionUsers(ctx, subject); err != nil {
 			return err
 		}
-		sess, err = s.PersonalDataTerminalSessions(ctx, subject)
+		if sess, err = s.PersonalDataTerminalSessions(ctx, subject); err != nil {
+			return err
+		}
+		comp, err = s.PersonalDataComputerSessions(ctx, subject)
 		return err
 	})
 	if err != nil {
@@ -131,6 +154,9 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 			CloseReason: s.CloseReason.String, BytesIn: s.BytesIn, BytesOut: s.BytesOut,
 		})
 	}
+	if err := w.Section(personaldata.FileDevices, "computer_sessions", exportComputer(comp)); err != nil {
+		return err
+	}
 	if err := w.Section(personaldata.FileDevices, "hosts", outHosts); err != nil {
 		return err
 	}
@@ -138,6 +164,19 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 		return err
 	}
 	return w.Section(personaldata.FileDevices, "terminal_sessions", outSess)
+}
+
+// exportComputer converts the computer sessions of the person into devices.json computer_sessions.
+func exportComputer(rows []sqlcgen.PersonalDataComputerSessionsRow) []exportComputerSession {
+	out := make([]exportComputerSession, 0, len(rows))
+	for _, c := range rows {
+		out = append(out, exportComputerSession{
+			ID: pg.IDOf(c.ID), HostID: pg.IDOf(c.HostID), AgentID: pg.IDOf(c.AgentID), RunID: pg.IDOf(c.RunID), State: c.State,
+			OpenedAt: pg.TimeOf(c.OpenedAt), StartedAt: pg.TimeOf(c.StartedAt), ClosedAt: pg.TimeOf(c.ClosedAt),
+			CloseReason: c.CloseReason.String, PausedMs: c.PausedMs, ActionCount: c.ActionCount, FrontApp: c.FrontApp.String,
+		})
+	}
+	return out
 }
 
 // Erase implements personaldata.Participant and changes nothing in any step (see PersonalData):

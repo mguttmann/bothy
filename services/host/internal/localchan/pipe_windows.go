@@ -35,6 +35,9 @@ type pipeListener struct {
 
 // ListenPipe creates the named pipe path with the security descriptor sddl.
 func ListenPipe(path, sddl string) (net.Listener, error) {
+	if u, err := windows.GetCurrentProcessToken().GetTokenUser(); err == nil {
+		sddl = WithCreator(sddl, u.User.Sid.String())
+	}
 	sd, err := windows.SecurityDescriptorFromString(sddl)
 	if err != nil {
 		return nil, fmt.Errorf("localchan: pipe security: %w", err)

@@ -135,6 +135,17 @@ background_status_interval = "2s"
 # other version stays untested. An update chain writes them; empty means only the pin.
 tested_claude_code_version = ""
 tested_claude_code_pin = ""
+# Computer use (docs/spec/27-computer-use.md 10): off by default. On, every turn of tool class
+# host loads the MCP server bothy-computer-mcp (a release binary of the host component) through a
+# per-turn MCP file, and the runner calls the server for it with its own credentials, which never
+# reach the turn. A run that opened a computer session ends its Claude Code session, and the
+# runner deletes its transcript with the screenshots. computer_mcp_bin is the absolute path of
+# the binary; with computer_use the runner refuses to start unless it is an existing file that
+# neither group nor others may write. computer_request_timeout bounds the binary's wait for the
+# runner's answer to one request.
+computer_use = false
+computer_mcp_bin = ""
+computer_request_timeout = "30s"
 # Roots of answer attachments by name only; an operator may narrow the list, never widen it.
 attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
 # Denied names of answer attachments; must contain the list of 09 18.10, may add more.

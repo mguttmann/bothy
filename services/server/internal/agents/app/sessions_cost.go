@@ -124,3 +124,26 @@ func indexTotals(totals []agents.SessionCostTotal) (map[ids.ID]agents.SessionCos
 	}
 	return byID, sessionIDs, nil
 }
+
+// EndForComputerUse implements agents.Sessions (27 10.5, CU-04): inside the caller's unit of work
+// the thread's current row is locked and ended with computer_use, and agent_session.changed
+// follows with the actor of the unit (none for the end of a run by the server). A thread without a
+// current row changes nothing.
+func (s *SessionService) EndForComputerUse(ctx context.Context, threadID ids.ID) error {
+	if _, ok := txn.UnitFrom(ctx); !ok {
+		return errs.New(errs.CodeInternalError, "agents: EndForComputerUse runs only inside a unit of work")
+	}
+	cur, found, err := s.lockCurrent(ctx, threadID)
+	if err != nil || !found {
+		return err
+	}
+	info, err := s.thread(ctx, threadID)
+	if err != nil {
+		return err
+	}
+	ended, err := s.end(ctx, cur, agents.EndComputerUse)
+	if err != nil {
+		return err
+	}
+	return s.emitChanged(ctx, info, ended)
+}

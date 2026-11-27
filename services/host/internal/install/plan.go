@@ -107,8 +107,11 @@ const (
 	DarwinProgramDir = "/Library/Application Support/bothy-host/bin"
 	// DarwinConfirmDir holds the socket of the local confirmation (M2-45, internal/confirm).
 	DarwinConfirmDir = "/Library/Application Support/bothy-host/confirm"
-	SystemdDir       = "/etc/systemd/system"
-	LaunchDaemonsDir = "/Library/LaunchDaemons"
+	// DarwinComputerDir holds the socket of the computer helper channel
+	// (docs/spec/27-computer-use.md 9.4, internal/computer).
+	DarwinComputerDir = "/Library/Application Support/bothy-host/computer"
+	SystemdDir        = "/etc/systemd/system"
+	LaunchDaemonsDir  = "/Library/LaunchDaemons"
 	// HostAccountWindows is the virtual account of the host service on Windows.
 	HostAccountWindows = `NT SERVICE\bothy-host`
 )
@@ -134,6 +137,9 @@ type Target struct {
 	SignedWithRuntime bool
 	// ConfigExists tells that the configuration file exists (install never overwrites it).
 	ConfigExists bool
+	// ComputerUse is host_service.computer_use: install creates the folder of the helper endpoint
+	// (docs/spec/27-computer-use.md 9.4).
+	ComputerUse bool
 	// HostRunning tells that the host service runs (Windows restart).
 	HostRunning bool
 }
@@ -186,8 +192,14 @@ func hostUnit(t Target) (path, content string) {
 		return filepath.Join(LaunchDaemonsDir, "bothy-host.plist"), render("host.plist.tmpl",
 			map[string]string{keyLabel: hostLabel, keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), keyConfig: t.ConfigPath})
 	}
+	// With host_service.computer_use the unit also creates /run/bothy-host-computer, the folder of
+	// the computer helper channel (27 9.4); without it the unit is the packaged reference unchanged.
+	computer := ""
+	if t.ComputerUse {
+		computer = "1"
+	}
 	return filepath.Join(SystemdDir, "bothy-host.service"), render("host.service.tmpl",
-		map[string]string{keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})
+		map[string]string{keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath, "Computer": computer})
 }
 
 // HostDefinition returns the path and the content of the service definition of the host service
@@ -405,6 +417,11 @@ func darwinInstall(t Target, users []string) ([]Step, error) {
 		Step{Kind: KindMkdir, Path: DarwinConfirmDir, Mode: 0o755, Owner: t.ServiceUser},
 		Step{Kind: KindMkdir, Path: filepath.Dir(t.ConfigPath), Mode: 0o755, Owner: ownerRoot},
 	)
+	if t.ComputerUse {
+		// The folder of the computer helper endpoint (27 9.4), owned by the service user; the
+		// socket in it has mode 0666 and the peer rule decides.
+		steps = append(steps, Step{Kind: KindMkdir, Path: DarwinComputerDir, Mode: 0o755, Owner: t.ServiceUser})
+	}
 	steps = append(steps, configStep(t, users)...)
 	for _, u := range users {
 		steps = append(steps, darwinHelper(t, u, ids[u], svc)...)

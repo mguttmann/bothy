@@ -23,6 +23,8 @@ class _$HostPairRequest extends HostPairRequest {
   final BuiltList<HostProfile> profiles;
   @override
   final BuiltList<HostReportedSessionUser> sessionUsers;
+  @override
+  final bool? computerUse;
 
   factory _$HostPairRequest([void Function(HostPairRequestBuilder)? updates]) =>
       (HostPairRequestBuilder()..update(updates))._build();
@@ -36,6 +38,7 @@ class _$HostPairRequest extends HostPairRequest {
     required this.hostVersion,
     required this.profiles,
     required this.sessionUsers,
+    this.computerUse,
   }) : super._();
   @override
   HostPairRequest rebuild(void Function(HostPairRequestBuilder) updates) =>
@@ -55,7 +58,8 @@ class _$HostPairRequest extends HostPairRequest {
         osVersion == other.osVersion &&
         hostVersion == other.hostVersion &&
         profiles == other.profiles &&
-        sessionUsers == other.sessionUsers;
+        sessionUsers == other.sessionUsers &&
+        computerUse == other.computerUse;
   }
 
   @override
@@ -69,6 +73,7 @@ class _$HostPairRequest extends HostPairRequest {
     _$hash = $jc(_$hash, hostVersion.hashCode);
     _$hash = $jc(_$hash, profiles.hashCode);
     _$hash = $jc(_$hash, sessionUsers.hashCode);
+    _$hash = $jc(_$hash, computerUse.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -83,7 +88,8 @@ class _$HostPairRequest extends HostPairRequest {
           ..add('osVersion', osVersion)
           ..add('hostVersion', hostVersion)
           ..add('profiles', profiles)
-          ..add('sessionUsers', sessionUsers))
+          ..add('sessionUsers', sessionUsers)
+          ..add('computerUse', computerUse))
         .toString();
   }
 }
@@ -131,6 +137,10 @@ class HostPairRequestBuilder
   set sessionUsers(ListBuilder<HostReportedSessionUser>? sessionUsers) =>
       _$this._sessionUsers = sessionUsers;
 
+  bool? _computerUse;
+  bool? get computerUse => _$this._computerUse;
+  set computerUse(bool? computerUse) => _$this._computerUse = computerUse;
+
   HostPairRequestBuilder() {
     HostPairRequest._defaults(this);
   }
@@ -146,6 +156,7 @@ class HostPairRequestBuilder
       _hostVersion = $v.hostVersion;
       _profiles = $v.profiles.toBuilder();
       _sessionUsers = $v.sessionUsers.toBuilder();
+      _computerUse = $v.computerUse;
       _$v = null;
     }
     return this;
@@ -194,6 +205,7 @@ class HostPairRequestBuilder
             ),
             profiles: profiles.build(),
             sessionUsers: sessionUsers.build(),
+            computerUse: computerUse,
           );
     } catch (_) {
       late String _$failedField;

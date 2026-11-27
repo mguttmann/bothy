@@ -332,7 +332,9 @@ their platforms and are proven in CI (6.3).
 
 1. `resolve` and the gates as in 6.1 (`services/host/VERSION` equals the tag).
 2. `build`: `make -C services/host release-build` writes the release binaries
-   `bothy-host_<version>_<os>_<arch>` (`.exe` on Windows) for the five platforms and the packages
+   `bothy-host_<version>_<os>_<arch>` (`.exe` on Windows) for the five platforms, the binaries of
+   the MCP server of computer use `bothy-computer-mcp_<version>_<os>_<arch>` for the same five
+   platforms ([27-computer-use.md](27-computer-use.md) C1, CU-05), and the packages
    `bothy-host_<version>_linux_<arch>.deb` and `.rpm` (amd64, arm64) from
    `infra/host/linux/nfpm.yaml` with nfpm. Every binary is built without cgo with `-trimpath
    -buildvcs=false`, the version from `services/host/VERSION` and the package kind with `-ldflags

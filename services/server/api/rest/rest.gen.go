@@ -351,6 +351,18 @@ type ServerInterface interface {
 	// CreateInteraction Use a button, select or form
 	// (POST /components/{component_id}/interactions)
 	CreateInteraction(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath)
+	// ListComputerDesktops List the desktops of the run's owner
+	// (GET /computer/desktops)
+	ListComputerDesktops(w http.ResponseWriter, r *http.Request)
+	// ListComputerSessions List one's own computer sessions
+	// (GET /computer/sessions)
+	ListComputerSessions(w http.ResponseWriter, r *http.Request, params ListComputerSessionsParams)
+	// OpenComputerSession Open a computer session on a desktop for the bound run
+	// (POST /computer/sessions)
+	OpenComputerSession(w http.ResponseWriter, r *http.Request)
+	// StopComputerSession Stop a computer session
+	// (POST /computer/sessions/{session_id}/stop)
+	StopComputerSession(w http.ResponseWriter, r *http.Request, sessionId ComputerSessionIdPath, params StopComputerSessionParams)
 	// GetConsoleSession Read the console session
 	// (GET /console/session)
 	GetConsoleSession(w http.ResponseWriter, r *http.Request)
@@ -489,6 +501,9 @@ type ServerInterface interface {
 	// UpdateHost Change name or assignee of a host
 	// (PATCH /hosts/{host_id})
 	UpdateHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params UpdateHostParams)
+	// DisableComputerDevice Switch the computer enablement of a host off
+	// (POST /hosts/{host_id}/computer/disable)
+	DisableComputerDevice(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params DisableComputerDeviceParams)
 	// ConfirmHost Confirm the fingerprint and declare the LLM login
 	// (POST /hosts/{host_id}/confirm)
 	ConfirmHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params ConfirmHostParams)
@@ -5634,6 +5649,117 @@ func (siw *ServerInterfaceWrapper) CreateInteraction(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListComputerDesktops operation middleware
+func (siw *ServerInterfaceWrapper) ListComputerDesktops(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListComputerDesktops(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListComputerSessions operation middleware
+func (siw *ServerInterfaceWrapper) ListComputerSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListComputerSessionsParams
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListComputerSessions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OpenComputerSession operation middleware
+func (siw *ServerInterfaceWrapper) OpenComputerSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenComputerSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopComputerSession operation middleware
+func (siw *ServerInterfaceWrapper) StopComputerSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "session_id" -------------
+	var sessionId ComputerSessionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "session_id", r.PathValue("session_id"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StopComputerSessionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopComputerSession(w, r, sessionId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetConsoleSession operation middleware
 func (siw *ServerInterfaceWrapper) GetConsoleSession(w http.ResponseWriter, r *http.Request) {
 
@@ -7610,6 +7736,56 @@ func (siw *ServerInterfaceWrapper) UpdateHost(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateHost(w, r, hostId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableComputerDevice operation middleware
+func (siw *ServerInterfaceWrapper) DisableComputerDevice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "host_id" -------------
+	var hostId HostIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "host_id", r.PathValue("host_id"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "host_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DisableComputerDeviceParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableComputerDevice(w, r, hostId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -15820,6 +15996,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/confirm", wrapper.ConfirmHost)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/hosts/{host_id}/llm-credentials", wrapper.SetHostLlmCredentials)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/state", wrapper.SetHostState)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/computer/desktops", wrapper.ListComputerDesktops)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/computer/sessions", wrapper.ListComputerSessions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/computer/sessions", wrapper.OpenComputerSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/computer/sessions/{session_id}/stop", wrapper.StopComputerSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/computer/disable", wrapper.DisableComputerDevice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/terminal/sessions", wrapper.OpenTerminalSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminal/sessions", wrapper.ListTerminalSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/terminal/sessions/{session_id}", wrapper.GetTerminalSession)

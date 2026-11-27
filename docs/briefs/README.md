@@ -34,6 +34,12 @@ briefs AR-02 to AR-10 were written by its specification ticket AR-01, carry the 
 names of merged code (D-W-100), and name in "Depends on" the tickets of the stage and, for AR-05,
 the A1 ticket it builds on.
 
+The stage CU "Computer use" ([PLAN](../PLAN.md) section 23, P-30) follows in the same way: its
+briefs CU-02 to CU-07 were written by its specification ticket CU-01 and carry the same boundary for
+names of merged code (D-W-100). Unlike the stages before, its tickets are built in parallel on the
+branch of the stage and land together with CU-01 in one pull request with one CI round (owner
+decision of 2026-11-21, AGENTS.md).
+
 ## How a brief runs
 
 1. The launcher starts a brief only when every ticket in "Depends on" is merged into the base
@@ -100,9 +106,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 | Wave | Tickets that may run in parallel |
 |---|---|
-| 1 | A1-02, A1-03, AR-02, AR-04, M1-01, M1-02, M2-32, M4-03 |
-| 2 | A1-04, A1-06, A1-07, AR-03, AR-08, M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
-| 3 | A1-05, A1-08, AR-09, M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
+| 1 | A1-02, A1-03, AR-02, AR-04, CU-02, CU-03, CU-04, M1-01, M1-02, M2-32, M4-03 |
+| 2 | A1-04, A1-06, A1-07, AR-03, AR-08, CU-05, CU-07, M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
+| 3 | A1-05, A1-08, AR-09, CU-06, M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
 | 4 | A1-09, AR-05, M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01, M7-19 |
 | 5 | A1-10, AR-06, AR-07, M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
 | 6 | AR-10, M1-11, M1-13, M4-13, M6-12, M8-02 |
@@ -149,7 +155,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
 are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3, D-W-114 for
-M4, D-W-120 for M5 and M6, D-W-125 for M7, D-W-124 for M8, the stage specifications for A1 and AR) under
+M4, D-W-120 for M5 and M6, D-W-125 for M7, D-W-124 for M8, the stage specifications for A1, AR and CU) under
 the names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
@@ -449,6 +455,12 @@ the names listed here.
 | 2 | AR-08 | Clients: autonomous runs | `AR-08-autonomous-runs-clients.md` | AR-04 |
 | 3 | AR-09 | Operations: runner service guide | `AR-09-runner-service-guide.md` | AR-03 |
 | 6 | AR-10 | End to end and rollout | `AR-10-autonomous-runs-end-to-end.md` | AR-06, AR-07, AR-08, AR-09 |
+| 1 | CU-02 | Computer helpers for macOS and Windows | `CU-02-computer-helpers.md` | none (specification merged) |
+| 1 | CU-03 | Host service: computer sessions and frames | `CU-03-host-computer-sessions.md` | none (specification merged) |
+| 1 | CU-04 | Server: computer sessions | `CU-04-server-computer-sessions.md` | none (specification merged) |
+| 2 | CU-05 | MCP server `bothy-computer-mcp` | `CU-05-computer-mcp-server.md` | CU-03, CU-04 |
+| 3 | CU-06 | Runner integration and end to end | `CU-06-runner-computer-use.md` | CU-05 |
+| 2 | CU-07 | Clients: status, stop and desktops | `CU-07-computer-use-clients.md` | CU-04 |
 
 ## Make targets created by tickets
 
@@ -1572,4 +1584,20 @@ flowchart TB
   AR_07 --> AR_10
   AR_08 --> AR_10
   AR_09 --> AR_10
+```
+
+Tickets of CU:
+
+```mermaid
+flowchart TB
+  CU_02["CU-02"]
+  CU_03["CU-03"]
+  CU_04["CU-04"]
+  CU_05["CU-05"]
+  CU_06["CU-06"]
+  CU_07["CU-07"]
+  CU_03 --> CU_05
+  CU_04 --> CU_05
+  CU_05 --> CU_06
+  CU_04 --> CU_07
 ```

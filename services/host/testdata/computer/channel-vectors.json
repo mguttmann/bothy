@@ -1,0 +1,260 @@
+{
+  "description": "Test vectors of the local channel between the host service and the computer helper (docs/spec/27-computer-use.md section 9.4, written by CU-01). A frame is a 4-byte big-endian length of type byte and content, the type byte (1 JSON object, 2 image bytes) and the content. Decoders must read every frame_hex to the object or bytes given; encoders may order JSON members freely, so an encoder test decodes its own output and compares the object. Member values are examples (example persons and example.com rules apply).",
+  "vectors": [
+    {
+      "name": "hello",
+      "type": 1,
+      "object": {
+        "op": "hello",
+        "enabled": true,
+        "generation": 3,
+        "os_account": "alex",
+        "permissions": {
+          "capture": "granted",
+          "input": "granted"
+        },
+        "helper_version": "1.0.0",
+        "signature": "verified",
+        "locked": false
+      },
+      "frame_hex": "000000b6017b226f70223a2268656c6c6f222c22656e61626c6564223a747275652c2267656e65726174696f6e223a332c226f735f6163636f756e74223a22616c6578222c227065726d697373696f6e73223a7b2263617074757265223a226772616e746564222c22696e707574223a226772616e746564227d2c2268656c7065725f76657273696f6e223a22312e302e30222c227369676e6174757265223a227665726966696564222c226c6f636b6564223a66616c73657d"
+    },
+    {
+      "name": "state locked",
+      "type": 1,
+      "object": {
+        "op": "state",
+        "locked": true
+      },
+      "frame_hex": "0000001d017b226f70223a227374617465222c226c6f636b6564223a747275657d"
+    },
+    {
+      "name": "state secure desktop",
+      "type": 1,
+      "object": {
+        "op": "state",
+        "secure_desktop": true
+      },
+      "frame_hex": "00000025017b226f70223a227374617465222c227365637572655f6465736b746f70223a747275657d"
+    },
+    {
+      "name": "stop by Esc",
+      "type": 1,
+      "object": {
+        "op": "stop",
+        "session_id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+        "detail": "local_escape"
+      },
+      "frame_hex": "0000005a017b226f70223a2273746f70222c2273657373696f6e5f6964223a2230313932663361342d356236632d376438652d396630312d323334353637383961626364222c2264657461696c223a226c6f63616c5f657363617065227d"
+    },
+    {
+      "name": "show",
+      "type": 1,
+      "object": {
+        "op": "show",
+        "session_id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+        "agent_name": "Builder"
+      },
+      "frame_hex": "00000059017b226f70223a2273686f77222c2273657373696f6e5f6964223a2230313932663361342d356236632d376438652d396630312d323334353637383961626364222c226167656e745f6e616d65223a224275696c646572227d"
+    },
+    {
+      "name": "hide",
+      "type": 1,
+      "object": {
+        "op": "hide",
+        "session_id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd"
+      },
+      "frame_hex": "00000042017b226f70223a2268696465222c2273657373696f6e5f6964223a2230313932663361342d356236632d376438652d396630312d323334353637383961626364227d"
+    },
+    {
+      "name": "capture screenshot",
+      "type": 1,
+      "object": {
+        "op": "capture",
+        "seq": 1,
+        "max_edge": 1280,
+        "format": "jpeg",
+        "quality": 80
+      },
+      "frame_hex": "00000046017b226f70223a2263617074757265222c22736571223a312c226d61785f65646765223a313238302c22666f726d6174223a226a706567222c227175616c697479223a38307d"
+    },
+    {
+      "name": "capture zoom",
+      "type": 1,
+      "object": {
+        "op": "capture",
+        "seq": 2,
+        "max_edge": 1280,
+        "format": "png",
+        "quality": 100,
+        "region": {
+          "x": 100,
+          "y": 200,
+          "width": 320,
+          "height": 240
+        }
+      },
+      "frame_hex": "0000007a017b226f70223a2263617074757265222c22736571223a322c226d61785f65646765223a313238302c22666f726d6174223a22706e67222c227175616c697479223a3130302c22726567696f6e223a7b2278223a3130302c2279223a3230302c227769647468223a3332302c22686569676874223a3234307d7d"
+    },
+    {
+      "name": "do left_click",
+      "type": 1,
+      "object": {
+        "op": "do",
+        "seq": 3,
+        "action": "left_click",
+        "x": 640.5,
+        "y": 400,
+        "modifiers": [
+          "cmd"
+        ]
+      },
+      "frame_hex": "00000050017b226f70223a22646f222c22736571223a332c22616374696f6e223a226c6566745f636c69636b222c2278223a3634302e352c2279223a3430302c226d6f64696669657273223a5b22636d64225d7d"
+    },
+    {
+      "name": "do type",
+      "type": 1,
+      "object": {
+        "op": "do",
+        "seq": 4,
+        "action": "type",
+        "text": "naïve café, 世界"
+      },
+      "frame_hex": "00000050017b226f70223a22646f222c22736571223a342c22616374696f6e223a2274797065222c2274657874223a226e615c75303065667665206361665c75303065392c205c75346531365c7537353463227d"
+    },
+    {
+      "name": "do key",
+      "type": 1,
+      "object": {
+        "op": "do",
+        "seq": 5,
+        "action": "key",
+        "keys": "cmd+shift+t",
+        "repeat": 1
+      },
+      "frame_hex": "00000043017b226f70223a22646f222c22736571223a352c22616374696f6e223a226b6579222c226b657973223a22636d642b73686966742b74222c22726570656174223a317d"
+    },
+    {
+      "name": "do scroll",
+      "type": 1,
+      "object": {
+        "op": "do",
+        "seq": 6,
+        "action": "scroll",
+        "x": 10,
+        "y": 20,
+        "direction": "down",
+        "amount": 3
+      },
+      "frame_hex": "00000052017b226f70223a22646f222c22736571223a362c22616374696f6e223a227363726f6c6c222c2278223a31302c2279223a32302c22646972656374696f6e223a22646f776e222c22616d6f756e74223a337d"
+    },
+    {
+      "name": "position",
+      "type": 1,
+      "object": {
+        "op": "position",
+        "seq": 7
+      },
+      "frame_hex": "0000001a017b226f70223a22706f736974696f6e222c22736571223a377d"
+    },
+    {
+      "name": "release",
+      "type": 1,
+      "object": {
+        "op": "release"
+      },
+      "frame_hex": "00000011017b226f70223a2272656c65617365227d"
+    },
+    {
+      "name": "disable",
+      "type": 1,
+      "object": {
+        "op": "disable",
+        "generation": 3
+      },
+      "frame_hex": "00000020017b226f70223a2264697361626c65222c2267656e65726174696f6e223a337d"
+    },
+    {
+      "name": "done capture",
+      "type": 1,
+      "object": {
+        "op": "done",
+        "seq": 1,
+        "code": "ok",
+        "app": {
+          "id": "com.example.editor",
+          "name": "Editor",
+          "signer": "EXAMPLE123"
+        },
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1512,
+          "height": 982,
+          "scale": 2
+        },
+        "image": {
+          "format": "jpeg",
+          "width": 1280,
+          "height": 831,
+          "bytes": 4
+        }
+      },
+      "frame_hex": "000000e3017b226f70223a22646f6e65222c22736571223a312c22636f6465223a226f6b222c22617070223a7b226964223a22636f6d2e6578616d706c652e656469746f72222c226e616d65223a22456469746f72222c227369676e6572223a224558414d504c45313233227d2c2273637265656e223a7b2278223a302c2279223a302c227769647468223a313531322c22686569676874223a3938322c227363616c65223a327d2c22696d616765223a7b22666f726d6174223a226a706567222c227769647468223a313238302c22686569676874223a3833312c226279746573223a347d7d"
+    },
+    {
+      "name": "image bytes",
+      "type": 2,
+      "bytes_hex": "ffd8ffd9",
+      "frame_hex": "0000000502ffd8ffd9"
+    },
+    {
+      "name": "done locked",
+      "type": 1,
+      "object": {
+        "op": "done",
+        "seq": 3,
+        "code": "screen_locked",
+        "app": {
+          "id": "",
+          "name": "",
+          "signer": ""
+        },
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1512,
+          "height": 982,
+          "scale": 2
+        }
+      },
+      "frame_hex": "0000008e017b226f70223a22646f6e65222c22736571223a332c22636f6465223a2273637265656e5f6c6f636b6564222c22617070223a7b226964223a22222c226e616d65223a22222c227369676e6572223a22227d2c2273637265656e223a7b2278223a302c2279223a302c227769647468223a313531322c22686569676874223a3938322c227363616c65223a327d7d"
+    },
+    {
+      "name": "done position",
+      "type": 1,
+      "object": {
+        "op": "done",
+        "seq": 7,
+        "code": "ok",
+        "app": {
+          "id": "com.example.editor",
+          "name": "Editor",
+          "signer": "EXAMPLE123"
+        },
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1512,
+          "height": 982,
+          "scale": 2
+        },
+        "cursor": {
+          "x": 640.5,
+          "y": 400
+        }
+      },
+      "frame_hex": "000000c2017b226f70223a22646f6e65222c22736571223a372c22636f6465223a226f6b222c22617070223a7b226964223a22636f6d2e6578616d706c652e656469746f72222c226e616d65223a22456469746f72222c227369676e6572223a224558414d504c45313233227d2c2273637265656e223a7b2278223a302c2279223a302c227769647468223a313531322c22686569676874223a3938322c227363616c65223a327d2c22637572736f72223a7b2278223a3634302e352c2279223a3430307d7d"
+    }
+  ]
+}

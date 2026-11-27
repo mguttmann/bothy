@@ -1074,6 +1074,30 @@ Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
 | `runner.agent_builder_model` |  | Runner |  | `sonnet` | model of the builder call (6.2) |  |
 | `runner.agent_builder_timeout` |  | Runner |  | `80s` | time limit of one builder call; below the server's `agents.interview.timeout` (6.2) |  |
 | `runner.channel_skills_dir` |  | Runner |  | empty | folder of channel skills for `claude-code:<name>` references, loaded only in `host` turns; empty means channel skills off (5.9) |  |
+
+### 27 Computer use
+
+Source: [27-computer-use.md](../spec/27-computer-use.md), section 18.
+
+| Key | Environment | Place | Type | Default | Meaning | Status |
+|---|---|---|---|---|---|---|
+| `computer.attach_token_ttl` | `BOTHY_COMPUTER__ATTACH_TOKEN_TTL` | Server | duration | `30s` | validity of an attach token (5.2) | active |
+| `computer.open_timeout` | `BOTHY_COMPUTER__OPEN_TIMEOUT` | Server | duration | `20s` | deadline until both sides are paired and the handshake is done (5.1) | active |
+| `computer.image_max_edge` | `BOTHY_COMPUTER__IMAGE_MAX_EDGE` | Server | int | `1280` | longest edge of a screenshot in pixels, sent to the host with `computer.open` (6.5) | active |
+| `computer.jpeg_quality` | `BOTHY_COMPUTER__JPEG_QUALITY` | Server | int | `80` | JPEG quality of a screenshot, 1 to 100 (6.5) | active |
+| `computer.settle` | `BOTHY_COMPUTER__SETTLE` | Server | duration | `500ms` | wait after an action before its automatic image (6.4); a `batch` item before the last waits 50 ms instead | active |
+| `computer.auto_screenshot` | `BOTHY_COMPUTER__AUTO_SCREENSHOT` | Server | bool | `true` | an image after every action that changes the screen (6.4) | active |
+| `computer.wait_max` | `BOTHY_COMPUTER__WAIT_MAX` | Server | duration | `60s` | longest `wait` of one action (6.4) | active |
+| `computer.key_repeat_max` | `BOTHY_COMPUTER__KEY_REPEAT_MAX` | Server | int | `50` | highest `repeat` of one `key` action (6.4) | active |
+| `computer.scroll_amount_max` | `BOTHY_COMPUTER__SCROLL_AMOUNT_MAX` | Server | int | `50` | highest `amount` of one `scroll` action (6.4) | active |
+| `computer.audit_apps_max` | `BOTHY_COMPUTER__AUDIT_APPS_MAX` | Server | int | `32` | most app identities in the audit entry of an end (13.1) | active |
+| `computer.status_interval` | `BOTHY_COMPUTER__STATUS_INTERVAL` | Server | duration | `2s` | shortest interval between two `computer.state` reports of a running session (12.3) | active |
+| `host_service.computer_frame_max_bytes` |  | Host service |  | `67108864` | longest frame on the helper channel, an image included (9.4); the host service closes a channel that sends a longer one |  |
+| `runner.computer_use` |  | Runner |  | `false` | load `bothy-computer-mcp` in `host` turns (10.1) |  |
+| `runner.computer_mcp_bin` |  | Runner |  | empty | absolute path of `bothy-computer-mcp`; required with `runner.computer_use` (10.1) |  |
+| `runner.computer_request_timeout` |  | Runner |  | `30s` | longest wait of the MCP server for the runner's answer, passed as `BOTHY_COMPUTER_TIMEOUT_MS` (10.1, 10.2) |  |
+| `host_service.computer_use` |  | Host service |  | `false` | open the helper channel and accept computer sessions (4, 9.4); refused together with `host_service.owner_account` |  |
+| `host_service.computer_test_peer` |  | Host service |  | empty | Linux only, tests only: the user whose process may act as the helper (9.4); empty admits nobody |  |
 <!-- config-reference:end -->
 
 ## 5. Secrets

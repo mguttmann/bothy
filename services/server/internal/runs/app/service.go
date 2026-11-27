@@ -324,6 +324,11 @@ type Deps struct {
 	// again (chat, retriggerMessage, F-PROJEKT-BEREIT). nil makes such a change an internal error;
 	// internal/wire always sets it.
 	ThreadOperators ThreadOperators
+	// Computer are the computer sessions of the module terminal (CU-04, 27 8.4 item 3 and 10.5,
+	// 07 SR13 item 5): the end of a run ends its computer session in the same transaction, and a
+	// run with a session that is not closed takes no follow-up or interaction of another person.
+	// nil means a world without computer use: nothing ends, nothing is held back.
+	Computer ComputerSessions
 
 	// AppDispatches inserts the job runs.app_dispatch with every app command and every interaction
 	// on an app card (M2-25); an app command or interaction without it is an internal error.
@@ -368,6 +373,26 @@ type Service struct {
 	wakes atomic.Pointer[wakeBox]
 	// teams holds the team channels once BindTeams ran (FEAT-TEAM-CHANNEL-SERVER).
 	teams atomic.Pointer[teamBox]
+	// computer holds the computer sessions of terminal once BindComputer ran (CU-04).
+	computer atomic.Pointer[computerBox]
+}
+
+// computerBox holds the bound computer sessions.
+type computerBox struct{ c ComputerSessions }
+
+// BindComputer binds the computer sessions of the module terminal (CU-04); the terminal step runs
+// after runs, so internal/wire binds them there. Deps.Computer, when set, wins.
+func (s *Service) BindComputer(c ComputerSessions) { s.computer.Store(&computerBox{c: c}) }
+
+// computerSessions returns the computer sessions: Deps.Computer, else the bound ones, else nil.
+func (s *Service) computerSessions() ComputerSessions {
+	if s.d.Computer != nil {
+		return s.d.Computer
+	}
+	if b := s.computer.Load(); b != nil {
+		return b.c
+	}
+	return nil
 }
 
 // publisherBox holds the bound publisher of run.updated.

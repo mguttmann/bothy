@@ -191,3 +191,17 @@ func (sc *Scenario) secretToken(grant map[string]any) {
 		sc.T.Errorf("terminal grant without session_token: %v", grant)
 	}
 }
+
+// computerSessions calls the operations of computer use (CU-04, docs/spec/27-computer-use.md):
+// the owner lists the computer sessions, stops an unknown one and switches off the enablement of
+// an unknown host; the runner without an invocation token lists desktops and opens a session,
+// which the server refuses. The scenario has no helper, so no session opens.
+func (sc *Scenario) computerSessions() {
+	sc.T.Helper()
+	o, runner := sc.W.Owner, sc.W.Agents["Runner"]
+	sc.get(o, "/computer/sessions", ok...)
+	sc.post(o, "/computer/sessions/"+newID()+"/stop", nil, http.StatusNotFound)
+	sc.post(o, "/hosts/"+newID()+"/computer/disable", nil, http.StatusNotFound)
+	sc.get(runner, "/computer/desktops", http.StatusForbidden)
+	sc.post(runner, "/computer/sessions", map[string]any{"host_id": newID(), "client_ephemeral_key_hash": fakehost.B64(make([]byte, 32))}, http.StatusForbidden)
+}

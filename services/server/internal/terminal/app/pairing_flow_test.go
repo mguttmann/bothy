@@ -981,3 +981,23 @@ func parallel(fns ...func() int) []int {
 	wg.Wait()
 	return out
 }
+
+// TestPairHost_ComputerOnly holds D-CU-03-13 on the server: computer_use with an empty list of
+// session users pairs (201); the same list without computer_use stays 400 empty. Such a host has
+// no session user, so terminal.open is refused with terminal_denied no_session_user (07 2.12).
+func TestPairHost_ComputerOnly(t *testing.T) {
+	t.Parallel()
+	p := newPairWorld(t)
+	_, code := p.create("Desk")
+	hs := newHostService(t)
+	body := hs.request(code)
+	body["session_users"] = []any{}
+	pr := p.Want(p.pair(body.json(t)), http.StatusBadRequest, "validation_failed")
+	if f := pr["errors"].([]any)[0].(map[string]any); f["pointer"] != "/session_users" || f["code"] != "empty" {
+		t.Fatalf("without computer_use: %v", pr["errors"])
+	}
+	body = hs.request(code)
+	body["session_users"] = []any{}
+	body["computer_use"] = true
+	p.Want(p.pair(body.json(t)), http.StatusCreated, "")
+}

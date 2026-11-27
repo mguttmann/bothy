@@ -30,7 +30,6 @@ import 'package:api_client/src/generated/model/message_created_event.dart';
 import 'package:api_client/src/generated/model/thread_closed_event.dart';
 import 'package:api_client/src/generated/model/sidebar_updated_event.dart';
 import 'package:api_client/src/generated/model/space_created_event.dart';
-import 'package:api_client/src/generated/model/terminal_session.dart';
 import 'package:api_client/src/generated/model/run_wake_changed_event.dart';
 import 'package:api_client/src/generated/model/run_cancel_requested_event.dart';
 import 'package:api_client/src/generated/model/agent_session_changed_event.dart';
@@ -39,6 +38,7 @@ import 'package:api_client/src/generated/model/pin_removed_event.dart';
 import 'package:api_client/src/generated/model/command_invoked_event.dart';
 import 'package:api_client/src/generated/model/sidebar_channel_updated_event.dart';
 import 'package:api_client/src/generated/model/read_state_updated_event.dart';
+import 'package:api_client/src/generated/model/computer_session_changed_event.dart';
 import 'package:api_client/src/generated/model/notification_pref_updated_event.dart';
 import 'package:api_client/src/generated/model/file_updated_event.dart';
 import 'package:api_client/src/generated/model/quiet_hours_updated_event.dart';
@@ -51,6 +51,7 @@ import 'package:api_client/src/generated/model/thread_created_event.dart';
 import 'package:api_client/src/generated/model/event_scope.dart';
 import 'package:api_client/src/generated/model/space_updated_event.dart';
 import 'package:api_client/src/generated/model/agent_hosting_changed_event.dart';
+import 'package:api_client/src/generated/model/computer_session.dart';
 import 'package:api_client/src/generated/model/pin_added_event.dart';
 import 'package:api_client/src/generated/model/import_progress_event.dart';
 import 'package:api_client/src/generated/model/draft_updated_event.dart';
@@ -95,7 +96,7 @@ part 'event.g.dart';
 /// * [payload]
 @BuiltValue()
 abstract class Event implements Built<Event, EventBuilder> {
-  /// One Of [AccessChangedEvent], [AccessExpiringEvent], [AgentConfigChangedEvent], [AgentDefinitionChangedEvent], [AgentFollowupEvent], [AgentHostingChangedEvent], [AgentInvocationEvent], [AgentSessionChangedEvent], [AgentUpdatedEvent], [AgentWakeInputEvent], [ChannelArchivedEvent], [ChannelCreatedEvent], [ChannelSettingsChangedEvent], [ChannelUpdatedEvent], [CommandChangedEvent], [CommandInvokedEvent], [DevicePendingEvent], [DraftDeletedEvent], [DraftUpdatedEvent], [FileUpdatedEvent], [GdprRequestDueEvent], [GdprRequestUpdatedEvent], [GrantChangedEvent], [GroupChangedEvent], [HostUpdatedEvent], [ImportProgressEvent], [InstanceUpdatedEvent], [InteractionCreatedEvent], [MessageCreatedEvent], [MessageDeletedEvent], [MessageUpdatedEvent], [NotificationPrefUpdatedEvent], [PinAddedEvent], [PinRemovedEvent], [QuietHoursUpdatedEvent], [ReactionAddedEvent], [ReactionRemovedEvent], [ReadStateUpdatedEvent], [RunCancelRequestedEvent], [RunStateChangedEvent], [RunWakeChangedEvent], [SessionRevokedEvent], [SettingsUpdatedEvent], [SidebarChannelUpdatedEvent], [SidebarUpdatedEvent], [SpaceArchivedEvent], [SpaceCreatedEvent], [SpaceUpdatedEvent], [StatusUpdatedEvent], [TerminalSessionChangedEvent], [ThreadClosedEvent], [ThreadCreatedEvent], [ThreadMovedEvent], [ThreadMovedOutEvent], [ThreadReopenedEvent], [ThreadUpdatedEvent], [UserUpdatedEvent]
+  /// One Of [AccessChangedEvent], [AccessExpiringEvent], [AgentConfigChangedEvent], [AgentDefinitionChangedEvent], [AgentFollowupEvent], [AgentHostingChangedEvent], [AgentInvocationEvent], [AgentSessionChangedEvent], [AgentUpdatedEvent], [AgentWakeInputEvent], [ChannelArchivedEvent], [ChannelCreatedEvent], [ChannelSettingsChangedEvent], [ChannelUpdatedEvent], [CommandChangedEvent], [CommandInvokedEvent], [ComputerSessionChangedEvent], [DevicePendingEvent], [DraftDeletedEvent], [DraftUpdatedEvent], [FileUpdatedEvent], [GdprRequestDueEvent], [GdprRequestUpdatedEvent], [GrantChangedEvent], [GroupChangedEvent], [HostUpdatedEvent], [ImportProgressEvent], [InstanceUpdatedEvent], [InteractionCreatedEvent], [MessageCreatedEvent], [MessageDeletedEvent], [MessageUpdatedEvent], [NotificationPrefUpdatedEvent], [PinAddedEvent], [PinRemovedEvent], [QuietHoursUpdatedEvent], [ReactionAddedEvent], [ReactionRemovedEvent], [ReadStateUpdatedEvent], [RunCancelRequestedEvent], [RunStateChangedEvent], [RunWakeChangedEvent], [SessionRevokedEvent], [SettingsUpdatedEvent], [SidebarChannelUpdatedEvent], [SidebarUpdatedEvent], [SpaceArchivedEvent], [SpaceCreatedEvent], [SpaceUpdatedEvent], [StatusUpdatedEvent], [TerminalSessionChangedEvent], [ThreadClosedEvent], [ThreadCreatedEvent], [ThreadMovedEvent], [ThreadMovedOutEvent], [ThreadReopenedEvent], [ThreadUpdatedEvent], [UserUpdatedEvent]
   OneOf get oneOf;
 
   static const String discriminatorFieldName = r'type';
@@ -117,6 +118,7 @@ abstract class Event implements Built<Event, EventBuilder> {
     r'channel.updated': ChannelUpdatedEvent,
     r'command.changed': CommandChangedEvent,
     r'command.invoked': CommandInvokedEvent,
+    r'computer_session.changed': ComputerSessionChangedEvent,
     r'device.pending': DevicePendingEvent,
     r'draft.deleted': DraftDeletedEvent,
     r'draft.updated': DraftUpdatedEvent,
@@ -220,6 +222,9 @@ extension EventDiscriminatorExt on Event {
     }
     if (this is CommandInvokedEvent) {
       return r'command.invoked';
+    }
+    if (this is ComputerSessionChangedEvent) {
+      return r'computer_session.changed';
     }
     if (this is DevicePendingEvent) {
       return r'device.pending';
@@ -397,6 +402,9 @@ extension EventBuilderDiscriminatorExt on EventBuilder {
     }
     if (this is CommandInvokedEventBuilder) {
       return r'command.invoked';
+    }
+    if (this is ComputerSessionChangedEventBuilder) {
+      return r'computer_session.changed';
     }
     if (this is DevicePendingEventBuilder) {
       return r'device.pending';
@@ -583,6 +591,7 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
       ChannelUpdatedEvent,
       CommandChangedEvent,
       CommandInvokedEvent,
+      ComputerSessionChangedEvent,
       DevicePendingEvent,
       DraftDeletedEvent,
       DraftUpdatedEvent,
@@ -739,6 +748,13 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
           specifiedType: FullType(CommandInvokedEvent),
         ) as CommandInvokedEvent;
         oneOfType = CommandInvokedEvent;
+        break;
+      case r'computer_session.changed':
+        oneOfResult = serializers.deserialize(
+          oneOfDataSrc,
+          specifiedType: FullType(ComputerSessionChangedEvent),
+        ) as ComputerSessionChangedEvent;
+        oneOfType = ComputerSessionChangedEvent;
         break;
       case r'device.pending':
         oneOfResult = serializers.deserialize(
@@ -1229,6 +1245,9 @@ class EventTypeEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'terminal_session.changed')
   static const EventTypeEnum terminalSessionPeriodChanged =
       _$eventTypeEnum_terminalSessionPeriodChanged;
+  @BuiltValueEnumConst(wireName: r'computer_session.changed')
+  static const EventTypeEnum computerSessionPeriodChanged =
+      _$eventTypeEnum_computerSessionPeriodChanged;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const EventTypeEnum unknownDefaultOpenApi =
       _$eventTypeEnum_unknownDefaultOpenApi;

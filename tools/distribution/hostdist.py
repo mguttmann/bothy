@@ -5,7 +5,10 @@ Builds the binaries and the installation packages of the component `host` (tag `
 
 * `build` (`make -C services/host release-build`, release.yml job build): the release binaries
   `bothy-host_<v>_<os>_<arch>[.exe]` for darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 and
-  windows/amd64, and the Linux packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` from
+  windows/amd64, the binaries of the MCP server of computer use
+  `bothy-computer-mcp_<v>_<os>_<arch>[.exe]` for the same platforms (docs/spec/27-computer-use.md
+  C1, run next to the Claude Code runner), and the Linux packages
+  `bothy-host_<v>_linux_<arch>.deb` and `.rpm` from
   `infra/host/linux/nfpm.yaml` with nfpm (pinned in tools/bin/tools.lock.json). Every binary is
   built without cgo from `services/host/VERSION` (`-trimpath -buildvcs=false`, the version and the
   package kind with `-ldflags -X`, internal/buildinfo); a package carries its own build with the
@@ -25,6 +28,23 @@ Without its secrets a release step stops before anything is built or signed, nam
 ones; the distribution file (apps/distribution) gives the Apple team and the timestamp server and
 must hold no placeholder.
 
+The computer helper (brief CU-02, D-CU-01-29, docs/decisions.d/CU-02.md D-CU-02-10) is not
+published: no release step above carries it. On the owner's own machines these steps sign it and
+build a host package with the helper as an optional component:
+
+* `helper-sign-macos`: signs `bothy-computer-helper.app` with a Developer ID Application identity of
+  the login keychain and the hardened runtime (no notarization), verifies it and compares its
+  designated requirement with the one recorded for the previous signed build.
+* `helper-package-macos`: one `.pkg` for one architecture with the choices `host` (always) and
+  `computer-helper` (off unless selected); the helper's postinstall sets
+  `host_service.computer_use` and loads its LaunchAgent.
+* `helper-cert-windows`: creates the self-signed code signing certificate of the machine once.
+* `helper-sign-windows`: signs `bothy-computer-helper.exe` with a certificate of the machine store
+  and checks `signtool verify /pa`.
+* `helper-package-windows`: the host MSI with the feature `ComputerHelper` (off unless selected,
+  `ADDLOCAL=ComputerHelper`); without a thumbprint everything stays unsigned (a development
+  package, as the CI jobs build it).
+
 `apple-trial` and `windows-trial` (the CI jobs `host trial (macOS)` and `host trial (Windows)`,
 D-W-127) run the same steps with a test publisher: a self-signed identity in a temporary keychain
 or certificate store, trusted for the run only, no notarization; productbuild signs only with an
@@ -42,6 +62,11 @@ Usage:
   hostdist.py apple-trial --out DIR
   hostdist.py windows-release --version X.Y.Z --out DIR --distribution FILE
   hostdist.py windows-trial --out DIR
+  hostdist.py helper-sign-macos --app APP --identity NAME --requirement-file FILE
+  hostdist.py helper-package-macos --version X.Y.Z --out DIR --app APP [--arch ARCH]
+  hostdist.py helper-cert-windows [--subject SUBJECT]
+  hostdist.py helper-sign-windows --exe EXE --thumbprint SHA1
+  hostdist.py helper-package-windows --version X.Y.Z --out DIR --helper EXE [--thumbprint SHA1]
 Exit codes: 0 done, 1 a step failed (named on stderr), 2 usage error.
 """
 
@@ -52,6 +77,7 @@ import hashlib
 import json
 import os
 import platform
+import plistlib
 import re
 import shutil
 import sys
@@ -71,6 +97,8 @@ from common import REPO, Runner, StepError, fail, require_env
 HOST = REPO / "services" / "host"
 INFRA = REPO / "infra" / "host"
 MODULE = "github.com/OWNER/bothy/services/host"
+# The MCP server of computer use (docs/spec/27-computer-use.md C1), shipped with the host release.
+MCP_PROGRAM = "bothy-computer-mcp"
 # The five platforms of docs/spec/18-release.md 2 (row host).
 PLATFORMS = (
     ("darwin", "arm64"),
@@ -112,6 +140,22 @@ APPLE_SECRETS = (
 )
 WINDOWS_SECRETS = windows.WINDOWS_SECRETS
 TRIAL_SUBJECT = "CN=bothy-host test publisher"
+# The computer helper (docs/decisions.d/CU-02.md D-CU-02-3); white label like PKG_IDENTIFIER.
+HELPER_APP = "bothy-computer-helper.app"
+HELPER_EXE_MACOS = "bothy-computer-helper"
+HELPER_EXE_WINDOWS = "bothy-computer-helper.exe"
+HELPER_BUNDLE_ID = "com.example.bothy-computer-helper"
+HELPER_PKG_IDENTIFIER = HELPER_BUNDLE_ID
+DARWIN_HELPER_DIR = DARWIN_PROGRAM_DIR  # D-CU-03-7: next to bothy-host
+HELPER_LAUNCH_AGENT = Path(f"/Library/LaunchAgents/{HELPER_BUNDLE_ID}.plist")
+HELPER_CERT_SUBJECT = "CN=bothy-computer-helper (local)"
+# The identities helper-sign-macos accepts (D-CU-01-29 as amended): a Developer ID, or the Apple
+# Development identity of the owner's login keychain; the helper is never published.
+HELPER_SIGNING_KINDS = ("Developer ID Application", "Apple Development")
+_TEAM = re.compile(r"^[A-Z0-9]{10}$")
+# The one keychain helper-sign-macos signs from (D-CU-02-21): never the search list.
+LOGIN_KEYCHAIN = Path.home() / "Library" / "Keychains" / "login.keychain-db"
+_THUMBPRINT = re.compile(r"^[0-9A-Fa-f]{40}$")
 _SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
 )
@@ -120,9 +164,12 @@ _SEMVER = re.compile(
 # ---- names and the Go build -----------------------------------------------------------------
 
 
-def binary_name(version: str, goos: str, goarch: str) -> str:
-    """Return the file name of a release binary, for example `bothy-host_1.2.3_linux_amd64`."""
-    return f"bothy-host_{version}_{goos}_{goarch}" + (".exe" if goos == "windows" else "")
+def binary_name(version: str, goos: str, goarch: str, program: str = "bothy-host") -> str:
+    """Return the file name of a release binary, for example `bothy-host_1.2.3_linux_amd64`.
+
+    `program` is `bothy-host` or `bothy-computer-mcp` (MCP_PROGRAM).
+    """
+    return f"{program}_{version}_{goos}_{goarch}" + (".exe" if goos == "windows" else "")
 
 
 def package_name(version: str, goos: str, goarch: str, kind: str) -> str:
@@ -147,16 +194,39 @@ def check_version(version: str) -> None:
         raise StepError(f"services/host/VERSION says {component_version()}, not {version}")
 
 
-def ldflags(version: str, kind: str) -> str:
-    """Return the linker flags of a release build: no symbol table, version and package kind."""
-    return (
+def ldflags(version: str, kind: str, requirement: str = "") -> str:
+    """Return the linker flags of a release build: no symbol table, version and package kind.
+
+    `requirement` is the code signing requirement of the computer helper the host service checks
+    (`buildinfo.ComputerHelperRequirement`, docs/decisions.d/CU-03.md D-CU-03-7); only the
+    packages with the helper set it, empty leaves a development build.
+
+    Raises:
+        StepError: the requirement holds a single quote, which the linker flags cannot carry.
+    """
+    flags = (
         f"-s -w -X {MODULE}/internal/buildinfo.Version={version} "
         f"-X {MODULE}/internal/buildinfo.PackageKind={kind}"
     )
+    if requirement:
+        if "'" in requirement:
+            raise StepError("the helper requirement holds a single quote")
+        flags += f" -X '{MODULE}/internal/buildinfo.ComputerHelperRequirement={requirement}'"
+    return flags
 
 
-def go_build(run: Runner, goos: str, goarch: str, version: str, kind: str, out: Path) -> Path:
-    """Build `cmd/bothy-host` for goos/goarch without cgo into `out`; return `out`.
+def go_build(  # noqa: PLR0913 - the target, the package kind and the helper requirement
+    run: Runner,
+    goos: str,
+    goarch: str,
+    version: str,
+    kind: str,
+    out: Path,
+    *,
+    requirement: str = "",
+    program: str = "bothy-host",
+) -> Path:
+    """Build `cmd/<program>` for goos/goarch without cgo into `out`; return `out`.
 
     The build depends only on the source and `version` (`-trimpath -buildvcs=false`), so the
     same commit and version give the same binary with the same Go (brief requirement 13).
@@ -169,10 +239,10 @@ def go_build(run: Runner, goos: str, goarch: str, version: str, kind: str, out: 
             "-trimpath",
             "-buildvcs=false",
             "-ldflags",
-            ldflags(version, kind),
+            ldflags(version, kind, requirement),
             "-o",
             out,
-            "./cmd/bothy-host",
+            f"./cmd/{program}",
         ],
         cwd=HOST,
         env={
@@ -196,6 +266,18 @@ def build(run: Runner, version: str, out: Path, nfpm: str) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     written = [
         go_build(run, goos, goarch, version, "", out / binary_name(version, goos, goarch))
+        for goos, goarch in PLATFORMS
+    ]
+    written += [
+        go_build(
+            run,
+            goos,
+            goarch,
+            version,
+            "",
+            out / binary_name(version, goos, goarch, MCP_PROGRAM),
+            program=MCP_PROGRAM,
+        )
         for goos, goarch in PLATFORMS
     ]
     with tempfile.TemporaryDirectory(prefix="bothy-host-packages-") as tmp:
@@ -288,8 +370,8 @@ def sign_binary(run: Runner, signer: apple.Signer, binary: Path, team: str | Non
         raise StepError(f"{binary.name} is not signed by the team {team}")
 
 
-def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Path) -> Path:
-    """Build the .pkg of one architecture from `binary` (already signed); signed with an installer.
+def host_component(run: Runner, version: str, arch: str, binary: Path, workdir: Path) -> Path:
+    """Build the component package of the host service from `binary`; return its path.
 
     One component installed below `/Library/Application Support`, so the installer touches no
     existing folder: `bothy-host/bin/bothy-host` and the reference copy of the LaunchDaemon in
@@ -314,7 +396,7 @@ def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Pa
             "--identifier",
             PKG_IDENTIFIER,
             "--version",
-            plan.version,
+            version,
             "--install-location",
             DARWIN_PROGRAM_DIR.parent.parent,
             "--ownership",
@@ -322,7 +404,15 @@ def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Pa
             component,
         ]
     )
-    components = [component]
+    return component
+
+
+def build_pkg(run: Runner, plan: ApplePlan, arch: str, binary: Path, workdir: Path) -> Path:
+    """Build the .pkg of one architecture from `binary` (already signed); signed with an installer.
+
+    The product holds the one component of `host_component`.
+    """
+    components = [host_component(run, plan.version, arch, binary, workdir)]
     pkg = plan.out / package_name(plan.version, "darwin", arch, KIND_PKG)
     plan.out.mkdir(parents=True, exist_ok=True)
     cmd = ["productbuild"]
@@ -823,6 +913,471 @@ def windows_trial(run: Runner, *, out: Path) -> list[str]:
     return checks
 
 
+# ---- computer helper (D-CU-01-29) ----------------------------------------------------------
+
+
+def designated_requirement(run: Runner, app: Path) -> str:
+    """Return the line `designated => ...` of `codesign -d -r-` for `app`.
+
+    Raises:
+        StepError: codesign prints no designated requirement.
+    """
+    done = run(["codesign", "-d", "-r-", app], capture=True)
+    for line in (done.stdout + done.stderr).splitlines():
+        if line.startswith("designated =>"):
+            return line.strip()
+    raise StepError(f"codesign prints no designated requirement for {app.name}")
+
+
+def _signing_fields(text: str) -> dict[str, str]:
+    """Return the `Key=value` lines of `codesign -dv` output."""
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key not in out:
+            out[key.strip()] = value.strip()
+    return out
+
+
+def helper_sign_macos(
+    run: Runner,
+    *,
+    app: Path,
+    identity: str,
+    requirement_file: Path,
+    keychain: Path = LOGIN_KEYCHAIN,
+) -> list[str]:
+    """Sign the helper bundle `app` with an identity of one keychain; return the checks.
+
+    The signature carries the hardened runtime and no timestamp (the helper is not notarized and
+    never leaves the machine, D-CU-01-29). Screen recording and accessibility grants follow the
+    designated requirement, so a requirement other than the one in `requirement_file` stops the
+    step before anyone installs the build (27 9.1); the first signed build writes the file.
+
+    Args:
+        run: the command runner.
+        app: `bothy-computer-helper.app` as `bundle.sh` assembled it.
+        identity: name or SHA-1 of a Developer ID Application or Apple Development identity
+            in `keychain` (on the owner's Mac a job in the GUI session, where the login keychain
+            is open). The step signs twice: the second signature carries a designated requirement
+            of the bundle ID and the team of the leaf certificate (D-CU-02-22).
+        requirement_file: the designated requirement of the previous signed build.
+        keychain: the only keychain codesign looks in (`--keychain`), the login keychain unless
+            named; the search list may hold keychains of other projects that would ask for their
+            password (D-CU-02-21).
+
+    Returns:
+        The checks that passed, for the log of the step.
+
+    Raises:
+        StepError: the signature does not verify, carries no hardened runtime, is not a Developer
+            ID, or its designated requirement differs from the recorded one.
+
+    Example:
+        helper_sign_macos(Runner(), app=Path("out/bothy-computer-helper.app"),
+                          identity="Developer ID Application: Example (TEAM123456)",
+                          requirement_file=Path("signing/requirement.txt"))
+    """
+    sign: list[str | Path] = [
+        "codesign",
+        "--force",
+        "--options",
+        "runtime",
+        "--timestamp=none",
+        "--keychain",
+        keychain,
+        "--sign",
+        identity,
+    ]
+    run([*sign, app])
+    first = run(["codesign", "-dv", "--verbose=2", app], capture=True)
+    found = _signing_fields(first.stdout + first.stderr)
+    team, ident = found.get("TeamIdentifier", ""), found.get("Identifier", "")
+    if not _TEAM.match(team) or not ident:
+        raise StepError(f"{app.name}: the identity names no team; the requirement needs one")
+    # The designated requirement names the bundle ID and the team of the leaf certificate, not
+    # the certificate itself, so a renewed certificate of the same team keeps the grants.
+    requirement = (
+        f'designated => identifier "{ident}" and anchor apple generic and '
+        f'certificate leaf[subject.OU] = "{team}"'
+    )
+    run([*sign, "--requirements", "=" + requirement, app])
+    run(["codesign", "--verify", "--strict", "--verbose=2", app])
+    details = run(["codesign", "-dv", "--verbose=2", app], capture=True)
+    text = details.stdout + details.stderr
+    if "flags=0x10000(runtime)" not in text:
+        raise StepError(f"{app.name} carries no hardened runtime")
+    kind = next((k for k in HELPER_SIGNING_KINDS if f"Authority={k}" in text), None)
+    if kind is None:
+        raise StepError(f"{app.name} is not signed by a Developer ID or Apple Development identity")
+    checks = [f"codesign --verify --strict passes, hardened runtime, {kind} of team {team}"]
+    requirement = designated_requirement(run, app)
+    if requirement_file.is_file():
+        before = requirement_file.read_text(encoding="utf-8").strip()
+        if before != requirement:
+            raise StepError(
+                f"designated requirement changed: {before!r} became {requirement!r}; the screen "
+                "recording and accessibility grants of the installed helper would no longer apply"
+            )
+        checks.append("designated requirement unchanged")
+    else:
+        requirement_file.parent.mkdir(parents=True, exist_ok=True)
+        requirement_file.write_text(requirement + "\n", encoding="utf-8")
+        checks.append(f"designated requirement recorded in {requirement_file}")
+    return checks
+
+
+# The component property list of the helper bundle (`pkgbuild --component-plist`).
+_COMPONENT = [
+    {
+        "RootRelativeBundlePath": f"bothy-host/bin/{HELPER_APP}",
+        "BundleIsRelocatable": False,
+        "BundleIsVersionChecked": False,
+        "BundleHasStrictIdentifier": True,
+        "BundleOverwriteAction": "upgrade",
+    }
+]
+
+
+def helper_distribution_xml(version: str) -> str:
+    """Return the productbuild distribution of the helper package (D-CU-02-10).
+
+    The choice `host` is always installed; `computer-helper` is off until the person installing
+    selects it (in Installer, or with `installer -applyChoiceChangesXML`).
+    """
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>bothy-host {version} with the computer helper</title>
+    <options customize="always" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <choices-outline>
+        <line choice="host"/>
+        <line choice="computer-helper"/>
+    </choices-outline>
+    <choice id="host" title="Host service" start_selected="true" enabled="false">
+        <pkg-ref id="{PKG_IDENTIFIER}"/>
+    </choice>
+    <choice id="computer-helper" title="Computer helper" start_selected="false"
+            description="An agent of the owner may control this desktop (computer_use).">
+        <pkg-ref id="{HELPER_PKG_IDENTIFIER}"/>
+    </choice>
+    <pkg-ref id="{PKG_IDENTIFIER}" version="{version}">{PKG_IDENTIFIER}.pkg</pkg-ref>
+    <pkg-ref id="{HELPER_PKG_IDENTIFIER}" version="{version}">{HELPER_PKG_IDENTIFIER}.pkg</pkg-ref>
+</installer-gui-script>
+"""
+
+
+def helper_component(run: Runner, version: str, app: Path, workdir: Path) -> Path:
+    """Build the component package of the helper from `app`; return its path.
+
+    Installed below `/Library/Application Support` like the host component: the bundle in
+    `bothy-host/bin` next to the host binary (D-CU-03-7) and the LaunchAgent as a reference in
+    `bothy-host/share`, which the postinstall copies to `/Library/LaunchAgents` (so the payload
+    touches no system folder). The bundle is not relocatable: Installer must not move the update
+    to another copy with the same bundle ID, because the peer rule trusts only the installed path
+    (27 9.4).
+    """
+    base = workdir / "pkg-helper"
+    root = base / "root" / "bothy-host"
+    desktop = root / "bin"
+    share = root / "share"
+    desktop.mkdir(parents=True)
+    share.mkdir(parents=True)
+    shutil.copytree(app, desktop / HELPER_APP, symlinks=True)
+    agent = share / HELPER_LAUNCH_AGENT.name
+    shutil.copy2(INFRA / "macos" / HELPER_LAUNCH_AGENT.name, agent)
+    agent.chmod(0o644)
+    scripts = base / "scripts"
+    scripts.mkdir()
+    shutil.copy2(INFRA / "macos" / "helper-postinstall", scripts / "postinstall")
+    (scripts / "postinstall").chmod(0o755)
+    shutil.copy2(INFRA / "set-computer-use.sh", scripts / "set-computer-use.sh")
+    (scripts / "set-computer-use.sh").chmod(0o755)
+    shutil.copy2(INFRA / "macos" / "start-computer-helper.sh", scripts / "start-computer-helper.sh")
+    (scripts / "start-computer-helper.sh").chmod(0o755)
+    component_plist = base / "component.plist"
+    component_plist.write_bytes(plistlib.dumps(_COMPONENT))
+    component = base / f"{HELPER_PKG_IDENTIFIER}.pkg"
+    run(
+        [
+            "pkgbuild",
+            "--root",
+            base / "root",
+            "--component-plist",
+            component_plist,
+            "--scripts",
+            scripts,
+            "--identifier",
+            HELPER_PKG_IDENTIFIER,
+            "--version",
+            version,
+            "--install-location",
+            DARWIN_PROGRAM_DIR.parent.parent,
+            "--ownership",
+            "recommended",
+            component,
+        ]
+    )
+    return component
+
+
+def helper_package_macos(
+    run: Runner,
+    *,
+    version: str,
+    out: Path,
+    app: Path,
+    arch: str,
+    workdir: Path,
+    requirement_file: Path | None = None,
+) -> Path:
+    """Build the host `.pkg` of `arch` with the helper as an optional choice; return it.
+
+    The host binary is built with the package kind `pkg` and left unsigned: `bothy-host install`
+    signs it ad hoc, as it does for a release binary (16 4.4). The product stays unsigned too: it
+    is built and installed on the same machine, so it carries no quarantine flag (D-CU-01-29).
+    With `requirement_file` (the one `helper-sign-macos` wrote) the host binary carries the
+    helper's designated requirement as `buildinfo.ComputerHelperRequirement`, so the host service
+    admits only that helper (27 9.4); without it the host is a development build.
+
+    Raises:
+        StepError: a build step fails.
+    """
+    requirement = ""
+    if requirement_file is not None:
+        line = requirement_file.read_text(encoding="utf-8").strip()
+        requirement = line.removeprefix("designated =>").strip()
+    binary = go_build(
+        run,
+        "darwin",
+        arch,
+        version,
+        KIND_PKG,
+        workdir / f"bin-{arch}" / "bothy-host",
+        requirement=requirement,
+    )
+    host = host_component(run, version, arch, binary, workdir)
+    helper = helper_component(run, version, app, workdir)
+    distribution = workdir / "distribution.xml"
+    distribution.write_text(helper_distribution_xml(version), encoding="utf-8")
+    out.mkdir(parents=True, exist_ok=True)
+    pkg = out / f"bothy-host-computer_{version}_darwin_{arch}.pkg"
+    run(
+        [
+            "productbuild",
+            "--distribution",
+            distribution,
+            "--package-path",
+            host.parent,
+            "--package-path",
+            helper.parent,
+            pkg,
+        ]
+    )
+    return pkg
+
+
+# PowerShell of helper-cert-windows; the subject comes in through the environment.
+_PS_HELPER_CERT = (
+    "$c = New-SelfSignedCertificate -Type CodeSigningCert -Subject $env:CERT_SUBJECT "
+    "-KeyExportPolicy NonExportable -KeyUsage DigitalSignature -KeyAlgorithm RSA "
+    "-KeyLength 3072 -HashAlgorithm SHA256 -CertStoreLocation Cert:\\LocalMachine\\My; "
+    "$cer = Join-Path ([System.IO.Path]::GetTempPath()) ($c.Thumbprint + '.cer'); "
+    "try { Export-Certificate -Cert $c -FilePath $cer | Out-Null; "
+    "Import-Certificate -FilePath $cer -CertStoreLocation Cert:\\LocalMachine\\Root | Out-Null; "
+    "Import-Certificate -FilePath $cer -CertStoreLocation Cert:\\LocalMachine\\TrustedPublisher "
+    "| Out-Null } finally { Remove-Item -LiteralPath $cer -ErrorAction SilentlyContinue }; "
+    "$c.Thumbprint"
+)
+
+
+def helper_cert_windows(run: Runner, *, subject: str = HELPER_CERT_SUBJECT) -> str:
+    """Create the self-signed code signing certificate of this machine; return its thumbprint.
+
+    Run once, elevated, on the owner's Windows computer (D-CU-01-29): the key stays in the
+    store `My` of the local machine and cannot be exported; the certificate (without the key)
+    goes into the machine's `Root` and `TrustedPublisher` stores, so `signtool verify /pa` and
+    `uiAccess` accept a signature with it on this machine and on no other.
+
+    Raises:
+        StepError: PowerShell fails or prints no thumbprint.
+    """
+    printed = windows.powershell(run, _PS_HELPER_CERT, env={"CERT_SUBJECT": subject}).strip()
+    thumb = printed.splitlines()[-1].strip() if printed else ""
+    if not _THUMBPRINT.match(thumb):
+        raise StepError("the new certificate has no thumbprint; nothing to sign with")
+    return thumb.upper()
+
+
+def sign_with_store(run: Runner, path: Path, thumbprint: str) -> None:
+    """Sign `path` with the certificate `thumbprint` of the machine store and verify it.
+
+    Raises:
+        StepError: the thumbprint is malformed, or signtool fails or rejects the signature.
+    """
+    if not _THUMBPRINT.match(thumbprint):
+        raise StepError("the thumbprint must be the 40 hex digits of the certificate")
+    run(
+        [
+            windows.sdk_tool("signtool.exe"),
+            "sign",
+            "/sha1",
+            thumbprint,
+            "/sm",
+            "/s",
+            "My",
+            "/fd",
+            "SHA256",
+            path,
+        ]
+    )
+    windows.verify(run, path)
+
+
+def helper_sign_windows(run: Runner, *, exe: Path, thumbprint: str) -> None:
+    """Sign `bothy-computer-helper.exe` with the machine's certificate (`helper-cert-windows`).
+
+    Raises:
+        StepError: as `sign_with_store`.
+    """
+    sign_with_store(run, exe, thumbprint)
+
+
+def helper_package_windows(
+    run: Runner,
+    *,
+    version: str,
+    out: Path,
+    helper: Path,
+    thumbprint: str | None,
+    wix: Path,
+    workdir: Path,
+) -> Path:
+    """Build the host MSI with the feature ComputerHelper around `helper`; return the MSI.
+
+    `helper` is signed already (`helper-sign-windows`) or a development build. With a thumbprint
+    the host binary and the MSI are signed with the same certificate, and the host binary carries
+    the publisher subject of `helper-cert-windows` as `buildinfo.ComputerHelperRequirement`;
+    without one everything stays unsigned and a development build, as in the CI jobs.
+
+    Raises:
+        StepError: a build or signing step fails.
+    """
+    publisher = HELPER_CERT_SUBJECT if thumbprint else ""
+    binary = go_build(
+        run,
+        "windows",
+        "amd64",
+        version,
+        KIND_MSI,
+        workdir / "msi-bin" / "bothy-host.exe",
+        requirement=publisher,
+    )
+    if thumbprint:
+        sign_with_store(run, binary, thumbprint)
+    msi = out / f"bothy-host-computer_{version}_windows_amd64.msi"
+    out.mkdir(parents=True, exist_ok=True)
+    run(
+        [
+            "dotnet",
+            wix,
+            "build",
+            INFRA / "windows" / "bothy-host.wxs",
+            "-arch",
+            "x64",
+            "-d",
+            f"ProductVersion={msi_version(version)}",
+            "-d",
+            f"BinaryPath={binary}",
+            "-d",
+            f"HelperPath={helper}",
+            "-d",
+            f"HelperScript={INFRA / 'windows' / 'set-computer-use.ps1'}",
+            "-d",
+            f"HelperStartScript={INFRA / 'windows' / 'start-computer-helper.ps1'}",
+            "-o",
+            msi,
+        ]
+    )
+    if thumbprint:
+        sign_with_store(run, msi, thumbprint)
+    return msi
+
+
+def _add_helper_parsers(sub: Any) -> None:
+    """Add the helper subcommands of the module docstring to `sub` (D-CU-01-29)."""
+    hs = sub.add_parser("helper-sign-macos", help="sign the computer helper (Developer ID)")
+    hs.add_argument("--app", type=Path, required=True)
+    hs.add_argument("--identity", required=True)
+    hs.add_argument("--requirement-file", type=Path, required=True)
+    hs.add_argument("--keychain", type=Path, default=LOGIN_KEYCHAIN)
+    hp = sub.add_parser("helper-package-macos", help="host .pkg with the computer helper")
+    hp.add_argument("--version", required=True)
+    hp.add_argument("--out", type=Path, required=True)
+    hp.add_argument("--app", type=Path, required=True)
+    hp.add_argument("--arch", default="arm64" if platform.machine() == "arm64" else "amd64")
+    hp.add_argument("--requirement-file", type=Path)
+    hc = sub.add_parser("helper-cert-windows", help="create the machine's signing certificate")
+    hc.add_argument("--subject", default=HELPER_CERT_SUBJECT)
+    hw = sub.add_parser("helper-sign-windows", help="sign the computer helper (machine store)")
+    hw.add_argument("--exe", type=Path, required=True)
+    hw.add_argument("--thumbprint", required=True)
+    hm = sub.add_parser("helper-package-windows", help="host MSI with the computer helper")
+    hm.add_argument("--version", required=True)
+    hm.add_argument("--out", type=Path, required=True)
+    hm.add_argument("--helper", type=Path, required=True)
+    hm.add_argument("--thumbprint", default="")
+
+
+def _helper_command(runner: Runner, args: argparse.Namespace) -> None:
+    """Run one helper subcommand of `main` (D-CU-01-29)."""
+    if args.command == "helper-sign-macos":
+        apple.require_macos()
+        for line in helper_sign_macos(
+            runner,
+            app=args.app.resolve(),
+            identity=args.identity,
+            requirement_file=args.requirement_file.resolve(),
+            keychain=args.keychain,
+        ):
+            print(f"helper-sign-macos: {line}")
+    elif args.command == "helper-package-macos":
+        apple.require_macos()
+        check_version(args.version)
+        with tempfile.TemporaryDirectory(prefix="helper-package-macos-") as tmp:
+            pkg = helper_package_macos(
+                runner,
+                version=args.version,
+                out=args.out.resolve(),
+                app=args.app.resolve(),
+                arch=args.arch,
+                workdir=Path(tmp),
+                requirement_file=args.requirement_file,
+            )
+        print(f"helper-package-macos: {pkg.name}")
+    elif args.command == "helper-cert-windows":
+        windows.require_windows()
+        print(helper_cert_windows(runner, subject=args.subject))
+    elif args.command == "helper-sign-windows":
+        windows.require_windows()
+        helper_sign_windows(runner, exe=args.exe.resolve(), thumbprint=args.thumbprint)
+        print(f"helper-sign-windows: {args.exe.name} signed and verified")
+    else:
+        windows.require_windows()
+        check_version(args.version)
+        with tempfile.TemporaryDirectory(prefix="helper-package-windows-") as tmp:
+            msi = helper_package_windows(
+                runner,
+                version=args.version,
+                out=args.out.resolve(),
+                helper=args.helper.resolve(),
+                thumbprint=args.thumbprint or None,
+                wix=fetch_wix(),
+                workdir=Path(tmp),
+            )
+        print(f"helper-package-windows: {msi.name}")
+
+
 # ---- command line ---------------------------------------------------------------------------
 
 
@@ -842,6 +1397,7 @@ def main(argv: Sequence[str] | None = None, run: Runner | None = None) -> int:
     for name in ("apple-trial", "windows-trial"):
         t = sub.add_parser(name, help="the chain with a test publisher and an installation")
         t.add_argument("--out", type=Path, required=True)
+    _add_helper_parsers(sub)
     args = parser.parse_args(argv)
     runner = run or Runner()
     try:
@@ -866,6 +1422,8 @@ def main(argv: Sequence[str] | None = None, run: Runner | None = None) -> int:
                 environ=os.environ,
             )
             print(f"release-windows: {msi.name}")
+        elif args.command.startswith("helper-"):
+            _helper_command(runner, args)
         elif args.command == "apple-trial":
             checks = apple_trial(runner, out=args.out.resolve())
             print(f"host trial (macOS): {len(checks)} checks passed")

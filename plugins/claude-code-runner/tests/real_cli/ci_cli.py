@@ -45,6 +45,9 @@ TESTS = (
     "tests/real_cli/test_background.py::test_launch_list_stop_and_remove",
     "tests/real_cli/test_background.py::"
     "test_a_call_that_would_wait_for_a_person_is_refused_and_the_turn_goes_on",
+    # The probes of docs/spec/27-computer-use.md 16 (CU-06): the computer MCP file in print mode
+    # and in a background session, and the files of the session that hold the image.
+    "tests/real_cli/test_computer_probe.py",
 )
 PLUGIN = Path(__file__).resolve().parents[2]
 

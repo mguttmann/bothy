@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
+#include <shlobj.h>
 #include <windows.h>
 
 #include "branding.h"
 #include "deep_link.h"
 #include "flutter_window.h"
 #include "key_scan_code.h"
+#include "legacy_data_dir.h"
 #include "utils.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
@@ -24,6 +26,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     return EXIT_SUCCESS;
   }
   deep_link::RegisterUrlScheme();
+
+  // Data of a version before the brand name in the version resource is copied to the folder
+  // path_provider now uses, before any plugin creates it (docs/decisions.d/FIX-windows-data-dir.md).
+  PWSTR roaming = nullptr;
+  if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming))) {
+    legacy_data_dir::Migrate(roaming, BRANDING_APP_NAME_W, BRANDING_APP_NAME_W);
+  }
+  ::CoTaskMemFree(roaming);
 
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.

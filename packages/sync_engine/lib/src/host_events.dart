@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The changes of hosts and of the person's terminal sessions (docs/spec/04-sync-protocol.md
-/// 2.1 and 8.2; docs/spec/15-client-architecture.md 23.1; brief M4-36 Scope): the dispatcher
-/// turns `host.updated` and `terminal_session.changed` (durable), `host.presence_changed`
+/// The changes of hosts and of the person's terminal and computer sessions (docs/spec/
+/// 04-sync-protocol.md 2.1 and 8.2; docs/spec/15-client-architecture.md 23.1; docs/spec/
+/// 27-computer-use.md 12.4; briefs M4-36 and CU-07 Scope): the dispatcher turns `host.updated`,
+/// `terminal_session.changed` and `computer_session.changed` (durable), `host.presence_changed`
 /// (ephemeral) and the `access.changed` entries of kind `host` into [HostEvent]s of the
 /// [HostEventsHub]. Nothing of them is stored: the app reloads hosts and sessions through REST
 /// (D-M4-36). The terminal stream itself never runs through the engine (15 8).
@@ -149,6 +150,106 @@ final class TerminalSessionChanged extends HostEvent {
   @override
   String toString() =>
       'TerminalSessionChanged($sessionId on $hostId, $state, v$version, '
+      'reason: $closeReason)';
+}
+
+/// `computer_session.changed`: a computer session of the owner changed (docs/spec/
+/// 27-computer-use.md 8, 12.4). Metadata only, never an image (R-CL-18).
+///
+/// [frontApp] names an app of the owner's desktop: it is personal data, so [toString] leaves
+/// it out and nothing of this event goes into a log line, a crash report or a metric.
+final class ComputerSessionChanged extends HostEvent {
+  /// Creates the change.
+  const ComputerSessionChanged({
+    required this.sessionId,
+    required this.hostId,
+    required this.runId,
+    required this.userId,
+    required this.desktop,
+    required this.state,
+    required this.version,
+    required this.actionCount,
+    this.pauseReason,
+    this.frontApp,
+    this.closeReason,
+    this.closeDetail,
+  });
+
+  /// The session.
+  final String sessionId;
+
+  @override
+  final String hostId;
+
+  /// The run that controls the desktop.
+  final String runId;
+
+  /// The owner who triggered the run.
+  final String userId;
+
+  /// The name of the desktop (`hosts.name`).
+  final String desktop;
+
+  /// The session's `state` (`opening`, `active`, `paused`, `closed`).
+  final String state;
+
+  /// `resource.version` of the event.
+  final int version;
+
+  /// The count of actions so far.
+  final int actionCount;
+
+  /// `locked` while paused, else null.
+  final String? pauseReason;
+
+  /// The identity of the frontmost app (bundle ID or executable name), or null.
+  final String? frontApp;
+
+  /// The `close_reason` of a closed session (27 8.3), else null.
+  final String? closeReason;
+
+  /// The `close_detail` of a closed session, else null.
+  final String? closeDetail;
+
+  /// Whether the session is closed.
+  bool get closed => state == 'closed';
+
+  @override
+  bool operator ==(Object other) =>
+      other is ComputerSessionChanged &&
+      other.sessionId == sessionId &&
+      other.hostId == hostId &&
+      other.runId == runId &&
+      other.userId == userId &&
+      other.desktop == desktop &&
+      other.state == state &&
+      other.version == version &&
+      other.actionCount == actionCount &&
+      other.pauseReason == pauseReason &&
+      other.frontApp == frontApp &&
+      other.closeReason == closeReason &&
+      other.closeDetail == closeDetail;
+
+  @override
+  int get hashCode => Object.hash(
+    sessionId,
+    hostId,
+    runId,
+    userId,
+    desktop,
+    state,
+    version,
+    actionCount,
+    pauseReason,
+    frontApp,
+    closeReason,
+    closeDetail,
+  );
+
+  // Neither the desktop's name nor the frontmost app: both are personal (R-CL-18).
+  @override
+  String toString() =>
+      'ComputerSessionChanged($sessionId on $hostId, $state, v$version, '
       'reason: $closeReason)';
 }
 

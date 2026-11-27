@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devices.json computer_sessions",
+  "description": "The computer sessions of the person (table computer_sessions): which agent in which run of the person controlled which desktop when, pauses, the number of actions, the last frontmost app and the reason for the end. Never an image, a coordinate, typed text or a key.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "host_id", "agent_id", "run_id", "state", "opened_at", "paused_ms", "action_count"],
+    "properties": {
+      "id": {"description": "ID of the computer session.", "type": "string", "format": "uuid"},
+      "host_id": {"description": "ID of the desktop (host).", "type": "string", "format": "uuid"},
+      "agent_id": {"description": "ID of the agent that controlled the desktop.", "type": "string", "format": "uuid"},
+      "run_id": {"description": "ID of the run of the person the session belonged to.", "type": "string", "format": "uuid"},
+      "state": {"description": "State of the session.", "type": "string", "enum": ["opening", "active", "paused", "closed"]},
+      "opened_at": {"description": "When the session was opened.", "type": "string", "format": "date-time"},
+      "started_at": {"description": "When the host service started the session.", "type": "string", "format": "date-time"},
+      "closed_at": {"description": "When the session ended.", "type": "string", "format": "date-time"},
+      "close_reason": {"description": "Reason for the end (docs/spec/27-computer-use.md section 8.3).", "type": "string"},
+      "paused_ms": {"description": "Milliseconds the session was paused while the screen was locked.", "type": "integer"},
+      "action_count": {"description": "Number of actions of the agent.", "type": "integer"},
+      "front_app": {"description": "Identity of the last frontmost app.", "type": "string"}
+    }
+  }
+}

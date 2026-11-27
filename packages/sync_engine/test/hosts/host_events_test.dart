@@ -153,6 +153,80 @@ void main() {
     },
   );
 
+  test('computer_session.changed reaches the hub with state, count and close reason', () async {
+    Map<String, Object?> computer(String state, {String? reason}) => {
+      'id': sessionId(9),
+      'host_id': hostId(1),
+      'desktop': 'Desk',
+      'user_id': alexId,
+      'agent_id': id(0x700),
+      'run_id': id(0x701),
+      'state': state,
+      'pause_reason': ?(state == 'paused' ? 'locked' : null),
+      'generation': 2,
+      'key_generation': 1,
+      'opened_at': at,
+      'paused_ms': 0,
+      'close_reason': ?reason,
+      'close_detail': ?(reason == 'stopped_by_user' ? 'client_stop' : null),
+      'action_count': 7,
+      'front_app': 'com.example.editor',
+      'version': state == 'closed' ? 5 : 4,
+    };
+    await w.dispatch([
+      envelope(
+        'computer_session.changed',
+        seq: 31,
+        payload: computer('paused'),
+        resourceKind: 'computer_session',
+        resourceId: sessionId(9),
+        version: 4,
+        personal: true,
+      ),
+      envelope(
+        'computer_session.changed',
+        seq: 32,
+        payload: computer('closed', reason: 'stopped_by_user'),
+        resourceKind: 'computer_session',
+        resourceId: sessionId(9),
+        version: 5,
+        personal: true,
+      ),
+    ]);
+    expect(events, [
+      ComputerSessionChanged(
+        sessionId: sessionId(9),
+        hostId: hostId(1),
+        runId: id(0x701),
+        userId: alexId,
+        desktop: 'Desk',
+        state: 'paused',
+        version: 4,
+        actionCount: 7,
+        pauseReason: 'locked',
+        frontApp: 'com.example.editor',
+      ),
+      ComputerSessionChanged(
+        sessionId: sessionId(9),
+        hostId: hostId(1),
+        runId: id(0x701),
+        userId: alexId,
+        desktop: 'Desk',
+        state: 'closed',
+        version: 5,
+        actionCount: 7,
+        frontApp: 'com.example.editor',
+        closeReason: 'stopped_by_user',
+        closeDetail: 'client_stop',
+      ),
+    ]);
+    // R-CL-18: the app identity and the desktop's name stay out of every log line.
+    for (final e in events) {
+      expect(e.toString(), isNot(contains('com.example.editor')));
+      expect(e.toString(), isNot(contains('Desk')));
+    }
+  });
+
   test(
     'access.changed of kind host signals the removed and the added hosts',
     () async {
@@ -211,13 +285,14 @@ void main() {
     },
   );
 
-  test(
-    'host.updated and terminal_session.changed are applied, not skipped',
-    () {
-      expect(
-        appliedEventTypes,
-        containsAll(['host.updated', 'terminal_session.changed']),
-      );
-    },
-  );
+  test('host.updated, terminal_session.changed and computer_session.changed are applied', () {
+    expect(
+      appliedEventTypes,
+      containsAll([
+        'host.updated',
+        'terminal_session.changed',
+        'computer_session.changed',
+      ]),
+    );
+  });
 }

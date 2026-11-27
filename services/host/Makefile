@@ -14,14 +14,15 @@ endif
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-builtin-rules --no-print-directory
 
-.PHONY: help release-build release-apple release-windows trial-apple recordings platform-bundle platform-test
+.PHONY: help release-build release-apple release-windows trial-apple helper-macos helper-sign-macos helper-package-macos helper-package-windows recordings platform-bundle platform-test computer-mcp-e2e
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # The release of the component host (brief M7-23, docs/spec/18-release.md 2 and 6): the steps live in
 # tools/distribution/hostdist.py, run with the pinned Python environment of tools/ and nfpm of
-# tools/bin/tools.lock.json. release-build writes the five release binaries without cgo
+# tools/bin/tools.lock.json. release-build writes the five release binaries of bothy-host and the
+# five of bothy-computer-mcp (docs/spec/27-computer-use.md C1, CU-05) without cgo
 # (docs/DECISIONS.md D-M2-38-6) and the .deb and .rpm packages of infra/host/linux; release.yml
 # signs them with SBOMs and SHA256SUMS. release-apple (macOS, environment release-apple) and
 # release-windows (environment release-windows) sign and package the .pkg and the MSI; the trials
@@ -47,6 +48,33 @@ release-windows: ## Signed MSI (Windows, release.yml calls hostdist.py directly)
 trial-apple: ## The macOS package chain with a test publisher, installed on this machine (disposable CI runner only): make trial-apple OUT=<dir>
 	@[ -n "$${OUT:-}" ] || { echo "usage: make trial-apple OUT=<dir>"; exit 2; }
 	@mkdir -p "$$OUT" && $(HOSTDIST) apple-trial --out "$$(cd "$$OUT" && pwd)"
+
+# The computer helper (brief CU-02, docs/decisions.d/CU-01.md D-CU-01-29 and CU-02.md D-CU-02-10):
+# never published, signed and packaged on the owner's own machines. helper-macos assembles the app
+# bundle (a development build, signed ad hoc); helper-sign-macos signs it with a Developer ID
+# Application identity of the login keychain, so on a Mac whose keychain is open only in the GUI
+# session it runs as a one-shot job there (services/host/desktop/README.md); helper-package-macos
+# builds the host .pkg with the helper as an optional choice. The Windows steps run on the owner's
+# Windows computer through hostdist.py (helper-cert-windows, helper-sign-windows) or this target.
+HELPER_OUT ?= $(CURDIR)/.helper
+
+helper-macos: ## Build the macOS computer helper bundle (development build): make helper-macos [OUT=<dir>]
+	@out="$${OUT:-$(HELPER_OUT)}"; mkdir -p "$$out" && bash desktop/macos/bundle.sh "$$(cd "$$out" && pwd)" "$$(tr -d '[:space:]' < VERSION)"
+
+helper-sign-macos: ## Sign the helper with a Developer ID: make helper-sign-macos APP=<.app> SIGN_IDENTITY=<name> REQUIREMENT_FILE=<file> [KEYCHAIN=<file>]
+	@[ -n "$${APP:-}" ] && [ -n "$${SIGN_IDENTITY:-}" ] && [ -n "$${REQUIREMENT_FILE:-}" ] || { echo "usage: make helper-sign-macos APP=<.app> SIGN_IDENTITY=<name> REQUIREMENT_FILE=<file>"; exit 2; }
+	@$(HOSTDIST) helper-sign-macos --app "$$APP" --identity "$$SIGN_IDENTITY" --requirement-file "$$REQUIREMENT_FILE" $${KEYCHAIN:+--keychain "$$KEYCHAIN"}
+
+helper-package-macos: ## Host .pkg with the helper as an optional choice: make helper-package-macos APP=<.app> OUT=<dir> [REQUIREMENT_FILE=<file>]
+	@[ -n "$${APP:-}" ] && [ -n "$${OUT:-}" ] || { echo "usage: make helper-package-macos APP=<.app> OUT=<dir>"; exit 2; }
+	@mkdir -p "$$OUT" && $(HOSTDIST) helper-package-macos --version "$$(tr -d '[:space:]' < VERSION)" --out "$$(cd "$$OUT" && pwd)" --app "$$APP" $${REQUIREMENT_FILE:+--requirement-file "$$REQUIREMENT_FILE"}
+
+helper-package-windows: ## Host MSI with the helper feature (Windows): make helper-package-windows HELPER=<exe> OUT=<dir> [THUMBPRINT=<sha1>]
+	@[ -n "$${HELPER:-}" ] && [ -n "$${OUT:-}" ] || { echo "usage: make helper-package-windows HELPER=<exe> OUT=<dir> [THUMBPRINT=<sha1>]"; exit 2; }
+	@mkdir -p "$$OUT" && $(HOSTDIST) helper-package-windows --version "$$(tr -d '[:space:]' < VERSION)" --out "$$(cd "$$OUT" && pwd)" --helper "$$HELPER" --thumbprint "$${THUMBPRINT:-}"
+
+computer-mcp-e2e: ## End-to-end test of bothy-computer-mcp with the Linux test backend in a throwaway container (needs Docker)
+	test/computermcp/run.sh
 
 recordings: ## Rewrite testdata/noise/recordings/go.json, testdata/noise/fingerprint.json and testdata/control/host_frames.json
 	UPDATE_RECORDINGS=1 GOTOOLCHAIN=local go test -count=1 -run 'TestRecordingsCurrent|TestFingerprintFileCurrent|TestHostFramesRecordingCurrent' ./internal/noise ./internal/fingerprint ./internal/control

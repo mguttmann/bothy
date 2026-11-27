@@ -66,7 +66,8 @@ var (
 )
 
 // Frame is one decoded frame. Only the fields of its type are set: Cols and Rows for start and
-// resize, Data for data, ExitCode for exit.
+// resize, Data for data and for the computer types (the JSON body or the image bytes), ExitCode for
+// exit.
 type Frame struct {
 	Type       Type
 	Cols, Rows uint16
@@ -104,6 +105,7 @@ func (f Frame) IsInput() bool {
 
 // allowedFrom reports whether sender may send frames of type t (docs/spec/24-terminal.md 5.4).
 func allowedFrom(t Type, from Sender) bool {
+	//exhaustive:ignore // The computer types have their own directions (computerFrom).
 	switch t {
 	case TypeStart, TypeResize, TypeClose:
 		return from == FromDevice
@@ -118,14 +120,43 @@ func allowedFrom(t Type, from Sender) bool {
 
 func known(t Type) bool { return t >= TypeStart && t <= TypeReplayEnd }
 
+// Kind is the kind of the session a stream belongs to; Decode accepts only the frame types of
+// that kind (docs/spec/27-computer-use.md 6.3).
+type Kind uint8
+
+// The session kinds.
+const (
+	// KindTerminal is a terminal session: the types 0x01 to 0x07 (docs/spec/24-terminal.md 5.4).
+	KindTerminal Kind = iota + 1
+	// KindComputer is a computer session: close and the types 0x20 to 0x25
+	// (docs/spec/27-computer-use.md 6.3).
+	KindComputer
+)
+
+// knownIn reports whether t is a frame type of a session of kind k.
+func knownIn(t Type, k Kind) bool {
+	switch k {
+	case KindTerminal:
+		return known(t)
+	case KindComputer:
+		return t == TypeClose || knownComputer(t)
+	default:
+		return false
+	}
+}
+
 // Encode returns the bytes of f. It checks the body rules of f.Type (fields of other types
 // must be zero) and the size limit; errors wrap ErrUnknownType, ErrMalformed or ErrTooLong.
 // Encode does not check the direction: the caller sends only its own frame types.
 func Encode(f Frame) ([]byte, error) {
+	if knownComputer(f.Type) {
+		return encodeComputer(f)
+	}
 	if !known(f.Type) {
 		return nil, fmt.Errorf("frame: encode type 0x%02x: %w", byte(f.Type), ErrUnknownType)
 	}
 	hasSize, hasData, hasExit := f.Cols != 0 || f.Rows != 0, len(f.Data) != 0, f.ExitCode != 0
+	//exhaustive:ignore // The computer types are encoded by encodeComputer before this switch.
 	switch f.Type {
 	case TypeStart, TypeResize:
 		if f.Cols == 0 || f.Rows == 0 || hasData || hasExit {
@@ -158,7 +189,7 @@ func encodeData(f Frame, otherFields bool) ([]byte, error) {
 	if len(f.Data) == 0 || otherFields {
 		return nil, encodeMalformed(f.Type)
 	}
-	if 1+len(f.Data) > MaxLen {
+	if len(f.Data) >= MaxLen {
 		return nil, fmt.Errorf("frame: encode type 0x%02x: %d bytes, limit %d: %w", byte(f.Type), 1+len(f.Data), MaxLen, ErrTooLong)
 	}
 	out := make([]byte, 1+len(f.Data))
@@ -171,12 +202,15 @@ func encodeMalformed(t Type) error {
 	return fmt.Errorf("frame: encode type 0x%02x: fields against the body rules: %w", byte(t), ErrMalformed)
 }
 
-// Decode parses one frame sent by from. The returned Data aliases b, so the caller must not
-// change b while it uses the frame. Errors wrap ErrEmpty (no bytes), ErrTooLong (more than
-// MaxLen bytes), ErrUnknownType (type byte outside 0x01 to 0x07), ErrWrongDirection (a known
-// type from the wrong side) or ErrMalformed (a body against the rules); their text names the
-// type byte and lengths, never body bytes.
-func Decode(b []byte, from Sender) (Frame, error) {
+// Decode parses one frame of a session of kind k sent by from. The returned Data aliases b, so the
+// caller must not change b while it uses the frame. Errors wrap ErrEmpty (no bytes), ErrTooLong
+// (more than MaxLen bytes), ErrUnknownType (a type byte that is no type of kind k: on a terminal
+// session everything outside 0x01 to 0x07, on a computer session everything except close and 0x20
+// to 0x25), ErrWrongDirection (a known type from the wrong side) or ErrMalformed (a body against the
+// rules); their text names the type byte and lengths, never body bytes.
+//
+// Example: Decode(pt, KindComputer, FromDevice) for a message of bothy-computer-mcp.
+func Decode(b []byte, k Kind, from Sender) (Frame, error) {
 	if len(b) == 0 {
 		return Frame{}, fmt.Errorf("frame: decode: %w", ErrEmpty)
 	}
@@ -184,17 +218,21 @@ func Decode(b []byte, from Sender) (Frame, error) {
 		return Frame{}, fmt.Errorf("frame: decode: %d bytes, limit %d: %w", len(b), MaxLen, ErrTooLong)
 	}
 	t, body := Type(b[0]), b[1:]
-	if !known(t) {
+	if !knownIn(t, k) {
 		return Frame{}, fmt.Errorf("frame: decode type 0x%02x: %w", byte(t), ErrUnknownType)
 	}
-	if !allowedFrom(t, from) {
+	if !allowedFrom(t, from) && !computerFrom(t, from) {
 		return Frame{}, fmt.Errorf("frame: decode type 0x%02x from %s: %w", byte(t), from, ErrWrongDirection)
+	}
+	if knownComputer(t) {
+		return decodeComputer(t, body)
 	}
 	return decodeBody(t, body)
 }
 
 // decodeBody applies the body rules of a known type.
 func decodeBody(t Type, body []byte) (Frame, error) {
+	//exhaustive:ignore // The computer types are decoded by decodeComputer before this switch.
 	switch t {
 	case TypeStart, TypeResize:
 		if len(body) != sizeBodyLen {

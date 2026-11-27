@@ -74,6 +74,46 @@
         "close_reason": "process_exited",
         "exit_code": 0
       }
+    },
+    {
+      "op": "computer.started",
+      "d": {
+        "session_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10",
+        "state": "active"
+      }
+    },
+    {
+      "op": "computer.state",
+      "d": {
+        "session_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10",
+        "state": "paused",
+        "reason": "locked",
+        "action_count": 4,
+        "front_app": {
+          "id": "com.example.editor",
+          "name": "Editor",
+          "signer": "ABCDE12345"
+        }
+      }
+    },
+    {
+      "op": "computer.ended",
+      "d": {
+        "session_id": "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10",
+        "close_reason": "stopped_by_user",
+        "close_detail": "local_escape",
+        "action_counts": {
+          "left_click": 3
+        },
+        "apps": [
+          {
+            "id": "com.example.editor",
+            "name": "Editor",
+            "signer": "ABCDE12345"
+          }
+        ],
+        "paused_ms": 1500
+      }
     }
   ]
 }

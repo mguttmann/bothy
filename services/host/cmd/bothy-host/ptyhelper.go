@@ -55,7 +55,7 @@ func cmdPtyHelper(ctx context.Context, args []string, _, stderr io.Writer) int {
 	if *owner {
 		return serveOwnerPtyHelper(ctx, *name, stderr)
 	}
-	body := func(ctx context.Context, _ bool) int { return servePtyHelper(ctx, *name, stderr) }
+	body := func(ctx context.Context, _ bool) int { return servePtyHelper(ctx, *name, serviceStderr(stderr)) }
 	if code, ok := serviceMode(body); ok {
 		return code
 	}
@@ -102,7 +102,7 @@ func serveHelperAs(ctx context.Context, name string, svc hostos.Account, listen 
 	}
 	l, err := listen()
 	if err != nil {
-		_, _ = io.WriteString(stderr, "bothy-host pty-helper: no channel endpoint\n")
+		_, _ = io.WriteString(stderr, "bothy-host pty-helper: no channel endpoint: "+err.Error()+"\n")
 		return exitFailed
 	}
 	env := doctor.HelperEnv{GOOS: sys.goos, Self: self, Users: users, Security: sec, Resolver: hostos.OSResolver{}, Files: hostos.OSLister{},
@@ -115,7 +115,7 @@ func serveHelperAs(ctx context.Context, name string, svc hostos.Account, listen 
 	defer func() { _ = sup.Close() }()
 	sess := &helper.SessionEnv{Check: env, Profiles: penv, PTY: sup, Log: sys.log(stderr)}
 	if err := helper.Serve(ctx, helper.Options{Listener: l, ServiceUID: svc.ID, Env: env, Session: sess}); err != nil {
-		_, _ = io.WriteString(stderr, "bothy-host pty-helper: channel closed\n")
+		_, _ = io.WriteString(stderr, "bothy-host pty-helper: channel closed: "+err.Error()+"\n")
 		return exitFailed
 	}
 	return exitOK

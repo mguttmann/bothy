@@ -44,6 +44,10 @@ func (s *Service) HandleSignal(ctx context.Context, sig domain.Signal) {
 		s.onSessionOpen(ctx, sig)
 	case domain.SignalHostClose:
 		s.onHostClose(ctx, sig.HostID)
+	case domain.SignalComputerOpen:
+		s.onComputerOpen(ctx, sig)
+	case domain.SignalComputerDisable:
+		s.onComputerDisable(ctx, sig.HostID)
 	case domain.SignalHostPresent, domain.SignalHostGone, domain.SignalSessionPaired:
 		// The hub's own kinds: presence and pairing need no row.
 	}

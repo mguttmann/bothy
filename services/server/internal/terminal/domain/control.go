@@ -233,6 +233,10 @@ type ListedSession struct {
 type SessionClose struct {
 	SessionID ids.ID
 	Reason    CloseReason
+	// Computer marks a computer session (CU-04): the frame is computer.close with ComputerReason
+	// instead of session.close.
+	Computer       bool
+	ComputerReason ComputerCloseReason
 }
 
 // Reconciliation is the effect of live_sessions: the open sessions that end with host_restarted
@@ -290,6 +294,9 @@ type Report struct {
 	IsServerHost        bool
 	RequireLocalConfirm bool
 	OSVersion           string
+	// Computer is the object computer of the report (CU-04, 27 12.3); nil when the host service
+	// reports none.
+	Computer *ReportedComputer
 }
 
 // doctorChecks are the checks HD1 to HD11 (HostDoctorCheck.check), in order.
@@ -319,6 +326,9 @@ func ValidateReport(r Report, lim ReportLimits) []errs.FieldError {
 	out = append(out, checkDoctor(r.Doctor, lim)...)
 	if r.OSVersion != "" {
 		out = appendText(out, "/os_version", "os_version", r.OSVersion, lim.LabelMaxChars)
+	}
+	if r.Computer != nil {
+		out = append(out, ValidateComputer(*r.Computer, ComputerLimits{OSUserMaxChars: lim.OSUserMaxChars, LabelMaxChars: lim.LabelMaxChars})...)
 	}
 	return out
 }
@@ -374,6 +384,8 @@ func checkEntry(c DoctorCheck, prefix string, lim ReportLimits) []errs.FieldErro
 // and the session user names added and removed (exact comparison, ascending).
 type ReportDiff struct {
 	Profiles, SessionUsers, Doctor, IsServerHost, RequireLocalConfirm, OSVersion bool
+	// Computer reports a change of the reported computer object (CU-04), audited on its own.
+	Computer bool
 	// ServerHostBefore and ServerHostAfter are the stored and the reported flag.
 	ServerHostBefore, ServerHostAfter bool
 	Added, Removed                    []string
@@ -388,6 +400,7 @@ func DiffReport(h Host, r Report) ReportDiff {
 		Doctor: !slices.Equal(h.Doctor, nonNil(r.Doctor)), IsServerHost: h.ReportedIsServerHost == nil || *h.ReportedIsServerHost != r.IsServerHost,
 		RequireLocalConfirm: h.RequireLocalConfirm == nil || *h.RequireLocalConfirm != r.RequireLocalConfirm,
 		OSVersion:           h.OSVersion != r.OSVersion, ServerHostAfter: r.IsServerHost,
+		Computer: !SameComputer(h.ReportedComputer, r.Computer),
 	}
 	if h.ReportedIsServerHost != nil {
 		d.ServerHostBefore = *h.ReportedIsServerHost
@@ -409,7 +422,7 @@ func nonNil[T any](list []T) []T {
 
 // Changed reports a report that writes anything.
 func (d ReportDiff) Changed() bool {
-	return d.Profiles || d.SessionUsers || d.Doctor || d.IsServerHost || d.RequireLocalConfirm || d.OSVersion
+	return d.Profiles || d.SessionUsers || d.Doctor || d.IsServerHost || d.RequireLocalConfirm || d.OSVersion || d.Computer
 }
 
 // Audit reports a report that host.connect audits: a change of the server-host flag, the check

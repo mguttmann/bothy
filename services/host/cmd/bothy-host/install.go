@@ -107,6 +107,7 @@ func installHost(ctx context.Context, c *config.Config, exists bool, extra []str
 		_, _ = fmt.Fprintf(stderr, "bothy-host install: %v\n", err)
 		return exitFailed
 	}
+	tg.ComputerUse = c.ComputerUse
 	steps, err := install.Install(tg, all)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "bothy-host install: %v\n", err)

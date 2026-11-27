@@ -12030,4 +12030,152 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get adminAppChangeConsentBody =>
       'Wähle, was die App nutzen darf und welche Ereignisse sie erhält; erforderliche Punkte bleiben an.';
+
+  @override
+  String computerChipOpening(String desktop) {
+    return 'Verbinde mit $desktop';
+  }
+
+  @override
+  String computerChipActive(String desktop, String app, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Aktionen',
+      one: '1 Aktion',
+    );
+    return 'Steuert $desktop · $app · $_temp0';
+  }
+
+  @override
+  String computerChipActiveNoApp(String desktop, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Aktionen',
+      one: '1 Aktion',
+    );
+    return 'Steuert $desktop · $_temp0';
+  }
+
+  @override
+  String computerChipLocked(String desktop) {
+    return '$desktop gesperrt, wartet';
+  }
+
+  @override
+  String computerChipEnded(String desktop, String reason) {
+    return 'Computer-Steuerung von $desktop beendet: $reason';
+  }
+
+  @override
+  String computerCloseReason(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'done': 'Erledigt',
+      'stopped_by_user': 'Gestoppt',
+      'device_disabled': 'Erlaubnis ausgeschaltet',
+      'run_ended': 'Lauf beendet',
+      'access_revoked': 'Zugriff entzogen',
+      'host_disabled': 'Rechner deaktiviert',
+      'host_retired': 'Rechner stillgelegt',
+      'host_rekeyed': 'Rechner neu gekoppelt',
+      'host_restarted': 'Host-Dienst neu gestartet',
+      'connection_lost': 'Verbindung verloren',
+      'open_failed': 'Start fehlgeschlagen',
+      'error': 'Fehler',
+      'other': 'Beendet',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get computerStop => 'Stoppen';
+
+  @override
+  String computerStopLabel(String desktop) {
+    return 'Computer-Steuerung von $desktop stoppen';
+  }
+
+  @override
+  String computerStopFailed(String problem) {
+    return 'Computer-Steuerung konnte nicht gestoppt werden: $problem';
+  }
+
+  @override
+  String get computerDismiss => 'Ausblenden';
+
+  @override
+  String get computerDesktopTitle => 'Computer-Steuerung';
+
+  @override
+  String get computerEnabled => 'Auf diesem Desktop erlaubt';
+
+  @override
+  String get computerNotEnabled => 'Nicht erlaubt';
+
+  @override
+  String get computerDisabledRemotely => 'Von einem Client ausgeschaltet';
+
+  @override
+  String computerHelperState(String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'absent': 'Kein Computer-Helfer verbunden',
+      'refused': 'Der Computer-Helfer wurde abgewiesen',
+      'other': 'Computer-Helfer verbunden',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String computerOsAccount(String account) {
+    return 'Konto: $account';
+  }
+
+  @override
+  String computerPermissions(String capture, String input) {
+    return 'Bildschirmaufnahme: $capture, Eingabe: $input';
+  }
+
+  @override
+  String computerPermission(String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'granted': 'erteilt',
+      'denied': 'verweigert',
+      'other': 'unbekannt',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get computerLocked => 'Der Bildschirm ist gesperrt';
+
+  @override
+  String get computerLiveSession => 'Ein Agent steuert diesen Desktop';
+
+  @override
+  String get computerDisable => 'Erlaubnis ausschalten';
+
+  @override
+  String computerDisableLabel(String desktop) {
+    return 'Computer-Steuerung von $desktop ausschalten';
+  }
+
+  @override
+  String get computerOnlyLocal =>
+      'Einschalten geht nur am Gerät selbst, mit \"Computer-Steuerung erlauben\" im Computer-Helfer.';
+
+  @override
+  String computerDisableFailed(String problem) {
+    return 'Erlaubnis konnte nicht ausgeschaltet werden: $problem';
+  }
+
+  @override
+  String computerDisabledDone(String desktop) {
+    return 'Computer-Steuerung von $desktop ist ausgeschaltet.';
+  }
+
+  @override
+  String trayComputerStop(String desktops) {
+    return 'Computer-Steuerung stoppen ($desktops)';
+  }
 }

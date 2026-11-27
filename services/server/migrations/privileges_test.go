@@ -131,6 +131,9 @@ var appPrivileges = map[string][]string{
 	"hosts":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"host_session_users": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"terminal_sessions":  {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 section 4.14 (CU-04): computer sessions are security history, deleted by the retention
+	// participant of the terminal module.
+	"computer_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 messages and mentions (M1-56): a deleted message stays as a tombstone (03 principle 7);
 	// editing replaces the mentions of a message and deleting removes them.
 	"messages": {"SELECT", "INSERT", "UPDATE"},

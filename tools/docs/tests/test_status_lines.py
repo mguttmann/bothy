@@ -47,9 +47,11 @@ FOLDER_READMES = ("services/server/README.md", "apps/README.md", "packages/READM
 TOP = 15
 
 _STATUS = re.compile(r"^Status:[ \t]*(?P<body>.*?)(?=\n[ \t]*\n|\Z)", re.MULTILINE | re.DOTALL)
-_REF = re.compile(r"\b(?P<milestone>M\d|V\d|A\d|AR)(?:-\d+[a-z]?)?\b")
+_REF = re.compile(r"\b(?P<milestone>M\d|V\d|A\d|AR|CU)(?:-\d+[a-z]?)?\b")
 _RANGE = re.compile(r"\b(?P<letter>[MV])(?P<low>\d) to (?P=letter)(?P<high>\d)\b")
-_ROW = re.compile(r"^\| *(?P<id>M\d|V\d|A\d|AR) [^|]*\|.*\| *(?P<state>[^|]+?) *\|$", re.MULTILINE)
+_ROW = re.compile(
+    r"^\| *(?P<id>M\d|V\d|A\d|AR|CU) [^|]*\|.*\| *(?P<state>[^|]+?) *\|$", re.MULTILINE
+)
 
 
 def status_of(text: str) -> str | None:
@@ -209,6 +211,11 @@ def test_milestones_are_read_from_tickets_and_ranges() -> None:
     assert milestones("(M1 to M3, M7-27, A1-06)") == ["A1", "M1", "M2", "M3", "M7"]
     assert milestones("(V2)") == ["V2"]
     assert milestones("of 2026-11-06 for FEAT-x") == []
+
+
+def test_stage_cu_is_read() -> None:
+    """A status line of stage CU (computer use, PLAN section 23) names its stage."""
+    assert milestones("(CU, CU-04)") == ["CU"]
 
 
 def test_the_roadmap_table_is_read() -> None:

@@ -196,6 +196,7 @@ export 'src/hints/access_list.dart' show AccessListView;
 export 'src/hints/expiring_access_view.dart';
 export 'src/hints/hint_texts.dart';
 export 'src/hints/permission_hints_view.dart';
+export 'src/hosts/computer_section.dart';
 export 'src/hosts/create_host_dialog.dart';
 export 'src/hosts/doctor_results.dart';
 export 'src/hosts/fingerprint_confirm.dart';

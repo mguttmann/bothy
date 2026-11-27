@@ -6,6 +6,14 @@
 # 2025 (the label `windows-2025`). No job runs on Windows 10 or Windows 11, so both stay
 # unmeasured (docs/decisions.d/AUD-misc-testing-01.md, "Open"). Manual or scheduled; a required
 # gate before M2-48. The result file of each platform is kept as an artifact.
+#
+# The computer helpers (brief CU-02, docs/spec/27-computer-use.md 9 and 16): the jobs helper-macos
+# and helper-windows build them, run their unit tests, build the host package with the optional
+# helper component and install it, then probe whether the hosted runner lets a helper capture the
+# screen and inject input (tools/ci/computer_probe.py with a fixture window and a fake host). The
+# probe records and never fails; the native jobs run the same steps as a test only where the probe
+# of their platform passed, and skip with a notice otherwise. They also run for a pull request that
+# changes the helpers, their packages or the probe; the platform suite does not.
 
 name: host-platform
 
@@ -13,6 +21,14 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * 1"
+  pull_request:
+    paths:
+      - "services/host/desktop/**"
+      - "infra/host/**"
+      - "tools/ci/computer_probe.py"
+      - "tools/ci/computer_fixture.py"
+      - "tools/distribution/hostdist.py"
+      - ".github/workflows/host-platform.yml"
 
 permissions:
   contents: read
@@ -24,7 +40,7 @@ concurrency:
 jobs:
   platform:
     name: platform suite (${{ matrix.os }})
-    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
@@ -139,4 +155,248 @@ jobs:
           path: |
             services/host/.platform/result-*.json
             /opt/bothy-platform/result-*.json
+          if-no-files-found: warn
+
+  helper-macos:
+    name: computer helper (macOS)
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: macos-15
+    timeout-minutes: 45
+    outputs:
+      capture: ${{ steps.probe.outputs.capture }}
+      input: ${{ steps.probe.outputs.input }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.7"
+      - name: Unit tests (XCTest, fakes and channel vectors)
+        shell: bash
+        run: cd services/host/desktop/macos && swift test
+      - name: Build the app bundle (development build, ad hoc signature)
+        shell: bash
+        run: make -C services/host helper-macos OUT="$RUNNER_TEMP/helper"
+      # Two installs of the same package: without the choice nothing of the helper arrives and the
+      # configuration stays untouched; with it the helper, its LaunchAgent and computer_use do.
+      - name: Package with the optional helper and install it
+        shell: bash
+        run: |
+          app="$RUNNER_TEMP/helper/bothy-computer-helper.app"
+          make -C services/host helper-package-macos APP="$app" OUT="$RUNNER_TEMP/pkg"
+          pkg="$(ls "$RUNNER_TEMP"/pkg/bothy-host-computer_*_darwin_*.pkg)"
+          base="/Library/Application Support/bothy-host"
+          sudo installer -pkg "$pkg" -target /
+          test -x "$base/bin/bothy-host"
+          if [ -e "$base/bin/bothy-computer-helper.app" ] || [ -e "$base/config.yaml" ]; then echo "the helper arrived without its choice"; exit 1; fi
+          printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><array><dict><key>attributeSetting</key><integer>1</integer>' \
+            '<key>choiceAttribute</key><string>selected</string><key>choiceIdentifier</key>' \
+            '<string>computer-helper</string></dict></array></plist>' > "$RUNNER_TEMP/choices.plist"
+          sudo installer -pkg "$pkg" -target / -applyChoiceChangesXML "$RUNNER_TEMP/choices.plist"
+          test -x "$base/bin/bothy-computer-helper.app/Contents/MacOS/bothy-computer-helper"
+          [ "$(stat -f '%Su:%Sg' "$base/bin/bothy-computer-helper.app")" = root:wheel ]
+          [ "$(stat -f '%Su:%Sg %Lp' /Library/LaunchAgents/com.example.bothy-computer-helper.plist)" = "root:wheel 644" ]
+          grep -qx '  computer_use: true' "$base/config.yaml"
+          sudo launchctl bootout "gui/$(id -u)/com.example.bothy-computer-helper" 2>/dev/null || true
+      # The hosted image may let a provisioning step grant screen recording and input to an app;
+      # the helper never grants itself anything (27 9.1). What the runner refuses is recorded.
+      - name: Grant the probe its permissions where the runner allows it
+        shell: bash
+        run: |
+          now="$(date +%s)"
+          for db in "/Library/Application Support/com.apple.TCC/TCC.db" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"; do
+            for svc in kTCCServiceScreenCapture kTCCServiceAccessibility kTCCServicePostEvent kTCCServiceListenEvent; do
+              if sudo sqlite3 "$db" "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version, indirect_object_identifier, flags, last_modified) VALUES ('$svc', 'com.example.bothy-computer-helper', 0, 2, 4, 1, 'UNUSED', 0, $now);"; then
+                echo "granted $svc in $db"
+              else
+                echo "refused $svc in $db"
+              fi
+            done
+          done
+      - name: Probe capture and input
+        id: probe
+        shell: bash
+        run: |
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode probe \
+            --helper "$RUNNER_TEMP/helper/bothy-computer-helper.app" \
+            --out "$RUNNER_TEMP/probe/probe-macos.json" --github-output "$GITHUB_OUTPUT"
+      - name: Notice when the probe failed
+        if: steps.probe.outputs.capture != 'true' || steps.probe.outputs.input != 'true'
+        shell: bash
+        run: echo "::notice title=computer helper (macOS)::the hosted runner did not allow capture and input; the native job skips (docs/spec/27-computer-use.md 16)"
+      - name: Keep the probe result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: computer-probe-macos
+          path: ${{ runner.temp }}/probe/
+          if-no-files-found: warn
+
+  helper-macos-native:
+    name: computer helper native test (macOS)
+    needs: helper-macos
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && needs.helper-macos.outputs.capture == 'true' && needs.helper-macos.outputs.input == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.7"
+      - name: Build the app bundle (development build, ad hoc signature)
+        shell: bash
+        run: make -C services/host helper-macos OUT="$RUNNER_TEMP/helper"
+      - name: Grant the permissions as in the probe
+        shell: bash
+        run: |
+          now="$(date +%s)"
+          for db in "/Library/Application Support/com.apple.TCC/TCC.db" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"; do
+            for svc in kTCCServiceScreenCapture kTCCServiceAccessibility kTCCServicePostEvent kTCCServiceListenEvent; do
+              sudo sqlite3 "$db" "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version, indirect_object_identifier, flags, last_modified) VALUES ('$svc', 'com.example.bothy-computer-helper', 0, 2, 4, 1, 'UNUSED', 0, $now);" || true
+            done
+          done
+      - name: Click, type, keys and image against the fixture window
+        shell: bash
+        run: |
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode native \
+            --helper "$RUNNER_TEMP/helper/bothy-computer-helper.app" --out "$RUNNER_TEMP/probe/native-macos.json"
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: computer-native-macos
+          path: ${{ runner.temp }}/probe/
+          if-no-files-found: warn
+
+  helper-windows:
+    name: computer helper (Windows)
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: windows-2025
+    timeout-minutes: 45
+    outputs:
+      capture: ${{ steps.probe.outputs.capture }}
+      input: ${{ steps.probe.outputs.input }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/host/go.mod
+          cache: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.7"
+      # The development build has no uiAccess: Windows starts a uiAccess executable only when it
+      # is signed by a trusted root and lies in a protected folder, which the package step below
+      # proves with the uiAccess build.
+      - name: Build (MSVC) and unit tests (CTest, fakes and channel vectors)
+        shell: bash
+        run: |
+          version="$(tr -d '[:space:]' < services/host/VERSION)"
+          cmake -S services/host/desktop/windows -B "$RUNNER_TEMP/dev" -A x64 -DHELPER_VERSION="$version" -DHELPER_UIACCESS=OFF
+          cmake --build "$RUNNER_TEMP/dev" --config Release
+          ctest --test-dir "$RUNNER_TEMP/dev" -C Release --output-on-failure
+          cmake -S services/host/desktop/windows -B "$RUNNER_TEMP/ui" -A x64 -DHELPER_VERSION="$version" -DHELPER_UIACCESS=ON
+          cmake --build "$RUNNER_TEMP/ui" --config Release --target bothy-computer-helper
+      # The steps of the owner's Windows computer (D-CU-01-29) on a disposable runner: the
+      # machine certificate, the signature, the MSI with the feature, an install without and one
+      # with the feature, and a start of the signed uiAccess helper from Program Files.
+      - name: Certificate, signature, package and install
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content services/host/VERSION -Raw).Trim()
+          $hostdist = 'tools/distribution/hostdist.py'
+          $thumb = (uv run --project tools --locked --quiet python $hostdist helper-cert-windows | Select-Object -Last 1).Trim()
+          $exe = Join-Path $env:RUNNER_TEMP 'ui\Release\bothy-computer-helper.exe'
+          uv run --project tools --locked --quiet python $hostdist helper-sign-windows --exe $exe --thumbprint $thumb
+          if ($LASTEXITCODE -ne 0) { throw 'helper-sign-windows failed' }
+          uv run --project tools --locked --quiet python $hostdist helper-package-windows --version $version --out (Join-Path $env:RUNNER_TEMP 'msi') --helper $exe --thumbprint $thumb
+          if ($LASTEXITCODE -ne 0) { throw 'helper-package-windows failed' }
+          $msi = (Get-ChildItem (Join-Path $env:RUNNER_TEMP 'msi') -Filter 'bothy-host-computer_*.msi').FullName
+          $dir = Join-Path $env:ProgramFiles 'bothy-host'
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', $msi, '/qn', '/norestart')
+          if ($p.ExitCode -ne 0) { throw "msiexec exited with $($p.ExitCode)" }
+          if (Test-Path (Join-Path $dir 'bothy-computer-helper.exe')) { throw 'the helper arrived without its feature' }
+          if (Test-Path (Join-Path $dir 'config.yaml')) { throw 'the configuration changed without the feature' }
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', $msi, '/qn', '/norestart', 'ADDLOCAL=ComputerHelper')
+          if ($p.ExitCode -ne 0) { throw "msiexec ADDLOCAL exited with $($p.ExitCode)" }
+          $helper = Join-Path $dir 'bothy-computer-helper.exe'
+          if (-not (Test-Path $helper)) { throw 'no helper in Program Files' }
+          $run = (Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run').'bothy-computer-helper'
+          if ($run -ne ('"' + $helper + '"')) { throw "start entry $run" }
+          if (-not ((Get-Content (Join-Path $dir 'config.yaml')) -contains '  computer_use: true')) { throw 'computer_use not set' }
+          # The install action StartComputerHelper starts the helper in the console session; a
+          # second start there ends at once with 0 (one helper per session). End that one first,
+          # so the start below still proves that Windows grants uiAccess to the signed helper.
+          $started = Get-Process -Name 'bothy-computer-helper' -ErrorAction SilentlyContinue
+          if ($started) {
+            $started | Stop-Process -Force -ErrorAction SilentlyContinue
+            $started | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+            Write-Output 'the install started the helper'
+          }
+          $h = Start-Process -FilePath $helper -PassThru
+          Start-Sleep -Seconds 5
+          if ($h.HasExited) { throw "the signed uiAccess helper ended with $($h.ExitCode)" }
+          Stop-Process -Id $h.Id
+          Wait-Process -Id $h.Id -Timeout 10 -ErrorAction SilentlyContinue
+          Write-Output 'the signed uiAccess helper starts from Program Files'
+      - name: Probe capture and input
+        id: probe
+        shell: bash
+        run: |
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode probe \
+            --helper "$RUNNER_TEMP/dev/Release/bothy-computer-helper.exe" \
+            --out "$RUNNER_TEMP/probe/probe-windows.json" --github-output "$GITHUB_OUTPUT"
+      - name: Notice when the probe failed
+        if: steps.probe.outputs.capture != 'true' || steps.probe.outputs.input != 'true'
+        shell: bash
+        run: echo "::notice title=computer helper (Windows)::the hosted runner did not allow capture and input; the native job skips (docs/spec/27-computer-use.md 16)"
+      - name: Keep the probe result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: computer-probe-windows
+          path: ${{ runner.temp }}/probe/
+          if-no-files-found: warn
+
+  helper-windows-native:
+    name: computer helper native test (Windows)
+    needs: helper-windows
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && needs.helper-windows.outputs.capture == 'true' && needs.helper-windows.outputs.input == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.7"
+      - name: Build (MSVC, development build)
+        shell: bash
+        run: |
+          cmake -S services/host/desktop/windows -B "$RUNNER_TEMP/dev" -A x64 -DHELPER_VERSION="$(tr -d '[:space:]' < services/host/VERSION)" -DHELPER_UIACCESS=OFF
+          cmake --build "$RUNNER_TEMP/dev" --config Release --target bothy-computer-helper
+      - name: Click, type, keys and image against the fixture window
+        shell: bash
+        run: |
+          uv run --no-project --managed-python --python 3.14 tools/ci/computer_probe.py --mode native \
+            --helper "$RUNNER_TEMP/dev/Release/bothy-computer-helper.exe" --out "$RUNNER_TEMP/probe/native-windows.json"
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: computer-native-windows
+          path: ${{ runner.temp }}/probe/
           if-no-files-found: warn

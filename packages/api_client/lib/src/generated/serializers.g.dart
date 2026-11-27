@@ -213,6 +213,20 @@ Serializers _$serializers =
           ..add(ComponentType.serializer)
           ..add(ComponentUpdate.serializer)
           ..add(ComponentUpdateStateEnum.serializer)
+          ..add(ComputerAttachHello.serializer)
+          ..add(ComputerAttachIdentify.serializer)
+          ..add(ComputerCloseDetail.serializer)
+          ..add(ComputerCloseReason.serializer)
+          ..add(ComputerDesktop.serializer)
+          ..add(ComputerDesktopList.serializer)
+          ..add(ComputerSession.serializer)
+          ..add(ComputerSessionChangedEvent.serializer)
+          ..add(ComputerSessionChangedEventTypeEnum.serializer)
+          ..add(ComputerSessionGrant.serializer)
+          ..add(ComputerSessionList.serializer)
+          ..add(ComputerSessionOpen.serializer)
+          ..add(ComputerSessionPauseReasonEnum.serializer)
+          ..add(ComputerSessionState.serializer)
           ..add(ConsoleSession.serializer)
           ..add(ConsoleSessionStepUpMethodEnum.serializer)
           ..add(ConsoleSessionStepUpMethodsAvailableEnum.serializer)
@@ -364,6 +378,24 @@ Serializers _$serializers =
           ..add(HeartbeatStateEnum.serializer)
           ..add(Host.serializer)
           ..add(HostChannelHello.serializer)
+          ..add(HostComputer.serializer)
+          ..add(HostComputerApp.serializer)
+          ..add(HostComputerClose.serializer)
+          ..add(HostComputerDisable.serializer)
+          ..add(HostComputerEnded.serializer)
+          ..add(HostComputerEndedCloseReasonEnum.serializer)
+          ..add(HostComputerHelperEnum.serializer)
+          ..add(HostComputerOpen.serializer)
+          ..add(HostComputerPermissions.serializer)
+          ..add(HostComputerPermissionsCaptureEnum.serializer)
+          ..add(HostComputerPermissionsInputEnum.serializer)
+          ..add(HostComputerSettings.serializer)
+          ..add(HostComputerSignatureEnum.serializer)
+          ..add(HostComputerStarted.serializer)
+          ..add(HostComputerStartedStateEnum.serializer)
+          ..add(HostComputerState.serializer)
+          ..add(HostComputerStateReasonEnum.serializer)
+          ..add(HostComputerStateStateEnum.serializer)
           ..add(HostConfirm.serializer)
           ..add(HostCreate.serializer)
           ..add(HostDisabledReasonEnum.serializer)
@@ -1252,6 +1284,14 @@ Serializers _$serializers =
             () => ListBuilder<CommandOptionValue>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(ComputerDesktop)]),
+            () => ListBuilder<ComputerDesktop>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(ComputerSession)]),
+            () => ListBuilder<ComputerSession>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [
               const FullType(ConsoleSessionStepUpMethodsAvailableEnum),
             ]),
@@ -2127,6 +2167,10 @@ Serializers _$serializers =
             () => ListBuilder<int>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(int)]),
+            () => ListBuilder<int>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltMap, const [
               const FullType(String),
               const FullType(RunStep),
@@ -2150,6 +2194,17 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),
             () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType(int),
+            ]),
+            () => MapBuilder<String, int>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(HostComputerApp)]),
+            () => ListBuilder<HostComputerApp>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltMap, const [

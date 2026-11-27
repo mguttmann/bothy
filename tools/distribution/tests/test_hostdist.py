@@ -37,6 +37,9 @@ def _fake_nfpm(args: list[str], _: dict[str, Any]) -> subprocess.CompletedProces
 def test_names_and_linker_flags() -> None:
     assert hostdist.binary_name("1.2.3", "windows", "amd64") == "bothy-host_1.2.3_windows_amd64.exe"
     assert hostdist.binary_name("1.2.3", "linux", "arm64") == "bothy-host_1.2.3_linux_arm64"
+    assert hostdist.binary_name("1.2.3", "windows", "amd64", "bothy-computer-mcp") == (
+        "bothy-computer-mcp_1.2.3_windows_amd64.exe"
+    )
     assert hostdist.package_name("1.2.3", "darwin", "arm64", "pkg") == (
         "bothy-host_1.2.3_darwin_arm64.pkg"
     )
@@ -56,16 +59,22 @@ def test_build_writes_binaries_and_linux_packages(tmp_path: Path) -> None:
     written = hostdist.build(run, VERSION, tmp_path, "nfpm")
     names = [p.name for p in written]
     assert names[:5] == [hostdist.binary_name(VERSION, o, a) for o, a in hostdist.PLATFORMS]
-    assert names[5:] == [
+    assert names[5:10] == [
+        hostdist.binary_name(VERSION, o, a, "bothy-computer-mcp") for o, a in hostdist.PLATFORMS
+    ]
+    assert names[10:] == [
         hostdist.package_name(VERSION, "linux", a, k) for k, a in hostdist.LINUX_PACKAGES
     ]
     builds = [c for c in run.calls if c[:2] == ["go", "build"]]
-    assert len(builds) == 9
+    assert len(builds) == 14
     for call in builds:
         assert "-trimpath" in call
         assert "-buildvcs=false" in call
+    assert [c[-1] for c in builds] == ["./cmd/bothy-host"] * 5 + [
+        "./cmd/bothy-computer-mcp"
+    ] * 5 + ["./cmd/bothy-host"] * 4
     kinds = [_ldflags(c).rsplit("=", 1)[1] for c in builds]
-    assert kinds == ["", "", "", "", "", "deb", "deb", "rpm", "rpm"]
+    assert kinds == ["", "", "", "", "", "", "", "", "", "", "deb", "deb", "rpm", "rpm"]
     packagers = [c[c.index("--packager") + 1] for c in run.calls if c[0] == "nfpm"]
     assert packagers == ["deb", "deb", "rpm", "rpm"]
 

@@ -15,6 +15,7 @@ from ..models.llm_credentials import LlmCredentials
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.host_computer import HostComputer
     from ..models.host_doctor_check import HostDoctorCheck
     from ..models.host_profile import HostProfile
     from ..models.host_reported_session_user import HostReportedSessionUser
@@ -62,6 +63,13 @@ class Host:
         host_version (str | Unset):
         os_version (str | Unset):
         last_seen_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        computer (HostComputer | Unset): The state of the computer helper of a host (schema `host_computer.v1`,
+            docs/spec/27-computer-use.md 12.3): reported by the host service in `report.computer`, stored in
+            `hosts.reported_computer`. Never a path, a key or screen content.
+        computer_listed (bool | Unset): The host is a desktop of the reading owner (27 4 item 3); only for active
+            owners, like `computer`.
+        computer_disabled_generation (int | Unset): The enablement generation that `computer.device.disable` switched
+            off (27 4 item 4); only for active owners, absent while none was switched off remotely.
     """
 
     id: UUID
@@ -88,6 +96,9 @@ class Host:
     host_version: str | Unset = UNSET
     os_version: str | Unset = UNSET
     last_seen_at: datetime.datetime | Unset = UNSET
+    computer: HostComputer | Unset = UNSET
+    computer_listed: bool | Unset = UNSET
+    computer_disabled_generation: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -165,6 +176,14 @@ class Host:
         if not isinstance(self.last_seen_at, Unset):
             last_seen_at = self.last_seen_at.isoformat()
 
+        computer: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.computer, Unset):
+            computer = self.computer.to_dict()
+
+        computer_listed = self.computer_listed
+
+        computer_disabled_generation = self.computer_disabled_generation
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -208,11 +227,18 @@ class Host:
             field_dict["os_version"] = os_version
         if last_seen_at is not UNSET:
             field_dict["last_seen_at"] = last_seen_at
+        if computer is not UNSET:
+            field_dict["computer"] = computer
+        if computer_listed is not UNSET:
+            field_dict["computer_listed"] = computer_listed
+        if computer_disabled_generation is not UNSET:
+            field_dict["computer_disabled_generation"] = computer_disabled_generation
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        from ..models.host_computer import HostComputer
         from ..models.host_doctor_check import HostDoctorCheck
         from ..models.host_profile import HostProfile
         from ..models.host_reported_session_user import HostReportedSessionUser
@@ -318,6 +344,17 @@ class Host:
         else:
             last_seen_at = datetime.datetime.fromisoformat(_last_seen_at)
 
+        _computer = d.pop("computer", UNSET)
+        computer: HostComputer | Unset
+        if isinstance(_computer, Unset):
+            computer = UNSET
+        else:
+            computer = HostComputer.from_dict(_computer)
+
+        computer_listed = d.pop("computer_listed", UNSET)
+
+        computer_disabled_generation = d.pop("computer_disabled_generation", UNSET)
+
         host = cls(
             id=id,
             name=name,
@@ -343,6 +380,9 @@ class Host:
             host_version=host_version,
             os_version=os_version,
             last_seen_at=last_seen_at,
+            computer=computer,
+            computer_listed=computer_listed,
+            computer_disabled_generation=computer_disabled_generation,
         )
 
         host.additional_properties = d

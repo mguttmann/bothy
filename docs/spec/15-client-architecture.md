@@ -1410,6 +1410,7 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | R-CL-15 | Ephemeral Noise key per handshake only in memory; pinned host keys in the encrypted local database, in the console in the storage of the origin with deletion on logout. | The ephemeral key has no purpose after the handshake; pinning needs only the public key, which, however, must not be swappable unnoticed ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)). |
 | R-CL-16 | The pin is checked against `getHost` before opening; a mismatch is opened only after explicit confirmation with `pin_changed = true`. | The confirmation must be in the audit of the opening (24, section 5.5); after the opening it would be too late. |
 | R-CL-17 | Terminal content never leaves the view: no cache, no local database, no crash reports, no metrics with content; the app switcher image is covered. | The server sees no content; a device must not store it on the side (SEC-TERM-1). |
+| R-CL-18 | The views of computer use (status chip, desktop list, tray entry, [27-computer-use.md](27-computer-use.md) 11) show metadata only and never request, cache or show a screenshot; app identities of the status stay out of crash reports and metrics (addendum of 2026-11-26, stage CU). | The server never has a screenshot (F3); app names of the owner's desktop are personal data that a crash report would carry out. |
 
 ## 22. Configuration values of this chapter
 

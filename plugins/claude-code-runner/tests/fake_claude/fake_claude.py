@@ -32,6 +32,9 @@ former wall-clock keys, so a test cannot rest on a race between a sleep and the 
 
 Fixtures are constructed from the message shapes of the Agent SDK reference, not recorded.
 
+With ``computer`` the turn calls the MCP tools of computer use from the per-turn file of
+``--mcp-config`` before it plays the fixture (``fake_computer.py``, CU-T24).
+
 The commands of background sessions (``--bg``, ``agents``, ``stop``, ``rm``, ``daemon status``)
 are in ``fake_bg.py``.
 """
@@ -51,6 +54,7 @@ from pathlib import Path
 from typing import Any
 
 import fake_bg
+import fake_computer
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PINNED = "2.1.326"
@@ -272,6 +276,9 @@ class Fake:
         if echo_mode == "on_read":
             lines.on_line = self.echo
         lines.start()
+        if "computer" in self.scenario:
+            # The scripted agent of computer use calls its MCP tools before it answers (CU-T24).
+            fake_computer.run(self, argv)
         error = self.scenario.get("api_error")
         result: dict[str, Any] | None = None
         played = 0

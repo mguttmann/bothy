@@ -216,7 +216,7 @@ through the `Fetcher` instead.
 | `file.updated` | `files` | seq |
 | `command.changed` | `commands` (`removed` deletes) | version |
 | `instance.updated` | `instance` (reloaded with `getInstance`) | seq |
-| `host.updated`, `terminal_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST) | version |
+| `host.updated`, `terminal_session.changed`, `computer_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST; CU-07 for computer sessions) | version |
 | `status.updated` | none: announced on `statusUpdates` after the commit (M7-21, the status view reloads `getStatus`) | seq |
 | `run.wake_changed` | `run_wakes`: the state and reason of a stored wake-up at once, then the thread's list reloaded with `listThreadWakes` after the commit when the thread is stored here (AR-08; the payload carries no label or condition) | seq; the reload by version |
 | `access.changed` | `sync_state.permission_version`, removal, REST structure | seq |
@@ -747,6 +747,13 @@ the server; the form covers REST requests and durable events, not gateway frames
   agent callers.
 - `retryRun` knows no thread operator rule (09 3.4 step 4a); `operator_not_in_channel` is scripted
   with `faults.onRequest`.
+- Computer use (CU-07, `rest/computer_handlers.dart`, `world_terminal.dart`):
+  `listComputerSessions`, `stopComputerSession` and `disableComputerDevice` for owners only
+  (`403 forbidden` with `reason` `owner_only` otherwise); `getHost` and `listHosts` add `computer`, `computer_listed` and
+  `computer_disabled_generation` for owners, `host.updated` never; tests open a session with
+  `FakeWorld.openComputerSession` and report the helper with `reportComputer`. The engine turns
+  `computer_session.changed` into `ComputerSessionChanged` on the host event hub, without a
+  table.
 - Terminal (M4-36, `rest/terminal_handlers.dart`, `terminal_stream_fake.dart`,
   `world_terminal.dart`): `listTerminalSessions`, `getTerminalSession`, `openTerminalSession`
   (a grant `terminal`, the assignee, an own session user the host reports, a known profile and

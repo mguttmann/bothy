@@ -14,6 +14,7 @@ import '../common/problem_banner.dart';
 import '../data/admin_repository.dart';
 import '../data/hosts_repository.dart';
 import '../self/self_feedback.dart';
+import 'computer_section.dart';
 import 'doctor_results.dart';
 import 'host_grants_section.dart';
 import 'host_labels.dart';
@@ -27,7 +28,8 @@ import 'session_users_section.dart';
 /// fingerprint and key generation, LLM login ([LlmLoginSection]), the server host
 /// ([ServerHostSection]), check results ([DoctorResults]), profiles, grants
 /// ([HostGrantsSection]), session users ([SessionUsersSection]), the count of open terminal
-/// sessions and the state actions ([HostStateActions]).
+/// sessions, computer control ([HostComputerSection], CU-07) and the state actions
+/// ([HostStateActions]).
 ///
 /// The check results name session users; for a name without a valid assignment the page reads
 /// the audit of the host once (`listAuditEvents`, step-up of `audit.read`) to show the person
@@ -493,6 +495,17 @@ class _HostDetailState extends State<HostDetail>
               onReload: _load,
             ),
           ),
+          // CU-07: computer control, for active owners only (the server sends the object to
+          // them alone, 07 2.15 item 5).
+          if (h.computer != null)
+            _field(
+              l.computerDesktopTitle,
+              HostComputerSection(
+                repository: widget.repository,
+                host: h,
+                onChanged: _changed,
+              ),
+            ),
           if (_sessions case final count?)
             _field(
               l.hostFieldSessions,

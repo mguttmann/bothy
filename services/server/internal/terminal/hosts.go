@@ -123,6 +123,27 @@ type HostView struct {
 	// CreatedAt is the creation time; Version the ETag.
 	CreatedAt time.Time
 	Version   int64
+	// Computer is the reported state of the computer helper, ComputerListed whether the host is a
+	// desktop of the reader and ComputerDisabledGeneration the remotely disabled generation (CU-04,
+	// 27 12.3 and 4); all three only for an active owner who reads the host, nil otherwise (07 2.15
+	// item 5).
+	Computer                   *HostComputer
+	ComputerListed             *bool
+	ComputerDisabledGeneration *int64
+}
+
+// HostComputer is the reported state of the computer helper of a host (schema HostComputer,
+// 27 12.3): never a path, a key or screen content.
+type HostComputer struct {
+	Helper        string
+	Enabled       bool
+	Generation    int64
+	OSAccount     string
+	Capture       string
+	Input         string
+	HelperVersion string
+	Signature     string
+	Locked        bool
 }
 
 // HostPage is one page of hosts ordered by lower(name), then id; NextCursor is "" on the last
@@ -195,6 +216,9 @@ type PairHost struct {
 	Platform, OSVersion, HostVersion string
 	Profiles                         []Profile
 	SessionUsers                     []ReportedSessionUser
+	// ComputerUse is computer_use of the body: the host service runs with
+	// host_service.computer_use, so it may pair without session users (D-CU-03-13).
+	ComputerUse bool
 }
 
 // PairResult is the answer of pairHost (schema HostPairResult): only public data.

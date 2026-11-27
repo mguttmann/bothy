@@ -18,6 +18,7 @@ const (
 	EndRebind       = "rebind"
 	EndImport       = "import"
 	EndAgentChanged = "agent_changed"
+	EndComputerUse  = "computer_use"
 )
 
 // BindFailedSessionMissing is the only value of bind_failed (09 9.5 item 4).
@@ -66,7 +67,7 @@ var errEndReason = errors.New("agents: unknown end reason")
 //	ended, err := domain.EndSession(cur, domain.EndReset, now)
 func EndSession(s Session, reason string, at time.Time) (Session, error) {
 	switch reason {
-	case EndReset, EndRebind, EndImport, EndAgentChanged:
+	case EndReset, EndRebind, EndImport, EndAgentChanged, EndComputerUse:
 	default:
 		return Session{}, errEndReason
 	}

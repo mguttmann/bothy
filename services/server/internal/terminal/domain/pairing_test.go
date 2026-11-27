@@ -258,3 +258,25 @@ func TestHost_HasKeys(t *testing.T) {
 		t.Fatal("Same")
 	}
 }
+
+// TestValidatePairReportComputerOnly holds D-CU-03-13: with computer_use a host pairs without
+// session users; without it the empty list stays refused, and with it a bad session user is
+// still checked.
+func TestValidatePairReportComputerOnly(t *testing.T) {
+	t.Parallel()
+	r := goodReport()
+	r.SessionUsers, r.ComputerUse = nil, true
+	if f := domain.ValidatePairReport(r, limits); len(f) != 0 {
+		t.Fatalf("computer-only host refused: %v", f)
+	}
+	r.ComputerUse = false
+	if f := domain.ValidatePairReport(r, limits); len(f) != 1 || f[0].Pointer != "/session_users" || f[0].Code != "empty" {
+		t.Fatalf("without computer use: %v", f)
+	}
+	r = goodReport()
+	r.ComputerUse = true
+	r.SessionUsers[0].OSUser = "a/b"
+	if f := domain.ValidatePairReport(r, limits); len(f) != 1 || f[0].Code != "pattern_mismatch" {
+		t.Fatalf("session users not checked with computer use: %v", f)
+	}
+}

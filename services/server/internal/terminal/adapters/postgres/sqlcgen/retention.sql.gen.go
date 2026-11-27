@@ -11,6 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteComputerSession = `-- name: DeleteComputerSession :execrows
+DELETE FROM computer_sessions WHERE id = $1 AND closed_at < $2
+`
+
+type DeleteComputerSessionParams struct {
+	ID     pgtype.UUID
+	Cutoff pgtype.Timestamptz
+}
+
+func (q *Queries) DeleteComputerSession(ctx context.Context, arg DeleteComputerSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteComputerSession, arg.ID, arg.Cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteHost = `-- name: DeleteHost :execrows
 DELETE FROM hosts WHERE id = $1 AND retired_at < $2
 `
@@ -61,6 +78,36 @@ func (q *Queries) DeleteTerminalSession(ctx context.Context, arg DeleteTerminalS
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const expiredComputerSessions = `-- name: ExpiredComputerSessions :many
+SELECT id FROM computer_sessions WHERE closed_at < $1 ORDER BY closed_at, id LIMIT $2
+`
+
+type ExpiredComputerSessionsParams struct {
+	Cutoff   pgtype.Timestamptz
+	RowLimit int32
+}
+
+// 03 computer_sessions (CU-04): metadata of computer sessions after closed_at.
+func (q *Queries) ExpiredComputerSessions(ctx context.Context, arg ExpiredComputerSessionsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, expiredComputerSessions, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const expiredHostSessionUsers = `-- name: ExpiredHostSessionUsers :many

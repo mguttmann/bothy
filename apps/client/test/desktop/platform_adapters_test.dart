@@ -125,6 +125,35 @@ void main() {
       expect(methods(calls).last, 'destroy');
     });
 
+    test(
+      'macOS: a click opens the menu with the computer entry (CU-07)',
+      () async {
+        final calls = record('tray_manager');
+        final tray = TrayManagerTray(manager: trayManager, menuOnClick: true);
+        final actions = <TrayAction>[];
+        final sub = tray.actions.listen(actions.add);
+        await tray.show(
+          iconAsset: trayIconAsset,
+          tooltip: 'ExampleChat',
+          openLabel: 'Open',
+          quitLabel: 'Quit',
+        );
+        await tray.setComputerEntry('Stop computer control (Desk)');
+        calls.clear();
+        tray.onTrayIconMouseDown();
+        await pumpEventQueue();
+        expect(actions, isEmpty);
+        expect(methods(calls), ['popUpContextMenu']);
+        tray.onTrayMenuItemClick(
+          MenuItem(key: 'stop_computer', label: 'Stop computer control'),
+        );
+        await pumpEventQueue();
+        expect(actions, [TrayAction.stopComputer]);
+        await sub.cancel();
+        await tray.dispose();
+      },
+    );
+
     test('the no-op tray does nothing', () async {
       const t = NoTray();
       await t.show(

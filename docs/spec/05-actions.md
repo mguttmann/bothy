@@ -633,11 +633,19 @@ Normative together with [24-terminal.md](24-terminal.md). Milestone M2.
 | `terminal.read_own` | read own terminal sessions; owners read all | terminal_session, host | self or owner | no | no | no | no | `rl.read` |
 | `terminal.close` | end a session; one's own, owners any | terminal_session | self or owner | no | no | yes | no | `rl.write` |
 | `terminal.terminate` | end a session by the server: revocation, idle, maximum duration, detach beyond `terminal.detach_grace`, disabling, logout, state change of the host, end of the process | terminal_session | system | no | no | yes | no | `none` |
+| `computer.desktops.list` | list the desktops of the run's owner ([27-computer-use.md](27-computer-use.md) 5.1, CU-04) | run | agent-self, bound to an active run by SR9 whose run satisfies SR13 | no | no | denials | no | `rl.agent_runtime` |
+| `computer.open` | open a computer session on a desktop for the bound run ([27-computer-use.md](27-computer-use.md) 5.1, CU-04) | host | agent-self, bound to an active run by SR9; SR2; SR13 | no | no | yes | no | `rl.agent_runtime` |
+| `computer.attach` | attach the MCP server of the run to its session ([27-computer-use.md](27-computer-use.md) 5.4, CU-04) | computer_session | holder of the session's attach token; run active; SR13 | no | no | yes | no | `rl.agent_runtime` |
+| `computer.session.read` | list one's own computer sessions ([27-computer-use.md](27-computer-use.md) 12.2, CU-04) | computer_session | the triggering owner of the session | yes | no | no | no | `rl.read` |
+| `computer.stop` | stop a computer session ([27-computer-use.md](27-computer-use.md) 8.3, CU-04) | computer_session | an active owner in a session | yes | no | yes | no | `rl.write` |
+| `computer.device.disable` | switch the enablement of a host off ([27-computer-use.md](27-computer-use.md) 4, CU-04) | host | an active owner in a session | yes | no | yes | no | `rl.admin` |
+| `computer.terminate` | every end of a computer session by the server or the host ([27-computer-use.md](27-computer-use.md) 8.4, CU-04) | computer_session | system | no | no | yes | no | `none` |
 <!-- END GENERATED: actions.terminal -->
 
 Agents, apps and personal tokens reach none of these actions except `host.pair` and
-`host.connect`, which have no principal from `principals` (`subject_kind_not_allowed`, SR5).
-There is no scope for apps.
+`host.connect`, which have no principal from `principals` (`subject_kind_not_allowed`, SR5), and
+the agent actions `computer.desktops.list`, `computer.open` and `computer.attach` of an agent bound
+to the run of an active owner (SR9, SR13, R-AZ-38). There is no scope for apps.
 
 ## 5. Agent invocation `agent.invoke`
 
@@ -809,6 +817,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `agent.hosting_changed` | agent | self (the old and the new hosting runner) and `agent.hosted.list` | a built-in agent was created, moved to another runner or disabled; payload only `agent_id` ([26-builtin-agents.md](26-builtin-agents.md) 9, A1-03) |
 | `host.updated` | host | `host.read` | also on creation; state, assignee, LLM declaration, profiles, check results, assignments of the session users; `key_changed` on re-pairing; never keys |
 | `terminal_session.changed` | terminal_session | self | to the person of the session: state, device, `close_reason`; never contents |
+| `computer_session.changed` | computer_session | self | to the triggering owner: state, reason, desktop, frontmost app identity, action count; never an image ([27-computer-use.md](27-computer-use.md) 12.4) |
 <!-- END GENERATED: events.durable -->
 
 Ephemeral events:
@@ -859,9 +868,14 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | | `identify` | device to server | `terminal.stream` |
 | | binary frames (Noise) | both | `terminal.stream` (the session must be valid) |
 | | `error` | server to device | `terminal.stream` |
-| control `/hosts/connect` | `hello`, `ready`, `heartbeat_ack`, `error`, `session.open`, `session.close` | server to host | `host.connect` |
-| | `identify`, `heartbeat`, `report`, `session.started`, `session.ended` | host to server | `host.connect` |
+| control `/hosts/connect` | `hello`, `ready`, `heartbeat_ack`, `error`, `session.open`, `session.close`, `computer.open`, `computer.close`, `computer.disable` | server to host | `host.connect` |
+| | `identify`, `heartbeat`, `report`, `session.started`, `session.ended`, `computer.started`, `computer.state`, `computer.ended` | host to server | `host.connect` |
 | data `/hosts/sessions/{session_id}/stream` | `hello`, `identify`, binary frames (Noise) | both | `host.connect` (the session belongs to the host) |
+| | `error` | server to host | `host.connect` |
+| computer attach `/computer/sessions/{session_id}/attach` | `hello` | server to agent tool | `computer.attach` |
+| | `identify` | agent tool to server | `computer.attach` |
+| | binary frames (Noise) | both | `computer.attach` (once per session, the run active) |
+| computer data `/hosts/computer-sessions/{session_id}/stream` | `hello`, `identify`, binary frames (Noise) | both | `host.connect` (the computer session belongs to the host) |
 | | `error` | server to host | `host.connect` |
 <!-- END GENERATED: channel_ops -->
 
@@ -906,6 +920,7 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | R-AZ-35 | The durable personal event `gdpr.request_due` (resource `principal`, receive action self, audience the owner): when an open privacy request (`gdpr_requests.state` in `requested`, `approved`, `running`) reaches the reminder lead before its statutory `due_at` ([20-privacy.md](20-privacy.md), section 5.1), the module `privacy` appends one event to every active owner, once per request; payload only `request_id`, `kind` and `due_at`. The consumer `push` maps it to a hint of kind `admin` without a thread ([13-push-notifications.md](13-push-notifications.md), section 2; R-AZ-30). | The console warning of 20 5.1 needs a durable signal that reaches owners on every device; a personal event fits the hint path of R-AZ-30 and carries no content. |
 | R-AZ-36 | The actions of built-in agents (`agent.definition.read`, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue`, `agent.interview`, `agent.interview.respond`, `agent.templates.read`) and the events `agent.definition_changed`, `agent.hosting_changed` and `agent.interview_requested` enter this catalogue with the A1 ticket that builds each, with the columns of [07-permissions.md](07-permissions.md) 2.13 and [26-builtin-agents.md](26-builtin-agents.md) 9; `agent.update` covers writing a definition, `agent.create` the member `hosted_by` (addendum of 2026-11-06). | The catalogue generates Go constants and route checks (ADR 0049); a row without its code would be a second truth until the build, so the specification fixes the values and the ticket adds the row (R-BA-14). |
 | R-AZ-37 | The actions of wake-ups and autonomous runs (`run.wake.create`, `run.wake.recover`, `run.wake.list_pending`, `run.wake.check`, `run.wake.fire`, `run.wake.cancel`, `run.wake.read`, `run.launch.check`, `channel.autonomous_runs.set`) and the events `run.wake_changed` and `agent.wake_input` enter this catalogue with the AR ticket that builds each, with the columns of [07-permissions.md](07-permissions.md) 2.14 (addendum of 2026-11-06). | The catalogue generates code (ADR 0049); an entry without its code would fail the code generation check. |
+| R-AZ-38 | The actions of computer use (`computer.desktops.list`, `computer.open`, `computer.attach`, `computer.session.read`, `computer.stop`, `computer.device.disable`, `computer.terminate`) and the event `computer_session.changed` enter this catalogue with CU-04, which builds them, with the columns of [07-permissions.md](07-permissions.md) 2.15 and [27-computer-use.md](27-computer-use.md) 12.1 (addendum of 2026-11-26). `computer.open` and `computer.attach` are actions of an agent bound to an active run of an active owner (SR9, SR13), without step-up; R-AZ-23 stays for terminal actions. | The catalogue generates code (ADR 0049); an entry without its code would fail the code generation check. The owner's order in the thread is the consent for computer use (OR-1), so no step-up and no person in a session can be asked for. |
 
 ## 9. Tests that hold this catalogue
 

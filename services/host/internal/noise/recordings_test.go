@@ -307,7 +307,7 @@ func replayTransport(t *testing.T, sc recordedScenario, tr *Transport, own strin
 			t.Fatalf("transport %d: %v", i, err)
 		}
 		sameBytes(t, fmt.Sprintf("frame %d", i), pt, m.Frame)
-		if _, err := frame.Decode(pt, peer); err != nil {
+		if _, err := frame.Decode(pt, frame.KindTerminal, peer); err != nil {
 			t.Errorf("frame %d: %v", i, err)
 		}
 	}

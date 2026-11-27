@@ -84,5 +84,5 @@ func (d *Device) Open(msg []byte) (frame.Frame, error) {
 	if err != nil {
 		return frame.Frame{}, err
 	}
-	return frame.Decode(pt, frame.FromHost)
+	return frame.Decode(pt, frame.KindTerminal, frame.FromHost)
 }

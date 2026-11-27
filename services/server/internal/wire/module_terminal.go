@@ -95,6 +95,15 @@ func (s *server) startTerminal(context.Context) error {
 	}
 	// The subscribers of the txn registry end sessions from now on (M2-46).
 	a.TerminalSubscribers().Bind(tm.Service)
+	// Computer sessions read the run facts of SR13 from runs, and runs ends them with the run
+	// (CU-04 Design notes 2 and 3); runs is built before this step.
+	s.mu.Lock()
+	rn := s.runs
+	s.mu.Unlock()
+	if rn != nil && rn.Service != nil {
+		tm.Service.BindComputerRuns(computerRuns{runs: rn.Service})
+		rn.Service.BindComputer(tm.Service)
+	}
 	if s.deps.TerminalModule != nil {
 		s.deps.TerminalModule(tm.Service)
 	}

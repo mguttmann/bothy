@@ -264,7 +264,8 @@ func (s *Service) codeWorks(h domain.Host, hash []byte) bool {
 
 // pairReport converts the report of the body.
 func pairReport(cmd terminal.PairHost) domain.PairReport {
-	r := domain.PairReport{Platform: cmd.Platform, OSVersion: cmd.OSVersion, HostVersion: cmd.HostVersion, Profiles: []domain.Profile{}}
+	r := domain.PairReport{Platform: cmd.Platform, OSVersion: cmd.OSVersion, HostVersion: cmd.HostVersion, Profiles: []domain.Profile{},
+		ComputerUse: cmd.ComputerUse}
 	for _, p := range cmd.Profiles {
 		r.Profiles = append(r.Profiles, domain.Profile{Name: p.Name, DisplayName: p.DisplayName, Kind: p.Kind})
 	}

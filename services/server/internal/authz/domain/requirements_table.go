@@ -125,7 +125,7 @@ var requirementGroups = []struct {
 	{"agent-self (runner of the environment)", AgentSelf, []string{"dev_environment.report"}},
 	{"system", System, []string{
 		"device.expire", "grant.expire", "group.member.expire", "group.member.sync",
-		"instance.bootstrap", "owner.recover", "price.load_start", "signing_key.transition", "terminal.terminate",
+		"instance.bootstrap", "owner.recover", "price.load_start", "signing_key.transition", "terminal.terminate", "computer.terminate",
 		"webhook_out.transition",
 	}},
 	{"self or owner", Any(Self, Owner), []string{
@@ -218,6 +218,14 @@ var requirementGroups = []struct {
 	}},
 	{"human and +terminal", All(HumanSession, Terminal), []string{"terminal.open"}},
 	{"self", All(HumanSession, Self), []string{"terminal.stream"}},
+	// The computer actions (CU-04, 07 2.15, 27): the three agent actions are decided by the
+	// computer path of the Authorizer (SR9 binding, SR2, SR13), whose first atom is AgentSelf; stop
+	// and disable are open to every active owner in a session, the read to the triggering owner.
+	{"agent-self, bound to an active run by SR9 whose run satisfies SR13", AgentSelf, []string{"computer.desktops.list"}},
+	{"agent-self, bound to an active run by SR9; SR2; SR13", AgentSelf, []string{"computer.open"}},
+	{"holder of the session's attach token; run active; SR13", AgentSelf, []string{"computer.attach"}},
+	{"the triggering owner of the session", All(HumanSession, Self, Owner), []string{"computer.session.read"}},
+	{"an active owner in a session", All(HumanSession, Owner), []string{"computer.stop", "computer.device.disable"}},
 	{"manage on source and target", All(HasCap(CapManage), TargetHasCap(CapManage)), []string{"thread.move"}},
 	{"write", All(AtLeast(LevelWrite), HasCapIf(CapManage, FactRestrictedTags)), []string{"thread.tags.set"}},
 	// A person deletes their own chat like their own message; manage deletes any (D-DEL-4).

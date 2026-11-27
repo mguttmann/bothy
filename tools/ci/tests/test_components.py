@@ -323,6 +323,20 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER | SDK),
         (["services/host/internal/noise/noise.go"], TESTS_SERVER | HOST_TRIALS),
+        # The computer use code of the host service runs CU-T24 of test-adapters-e2e (CU-06).
+        (
+            ["services/host/test/computer_backend/backend.py"],
+            TESTS_SERVER | HOST_TRIALS | {"test-adapters-e2e"},
+        ),
+        (
+            ["services/host/cmd/bothy-computer-mcp/main.go"],
+            TESTS_SERVER | HOST_TRIALS | {"test-adapters-e2e"},
+        ),
+        (
+            ["services/host/internal/frame/computer.go"],
+            TESTS_SERVER | HOST_TRIALS | {"test-adapters-e2e"},
+        ),
+        (["infra/compose/test/host/Dockerfile"], TESTS_SERVER | {"test-adapters-e2e"}),
         (["docs/spec/actions.yaml"], TESTS_SERVER | {"test-apps"}),
         # Members of the Dart workspace (with their native code) and its root files run the
         # platform jobs; inputs of generated Dart files that are committed under packages/ do not.

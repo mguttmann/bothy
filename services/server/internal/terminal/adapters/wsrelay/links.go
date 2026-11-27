@@ -236,6 +236,42 @@ func (l *Links) CloseSession(_ context.Context, hostID, sessionID ids.ID, reason
 	return nil
 }
 
+// Compile-time check: the links send the computer ops (CU-04).
+var _ app.ComputerControl = (*Links)(nil)
+
+// OpenComputer implements app.ComputerControl: computer.open on the eligible link of the host
+// (27 5.1 step 7); a link in probation of several nodes defers nothing here, because the opening
+// has its own deadline and the host service refuses a second controller itself.
+func (l *Links) OpenComputer(_ context.Context, hostID ids.ID, op app.ComputerOpenOp) error {
+	k := l.get(hostID)
+	if k == nil {
+		return app.ErrHostNotConnected
+	}
+	if !k.isReported() {
+		return app.ErrHostNotReady
+	}
+	k.send(computerOpenFrame(op))
+	return nil
+}
+
+// CloseComputer implements app.ComputerControl: computer.close on the link of the host; without a
+// link nothing happens (the next login names the session in live_sessions, 27 8.4 item 1).
+func (l *Links) CloseComputer(_ context.Context, hostID, sessionID ids.ID, reason domain.ComputerCloseReason) error {
+	if k := l.get(hostID); k != nil {
+		k.send(computerCloseFrame(sessionID, reason))
+	}
+	return nil
+}
+
+// DisableComputer implements app.ComputerControl: computer.disable on the link of the host; without
+// a link nothing happens (the host stays unlisted, D-CU-01-25).
+func (l *Links) DisableComputer(_ context.Context, hostID ids.ID, generation int64) error {
+	if k := l.get(hostID); k != nil {
+		k.send(computerDisableFrame(generation))
+	}
+	return nil
+}
+
 // CloseHost implements app.ControlLinks: the link closes with code; a code that comes with a
 // state change of the host detaches nothing (Design note 11).
 func (l *Links) CloseHost(hostID ids.ID, code domain.CloseCode) {

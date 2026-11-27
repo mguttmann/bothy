@@ -38,7 +38,31 @@ const (
 	hostDataOperationID       = "hostData"
 	hostDataPath              = "/api/v1/hosts/sessions/{session_id}/stream"
 	terminalStreamClass       = "rl.terminal"
+	// The two upgrade routes of computer sessions (CU-04, asyncapi computerAttach and
+	// hostComputerData): computer.attach authorizes on the connection after identify, the host
+	// data connection logs in with host.connect.
+	computerAttachOperationID = "computerAttach"
+	computerAttachPath        = "/api/v1/computer/sessions/{session_id}/attach"
+	hostComputerDataID        = "hostComputerData"
+	hostComputerDataPath      = "/api/v1/hosts/computer-sessions/{session_id}/stream"
+	computerAttachClass       = "rl.agent_runtime"
 )
+
+// ComputerAttachOperation returns the route of the attach connection of bothy-computer-mcp for the
+// HTTP chain: action computer.attach, class rl.agent_runtime, marked AuthorizedInBand (CU-04).
+func ComputerAttachOperation() httpserver.Operation {
+	return httpserver.Operation{ID: computerAttachOperationID, Method: http.MethodGet, Path: computerAttachPath,
+		Pattern: http.MethodGet + " " + computerAttachPath, Action: string(authorize.ActionComputerAttach),
+		RateLimitClass: computerAttachClass, AuthorizedInBand: true}
+}
+
+// HostComputerDataOperation returns the route of the computer data connection of the host service
+// for the HTTP chain: action host.connect, class rl.host, marked AuthorizedInBand (CU-04).
+func HostComputerDataOperation() httpserver.Operation {
+	return httpserver.Operation{ID: hostComputerDataID, Method: http.MethodGet, Path: hostComputerDataPath,
+		Pattern: http.MethodGet + " " + hostComputerDataPath, Action: string(authorize.ActionHostConnect),
+		RateLimitClass: hostConnectClass, AuthorizedInBand: true}
+}
 
 // TerminalStreamOperation returns the route of the device stream for the HTTP chain: action
 // terminal.stream, class rl.terminal, marked AuthorizedInBand.
@@ -60,7 +84,7 @@ func HostDataOperation() httpserver.Operation {
 // (AZ-P1).
 func TerminalStreamRouteBindings() []authorize.RouteBinding {
 	var out []authorize.RouteBinding
-	for _, op := range []httpserver.Operation{TerminalStreamOperation(), HostDataOperation()} {
+	for _, op := range []httpserver.Operation{TerminalStreamOperation(), HostDataOperation(), ComputerAttachOperation(), HostComputerDataOperation()} {
 		out = append(out, authorize.RouteBinding{OperationID: op.ID, Method: op.Method, Pattern: op.Pattern, Action: op.Action,
 			RateLimitClass: op.RateLimitClass})
 	}
@@ -83,6 +107,10 @@ type TerminalStreamsConfig struct {
 	StallTimeout                   time.Duration `config:"terminal.relay_stall_timeout"`
 	MaxFrameBytes                  int           `config:"sync.ws_max_frame_bytes"`
 	MaxJSONDepth                   int           `config:"http.max_json_depth"`
+	// ComputerOpenTimeout is computer.open_timeout and WriteTimeout gateway.write_timeout, the
+	// deadlines of the computer relay (CU-04).
+	ComputerOpenTimeout time.Duration `config:"computer.open_timeout"`
+	WriteTimeout        time.Duration `config:"gateway.write_timeout"`
 }
 
 // TerminalStreamsConfigFrom binds TerminalStreamsConfig from v; the error names the key, never a
@@ -124,7 +152,16 @@ type TerminalStreams struct {
 	Relay  *wsrelay.Relay
 	Stream *wsrelay.StreamHandler
 	Data   *wsrelay.DataHandler
+	// Computer is the relay of computer sessions with its two handlers (CU-04).
+	Computer     *wsrelay.ComputerRelay
+	Attach       *wsrelay.AttachHandler
+	ComputerData *wsrelay.ComputerDataHandler
 }
+
+// attachSchemas compiles the schema of identify of the attach connection once per process.
+var attachSchemas = stdsync.OnceValues(func() (*httpserver.SchemaValidator, error) {
+	return httpserver.NewSchemaValidator(rest.Spec, wsrelay.AttachSchemaNames())
+})
 
 // streamSchemas compiles the schema of identify of the device stream once per process.
 var streamSchemas = stdsync.OnceValues(func() (*httpserver.SchemaValidator, error) {
@@ -177,19 +214,57 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 	t.Service.BindMetrics(m)
 	t.Service.BindRelay(relay)
 	hc.Links.BindRelay(relay)
-	return &TerminalStreams{Relay: relay, Stream: stream, Data: data}, nil
+	ts := &TerminalStreams{Relay: relay, Stream: stream, Data: data}
+	if err := ts.buildComputer(cfg, t, hc, d); err != nil {
+		return nil, err
+	}
+	return ts, nil
+}
+
+// buildComputer builds the computer relay and its two handlers and binds the relay to the module
+// (CU-04): the opening tells it the expectation, the log tail ends its slots.
+func (s *TerminalStreams) buildComputer(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl, d TerminalStreamsDeps) error {
+	var cm wsrelay.ComputerMetrics = wsrelay.NoComputerMetrics{}
+	if t.Metrics != nil {
+		cm = t.Metrics
+	}
+	relay, err := wsrelay.NewComputerRelay(wsrelay.ComputerRelayConfig{OpenTimeout: cfg.ComputerOpenTimeout, WriteTimeout: cfg.WriteTimeout},
+		t.Service, hc.Links, d.Clock, d.Log, cm)
+	if err != nil {
+		return err
+	}
+	schemas, err := attachSchemas()
+	if err != nil {
+		return err
+	}
+	attach, err := wsrelay.NewAttachHandler(wsrelay.AttachConfig{OpenTimeout: cfg.ComputerOpenTimeout, MaxFrameBytes: cfg.MaxFrameBytes,
+		MaxJSONDepth: cfg.MaxJSONDepth}, t.Service, relay, schemas, d.Clock, d.Log)
+	if err != nil {
+		return err
+	}
+	data, err := wsrelay.NewComputerDataHandler(hc.Handler, relay, t.Service)
+	if err != nil {
+		return err
+	}
+	t.Service.BindComputerRelay(relay)
+	s.Computer, s.Attach, s.ComputerData = relay, attach, data
+	return nil
 }
 
 // Mount mounts both upgrade routes on mux through chain (only the outer steps run for them).
 func (s *TerminalStreams) Mount(mux Mux, chain *httpserver.Chain) {
 	mux.Handle(TerminalStreamOperation().Pattern, chain.Wrap(TerminalStreamOperation(), s.Stream))
 	mux.Handle(HostDataOperation().Pattern, chain.Wrap(HostDataOperation(), s.Data))
+	mux.Handle(ComputerAttachOperation().Pattern, chain.Wrap(ComputerAttachOperation(), s.Attach))
+	mux.Handle(HostComputerDataOperation().Pattern, chain.Wrap(HostComputerDataOperation(), s.ComputerData))
 }
 
 // StopConnections is the stop step of PhaseConnections (02 section 15.3 step 3, Design note 14 of
 // M2-44): every relay connection closes with 4013 within the rest of shutdown.total_timeout.
 func (s *TerminalStreams) StopConnections() lifecycle.StopStep {
-	return lifecycle.StopStep{Name: "terminal_relay_connections", Phase: lifecycle.PhaseConnections, Run: s.Relay.Shutdown}
+	return lifecycle.StopStep{Name: "terminal_relay_connections", Phase: lifecycle.PhaseConnections, Run: func(ctx context.Context) error {
+		return errors.Join(s.Relay.Shutdown(ctx), s.Computer.Shutdown(ctx))
+	}}
 }
 
 // Observer returns the observer of the log tail (Design note 11 of M2-44): every event after
@@ -198,6 +273,7 @@ func (s *TerminalStreams) StopConnections() lifecycle.StopStep {
 func (s *TerminalStreams) Observer() LogObserver {
 	return func(ctx context.Context, ev sync.Event) {
 		s.Relay.ObserveLogEvent(ctx, ev.Type, ev.ResourceID, ev.Payload)
+		s.Computer.ObserveLogEvent(ctx, ev.Type, ev.ResourceID, ev.Payload)
 	}
 }
 

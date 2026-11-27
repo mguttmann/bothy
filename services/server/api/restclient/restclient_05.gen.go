@@ -9,6 +9,1258 @@ import (
 	"net/http"
 )
 
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMySidebarResponse) GetJSON200() *SidebarStateList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetMySidebarResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMySidebarResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMySidebarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMySidebarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMySidebarResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutMySidebarChannelResponse200Headers the declared response headers of an HTTP 200 response for PutMySidebarChannel
+type PutMySidebarChannelResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PutMySidebarChannelResponse400Headers the declared response headers of an HTTP 400 response for PutMySidebarChannel
+type PutMySidebarChannelResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarChannelResponse401Headers the declared response headers of an HTTP 401 response for PutMySidebarChannel
+type PutMySidebarChannelResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// PutMySidebarChannelResponse403Headers the declared response headers of an HTTP 403 response for PutMySidebarChannel
+type PutMySidebarChannelResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarChannelResponse404Headers the declared response headers of an HTTP 404 response for PutMySidebarChannel
+type PutMySidebarChannelResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarChannelResponse429Headers the declared response headers of an HTTP 429 response for PutMySidebarChannel
+type PutMySidebarChannelResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// PutMySidebarChannelResponseDefaultHeaders the declared response headers of an HTTP default response for PutMySidebarChannel
+type PutMySidebarChannelResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type PutMySidebarChannelResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SidebarChannelState
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *PutMySidebarChannelResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *PutMySidebarChannelResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PutMySidebarChannelResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *PutMySidebarChannelResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *PutMySidebarChannelResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutMySidebarChannelResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *PutMySidebarChannelResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutMySidebarChannelResponse) GetJSON200() *SidebarChannelState {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PutMySidebarChannelResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutMySidebarChannelResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutMySidebarChannelResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutMySidebarChannelResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r PutMySidebarChannelResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r PutMySidebarChannelResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r PutMySidebarChannelResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutMySidebarChannelResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutMySidebarChannelResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutMySidebarChannelResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutMySidebarSpaceResponse200Headers the declared response headers of an HTTP 200 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PutMySidebarSpaceResponse400Headers the declared response headers of an HTTP 400 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarSpaceResponse401Headers the declared response headers of an HTTP 401 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// PutMySidebarSpaceResponse403Headers the declared response headers of an HTTP 403 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarSpaceResponse404Headers the declared response headers of an HTTP 404 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutMySidebarSpaceResponse429Headers the declared response headers of an HTTP 429 response for PutMySidebarSpace
+type PutMySidebarSpaceResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// PutMySidebarSpaceResponseDefaultHeaders the declared response headers of an HTTP default response for PutMySidebarSpace
+type PutMySidebarSpaceResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type PutMySidebarSpaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SidebarState
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *PutMySidebarSpaceResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *PutMySidebarSpaceResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PutMySidebarSpaceResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *PutMySidebarSpaceResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *PutMySidebarSpaceResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutMySidebarSpaceResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *PutMySidebarSpaceResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutMySidebarSpaceResponse) GetJSON200() *SidebarState {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PutMySidebarSpaceResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutMySidebarSpaceResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutMySidebarSpaceResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutMySidebarSpaceResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r PutMySidebarSpaceResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r PutMySidebarSpaceResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r PutMySidebarSpaceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutMySidebarSpaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutMySidebarSpaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutMySidebarSpaceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMyTemplatesResponse200Headers the declared response headers of an HTTP 200 response for ListMyTemplates
+type ListMyTemplatesResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// ListMyTemplatesResponse401Headers the declared response headers of an HTTP 401 response for ListMyTemplates
+type ListMyTemplatesResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// ListMyTemplatesResponse403Headers the declared response headers of an HTTP 403 response for ListMyTemplates
+type ListMyTemplatesResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ListMyTemplatesResponse429Headers the declared response headers of an HTTP 429 response for ListMyTemplates
+type ListMyTemplatesResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// ListMyTemplatesResponseDefaultHeaders the declared response headers of an HTTP default response for ListMyTemplates
+type ListMyTemplatesResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type ListMyTemplatesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TemplateList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListMyTemplatesResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMyTemplatesResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *ListMyTemplatesResponse403Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ListMyTemplatesResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *ListMyTemplatesResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMyTemplatesResponse) GetJSON200() *TemplateList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMyTemplatesResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMyTemplatesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListMyTemplatesResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListMyTemplatesResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMyTemplatesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMyTemplatesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMyTemplatesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMyTemplatesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreatePersonalTemplateResponse201Headers the declared response headers of an HTTP 201 response for CreatePersonalTemplate
+type CreatePersonalTemplateResponse201Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// CreatePersonalTemplateResponse400Headers the declared response headers of an HTTP 400 response for CreatePersonalTemplate
+type CreatePersonalTemplateResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreatePersonalTemplateResponse401Headers the declared response headers of an HTTP 401 response for CreatePersonalTemplate
+type CreatePersonalTemplateResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// CreatePersonalTemplateResponse403Headers the declared response headers of an HTTP 403 response for CreatePersonalTemplate
+type CreatePersonalTemplateResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreatePersonalTemplateResponse422Headers the declared response headers of an HTTP 422 response for CreatePersonalTemplate
+type CreatePersonalTemplateResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreatePersonalTemplateResponse429Headers the declared response headers of an HTTP 429 response for CreatePersonalTemplate
+type CreatePersonalTemplateResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// CreatePersonalTemplateResponseDefaultHeaders the declared response headers of an HTTP default response for CreatePersonalTemplate
+type CreatePersonalTemplateResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type CreatePersonalTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Template
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *UnprocessableEntity
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreatePersonalTemplateResponse201Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *CreatePersonalTemplateResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreatePersonalTemplateResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *CreatePersonalTemplateResponse403Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *CreatePersonalTemplateResponse422Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CreatePersonalTemplateResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *CreatePersonalTemplateResponseDefaultHeaders
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreatePersonalTemplateResponse) GetJSON201() *Template {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreatePersonalTemplateResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreatePersonalTemplateResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreatePersonalTemplateResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreatePersonalTemplateResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r CreatePersonalTemplateResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreatePersonalTemplateResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreatePersonalTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePersonalTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePersonalTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreatePersonalTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteMessageResponse204Headers the declared response headers of an HTTP 204 response for DeleteMessage
+type DeleteMessageResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// DeleteMessageResponse400Headers the declared response headers of an HTTP 400 response for DeleteMessage
+type DeleteMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteMessageResponse401Headers the declared response headers of an HTTP 401 response for DeleteMessage
+type DeleteMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// DeleteMessageResponse403Headers the declared response headers of an HTTP 403 response for DeleteMessage
+type DeleteMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteMessageResponse404Headers the declared response headers of an HTTP 404 response for DeleteMessage
+type DeleteMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteMessageResponse429Headers the declared response headers of an HTTP 429 response for DeleteMessage
+type DeleteMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// DeleteMessageResponseDefaultHeaders the declared response headers of an HTTP default response for DeleteMessage
+type DeleteMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type DeleteMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *DeleteMessageResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *DeleteMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *DeleteMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *DeleteMessageResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DeleteMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *DeleteMessageResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r DeleteMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteMessageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteMessageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteMessageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteMessageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetMessageResponse200Headers the declared response headers of an HTTP 200 response for GetMessage
+type GetMessageResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// GetMessageResponse400Headers the declared response headers of an HTTP 400 response for GetMessage
+type GetMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// GetMessageResponse401Headers the declared response headers of an HTTP 401 response for GetMessage
+type GetMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// GetMessageResponse403Headers the declared response headers of an HTTP 403 response for GetMessage
+type GetMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// GetMessageResponse404Headers the declared response headers of an HTTP 404 response for GetMessage
+type GetMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// GetMessageResponse429Headers the declared response headers of an HTTP 429 response for GetMessage
+type GetMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// GetMessageResponseDefaultHeaders the declared response headers of an HTTP default response for GetMessage
+type GetMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type GetMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Message
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetMessageResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *GetMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *GetMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *GetMessageResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *GetMessageResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMessageResponse) GetJSON200() *Message {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r GetMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMessageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMessageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMessageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMessageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateMessageResponse200Headers the declared response headers of an HTTP 200 response for UpdateMessage
+type UpdateMessageResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// UpdateMessageResponse400Headers the declared response headers of an HTTP 400 response for UpdateMessage
+type UpdateMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse401Headers the declared response headers of an HTTP 401 response for UpdateMessage
+type UpdateMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// UpdateMessageResponse403Headers the declared response headers of an HTTP 403 response for UpdateMessage
+type UpdateMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse404Headers the declared response headers of an HTTP 404 response for UpdateMessage
+type UpdateMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse410Headers the declared response headers of an HTTP 410 response for UpdateMessage
+type UpdateMessageResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse412Headers the declared response headers of an HTTP 412 response for UpdateMessage
+type UpdateMessageResponse412Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse413Headers the declared response headers of an HTTP 413 response for UpdateMessage
+type UpdateMessageResponse413Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse422Headers the declared response headers of an HTTP 422 response for UpdateMessage
+type UpdateMessageResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse428Headers the declared response headers of an HTTP 428 response for UpdateMessage
+type UpdateMessageResponse428Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateMessageResponse429Headers the declared response headers of an HTTP 429 response for UpdateMessage
+type UpdateMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// UpdateMessageResponseDefaultHeaders the declared response headers of an HTTP default response for UpdateMessage
+type UpdateMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type UpdateMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Message
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *Gone
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *PreconditionFailed
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *PayloadTooLarge
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *UnprocessableEntity
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateMessageResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *UpdateMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *UpdateMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *UpdateMessageResponse404Headers
+	// Headers410 the parsed response headers for an HTTP 410 response
+	Headers410 *UpdateMessageResponse410Headers
+	// Headers412 the parsed response headers for an HTTP 412 response
+	Headers412 *UpdateMessageResponse412Headers
+	// Headers413 the parsed response headers for an HTTP 413 response
+	Headers413 *UpdateMessageResponse413Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *UpdateMessageResponse422Headers
+	// Headers428 the parsed response headers for an HTTP 428 response
+	Headers428 *UpdateMessageResponse428Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *UpdateMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *UpdateMessageResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateMessageResponse) GetJSON200() *Message {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON412() *PreconditionFailed {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON413() *PayloadTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateMessageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateMessageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateMessageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateMessageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UnpinMessageResponse204Headers the declared response headers of an HTTP 204 response for UnpinMessage
+type UnpinMessageResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// UnpinMessageResponse400Headers the declared response headers of an HTTP 400 response for UnpinMessage
+type UnpinMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnpinMessageResponse401Headers the declared response headers of an HTTP 401 response for UnpinMessage
+type UnpinMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// UnpinMessageResponse403Headers the declared response headers of an HTTP 403 response for UnpinMessage
+type UnpinMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnpinMessageResponse404Headers the declared response headers of an HTTP 404 response for UnpinMessage
+type UnpinMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnpinMessageResponse429Headers the declared response headers of an HTTP 429 response for UnpinMessage
+type UnpinMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// UnpinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for UnpinMessage
+type UnpinMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type UnpinMessageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *UnpinMessageResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *UnpinMessageResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UnpinMessageResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *UnpinMessageResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *UnpinMessageResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *UnpinMessageResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *UnpinMessageResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UnpinMessageResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnpinMessageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnpinMessageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnpinMessageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnpinMessageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PinMessageResponse204Headers the declared response headers of an HTTP 204 response for PinMessage
+type PinMessageResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PinMessageResponse400Headers the declared response headers of an HTTP 400 response for PinMessage
+type PinMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse401Headers the declared response headers of an HTTP 401 response for PinMessage
+type PinMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// PinMessageResponse403Headers the declared response headers of an HTTP 403 response for PinMessage
+type PinMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse404Headers the declared response headers of an HTTP 404 response for PinMessage
+type PinMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse410Headers the declared response headers of an HTTP 410 response for PinMessage
+type PinMessageResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PinMessageResponse429Headers the declared response headers of an HTTP 429 response for PinMessage
+type PinMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// PinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for PinMessage
+type PinMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type PinMessageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20755,6 +22007,81 @@ func (c *ClientWithResponses) CreateInteractionWithResponse(ctx context.Context,
 	return ParseCreateInteractionResponse(rsp)
 }
 
+// ListComputerDesktopsWithResponse List the desktops of the run's owner
+//
+// The desktops of the triggering owner of the bound run (docs/spec/27-computer-use.md 4 item 3 and 7): every host that is `active` and connected, whose last `report` has a connected helper that is enabled with every permission granted, whose reported generation is above the disabled generation, and whose assignee is absent or the owner. Only an agent bound by the header `Invocation-Token` to an active run under tool class `host` that its owner started with an own message (07 SR9, SR2, SR13); otherwise 403 `forbidden` with `reason: computer_not_owner_run` or `computer_tool_class`, or 403 `invocation_token_invalid` (`run_inactive` for an ended run). Denials are audited.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /computer/desktops (the `ListComputerDesktops` operationId).
+func (c *ClientWithResponses) ListComputerDesktopsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListComputerDesktopsResponse, error) {
+	rsp, err := c.ListComputerDesktops(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListComputerDesktopsResponse(rsp)
+}
+
+// ListComputerSessionsWithResponse List one's own computer sessions
+//
+// The computer sessions the caller triggered as an active owner, newest first, at most `api.page_size_max` (docs/spec/27-computer-use.md 12.2, 07 2.15 item 5). Metadata only; never an image, the token or its `jti`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /computer/sessions (the `ListComputerSessions` operationId).
+func (c *ClientWithResponses) ListComputerSessionsWithResponse(ctx context.Context, params *ListComputerSessionsParams, reqEditors ...RequestEditorFn) (*ListComputerSessionsResponse, error) {
+	rsp, err := c.ListComputerSessions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListComputerSessionsResponse(rsp)
+}
+
+// OpenComputerSessionWithBodyWithResponse Open a computer session on a desktop for the bound run
+//
+// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+func (c *ClientWithResponses) OpenComputerSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OpenComputerSessionResponse, error) {
+	rsp, err := c.OpenComputerSessionWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOpenComputerSessionResponse(rsp)
+}
+
+// OpenComputerSessionWithResponse Open a computer session on a desktop for the bound run
+//
+// Opens a computer session of the bound run on a desktop of its owner (docs/spec/27-computer-use.md 5.1). Only an agent bound by the header `Invocation-Token` to an active run (07 SR9) under tool class `host` (SR2) that an active owner started with an own message and that no other person fed (SR13). The checks in this order: 403 `invocation_token_invalid` (`run_inactive` for an ended run); 404 `not_found` for a host the owner cannot read; 403 `forbidden` with `reason: computer_tool_class` or `computer_not_owner_run`; 409 `host_unavailable` for a host that is not `active` or not connected; 403 `forbidden` with `reason: computer_not_enabled` for a host that is no enabled desktop of the owner; 409 `conflict` with `reason: computer_busy` (another session on the host) or `computer_run_busy` (another session of the run). One transaction writes the session in `opening`, the audit entry and `computer_session.changed`; after the commit the server sends `computer.open` to the host service. The answer carries the single-use attach token (`typ = computer-session+jwt`, valid `computer.attach_token_ttl`), which is never stored; the request is exempt from `Idempotency-Key`. Allows and denials are audited.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /computer/sessions (the `OpenComputerSession` operationId).
+func (c *ClientWithResponses) OpenComputerSessionWithResponse(ctx context.Context, body OpenComputerSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*OpenComputerSessionResponse, error) {
+	rsp, err := c.OpenComputerSession(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOpenComputerSessionResponse(rsp)
+}
+
+// StopComputerSessionWithResponse Stop a computer session
+//
+// Any active owner in a session stops any computer session of the instance, from any device, without step-up (docs/spec/27-computer-use.md 8.3, 07 2.15 item 4). The session ends with `stopped_by_user` and `close_detail = client_stop`; the server closes both connections and sends `computer.close` to the host service. A closed session answers unchanged. Audited.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /computer/sessions/{session_id}/stop (the `StopComputerSession` operationId).
+func (c *ClientWithResponses) StopComputerSessionWithResponse(ctx context.Context, sessionId ComputerSessionIdPath, params *StopComputerSessionParams, reqEditors ...RequestEditorFn) (*StopComputerSessionResponse, error) {
+	rsp, err := c.StopComputerSession(ctx, sessionId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopComputerSessionResponse(rsp)
+}
+
 // GetConsoleSessionWithResponse Read the console session
 //
 // Returns a wrapper object for the known response body format(s).
@@ -21868,6 +23195,21 @@ func (c *ClientWithResponses) UpdateHostWithResponse(ctx context.Context, hostId
 	return ParseUpdateHostResponse(rsp)
 }
 
+// DisableComputerDeviceWithResponse Switch the computer enablement of a host off
+//
+// Any active owner in a session switches the enablement of a host off, from any device, without step-up (docs/spec/27-computer-use.md 4 item 4). The server stores the reported generation as the disabled generation, ends the host's computer session with `device_disabled` in the same transaction and sends `computer.disable` over the control connection; the host stays unlisted until a new local switch-on raises the generation. A host without a reported helper answers unchanged. Switching on is no operation of the API. Audited.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /hosts/{host_id}/computer/disable (the `DisableComputerDevice` operationId).
+func (c *ClientWithResponses) DisableComputerDeviceWithResponse(ctx context.Context, hostId HostIdPath, params *DisableComputerDeviceParams, reqEditors ...RequestEditorFn) (*DisableComputerDeviceResponse, error) {
+	rsp, err := c.DisableComputerDevice(ctx, hostId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableComputerDeviceResponse(rsp)
+}
+
 // ConfirmHostWithBodyWithResponse Confirm the fingerprint and declare the LLM login
 //
 // The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an active owner may assign it, only to himself (`403 forbidden` with `reason: owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs step-up.
@@ -22169,905 +23511,4 @@ func (c *ClientWithResponses) GetImportWithResponse(ctx context.Context, importI
 		return nil, err
 	}
 	return ParseGetImportResponse(rsp)
-}
-
-// ApplyImportBatchWithBodyWithResponse Write a batch of imported objects
-//
-// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
-// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/batches (the `ApplyImportBatch` operationId).
-func (c *ClientWithResponses) ApplyImportBatchWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApplyImportBatchResponse, error) {
-	rsp, err := c.ApplyImportBatchWithBody(ctx, importId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseApplyImportBatchResponse(rsp)
-}
-
-// ApplyImportBatchWithResponse Write a batch of imported objects
-//
-// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
-// A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/batches (the `ApplyImportBatch` operationId).
-func (c *ClientWithResponses) ApplyImportBatchWithResponse(ctx context.Context, importId ImportIdPath, body ApplyImportBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*ApplyImportBatchResponse, error) {
-	rsp, err := c.ApplyImportBatch(ctx, importId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseApplyImportBatchResponse(rsp)
-}
-
-// CancelImportWithResponse Cancel an import
-//
-// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/cancel (the `CancelImport` operationId).
-func (c *ClientWithResponses) CancelImportWithResponse(ctx context.Context, importId ImportIdPath, params *CancelImportParams, reqEditors ...RequestEditorFn) (*CancelImportResponse, error) {
-	rsp, err := c.CancelImport(ctx, importId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCancelImportResponse(rsp)
-}
-
-// CompleteImportWithResponse Complete an import
-//
-// When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
-// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived space), whose lead can no longer change.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/complete (the `CompleteImport` operationId).
-func (c *ClientWithResponses) CompleteImportWithResponse(ctx context.Context, importId ImportIdPath, params *CompleteImportParams, reqEditors ...RequestEditorFn) (*CompleteImportResponse, error) {
-	rsp, err := c.CompleteImport(ctx, importId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompleteImportResponse(rsp)
-}
-
-// SetImportCursorWithBodyWithResponse Advance the import cursor
-//
-// Only after a successful batch (22, 7.3).
-// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /imports/{import_id}/cursor (the `SetImportCursor` operationId).
-func (c *ClientWithResponses) SetImportCursorWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetImportCursorResponse, error) {
-	rsp, err := c.SetImportCursorWithBody(ctx, importId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetImportCursorResponse(rsp)
-}
-
-// SetImportCursorWithResponse Advance the import cursor
-//
-// Only after a successful batch (22, 7.3).
-// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /imports/{import_id}/cursor (the `SetImportCursor` operationId).
-func (c *ClientWithResponses) SetImportCursorWithResponse(ctx context.Context, importId ImportIdPath, body SetImportCursorJSONRequestBody, reqEditors ...RequestEditorFn) (*SetImportCursorResponse, error) {
-	rsp, err := c.SetImportCursor(ctx, importId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetImportCursorResponse(rsp)
-}
-
-// CreateImportFileWithBodyWithResponse Reserve an imported file
-//
-// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
-func (c *ClientWithResponses) CreateImportFileWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateImportFileResponse, error) {
-	rsp, err := c.CreateImportFileWithBody(ctx, importId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateImportFileResponse(rsp)
-}
-
-// CreateImportFileWithResponse Reserve an imported file
-//
-// Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/files (the `CreateImportFile` operationId).
-func (c *ClientWithResponses) CreateImportFileWithResponse(ctx context.Context, importId ImportIdPath, body CreateImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateImportFileResponse, error) {
-	rsp, err := c.CreateImportFile(ctx, importId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateImportFileResponse(rsp)
-}
-
-// CompleteImportFileWithBodyWithResponse Finish the upload of an imported file
-//
-// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
-func (c *ClientWithResponses) CompleteImportFileWithBodyWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteImportFileResponse, error) {
-	rsp, err := c.CompleteImportFileWithBody(ctx, importId, fileId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompleteImportFileResponse(rsp)
-}
-
-// CompleteImportFileWithResponse Finish the upload of an imported file
-//
-// Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/files/{file_id}/complete (the `CompleteImportFile` operationId).
-func (c *ClientWithResponses) CompleteImportFileWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, body CompleteImportFileJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteImportFileResponse, error) {
-	rsp, err := c.CompleteImportFile(ctx, importId, fileId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompleteImportFileResponse(rsp)
-}
-
-// UploadImportFilePartWithBodyWithResponse Upload one part of an imported file
-//
-// One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /imports/{import_id}/files/{file_id}/parts/{part_number} (the `UploadImportFilePart` operationId).
-func (c *ClientWithResponses) UploadImportFilePartWithBodyWithResponse(ctx context.Context, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params *UploadImportFilePartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadImportFilePartResponse, error) {
-	rsp, err := c.UploadImportFilePartWithBody(ctx, importId, fileId, partNumber, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUploadImportFilePartResponse(rsp)
-}
-
-// ListImportItemsWithResponse List imported items
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /imports/{import_id}/items (the `ListImportItems` operationId).
-func (c *ClientWithResponses) ListImportItemsWithResponse(ctx context.Context, importId ImportIdPath, params *ListImportItemsParams, reqEditors ...RequestEditorFn) (*ListImportItemsResponse, error) {
-	rsp, err := c.ListImportItems(ctx, importId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListImportItemsResponse(rsp)
-}
-
-// SetImportLeadWithBodyWithResponse Set the leading side of a channel
-//
-// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
-// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /imports/{import_id}/leads (the `SetImportLead` operationId).
-func (c *ClientWithResponses) SetImportLeadWithBodyWithResponse(ctx context.Context, importId ImportIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetImportLeadResponse, error) {
-	rsp, err := c.SetImportLeadWithBody(ctx, importId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetImportLeadResponse(rsp)
-}
-
-// SetImportLeadWithResponse Set the leading side of a channel
-//
-// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
-// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /imports/{import_id}/leads (the `SetImportLead` operationId).
-func (c *ClientWithResponses) SetImportLeadWithResponse(ctx context.Context, importId ImportIdPath, body SetImportLeadJSONRequestBody, reqEditors ...RequestEditorFn) (*SetImportLeadResponse, error) {
-	rsp, err := c.SetImportLead(ctx, importId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetImportLeadResponse(rsp)
-}
-
-// PauseImportWithResponse Pause an import
-//
-// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
-func (c *ClientWithResponses) PauseImportWithResponse(ctx context.Context, importId ImportIdPath, params *PauseImportParams, reqEditors ...RequestEditorFn) (*PauseImportResponse, error) {
-	rsp, err := c.PauseImport(ctx, importId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePauseImportResponse(rsp)
-}
-
-// StartImportWithResponse Start or continue an import
-//
-// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /imports/{import_id}/start (the `StartImport` operationId).
-func (c *ClientWithResponses) StartImportWithResponse(ctx context.Context, importId ImportIdPath, params *StartImportParams, reqEditors ...RequestEditorFn) (*StartImportResponse, error) {
-	rsp, err := c.StartImport(ctx, importId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseStartImportResponse(rsp)
-}
-
-// RevokeIncomingWebhookWithResponse Revoke an incoming webhook
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /incoming-webhooks/{webhook_id} (the `RevokeIncomingWebhook` operationId).
-func (c *ClientWithResponses) RevokeIncomingWebhookWithResponse(ctx context.Context, webhookId WebhookIdPath, reqEditors ...RequestEditorFn) (*RevokeIncomingWebhookResponse, error) {
-	rsp, err := c.RevokeIncomingWebhook(ctx, webhookId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRevokeIncomingWebhookResponse(rsp)
-}
-
-// GetInstanceWithResponse Instance settings for clients
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /instance (the `GetInstance` operationId).
-func (c *ClientWithResponses) GetInstanceWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInstanceResponse, error) {
-	rsp, err := c.GetInstance(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetInstanceResponse(rsp)
-}
-
-// SetAllAgentsBillingModeWithBodyWithResponse Switch the backend policy of all agents
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/agent-billing-mode (the `SetAllAgentsBillingMode` operationId).
-func (c *ClientWithResponses) SetAllAgentsBillingModeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAllAgentsBillingModeResponse, error) {
-	rsp, err := c.SetAllAgentsBillingModeWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAllAgentsBillingModeResponse(rsp)
-}
-
-// SetAllAgentsBillingModeWithResponse Switch the backend policy of all agents
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/agent-billing-mode (the `SetAllAgentsBillingMode` operationId).
-func (c *ClientWithResponses) SetAllAgentsBillingModeWithResponse(ctx context.Context, body SetAllAgentsBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAllAgentsBillingModeResponse, error) {
-	rsp, err := c.SetAllAgentsBillingMode(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAllAgentsBillingModeResponse(rsp)
-}
-
-// UpdateBrandingWithBodyWithResponse Change branding
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/branding (the `UpdateBranding` operationId).
-func (c *ClientWithResponses) UpdateBrandingWithBodyWithResponse(ctx context.Context, params *UpdateBrandingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBrandingResponse, error) {
-	rsp, err := c.UpdateBrandingWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateBrandingResponse(rsp)
-}
-
-// UpdateBrandingWithResponse Change branding
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/branding (the `UpdateBranding` operationId).
-func (c *ClientWithResponses) UpdateBrandingWithResponse(ctx context.Context, params *UpdateBrandingParams, body UpdateBrandingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBrandingResponse, error) {
-	rsp, err := c.UpdateBranding(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateBrandingResponse(rsp)
-}
-
-// DeleteBrandingLogoWithResponse Remove the logo
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /instance/branding/logo (the `DeleteBrandingLogo` operationId).
-func (c *ClientWithResponses) DeleteBrandingLogoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteBrandingLogoResponse, error) {
-	rsp, err := c.DeleteBrandingLogo(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteBrandingLogoResponse(rsp)
-}
-
-// GetBrandingLogoWithResponse Download the instance logo
-//
-// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
-func (c *ClientWithResponses) GetBrandingLogoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetBrandingLogoResponse, error) {
-	rsp, err := c.GetBrandingLogo(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetBrandingLogoResponse(rsp)
-}
-
-// UploadBrandingLogoWithBodyWithResponse Upload the logo
-//
-// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/branding/logo (the `UploadBrandingLogo` operationId).
-func (c *ClientWithResponses) UploadBrandingLogoWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBrandingLogoResponse, error) {
-	rsp, err := c.UploadBrandingLogoWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUploadBrandingLogoResponse(rsp)
-}
-
-// GetDiscoveryWithResponse Public instance metadata
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /instance/discovery (the `GetDiscovery` operationId).
-func (c *ClientWithResponses) GetDiscoveryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDiscoveryResponse, error) {
-	rsp, err := c.GetDiscovery(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetDiscoveryResponse(rsp)
-}
-
-// GetJwksWithResponse Public keys for access and invocation tokens
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /instance/jwks (the `GetJwks` operationId).
-func (c *ClientWithResponses) GetJwksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetJwksResponse, error) {
-	rsp, err := c.GetJwks(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetJwksResponse(rsp)
-}
-
-// ListInstanceSettingsWithResponse List all instance settings
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /instance/settings (the `ListInstanceSettings` operationId).
-func (c *ClientWithResponses) ListInstanceSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInstanceSettingsResponse, error) {
-	rsp, err := c.ListInstanceSettings(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListInstanceSettingsResponse(rsp)
-}
-
-// PutInstanceSettingWithBodyWithResponse Set an instance setting
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/settings/{key} (the `PutInstanceSetting` operationId).
-func (c *ClientWithResponses) PutInstanceSettingWithBodyWithResponse(ctx context.Context, key KeyPath, params *PutInstanceSettingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutInstanceSettingResponse, error) {
-	rsp, err := c.PutInstanceSettingWithBody(ctx, key, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutInstanceSettingResponse(rsp)
-}
-
-// PutInstanceSettingWithResponse Set an instance setting
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /instance/settings/{key} (the `PutInstanceSetting` operationId).
-func (c *ClientWithResponses) PutInstanceSettingWithResponse(ctx context.Context, key KeyPath, params *PutInstanceSettingParams, body PutInstanceSettingJSONRequestBody, reqEditors ...RequestEditorFn) (*PutInstanceSettingResponse, error) {
-	rsp, err := c.PutInstanceSetting(ctx, key, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutInstanceSettingResponse(rsp)
-}
-
-// GetWebhookKeysWithResponse Public keys for webhook signatures
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /instance/webhook-keys (the `GetWebhookKeys` operationId).
-func (c *ClientWithResponses) GetWebhookKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetWebhookKeysResponse, error) {
-	rsp, err := c.GetWebhookKeys(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetWebhookKeysResponse(rsp)
-}
-
-// RespondToInteractionWithBodyWithResponse Acknowledge or answer an interaction
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /interactions/{interaction_id}/respond (the `RespondToInteraction` operationId).
-func (c *ClientWithResponses) RespondToInteractionWithBodyWithResponse(ctx context.Context, interactionId InteractionIdPath, params *RespondToInteractionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RespondToInteractionResponse, error) {
-	rsp, err := c.RespondToInteractionWithBody(ctx, interactionId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRespondToInteractionResponse(rsp)
-}
-
-// RespondToInteractionWithResponse Acknowledge or answer an interaction
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /interactions/{interaction_id}/respond (the `RespondToInteraction` operationId).
-func (c *ClientWithResponses) RespondToInteractionWithResponse(ctx context.Context, interactionId InteractionIdPath, params *RespondToInteractionParams, body RespondToInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*RespondToInteractionResponse, error) {
-	rsp, err := c.RespondToInteraction(ctx, interactionId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRespondToInteractionResponse(rsp)
-}
-
-// GetMeWithResponse Read the calling principal
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me (the `GetMe` operationId).
-func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error) {
-	rsp, err := c.GetMe(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetMeResponse(rsp)
-}
-
-// DeleteMyAvatarWithResponse Remove own avatar
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /me/avatar (the `DeleteMyAvatar` operationId).
-func (c *ClientWithResponses) DeleteMyAvatarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteMyAvatarResponse, error) {
-	rsp, err := c.DeleteMyAvatar(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteMyAvatarResponse(rsp)
-}
-
-// SetMyAvatarWithBodyWithResponse Upload own avatar
-//
-// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /me/avatar (the `SetMyAvatar` operationId).
-func (c *ClientWithResponses) SetMyAvatarWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMyAvatarResponse, error) {
-	rsp, err := c.SetMyAvatarWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMyAvatarResponse(rsp)
-}
-
-// GetMyCredentialsWithResponse List own identities and passkeys
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/credentials (the `GetMyCredentials` operationId).
-func (c *ClientWithResponses) GetMyCredentialsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMyCredentialsResponse, error) {
-	rsp, err := c.GetMyCredentials(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetMyCredentialsResponse(rsp)
-}
-
-// ListMyDevicesWithResponse List own devices
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/devices (the `ListMyDevices` operationId).
-func (c *ClientWithResponses) ListMyDevicesWithResponse(ctx context.Context, params *ListMyDevicesParams, reqEditors ...RequestEditorFn) (*ListMyDevicesResponse, error) {
-	rsp, err := c.ListMyDevices(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMyDevicesResponse(rsp)
-}
-
-// RegisterPushWithBodyWithResponse Register a push target for the current device
-//
-// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
-func (c *ClientWithResponses) RegisterPushWithBodyWithResponse(ctx context.Context, params *RegisterPushParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterPushResponse, error) {
-	rsp, err := c.RegisterPushWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRegisterPushResponse(rsp)
-}
-
-// RegisterPushWithResponse Register a push target for the current device
-//
-// Registers the push target of the caller's own active device in the caller's session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known `(provider, token)` is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and `app_id` end with `disabled_reason` `token_invalid` (one current token per app installation). Every new registration rotates the preview token. `unifiedpush` and `wns` give `400 validation_failed` with `errors[].code` `not_enabled`; `apns` or `fcm` without a configured adapter on this instance give `403 feature_disabled` with `reason` `push_provider_disabled`; a principal without a session (API tokens, agents, apps) gives `403 forbidden` with `reason` `step_up_not_possible`; a pending device gives `403 device_pending`. The preview token is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer `409 conflict`.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/devices/current/push-registrations (the `RegisterPush` operationId).
-func (c *ClientWithResponses) RegisterPushWithResponse(ctx context.Context, params *RegisterPushParams, body RegisterPushJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterPushResponse, error) {
-	rsp, err := c.RegisterPush(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRegisterPushResponse(rsp)
-}
-
-// ApprovePairingWithBodyWithResponse Approve a device pairing with its code
-//
-// Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/devices/pairings (the `ApprovePairing` operationId).
-func (c *ClientWithResponses) ApprovePairingWithBodyWithResponse(ctx context.Context, params *ApprovePairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApprovePairingResponse, error) {
-	rsp, err := c.ApprovePairingWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseApprovePairingResponse(rsp)
-}
-
-// ApprovePairingWithResponse Approve a device pairing with its code
-//
-// Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/devices/pairings (the `ApprovePairing` operationId).
-func (c *ClientWithResponses) ApprovePairingWithResponse(ctx context.Context, params *ApprovePairingParams, body ApprovePairingJSONRequestBody, reqEditors ...RequestEditorFn) (*ApprovePairingResponse, error) {
-	rsp, err := c.ApprovePairing(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseApprovePairingResponse(rsp)
-}
-
-// ListMyDmsWithResponse List own direct message channels
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/dms (the `ListMyDms` operationId).
-func (c *ClientWithResponses) ListMyDmsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyDmsResponse, error) {
-	rsp, err := c.ListMyDms(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMyDmsResponse(rsp)
-}
-
-// ListMyDraftsWithResponse List own drafts
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/drafts (the `ListMyDrafts` operationId).
-func (c *ClientWithResponses) ListMyDraftsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyDraftsResponse, error) {
-	rsp, err := c.ListMyDrafts(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMyDraftsResponse(rsp)
-}
-
-// BeginIdentityLinkWithBodyWithResponse Start linking another identity
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/identities/begin (the `BeginIdentityLink` operationId).
-func (c *ClientWithResponses) BeginIdentityLinkWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BeginIdentityLinkResponse, error) {
-	rsp, err := c.BeginIdentityLinkWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseBeginIdentityLinkResponse(rsp)
-}
-
-// BeginIdentityLinkWithResponse Start linking another identity
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/identities/begin (the `BeginIdentityLink` operationId).
-func (c *ClientWithResponses) BeginIdentityLinkWithResponse(ctx context.Context, body BeginIdentityLinkJSONRequestBody, reqEditors ...RequestEditorFn) (*BeginIdentityLinkResponse, error) {
-	rsp, err := c.BeginIdentityLink(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseBeginIdentityLinkResponse(rsp)
-}
-
-// CompleteIdentityLinkWithBodyWithResponse Finish linking another identity
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/identities/complete (the `CompleteIdentityLink` operationId).
-func (c *ClientWithResponses) CompleteIdentityLinkWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompleteIdentityLinkResponse, error) {
-	rsp, err := c.CompleteIdentityLinkWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompleteIdentityLinkResponse(rsp)
-}
-
-// CompleteIdentityLinkWithResponse Finish linking another identity
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/identities/complete (the `CompleteIdentityLink` operationId).
-func (c *ClientWithResponses) CompleteIdentityLinkWithResponse(ctx context.Context, body CompleteIdentityLinkJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteIdentityLinkResponse, error) {
-	rsp, err := c.CompleteIdentityLink(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompleteIdentityLinkResponse(rsp)
-}
-
-// SetMyLocalCredentialWithBodyWithResponse Set local password and enroll TOTP
-//
-// Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /me/local-credential (the `SetMyLocalCredential` operationId).
-func (c *ClientWithResponses) SetMyLocalCredentialWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMyLocalCredentialResponse, error) {
-	rsp, err := c.SetMyLocalCredentialWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMyLocalCredentialResponse(rsp)
-}
-
-// SetMyLocalCredentialWithResponse Set local password and enroll TOTP
-//
-// Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /me/local-credential (the `SetMyLocalCredential` operationId).
-func (c *ClientWithResponses) SetMyLocalCredentialWithResponse(ctx context.Context, body SetMyLocalCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMyLocalCredentialResponse, error) {
-	rsp, err := c.SetMyLocalCredential(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMyLocalCredentialResponse(rsp)
-}
-
-// ListMyMentionsWithResponse List own mentions
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/mentions (the `ListMyMentions` operationId).
-func (c *ClientWithResponses) ListMyMentionsWithResponse(ctx context.Context, params *ListMyMentionsParams, reqEditors ...RequestEditorFn) (*ListMyMentionsResponse, error) {
-	rsp, err := c.ListMyMentions(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMyMentionsResponse(rsp)
-}
-
-// ListMyNotificationPreferencesWithResponse List notification levels
-//
-// The caller's own levels, ordered by target kind, then target id. Only targets the caller can still read are listed; rows on targets the caller lost stay stored and appear again when the right returns.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/notification-preferences (the `ListMyNotificationPreferences` operationId).
-func (c *ClientWithResponses) ListMyNotificationPreferencesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyNotificationPreferencesResponse, error) {
-	rsp, err := c.ListMyNotificationPreferences(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMyNotificationPreferencesResponse(rsp)
-}
-
-// DeleteNotificationPreferenceWithResponse Inherit the notification level again
-//
-// Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is stored (then without event); deleting stays possible on an archived target. A later put starts again at version 1.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /me/notification-preferences/{target_kind}/{target_id} (the `DeleteNotificationPreference` operationId).
-func (c *ClientWithResponses) DeleteNotificationPreferenceWithResponse(ctx context.Context, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath, reqEditors ...RequestEditorFn) (*DeleteNotificationPreferenceResponse, error) {
-	rsp, err := c.DeleteNotificationPreference(ctx, targetKind, targetId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteNotificationPreferenceResponse(rsp)
-}
-
-// PutNotificationPreferenceWithBodyWithResponse Set the notification level of a target
-//
-// Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /me/notification-preferences/{target_kind}/{target_id} (the `PutNotificationPreference` operationId).
-func (c *ClientWithResponses) PutNotificationPreferenceWithBodyWithResponse(ctx context.Context, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutNotificationPreferenceResponse, error) {
-	rsp, err := c.PutNotificationPreferenceWithBody(ctx, targetKind, targetId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutNotificationPreferenceResponse(rsp)
-}
-
-// PutNotificationPreferenceWithResponse Set the notification level of a target
-//
-// Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /me/notification-preferences/{target_kind}/{target_id} (the `PutNotificationPreference` operationId).
-func (c *ClientWithResponses) PutNotificationPreferenceWithResponse(ctx context.Context, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, body PutNotificationPreferenceJSONRequestBody, reqEditors ...RequestEditorFn) (*PutNotificationPreferenceResponse, error) {
-	rsp, err := c.PutNotificationPreference(ctx, targetKind, targetId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutNotificationPreferenceResponse(rsp)
-}
-
-// BeginPasskeyRegistrationWithResponse Start registering a passkey
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/passkeys/begin (the `BeginPasskeyRegistration` operationId).
-func (c *ClientWithResponses) BeginPasskeyRegistrationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*BeginPasskeyRegistrationResponse, error) {
-	rsp, err := c.BeginPasskeyRegistration(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseBeginPasskeyRegistrationResponse(rsp)
-}
-
-// CompletePasskeyRegistrationWithBodyWithResponse Finish registering a passkey
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/passkeys/complete (the `CompletePasskeyRegistration` operationId).
-func (c *ClientWithResponses) CompletePasskeyRegistrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CompletePasskeyRegistrationResponse, error) {
-	rsp, err := c.CompletePasskeyRegistrationWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompletePasskeyRegistrationResponse(rsp)
-}
-
-// CompletePasskeyRegistrationWithResponse Finish registering a passkey
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/passkeys/complete (the `CompletePasskeyRegistration` operationId).
-func (c *ClientWithResponses) CompletePasskeyRegistrationWithResponse(ctx context.Context, body CompletePasskeyRegistrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CompletePasskeyRegistrationResponse, error) {
-	rsp, err := c.CompletePasskeyRegistration(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCompletePasskeyRegistrationResponse(rsp)
-}
-
-// UpdateMyProfileWithBodyWithResponse Change own profile
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /me/profile (the `UpdateMyProfile` operationId).
-func (c *ClientWithResponses) UpdateMyProfileWithBodyWithResponse(ctx context.Context, params *UpdateMyProfileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMyProfileResponse, error) {
-	rsp, err := c.UpdateMyProfileWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateMyProfileResponse(rsp)
-}
-
-// UpdateMyProfileWithResponse Change own profile
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /me/profile (the `UpdateMyProfile` operationId).
-func (c *ClientWithResponses) UpdateMyProfileWithResponse(ctx context.Context, params *UpdateMyProfileParams, body UpdateMyProfileJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMyProfileResponse, error) {
-	rsp, err := c.UpdateMyProfile(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateMyProfileResponse(rsp)
-}
-
-// ListMyQuietHoursWithResponse List quiet hours
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /me/quiet-hours (the `ListMyQuietHours` operationId).
-func (c *ClientWithResponses) ListMyQuietHoursWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyQuietHoursResponse, error) {
-	rsp, err := c.ListMyQuietHours(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMyQuietHoursResponse(rsp)
-}
-
-// CreateQuietHoursRuleWithBodyWithResponse Add a quiet hours rule
-//
-// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/quiet-hours (the `CreateQuietHoursRule` operationId).
-func (c *ClientWithResponses) CreateQuietHoursRuleWithBodyWithResponse(ctx context.Context, params *CreateQuietHoursRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateQuietHoursRuleResponse, error) {
-	rsp, err := c.CreateQuietHoursRuleWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateQuietHoursRuleResponse(rsp)
-}
-
-// CreateQuietHoursRuleWithResponse Add a quiet hours rule
-//
-// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person's time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /me/quiet-hours (the `CreateQuietHoursRule` operationId).
-func (c *ClientWithResponses) CreateQuietHoursRuleWithResponse(ctx context.Context, params *CreateQuietHoursRuleParams, body CreateQuietHoursRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateQuietHoursRuleResponse, error) {
-	rsp, err := c.CreateQuietHoursRule(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateQuietHoursRuleResponse(rsp)
-}
-
-// DeleteQuietHoursRuleWithResponse Delete a quiet hours rule
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /me/quiet-hours/{rule_id} (the `DeleteQuietHoursRule` operationId).
-func (c *ClientWithResponses) DeleteQuietHoursRuleWithResponse(ctx context.Context, ruleId RuleIdPath, reqEditors ...RequestEditorFn) (*DeleteQuietHoursRuleResponse, error) {
-	rsp, err := c.DeleteQuietHoursRule(ctx, ruleId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteQuietHoursRuleResponse(rsp)
 }

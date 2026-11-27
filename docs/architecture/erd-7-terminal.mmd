@@ -1,5 +1,5 @@
-%% ERD part 7: module terminal. Source: 03-data-model.md, 4.14; 24-terminal.md.
-%% Pure log columns (created_by, confirmed_by, llm_credentials_declared_by, revoked_by, closed_by) point to
+%% ERD part 7: module terminal. Source: 03-data-model.md, 4.14; 24-terminal.md; 27-computer-use.md.
+%% Pure log columns (created_by, confirmed_by, llm_credentials_declared_by, revoked_by, closed_by, stopped_by) point to
 %% principals(id) and are not drawn as a relationship.
 %% Tables of other modules only with their key. Grants on hosts are in part 2 (grants).
 erDiagram
@@ -17,6 +17,8 @@ erDiagram
     text key_fingerprint
     integer key_generation
     jsonb reported_session_users "reported names (T12, T13)"
+    jsonb reported_computer "desktop enablement (stage CU)"
+    integer computer_disabled_generation
     bigint version
   }
   host_session_users {
@@ -39,8 +41,24 @@ erDiagram
     uuid token_jti
     text close_reason
   }
+  computer_sessions {
+    uuid id PK
+    uuid host_id FK
+    uuid user_id FK "triggering owner"
+    uuid agent_id FK
+    uuid run_id FK "one run, ends with it"
+    text state "opening, active, paused, closed"
+    uuid token_jti
+    text close_reason
+  }
   users {
     uuid principal_id PK
+  }
+  agents {
+    uuid principal_id PK
+  }
+  runs {
+    uuid id PK
   }
   devices {
     uuid id PK
@@ -63,3 +81,7 @@ erDiagram
   devices ||--o{ terminal_sessions : "opened by"
   devices ||--o{ terminal_sessions : "connected"
   auth_sessions ||--o{ terminal_sessions : "allows"
+  hosts ||--o{ computer_sessions : "is controlled in"
+  users ||--o{ computer_sessions : "orders"
+  agents ||--o{ computer_sessions : "controls"
+  runs ||--o{ computer_sessions : "binds"

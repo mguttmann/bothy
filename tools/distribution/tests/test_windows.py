@@ -404,3 +404,15 @@ def test_trial_runs_two_builds_and_the_update_test(
     assert built == list(windows.TRIAL_VERSIONS)
     assert "updated" in (tmp_path / "out" / "trial-windows.json").read_text("utf-8")
     assert any("Remove-AppxPackage" in s for s in run.scripts)
+
+
+def test_powershell_uses_the_module_path_of_windows_powershell() -> None:
+    """A Windows PowerShell started from pwsh 7 inherits pwsh's PSModulePath and then has no
+    `Cert:` drive (New-SelfSignedCertificate failed in the helper job of host-platform.yml), so
+    every script first takes the machine's module path."""
+    run = FakeRun()
+    windows.powershell(run, "Get-ChildItem Cert:\\LocalMachine\\My")
+    script = run.calls[-1][-1]
+    reset = "$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); "
+    assert script.startswith(reset)
+    assert script.endswith("Get-ChildItem Cert:\\LocalMachine\\My")

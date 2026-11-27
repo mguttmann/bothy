@@ -57,6 +57,7 @@ __all__ = [
     "process_matches",
     "read_identity",
     "read_turn_record",
+    "record_paths",
 ]
 
 MAX_PROCESS_ID = 2**31 - 1
@@ -168,6 +169,32 @@ def _session_checked(record: Mapping[str, Any]) -> bool:
         # A tuple, so a phase of any JSON type is compared and never hashed.
         return record.get("phase") in PHASES_BEFORE_START
     return _is_uuid(record["session_ref"], any_case=True)
+
+
+def record_paths(turns: Path) -> list[Path]:
+    """Return the turn records of a ``turns`` folder: the files ``<run_id>.json``, sorted.
+
+    The folder also holds files of a run that are no records, such as the per-turn MCP file of
+    computer use ``<run_id>.computer.mcp.json`` (docs/spec/27-computer-use.md 10.1); only a
+    name whose stem is a run id in its canonical text is a record.
+
+    Args:
+        turns: ``<runner.state_dir>/turns`` (or a hosted agent's).
+
+    Returns:
+        The paths; empty when the folder is missing.
+    """
+    if not turns.is_dir():
+        return []
+    found = []
+    for path in sorted(turns.glob("*.json")):
+        try:
+            canonical = str(UUID(path.stem))
+        except ValueError:
+            continue
+        if canonical == path.stem.lower():
+            found.append(path)
+    return found
 
 
 def read_turn_record(path: Path) -> dict[str, Any] | None:

@@ -19,6 +19,8 @@ class _$HostReport extends HostReport {
   final bool requireLocalConfirm;
   @override
   final String? osVersion;
+  @override
+  final HostComputer? computer;
 
   factory _$HostReport([void Function(HostReportBuilder)? updates]) =>
       (HostReportBuilder()..update(updates))._build();
@@ -30,6 +32,7 @@ class _$HostReport extends HostReport {
     required this.isServerHost,
     required this.requireLocalConfirm,
     this.osVersion,
+    this.computer,
   }) : super._();
   @override
   HostReport rebuild(void Function(HostReportBuilder) updates) =>
@@ -47,7 +50,8 @@ class _$HostReport extends HostReport {
         doctor == other.doctor &&
         isServerHost == other.isServerHost &&
         requireLocalConfirm == other.requireLocalConfirm &&
-        osVersion == other.osVersion;
+        osVersion == other.osVersion &&
+        computer == other.computer;
   }
 
   @override
@@ -59,6 +63,7 @@ class _$HostReport extends HostReport {
     _$hash = $jc(_$hash, isServerHost.hashCode);
     _$hash = $jc(_$hash, requireLocalConfirm.hashCode);
     _$hash = $jc(_$hash, osVersion.hashCode);
+    _$hash = $jc(_$hash, computer.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -71,7 +76,8 @@ class _$HostReport extends HostReport {
           ..add('doctor', doctor)
           ..add('isServerHost', isServerHost)
           ..add('requireLocalConfirm', requireLocalConfirm)
-          ..add('osVersion', osVersion))
+          ..add('osVersion', osVersion)
+          ..add('computer', computer))
         .toString();
   }
 }
@@ -109,6 +115,11 @@ class HostReportBuilder implements Builder<HostReport, HostReportBuilder> {
   String? get osVersion => _$this._osVersion;
   set osVersion(String? osVersion) => _$this._osVersion = osVersion;
 
+  HostComputerBuilder? _computer;
+  HostComputerBuilder get computer =>
+      _$this._computer ??= HostComputerBuilder();
+  set computer(HostComputerBuilder? computer) => _$this._computer = computer;
+
   HostReportBuilder() {
     HostReport._defaults(this);
   }
@@ -122,6 +133,7 @@ class HostReportBuilder implements Builder<HostReport, HostReportBuilder> {
       _isServerHost = $v.isServerHost;
       _requireLocalConfirm = $v.requireLocalConfirm;
       _osVersion = $v.osVersion;
+      _computer = $v.computer?.toBuilder();
       _$v = null;
     }
     return this;
@@ -160,6 +172,7 @@ class HostReportBuilder implements Builder<HostReport, HostReportBuilder> {
               'requireLocalConfirm',
             ),
             osVersion: osVersion,
+            computer: _computer?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -170,6 +183,9 @@ class HostReportBuilder implements Builder<HostReport, HostReportBuilder> {
         sessionUsers.build();
         _$failedField = 'doctor';
         doctor.build();
+
+        _$failedField = 'computer';
+        _computer?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'HostReport',

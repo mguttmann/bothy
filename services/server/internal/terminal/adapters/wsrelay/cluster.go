@@ -105,7 +105,7 @@ func (h *Hub) window() time.Duration {
 // cases; presence, withdrawal and pairing are the hub's own.
 func (h *Hub) HandleSignal(ctx context.Context, s domain.Signal) {
 	switch s.Kind {
-	case domain.SignalSessionOpen, domain.SignalHostClose:
+	case domain.SignalSessionOpen, domain.SignalHostClose, domain.SignalComputerOpen, domain.SignalComputerDisable:
 		h.uc.HandleSignal(ctx, s)
 	case domain.SignalHostPresent:
 		if h.cfg.Multi {

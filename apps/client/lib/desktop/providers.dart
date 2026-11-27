@@ -11,6 +11,7 @@ import 'package:l10n/l10n.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app/providers/ports.dart';
+import '../computer/computer_tray.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../settings/settings_providers.dart';
 import 'start_at_login.dart';
@@ -35,28 +36,46 @@ WindowBehavior windowBehavior(Ref ref) {
   return behavior;
 }
 
-/// Starts the window behavior and, on Windows, the tray icon with Open and Quit; the app
-/// widget watches it once.
+/// The tray of the desktop app, or null where the app has none: on Windows the icon with Open
+/// and Quit stays (15 10.3); on macOS the icon shows only while a computer session of the owner
+/// is live (D-CU-07-4, which narrows D-M4-30-5).
+@Riverpod(keepAlive: true)
+DesktopTray? desktopTray(Ref ref) {
+  final ports = ref.watch(appPortsProvider);
+  final windows = ports.platform == 'windows';
+  if (!windows && ports.platform != 'macos') return null;
+  final tray = DesktopTray(
+    port: ports.tray,
+    behavior: ref.watch(windowBehaviorProvider),
+    persistent: windows,
+  );
+  ref.onDispose(tray.dispose);
+  return tray;
+}
+
+/// The texts of the app in the language of `users.locale` once the person chose one, the
+/// system language before (01 9; brief M4-32).
+AppLocalizations _trayTexts(String? userLocale) => lookupAppLocalizations(
+  resolveAppLocale(
+    userLocale: userLocale,
+    systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
+  ),
+);
+
+/// Starts the window behavior and the tray: on Windows the tray icon with Open and Quit, on
+/// macOS the texts of the icon that shows during computer use; the app widget watches it once.
 @Riverpod(keepAlive: true)
 Future<void> desktopShell(Ref ref) async {
   final ports = ref.watch(appPortsProvider);
   final behavior = ref.watch(windowBehaviorProvider);
-  // D-M4-30-5: the notification area is the Windows path; macOS keeps its window behavior.
-  if (ports.platform != 'windows') {
+  final tray = ref.watch(desktopTrayProvider);
+  if (tray == null) {
     await behavior.start();
     return;
   }
-  final tray = DesktopTray(port: ports.tray, behavior: behavior);
-  ref.onDispose(tray.dispose);
-  // 01 9: the menu speaks the language of the app, `users.locale` once the person chose one,
-  // the system language before; it follows a later choice (01 8 "Language"; brief M4-32).
+  // 01 9: the menu speaks the language of the app and follows a later choice (01 8).
   Future<void> label(String? userLocale) {
-    final l = lookupAppLocalizations(
-      resolveAppLocale(
-        userLocale: userLocale,
-        systemLocales: WidgetsBinding.instance.platformDispatcher.locales,
-      ),
-    );
+    final l = _trayTexts(userLocale);
     return tray.start(
       tooltip: ports.branding.appName,
       openLabel: l.trayOpen,
@@ -72,6 +91,21 @@ Future<void> desktopShell(Ref ref) async {
   // Hide on close only once the tray icon exists: a failed tray start leaves the window
   // closing normally instead of hiding it where nothing can bring it back.
   await behavior.start();
+}
+
+/// The computer entry of the tray (27 11 item 4; brief CU-07): follows the owner's live
+/// computer sessions; null where the app has no tray.
+@Riverpod(keepAlive: true)
+ComputerTray? computerTray(Ref ref) {
+  final tray = ref.watch(desktopTrayProvider);
+  if (tray == null) return null;
+  return ComputerTray(
+    tray: tray,
+    ref: ref,
+    label: (desktops) =>
+        _trayTexts(ref.read(profileControllerProvider).value?.locale)
+            .trayComputerStop(desktops),
+  );
 }
 
 /// The state of "Start at login": whether the system offers it and whether it is on.

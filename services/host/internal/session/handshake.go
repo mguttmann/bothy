@@ -195,7 +195,7 @@ func (h *handshake) firstFrame(ctx context.Context, tr *noise.Transport) (frame.
 		if err != nil {
 			return frame.Frame{}, DetailHandshakeFailed, true
 		}
-		f, err := frame.Decode(pt, frame.FromDevice)
+		f, err := frame.Decode(pt, frame.KindTerminal, frame.FromDevice)
 		if err != nil || f.Type != frame.TypeStart {
 			return frame.Frame{}, DetailHandshakeFailed, true
 		}

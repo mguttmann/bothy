@@ -228,7 +228,9 @@ func TestRetention_DPT05(t *testing.T) {
 		// The class import of the import sources and their items.
 		"import_items", "import_sources",
 		// AUD-PKG-R2-owner-server (#685): run texts and thread titles follow retention.content.
-		"runs", "run_steps", "run_wakes", "threads"}
+		"runs", "run_steps", "run_wakes", "threads",
+		// CU-04 (D-CU-04-20): the computer sessions follow retention.security.
+		"computer_sessions"}
 	for _, tb := range want {
 		if !tables[tb] {
 			t.Errorf("the server registers no participant for %s", tb)

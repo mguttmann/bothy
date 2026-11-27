@@ -138,6 +138,12 @@ rules:
         - command.register
         - command.remove
         - component.update
+        - computer.attach
+        - computer.desktops.list
+        - computer.device.disable
+        - computer.open
+        - computer.session.read
+        - computer.stop
         - console.csp_report
         - cost.read.aggregate
         - cost.read.thread
@@ -427,6 +433,12 @@ rules:
         - command.register
         - command.remove
         - component.update
+        - computer.attach
+        - computer.desktops.list
+        - computer.device.disable
+        - computer.open
+        - computer.session.read
+        - computer.stop
         - console.csp_report
         - cost.read.aggregate
         - cost.read.thread

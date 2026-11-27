@@ -83,10 +83,10 @@ GATEWAY = "gateway"
 DISPATCH = "dispatch"
 """Gateway op of the operation with many messages, one per event type."""
 
-RECEIVE_DIRECTIONS = frozenset({"device_to_server", "host_to_server", "both"})
+RECEIVE_DIRECTIONS = frozenset({"device_to_server", "host_to_server", "agent_to_server", "both"})
 """Catalogue directions of a terminal channel row that an asyncapi `receive` operation fits."""
 
-SEND_DIRECTIONS = frozenset({"server_to_device", "server_to_host", "both"})
+SEND_DIRECTIONS = frozenset({"server_to_device", "server_to_host", "server_to_agent", "both"})
 """Catalogue directions of a terminal channel row that an asyncapi `send` operation fits."""
 
 CLOSE_CODES_TITLE = "Close codes"

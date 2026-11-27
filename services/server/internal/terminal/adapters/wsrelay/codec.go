@@ -28,17 +28,26 @@ const (
 	opSessionStarted = "session.started"
 	opSessionEnded   = "session.ended"
 	opError          = "error"
+	// The computer ops of hostControl (CU-04, 27 12.3).
+	opComputerOpen    = "computer.open"
+	opComputerClose   = "computer.close"
+	opComputerDisable = "computer.disable"
+	opComputerStarted = "computer.started"
+	opComputerState   = "computer.state"
+	opComputerEnded   = "computer.ended"
 )
 
 // hostOps are the ops a host service sends, with the schema of their body d.
 var hostOps = map[string]string{
 	opIdentify: "HostIdentify", opHeartbeat: "HostHeartbeat", opReport: "HostReport",
 	opSessionStarted: "HostSessionStarted", opSessionEnded: "HostSessionEnded",
+	opComputerStarted: "HostComputerStarted", opComputerState: "HostComputerState", opComputerEnded: "HostComputerEnded",
 }
 
 // SchemaNames returns the schemas of the host ops, for the validator of internal/wire.
 func SchemaNames() []string {
-	return []string{"HostIdentify", "HostHeartbeat", "HostReport", "HostSessionStarted", "HostSessionEnded"}
+	return []string{"HostIdentify", "HostHeartbeat", "HostReport", "HostSessionStarted", "HostSessionEnded",
+		"HostComputerStarted", "HostComputerState", "HostComputerEnded"}
 }
 
 // SchemaChecker checks a JSON value against a named schema of the contract
@@ -98,6 +107,12 @@ func decodeFrame(b []byte, maxDepth int, check SchemaChecker) (frame, error) {
 		d = &rest.HostSessionStarted{}
 	case opSessionEnded:
 		d = &rest.HostSessionEnded{}
+	case opComputerStarted:
+		d = &rest.HostComputerStarted{}
+	case opComputerState:
+		d = &rest.HostComputerState{}
+	case opComputerEnded:
+		d = &rest.HostComputerEnded{}
 	}
 	if err := strict(env.D, d); err != nil {
 		return frame{}, errDecode
@@ -149,6 +164,11 @@ func reportOf(f *rest.HostReport) domain.Report {
 			dirs = []string{}
 		}
 		r.SessionUsers = append(r.SessionUsers, domain.ReportedSessionUser{OSUser: u.OsUser, Workdirs: dirs, OwnerAccount: u.OwnerAccount != nil && *u.OwnerAccount})
+	}
+	if c := f.Computer; c != nil {
+		r.Computer = &domain.ReportedComputer{Helper: string(c.Helper), Enabled: c.Enabled, Generation: int64(c.Generation), OSAccount: c.OsAccount,
+			Capture: string(c.Permissions.Capture), Input: string(c.Permissions.Input), HelperVersion: c.HelperVersion,
+			Signature: string(c.Signature), Locked: c.Locked}
 	}
 	for _, c := range f.Doctor {
 		e := domain.DoctorCheck{Check: string(c.Check), OK: c.Ok}
@@ -228,9 +248,63 @@ func heartbeatAckFrame(at time.Time, keys []app.JWK) []byte {
 	return encode(opHeartbeatAck, ack)
 }
 
-// sessionCloseFrame is session.close (schema HostSessionClose).
+// sessionCloseFrame is session.close (schema HostSessionClose), or computer.close (schema
+// HostComputerClose) for a computer session.
 func sessionCloseFrame(c domain.SessionClose) []byte {
+	if c.Computer {
+		return computerCloseFrame(c.SessionID, c.ComputerReason)
+	}
 	return encode(opSessionClose, rest.HostSessionClose{SessionId: rest.Uuid(c.SessionID), CloseReason: rest.TerminalCloseReason(c.Reason)})
+}
+
+// computerCloseFrame is computer.close (schema HostComputerClose).
+func computerCloseFrame(id ids.ID, reason domain.ComputerCloseReason) []byte {
+	return encode(opComputerClose, rest.HostComputerClose{SessionId: rest.Uuid(id), Reason: rest.ComputerCloseReason(reason)})
+}
+
+// computerDisableFrame is computer.disable (schema HostComputerDisable).
+func computerDisableFrame(generation int64) []byte {
+	return encode(opComputerDisable, rest.HostComputerDisable{Generation: int(generation)})
+}
+
+// computerOpenFrame is computer.open (schema HostComputerOpen) with the settings of 27 18.
+func computerOpenFrame(c app.ComputerOpenOp) []byte {
+	st := c.Settings
+	return encode(opComputerOpen, rest.HostComputerOpen{SessionId: rest.Uuid(c.SessionID), RunId: rest.Uuid(c.RunID), AgentId: rest.Uuid(c.AgentID),
+		AgentName: c.AgentName, UserId: rest.Uuid(c.UserID), DataPath: c.DataPath, ExpiresAt: stamp(c.ExpiresAt),
+		Settings: rest.HostComputerSettings{ImageMaxEdge: st.ImageMaxEdge, JpegQuality: st.JPEGQuality, SettleMs: st.Settle.Milliseconds(),
+			AutoScreenshot: st.AutoScreenshot, WaitMaxMs: st.WaitMax.Milliseconds(), KeyRepeatMax: st.KeyRepeatMax,
+			ScrollAmountMax: st.ScrollAmountMax,
+			AuditAppsMax:    st.AuditAppsMax, StatusIntervalMs: st.StatusInterval.Milliseconds()}})
+}
+
+// computerStateOf converts the body of computer.state: the frontmost app is its id (bundle ID or
+// executable name), "" before the helper named one.
+func computerStateOf(f *rest.HostComputerState) app.ComputerStateReport {
+	return app.ComputerStateReport{SessionID: ids.ID(f.SessionId), State: string(f.State), Locked: f.Reason == "locked",
+		ActionCount: int64(f.ActionCount), FrontApp: f.FrontApp.Id}
+}
+
+// computerEndOf converts the body of computer.ended: an app is its id with the signer's team ID or
+// subject ("id:signer"; the audit keeps codes, D-CU-04-9).
+func computerEndOf(f *rest.HostComputerEnded) domain.ComputerEnd {
+	e := domain.ComputerEnd{Reason: domain.ComputerCloseReason(f.CloseReason), PausedMS: f.PausedMs, ActionCounts: map[string]int64{}}
+	if f.CloseDetail != nil {
+		e.Detail = domain.ComputerCloseDetail(*f.CloseDetail)
+	}
+	for k, v := range f.ActionCounts {
+		e.ActionCounts[k] = int64(v)
+	}
+	for _, a := range f.Apps {
+		id := a.Id
+		if a.Signer != "" {
+			id += ":" + a.Signer
+		}
+		if id != "" {
+			e.Apps = append(e.Apps, id)
+		}
+	}
+	return e
 }
 
 // sessionOpenFrame is session.open (schema HostSessionOpen).

@@ -34,10 +34,21 @@ var pkg struct {
 // and checks the profiles, starts the stack, builds the binaries of the host containers and the
 // sidecar, creates the bootstrap owner, runs m and removes the stack. Its result is the exit code
 // of the test binary. A machine without the prerequisites fails (requirement 18).
-func Main(m *testing.M, name, profile string) int {
+func Main(m *testing.M, name, profile string) int { return MainWith(m, name, profile, Extra{}) }
+
+// Extra are the additions of one e2e package to its stack.
+type Extra struct {
+	// HostPackages are Debian packages added to the image of the host containers
+	// (stack.Options.HostPackages): the end-to-end test of computer use adds Xvfb, Python and Tk
+	// (e2e/computer, CU-T24).
+	HostPackages []string
+}
+
+// MainWith is Main with the additions extra.
+func MainWith(m *testing.M, name, profile string, extra Extra) int {
 	ctx, cancel := context.WithTimeout(context.Background(), startWait)
 	defer cancel()
-	env, s, err := setup(ctx, name, profile)
+	env, s, err := setup(ctx, name, profile, extra)
 	rc := 1
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "terminal suite %s: %v\n", name, err)
@@ -61,7 +72,7 @@ func Main(m *testing.M, name, profile string) int {
 }
 
 // setup prepares the Env of a package.
-func setup(ctx context.Context, name, profile string) (*Env, *stack.Stack, error) {
+func setup(ctx context.Context, name, profile string, extra Extra) (*Env, *stack.Stack, error) {
 	repo, err := FindRepo()
 	if err != nil {
 		return nil, nil, err
@@ -94,7 +105,7 @@ func setup(ctx context.Context, name, profile string) (*Env, *stack.Stack, error
 		return nil, nil, err
 	}
 	s, err := stack.Start(ctx, stack.Options{Package: name, Profile: stack.Profile(profile), ServerKeys: prof.Server, Front: front,
-		Logf: func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) }})
+		Logf: func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) }, HostPackages: extra.HostPackages})
 	if err != nil {
 		return nil, s, err
 	}
@@ -182,7 +193,7 @@ func StartEnv(t *testing.T, name, profile string) *Env {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), startWait)
 	t.Cleanup(cancel)
-	env, s, err := setup(ctx, name, profile)
+	env, s, err := setup(ctx, name, profile, Extra{})
 	if s != nil {
 		t.Cleanup(func() {
 			if t.Failed() {

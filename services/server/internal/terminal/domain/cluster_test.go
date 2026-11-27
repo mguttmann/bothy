@@ -106,14 +106,14 @@ func TestSignalPayloadBound(t *testing.T) {
 	longest := 0
 	full := ids.MustParse("ffffffff-ffff-7fff-bfff-ffffffffffff")
 	for _, k := range []domain.SignalKind{domain.SignalSessionOpen, domain.SignalHostClose, domain.SignalHostPresent,
-		domain.SignalHostGone, domain.SignalSessionPaired} {
+		domain.SignalHostGone, domain.SignalSessionPaired, domain.SignalComputerOpen, domain.SignalComputerDisable} {
 		sig := domain.Signal{Kind: k, HostID: full}
 		switch k {
-		case domain.SignalSessionOpen, domain.SignalSessionPaired:
+		case domain.SignalSessionOpen, domain.SignalSessionPaired, domain.SignalComputerOpen:
 			sig.SessionID = full
 		case domain.SignalHostPresent, domain.SignalHostGone:
 			sig.ConnID = full
-		case domain.SignalHostClose:
+		case domain.SignalHostClose, domain.SignalComputerDisable:
 		}
 		b, err := domain.EncodeSignal(sig)
 		if err != nil {

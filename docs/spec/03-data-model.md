@@ -78,7 +78,7 @@ migration comes with that milestone, the contract already applies now.
 | `gateway` | WebSocket endpoint, gateway sessions, focus, typing, ephemeral events, shared presence state of several nodes | yes |
 | `search` | Search coordinator over the read ports of `messaging`, `chat` and `files` ([14-search.md](14-search.md)) | none |
 | `stats` | Statistics of the console from the read ports of other modules, own measurement as minute aggregates ([25-visualization.md](25-visualization.md)) | yes |
-| `terminal` | Hosts, pairing, session users per person, terminal sessions, terminal session tokens, relay of the streams ([24-terminal.md](24-terminal.md)) | yes |
+| `terminal` | Hosts, pairing, session users per person, terminal sessions, terminal session tokens, relay of the streams ([24-terminal.md](24-terminal.md)); computer sessions with their attach tokens and the mirror of the desktop enablement ([27-computer-use.md](27-computer-use.md)) | yes |
 
 The two modules without tables are separate modules because they have their own ports,
 dependencies and performance targets ([02-architecture.md](02-architecture.md), section 4).
@@ -1278,7 +1278,7 @@ thread are the earlier session references. Module: `agents`.
 | `dev_environment_id` | `uuid` | yes | | dev environment in which the first run of the session ran; NULL outside dev isolation (milestone, SR3) |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `ended_at` | `timestamptz` | yes | | set when the session ends or was never current |
-| `end_reason` | `text` | yes | | `CHECK (end_reason IN ('reset','rebind','import','agent_changed'))`, meaning below |
+| `end_reason` | `text` | yes | | `CHECK (end_reason IN ('reset','rebind','import','agent_changed','computer_use'))`, meaning below |
 | `version` | `bigint` | no | `1` | compare-and-swap on rebinding and on `agent_session.report` |
 
 PK: `id`. FK: `thread_id` -> `threads(id)` ON DELETE RESTRICT; `agent_id` ->
@@ -1298,6 +1298,7 @@ Meaning of `end_reason`:
 | `rebind` | replaced by `agent_session.bind`, or because resuming a bound session failed and the adapter reported a new one |
 | `import` | earlier session reference from an import; was never current in this product. On the first trigger without a current session, the server binds it exactly once as a new current row with `started = true` ([22-import-migration.md](22-import-migration.md), section 9) |
 | `agent_changed` | operator change in the main thread; the session ends at the next run |
+| `computer_use` | the run that ended had opened a computer session; the server ends the session in the transaction that ends the run, so no screenshot of it is resumed ([27-computer-use.md](27-computer-use.md) 10.5, addendum of 2026-11-26, stage CU) |
 
 ### 4.6 Messages (`messaging`)
 
@@ -2729,7 +2730,9 @@ Domain modules never read or write these tables directly.
 
 ### 4.14 Terminal (`terminal`)
 
-Normative together with [24-terminal.md](24-terminal.md). Milestone M2.
+Normative together with [24-terminal.md](24-terminal.md). Milestone M2; the computer columns of
+`hosts` and `computer_sessions` belong to stage CU ([27-computer-use.md](27-computer-use.md), addendum
+of 2026-11-26, R-DM-65).
 
 #### `hosts`
 
@@ -2773,6 +2776,8 @@ LLM login (I6) and its reported state. Module: `terminal`.
 | `disabled_at` | `timestamptz` | yes | | |
 | `disabled_reason` | `text` | yes | | `CHECK (disabled_reason IN ('owner','duplicate_connection'))`; the server sets `duplicate_connection` on a second live control connection (24, section 3.4) |
 | `retired_at` | `timestamptz` | yes | | |
+| `reported_computer` | `jsonb` | yes | | schema `host_computer.v1` of the last `report` (27 12.3): `helper` (`connected`, `absent`), `enabled`, `generation` (integer from 0), `os_account`, `permissions` (`capture`, `input`, each `granted`, `denied`, `unknown`), `helper_version`, `signature` (`verified`, `development`), `locked`; `helper` also `refused` (a peer the rule of 27 9.4 refused); NULL while the host service reports no `computer` object (stage CU) |
+| `computer_disabled_generation` | `integer` | yes | | the enablement generation that `computer.device.disable` switched off; the host is a desktop only while `reported_computer.generation` is higher (27 4, stage CU) |
 | `version` | `bigint` | no | `1` | optimistic lock |
 
 PK: `id`. FK: `assigned_user_id`, `credential_holder_id` -> `users(principal_id)` ON DELETE
@@ -2871,6 +2876,50 @@ Unique: `token_jti`. Indexes: `(user_id) WHERE state <> 'closed'` for `terminal.
 and for ending sessions on revocation; `(host_id) WHERE state <> 'closed'`; `(auth_session_id) WHERE state <>
 'closed'`; `(device_id) WHERE state <> 'closed'`; BRIN `(opened_at)` for retention; `(closed_at, id) WHERE
 closed_at IS NOT NULL` for the candidates of the retention job.
+Retention: `security` (period `retention.security_after_end` after `closed_at`).
+
+#### `computer_sessions`
+
+Purpose: metadata of a computer session ([27-computer-use.md](27-computer-use.md)). Never an image,
+a coordinate, typed text or a key name. Module: `terminal`. Stage CU (addendum of 2026-11-26).
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `id` | `uuid` | no | | UUIDv7; session ID in the prologue and in `sid` of the attach token |
+| `host_id` | `uuid` | no | | the desktop |
+| `user_id` | `uuid` | no | | the triggering owner of the run; only people |
+| `agent_id` | `uuid` | no | | the agent of the run |
+| `run_id` | `uuid` | no | | the run the session is bound to (27 8.1) |
+| `state` | `text` | no | `'opening'` | `CHECK (state IN ('opening','active','paused','closed'))` (27 8.1) |
+| `pause_reason` | `text` | yes | | `CHECK (pause_reason IN ('locked'))` |
+| `token_jti` | `uuid` | no | | `jti` of the attach token |
+| `generation` | `integer` | no | | the enablement generation of the attach token (`gen`) |
+| `key_generation` | `integer` | no | | `hosts.key_generation` at opening |
+| `attached_at` | `timestamptz` | yes | | `computer.attach` accepted; set once |
+| `opened_at` | `timestamptz` | no | `now()` | |
+| `started_at` | `timestamptz` | yes | | `computer.started` of the host service |
+| `paused_at` | `timestamptz` | yes | | start of the current pause |
+| `paused_ms` | `bigint` | no | `0` | sum of the pauses |
+| `closed_at` | `timestamptz` | yes | | |
+| `stopped_by` | `uuid` | yes | | person for `stopped_by_user` with `client_stop`; otherwise NULL |
+| `close_reason` | `text` | yes | | `CHECK (close_reason IN ('done','stopped_by_user','device_disabled','run_ended','access_revoked','host_disabled','host_retired','host_rekeyed','host_restarted','connection_lost','open_failed','error'))` (27 8.3) |
+| `close_detail` | `text` | yes | | code from the closed list of 27 8.3; never free text |
+| `action_count` | `integer` | no | `0` | actions of the last `computer.state` or of `computer.ended` |
+| `front_app` | `text` | yes | | identity of the frontmost app of the last `computer.state` (bundle ID or executable name), at most `host.name_max_chars` characters, without control and bidi characters; for the status chip |
+| `version` | `bigint` | no | `1` | |
+
+PK: `id`. FK: `host_id` -> `hosts(id)` ON DELETE RESTRICT; `user_id` -> `users(principal_id)` ON
+DELETE RESTRICT; `agent_id` -> `agents(principal_id)` ON DELETE RESTRICT; `run_id` -> `runs(id)` ON
+DELETE RESTRICT; `stopped_by` -> `principals(id)` ON DELETE RESTRICT.
+Checks: `(state = 'closed') = (closed_at IS NOT NULL)`; `(state = 'closed') = (close_reason IS NOT
+NULL)`; `close_detail IS NULL OR state = 'closed'`; `(state = 'paused') = (pause_reason IS NOT
+NULL)`; `(state = 'paused') = (paused_at IS NOT NULL)`.
+Unique: `token_jti`; `(host_id) WHERE state <> 'closed'` (one controller per host, 27 8.5);
+`(run_id) WHERE state <> 'closed'` (one session per run). A run with a row here ends its thread's
+agent session with `end_reason = 'computer_use'` (`agent_sessions`).
+Indexes: `(user_id) WHERE state <> 'closed'` for ending sessions on revocation and for the status
+chip; BRIN `(opened_at)` for retention; `(closed_at, id) WHERE closed_at IS NOT NULL` for the
+candidates of the retention job.
 Retention: `security` (period `retention.security_after_end` after `closed_at`).
 
 ### 4.15 Statistics (`stats`)
@@ -3171,6 +3220,7 @@ section 4 applies, and the gate fails.
 | R-DM-62 | A team channel is a row of `team_channels`; its members are rows of `team_members`, each with one work thread; every message the server copies into a work thread is a row of `team_inputs` with its authority, and every mirrored reply a row of `team_mirrors`; a run of a member has `trigger_kind = 'team'` and its input as `triggering_message_id` (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9). | The run, the follow-ups, the run context and the session need the input in the run's own thread; the check before every delivery needs the authority of an input whose author may be an agent, which the message itself cannot carry; the two unique keys make the job that copies idempotent. |
 | R-DM-64 | Every agent message whose `run_id` the answer check accepted and whose request carried the invocation token of that very run, and every live box anchor, is linked to its run in `run_answers` in the unit of work of the message (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | A run context gives an agent's text the record of the run that wrote it; without the link the member's own text, steered by a non-owner in another channel or an earlier run, passed the owner check (red team round 6); the token binding, because an agent steered in another run could name a concurrent owner run of the thread in `run_id` (red team round 7). |
 | R-DM-63 | Every input a run takes is recorded in `run_feeders` with the person it speaks for when it is stored or given to the run, and the record is append-only for the server (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | The check that a member's reply hands on only what owners fed reads this record; a check over the input rows themselves let a deleted card or follow-up drop a person out of it (red team rounds 2 to 4). |
+| R-DM-65 | Computer sessions are rows of `computer_sessions` in the module `terminal`, bound to one run, with at most one non-closed row per host and per run; the desktop enablement is mirrored in `hosts.reported_computer` and `hosts.computer_disabled_generation` (addendum of 2026-11-26, stage CU). | The module owns hosts, relay, keys and revocation (D-CU-01-15); the unique indexes hold one controller per host and one session per run in the database; the disabled generation keeps a remote disable in force until a new local switch-on ([27-computer-use.md](27-computer-use.md) 4). |
 
 ## 9. Configuration values of this chapter
 

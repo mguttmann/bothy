@@ -130,10 +130,12 @@ validation:
     unrecognized_links: warn
 
 # Deliberately outside the navigation: single ADRs (linked from the ADR index) and the ruling
-# files of the tickets (linked from the generated page decisions.d/index.md).
+# files of the tickets (linked from the generated page decisions.d/index.md) and the open minors
+# under backlog/ (working lists, not documentation).
 not_in_nav: |
   /adr/0*.md
   /decisions.d/*.md
+  /backlog/*.md
   /api/dart/
 
 nav:
@@ -172,6 +174,7 @@ nav:
       - 24 Terminal: spec/24-terminal.md
       - 25 Visualization: spec/25-visualization.md
       - 26 Built-in agents: spec/26-builtin-agents.md
+      - 27 Computer use: spec/27-computer-use.md
   - Architecture: architecture/README.md
   - API:
       - Overview: api/README.md
@@ -215,6 +218,7 @@ nav:
       - Mirror of Hermes sessions outside Bothy: design/hermes-session-mirror.md
       - Claude Code runner on background sessions: design/runner-background-sessions.md
       - "Team channels: agents of several projects": design/cross-project-handoff.md
+      - Computer use: design/computer-use.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
@@ -568,3 +572,10 @@ nav:
           - "AR-08: Clients: autonomous runs": briefs/AR-08-autonomous-runs-clients.md
           - "AR-09: Operations: runner service guide": briefs/AR-09-runner-service-guide.md
           - "AR-10: End to end and rollout": briefs/AR-10-autonomous-runs-end-to-end.md
+      - Stage CU:
+          - "CU-02: Computer helpers for macOS and Windows": briefs/CU-02-computer-helpers.md
+          - "CU-03: Host service: computer sessions and frames": briefs/CU-03-host-computer-sessions.md
+          - "CU-04: Server: computer sessions": briefs/CU-04-server-computer-sessions.md
+          - "CU-05: MCP server bothy-computer-mcp": briefs/CU-05-computer-mcp-server.md
+          - "CU-06: Runner integration and end to end": briefs/CU-06-runner-computer-use.md
+          - "CU-07: Clients: status, stop and desktops": briefs/CU-07-computer-use-clients.md

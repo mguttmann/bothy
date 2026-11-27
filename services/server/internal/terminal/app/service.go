@@ -77,6 +77,21 @@ type Config struct {
 	// the session limits moved between the decision and the locked unit of work (M2-46 Design
 	// note 9).
 	TxRetryMax int `config:"database.tx_retry_max"`
+	// The keys of computer sessions (CU-04, docs/spec/27-computer-use.md 18): the validity of an
+	// attach token, the deadline of the pairing, and the server values computer.open carries to
+	// the host service. Zero values make every computer use case fail closed
+	// (computerReady), so a hand-built configuration without them keeps every terminal use case.
+	ComputerAttachTokenTTL  time.Duration `config:"computer.attach_token_ttl"`
+	ComputerOpenTimeout     time.Duration `config:"computer.open_timeout"`
+	ComputerImageMaxEdge    int           `config:"computer.image_max_edge"`
+	ComputerJPEGQuality     int           `config:"computer.jpeg_quality"`
+	ComputerSettle          time.Duration `config:"computer.settle"`
+	ComputerAutoScreenshot  bool          `config:"computer.auto_screenshot"`
+	ComputerWaitMax         time.Duration `config:"computer.wait_max"`
+	ComputerKeyRepeatMax    int           `config:"computer.key_repeat_max"`
+	ComputerScrollAmountMax int           `config:"computer.scroll_amount_max"`
+	ComputerAuditAppsMax    int           `config:"computer.audit_apps_max"`
+	ComputerStatusInterval  time.Duration `config:"computer.status_interval"`
 }
 
 // Deps are the collaborators of the host use cases.
@@ -115,6 +130,9 @@ type Deps struct {
 	// AuthSessions tells terminal.sweep which login sessions ended (identity.Auth.EndedSessions,
 	// M2-46); nil fails the sweep closed.
 	AuthSessions AuthSessions
+	// Computer reads and writes the computer sessions and the enablement columns of hosts (CU-04);
+	// nil fails every computer use case closed and ends no computer session.
+	Computer ComputerStore
 	// BeforeOpenCommit is a test seam: when set, Open calls it inside its unit of work after the
 	// insert, so a test can commit a revocation between the decision and the commit
 	// (TestOpen_RevocationRaceRecheck). nil in production.
@@ -144,6 +162,8 @@ type Service struct {
 	signals atomic.Pointer[signalsHolder]
 	// notes keep the working directory index of a grant for the handler of this node (M2-47).
 	notes grantNotes
+	// computer holds the late bound ports of computer sessions (CU-04).
+	computer computerBindings
 }
 
 // relayHolder, signerHolder and metricsHolder carry the bound ports through the atomic pointers.

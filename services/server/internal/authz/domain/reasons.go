@@ -58,6 +58,9 @@ const (
 	ReasonI6Violation                      Reason = "i6_violation"
 	ReasonTerminalNoSessionUser            Reason = "terminal_no_session_user"
 	ReasonTerminalOwnerAccountOwnerOnly    Reason = "terminal_owner_account_owner_only"
+	ReasonComputerNotOwnerRun              Reason = "computer_not_owner_run"
+	ReasonComputerToolClass                Reason = "computer_tool_class"
+	ReasonComputerNotEnabled               Reason = "computer_not_enabled"
 	ReasonTerminalProfileUnknown           Reason = "terminal_profile_unknown"
 	ReasonTerminalSessionLimit             Reason = "terminal_session_limit"
 	ReasonTerminalStepUpNotFresh           Reason = "terminal_step_up_not_fresh"
@@ -137,6 +140,9 @@ var reasons = []Reason{
 	ReasonI6Violation,
 	ReasonTerminalNoSessionUser,
 	ReasonTerminalOwnerAccountOwnerOnly,
+	ReasonComputerNotOwnerRun,
+	ReasonComputerToolClass,
+	ReasonComputerNotEnabled,
 	ReasonTerminalProfileUnknown,
 	ReasonTerminalSessionLimit,
 	ReasonTerminalStepUpNotFresh,

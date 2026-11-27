@@ -14,6 +14,8 @@ const AgentSessionEndReasonEnum _$agentSessionEndReasonEnum_import_ =
     const AgentSessionEndReasonEnum._('import_');
 const AgentSessionEndReasonEnum _$agentSessionEndReasonEnum_agentChanged =
     const AgentSessionEndReasonEnum._('agentChanged');
+const AgentSessionEndReasonEnum _$agentSessionEndReasonEnum_computerUse =
+    const AgentSessionEndReasonEnum._('computerUse');
 const AgentSessionEndReasonEnum
 _$agentSessionEndReasonEnum_unknownDefaultOpenApi =
     const AgentSessionEndReasonEnum._('unknownDefaultOpenApi');
@@ -28,6 +30,8 @@ AgentSessionEndReasonEnum _$agentSessionEndReasonEnumValueOf(String name) {
       return _$agentSessionEndReasonEnum_import_;
     case 'agentChanged':
       return _$agentSessionEndReasonEnum_agentChanged;
+    case 'computerUse':
+      return _$agentSessionEndReasonEnum_computerUse;
     case 'unknownDefaultOpenApi':
       return _$agentSessionEndReasonEnum_unknownDefaultOpenApi;
     default:
@@ -41,6 +45,7 @@ final BuiltSet<AgentSessionEndReasonEnum> _$agentSessionEndReasonEnumValues =
       _$agentSessionEndReasonEnum_rebind,
       _$agentSessionEndReasonEnum_import_,
       _$agentSessionEndReasonEnum_agentChanged,
+      _$agentSessionEndReasonEnum_computerUse,
       _$agentSessionEndReasonEnum_unknownDefaultOpenApi,
     ]);
 
@@ -54,6 +59,7 @@ class _$AgentSessionEndReasonEnumSerializer
     'rebind': 'rebind',
     'import_': 'import',
     'agentChanged': 'agent_changed',
+    'computerUse': 'computer_use',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
@@ -61,6 +67,7 @@ class _$AgentSessionEndReasonEnumSerializer
     'rebind': 'rebind',
     'import': 'import_',
     'agent_changed': 'agentChanged',
+    'computer_use': 'computerUse',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 

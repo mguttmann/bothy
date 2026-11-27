@@ -84,6 +84,41 @@ new sessions of that session user and ends its running ones, no other session us
 any other start-refusing finding refuses new sessions with `pty_failed`.
 Every change of the result sends `report`.
 
+## Computer sessions (CU-03)
+
+Normative: [27-computer-use.md](../../docs/spec/27-computer-use.md); rulings:
+[decisions.d/CU-03.md](../../docs/decisions.d/CU-03.md). Only with `host_service.computer_use`
+(refused together with `host_service.owner_account`): the service opens the helper endpoint
+(macOS `/Library/Application Support/bothy-host/computer/computer.sock`, Windows
+`\\.\pipe\bothy-host-computer`, Linux `/run/bothy-host-computer/computer.sock` for the test peer
+of `host_service.computer_test_peer` only) and admits the computer helper by the peer rule of 27 9.4
+(console user, not the service user or a session user, the installed helper path with the rule of
+HD10, the signing requirement of the build; the peer is the process the connection captured: macOS
+audit token with its PID version, Windows the client process handle held from the accept; checked
+again after `hello` and before every session); a refused peer is closed and logged with
+`computer_peer_refused` and the step that refused it under `reason` (27 9.4); an admitted helper
+is logged with `computer_helper_connected`, its end with `computer_helper_gone`. The helper's `hello` and `state` become the `report` object `computer`;
+without the key nothing listens and the report carries no object `computer` (the server reads it as
+`helper: absent`).
+
+`computer.open` checks helper, enablement and the controller lock (one live computer session per
+host), shows the indicator and dials `/api/v1/hosts/computer-sessions/{session_id}/stream`; message
+1 runs the checks of 27 5.3 with the prologue `bothy-computer/1` and the attach token
+(`computer-session+jwt`, verified with the JWKS of purpose `terminal` of that connection). Frames
+`0x20` to `0x25` (`internal/frame`, `frame.Decode` takes the session kind). Actions are mapped back
+from screenshot pixels with scale IDs, images go out in `cu_image_data` chunks of at most
+`frame.MaxImageChunk` bytes and live only in memory. A lock pauses the session (`screen_locked` per
+action, every key released), the unlock resumes. Every end the host sees releases every key and
+button, hides the indicator, sends `cu_state` `stopped` and exactly one `computer.ended` (none after
+`computer.close`). The Linux test backend of the helper is
+[test/computer_backend](test/computer_backend/README.md).
+
+The other end of the stream is `bothy-computer-mcp` (CU-05), the stdio MCP server next to the
+Claude Code runner: tools, request folder, key pinning, Noise initiator and image reassembly in
+`internal/computermcp`, the command in [cmd/bothy-computer-mcp](cmd/bothy-computer-mcp/README.md).
+It is built from this module and shipped with the host release, but it never runs inside the host
+service.
+
 ## Session ops of the local channel
 
 Kind `0x00` carries JSON ops `{"op","id","d"}`:
@@ -215,7 +250,8 @@ definition restarts it, only `bothy-host restart` does.
 
 `make release-build VERSION=<x.y.z> OUT=<dir>` (tools/distribution/hostdist.py) writes the
 release binaries `bothy-host_<v>_<os>_<arch>[.exe]` for darwin/arm64, darwin/amd64, linux/amd64,
-linux/arm64 and windows/amd64 and the packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` of
+linux/arm64 and windows/amd64, the binaries `bothy-computer-mcp_<v>_<os>_<arch>[.exe]` for the same
+platforms (CU-05, not in the packages) and the packages `bothy-host_<v>_linux_<arch>.deb` and `.rpm` of
 [infra/host](../../infra/host/README.md); `release-apple` (macOS) the signed and notarized
 `.pkg` per architecture, `release-windows` the signed MSI. The packages carry the service
 definitions of `install` only as references in `share/`; `install` writes the live ones. Builds are without cgo, with
@@ -225,6 +261,12 @@ trials: `make release-trial COMPONENT=host` at the root (binaries, Linux package
 signatures), `make trial-apple OUT=<dir>` and the CI jobs `host trial (macOS)` and `host trial
 (Windows)` (only on disposable runners: they install the package). docs/operations/release.md
 2.5 is the runbook.
+
+The computer helpers (brief CU-02, [desktop/README.md](desktop/README.md)) are not published:
+the release packages carry none (D-CU-01-29). On the owner's machines `make helper-macos`,
+`helper-sign-macos` and `helper-package-macos` (macOS) and the `helper-*-windows` steps of
+`hostdist.py` sign them and build a host package with the helper as an optional component, which
+sets `host_service.computer_use` when selected.
 
 Version below the minimum: the server closes with `4114` (or `hello` names no protocol version
 of the host). The client ends all PTYs, does not reconnect, logs one line `update the host
@@ -293,7 +335,10 @@ place; it never prints a path.
 `doctor` prints one line per entry (`HD<n> ok`, `HD<n> WARN <code>`, `HD<n> FAIL <code>` with
 `session_user=`, `user=`, `drive=` or `item=`), the summary and the declaration in use; never a
 path, a content or a value. The codes are the table "Codes of `doctor`" in 24 2.2. The report to
-the server carries codes and, by the rule for names, the names of session users only.
+the server carries codes and, by the rule for names, the names of session users only. After the
+summary follows the section `computer` (27 9.3; no HD check): `computer: off`, or the helper
+installed, its path trusted, the build signed or development, the helper connected, switched on
+with its generation, and the two permissions.
 
 ## Exit policy and the way per platform
 
@@ -339,8 +384,15 @@ the server carries codes and, by the rule for names, the names of session users 
 | `internal/pty/` | PTY and process tree per platform (cgroup, process group and run file, Job Object) |
 | `internal/profiles/` | offered profiles, start specifications and allow-list environments |
 | `internal/confirm/` | confirmation endpoint, peer rule and the agent with its dialogs |
+| `desktop/` | the computer helpers for macOS (Swift) and Windows (C++), [README](desktop/README.md) (CU-02) |
+| `testdata/computer/` | the channel vectors of the helper channel (27 9.4) |
+| `internal/computer/` | computer sessions (CU-03): manager, session, helper channel, peer rule, scale map, chunking, attach token check |
+| `internal/computermcp/` | `bothy-computer-mcp` (CU-05): MCP over stdio, tools, request folder client, pin store, attach client and Noise initiator |
+| `cmd/bothy-computer-mcp/` | the command of the MCP server of computer use ([README](cmd/bothy-computer-mcp/README.md)) |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
 | `test/platform/` | the platform suite (build tag `platform`), its marker guard (`guard.go`, untagged) and the accounts it creates (`accounts.go`, untagged) |
+| `test/computer_backend/` | Linux test backend of the computer helper (Python, python-xlib and XTEST) and the fixture app ([README](test/computer_backend/README.md)) |
+| `test/computermcp/` | end-to-end test of `bothy-computer-mcp` (build tag `computere2e`) and `run.sh`, its throwaway container (`make computer-mcp-e2e`) |
 | `test/noisedevice/` | the Noise sidecar of the Go test device of the terminal suite in `services/server/test/terminal` (M2-48): JSON lines on stdin and stdout, `internal/noise` and `internal/frame` unchanged |
 | `.go-arch-lint.yml` | architecture rules, maintained by hand, one component per package |
 

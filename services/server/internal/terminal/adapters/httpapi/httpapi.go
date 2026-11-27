@@ -230,7 +230,24 @@ func toREST(v terminal.HostView) rest.Host {
 		}
 		out.ReportedSessionUsers = &list
 	}
+	withComputer(&out, v)
 	return out
+}
+
+// withComputer adds the computer members of v to out (07 2.15 item 5: only an owner's view has
+// them).
+func withComputer(out *rest.Host, v terminal.HostView) {
+	if c := v.Computer; c != nil {
+		out.Computer = &rest.HostComputer{Helper: rest.HostComputerHelper(c.Helper), Enabled: c.Enabled, Generation: int(c.Generation),
+			OsAccount: c.OSAccount, Permissions: rest.HostComputerPermissions{Capture: rest.HostComputerPermissionsCapture(c.Capture),
+				Input: rest.HostComputerPermissionsInput(c.Input)}, HelperVersion: c.HelperVersion, Signature: rest.HostComputerSignature(c.Signature),
+			Locked: c.Locked}
+	}
+	out.ComputerListed = v.ComputerListed
+	if g := v.ComputerDisabledGeneration; g != nil {
+		n := int(*g)
+		out.ComputerDisabledGeneration = &n
+	}
 }
 
 func optional(s string) *string {

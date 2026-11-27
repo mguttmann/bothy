@@ -42,7 +42,10 @@ Security is built in and cannot be switched off:
 
 Not in this version: file transfer and clipboard over the channel, recording of
 content, shared sessions of several people, terminal for agents or apps, taking over a
-thread of the runner into the terminal (section 11.3).
+thread of the runner into the terminal (section 11.3). Computer sessions
+([27-computer-use.md](27-computer-use.md), stage CU) use the same host service, pairing, keys,
+relay and revocation path with a session kind of their own; they are no terminal sessions and
+change none of the rules of this chapter.
 
 Anti-goals: a way around the permission model; terminal content in the server, in telemetry, in the
 audit, in search, in push or in the context of an agent; a way to use the personal
@@ -658,6 +661,12 @@ check passed.
 
 `peer_mismatch` and `helper_unreachable` name the session user of that channel.
 
+A computer-use-only host (`host_service.computer_use` on, no session users, not the owner account
+mode; 27 9.4, D-CU-03-13) gives no terminal session: there `session_users_empty` (HD1) and
+`peer_check_unavailable` (HD10) are warnings and refuse no start, and the report names them, so the
+server shows the terminal as unavailable. With at least one session user every rule above applies
+unchanged.
+
 ### 2.3 Server host
 
 If the host service runs on the host that runs the server, a shell there reaches the
@@ -821,7 +830,9 @@ Details of the pairing (M2-41, docs/DECISIONS.md D-M2-41-1 to D-M2-41-16):
   above all the private `d`, is `unknown_member` under `/auth_public_jwk/<name>`. The server stores
   the JWK as it builds it and its RFC 7638 thumbprint as `auth_jkt`.
 - **Report.** At least one session user (`empty`, otherwise the host can never offer a terminal,
-  HD1); names follow the pattern of 03, at most `host.os_user_max_chars` characters (`too_long`),
+  HD1), except with `computer_use` true: a computer-use-only host pairs with an empty list and
+  offers no terminal; `terminal.open` on it is refused with `terminal_denied` `no_session_user`
+  (07 2.12, D-CU-03-13); names follow the pattern of 03, at most `host.os_user_max_chars` characters (`too_long`),
   distinct without regard to case (`duplicate`); working directories, profile names, display names
   and `os_version` are display texts (SEC-IN-4) with at most `terminal.report_label_max_chars`
   characters; profile names distinct (`duplicate`); every list at most
@@ -2004,7 +2015,9 @@ The rules are in [07-permissions.md](07-permissions.md):
   Reason: without a separate session user, the session would run in an account whose logins
   another person also uses (2.2).
 - Agents and apps never open a terminal: the actions require a person in a session;
-  an agent that is controlled by prompt injection reaches no host.
+  an agent that is controlled by prompt injection reaches no host through a terminal. The only
+  way an agent reaches a host is computer use on a desktop of the owner in a run the owner
+  started (SR13, [27-computer-use.md](27-computer-use.md), ADR 0079, T-CU-02).
 
 ### 8.3 Revocation
 

@@ -51,6 +51,10 @@ void registerHostHandlers(
       world.hosts[r.param('host_id')] ??
       (throw const FakeProblem(404, 'not_found'));
 
+  /// [h] as the caller of [r] reads it: owners get the computer members (07 2.15 item 5).
+  HostJson readerJson(FakeRequest r, FakeHost h) =>
+      r.person.isOwner ? h.ownerJson(r.person.id) : h.json;
+
   /// `If-Match` against the version of [h] (06: `428` without, `412` on a mismatch).
   void ifMatch(FakeRequest r, FakeHost h) {
     final match = RegExp(r'^"?(\d+)"?$')
@@ -175,10 +179,10 @@ void registerHostHandlers(
             h,
       ]..sort((a, b) => a.name.compareTo(b.name));
       return FakeResponse(200, {
-        'items': [for (final h in hosts) h.json],
+        'items': [for (final h in hosts) readerJson(r, h)],
       });
     })
-    ..handle('getHost', (r) => FakeResponse(200, hostOf(r).json))
+    ..handle('getHost', (r) => FakeResponse(200, readerJson(r, hostOf(r))))
     ..handle('createHost', (r) {
       owner(r);
       stepUp(r);

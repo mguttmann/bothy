@@ -28,8 +28,10 @@ class HostPairRequest:
         host_version (str):
         profiles (list[HostProfile]):
         session_users (list[HostReportedSessionUser]): The session users of `host_service.session_users` with the
-            display names of their working directories (24 section 2.2).
+            display names of their working directories (24 section 2.2). At least one, except with `computer_use`.
         os_version (str | Unset):
+        computer_use (bool | Unset): The host service runs with `host_service.computer_use`; then `session_users` may be
+            empty, a computer-use-only host that gives no terminal session (27 9.4, D-CU-03-13). Default: False.
     """
 
     pairing_code: str
@@ -40,6 +42,7 @@ class HostPairRequest:
     profiles: list[HostProfile]
     session_users: list[HostReportedSessionUser]
     os_version: str | Unset = UNSET
+    computer_use: bool | Unset = False
 
     def to_dict(self) -> dict[str, Any]:
         pairing_code = self.pairing_code
@@ -64,6 +67,8 @@ class HostPairRequest:
 
         os_version = self.os_version
 
+        computer_use = self.computer_use
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -79,6 +84,8 @@ class HostPairRequest:
         )
         if os_version is not UNSET:
             field_dict["os_version"] = os_version
+        if computer_use is not UNSET:
+            field_dict["computer_use"] = computer_use
 
         return field_dict
 
@@ -117,6 +124,8 @@ class HostPairRequest:
 
         os_version = d.pop("os_version", UNSET)
 
+        computer_use = d.pop("computer_use", UNSET)
+
         host_pair_request = cls(
             pairing_code=pairing_code,
             noise_public_key=noise_public_key,
@@ -126,6 +135,7 @@ class HostPairRequest:
             profiles=profiles,
             session_users=session_users,
             os_version=os_version,
+            computer_use=computer_use,
         )
 
         return host_pair_request

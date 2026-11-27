@@ -183,6 +183,10 @@ final class FakeTerminal {
   /// The open device stream per session.
   final Map<String, FakeTerminalStream> streams = {};
 
+  /// The computer sessions by ID (27 8; CU-07); the tests of the apps open them with
+  /// [FakeWorldComputer.openComputerSession], as the runner would.
+  final Map<String, FakeComputerSession> computerSessions = {};
+
   /// Every close code the fake sent to a device stream, in order, as `(session, code, reason)`.
   final List<(String, int, String?)> closes = [];
 
@@ -405,4 +409,217 @@ extension FakeWorldTerminalHosts on FakeWorld {
       )
       .map((g) => g['id']! as String)
       .firstOrNull;
+}
+
+/// One computer session as the fake server keeps it (docs/spec/27-computer-use.md 8, 12.2;
+/// brief CU-07 Scope): the metadata of `ComputerSession`, never an image.
+final class FakeComputerSession {
+  /// Creates a session in `opening`.
+  FakeComputerSession({
+    required this.id,
+    required this.hostId,
+    required this.desktop,
+    required this.userId,
+    required this.agentId,
+    required this.runId,
+    required this.generation,
+    required this.keyGeneration,
+    required this.openedAt,
+  });
+
+  /// The session ID.
+  final String id;
+
+  /// The host.
+  final String hostId;
+
+  /// The host's name.
+  final String desktop;
+
+  /// The triggering owner.
+  final String userId;
+
+  /// The agent of the run.
+  final String agentId;
+
+  /// The run.
+  final String runId;
+
+  /// The enablement generation the session was opened with.
+  final int generation;
+
+  /// The key generation of the host.
+  final int keyGeneration;
+
+  /// When the session was opened (API timestamp).
+  final String openedAt;
+
+  /// `opening`, `active`, `paused` or `closed`.
+  String state = 'opening';
+
+  /// `locked` while paused, else null.
+  String? pauseReason;
+
+  /// The count of actions.
+  int actionCount = 0;
+
+  /// The identity of the frontmost app, or null.
+  String? frontApp;
+
+  /// When the session ended, or null.
+  String? closedAt;
+
+  /// The person who stopped it, or null.
+  String? stoppedBy;
+
+  /// The `close_reason` of a closed session.
+  String? closeReason;
+
+  /// The `close_detail` of a closed session, or null.
+  String? closeDetail;
+
+  /// The version.
+  int version = 1;
+
+  /// Whether the session is closed.
+  bool get closed => state == 'closed';
+
+  /// The API `ComputerSession`.
+  JsonMap get json => {
+    'id': id,
+    'host_id': hostId,
+    'desktop': desktop,
+    'user_id': userId,
+    'agent_id': agentId,
+    'run_id': runId,
+    'state': state,
+    'pause_reason': ?pauseReason,
+    'generation': generation,
+    'key_generation': keyGeneration,
+    'opened_at': openedAt,
+    'paused_ms': 0,
+    'closed_at': ?closedAt,
+    'stopped_by': ?stoppedBy,
+    'close_reason': ?closeReason,
+    'close_detail': ?closeDetail,
+    'action_count': actionCount,
+    'front_app': ?frontApp,
+    'version': version,
+  };
+}
+
+/// The computer steps of the world (27 4, 8; brief CU-07): what the host service and the
+/// runner would report, and the ends the server writes.
+extension FakeWorldComputer on FakeWorld {
+  /// Sets the `computer` object host [hostId] reports (27 12.3): a connected helper, [enabled]
+  /// with [generation], the account [osAccount], and both permissions [permission]; raises the
+  /// host's version and appends `host.updated` (without the object, D-CU-04-6).
+  void reportComputer(
+    String hostId, {
+    required bool enabled,
+    required int generation,
+    String osAccount = 'alex',
+    String permission = 'granted',
+    String helper = 'connected',
+    bool locked = false,
+  }) {
+    final h = hosts[hostId]!
+      ..computer = {
+        'helper': helper,
+        'enabled': enabled,
+        'generation': generation,
+        'os_account': osAccount,
+        'permissions': {'capture': permission, 'input': permission},
+        'helper_version': '1.0.0',
+        'signature': 'verified',
+        'locked': locked,
+      };
+    hostUpdated(h);
+  }
+
+  /// Opens a computer session of [userId] on [hostId] for the run [runId] of [agentId] (fresh
+  /// IDs when null), as `openComputerSession` of the runner does, and appends its event.
+  FakeComputerSession openComputerSession({
+    required String hostId,
+    required String userId,
+    String? agentId,
+    String? runId,
+  }) {
+    final h = hosts[hostId]!;
+    final s = FakeComputerSession(
+      id: nextId(),
+      hostId: h.id,
+      desktop: h.name,
+      userId: userId,
+      agentId: agentId ?? nextId(),
+      runId: runId ?? nextId(),
+      generation: (h.computer?['generation'] as int?) ?? 0,
+      keyGeneration: h.keyGeneration,
+      openedAt: stamp(),
+    );
+    terminal.computerSessions[s.id] = s;
+    computerSessionChanged(s);
+    return s;
+  }
+
+  /// Appends the personal `computer_session.changed` of [s] (27 12.4).
+  void computerSessionChanged(FakeComputerSession s) {
+    s.version += 1;
+    append(
+      'computer_session.changed',
+      resource: {'kind': 'computer_session', 'id': s.id, 'version': s.version},
+      payload: s.json,
+      audience: s.userId,
+    );
+  }
+
+  /// A `computer.state` of the host (27 12.3): [state] (`active` or `paused`), the action count
+  /// and the frontmost app; `paused` carries `locked`.
+  void setComputerState(
+    FakeComputerSession s, {
+    required String state,
+    int? actionCount,
+    String? frontApp,
+  }) {
+    s
+      ..state = state
+      ..pauseReason = state == 'paused' ? 'locked' : null
+      ..actionCount = actionCount ?? s.actionCount
+      ..frontApp = frontApp ?? s.frontApp;
+    computerSessionChanged(s);
+  }
+
+  /// Ends [s] with [reason] and [detail] (27 8.3); [stoppedBy] for a stop from a client.
+  void endComputerSession(
+    FakeComputerSession s,
+    String reason, {
+    String? detail,
+    String? stoppedBy,
+  }) {
+    if (s.closed) return;
+    s
+      ..state = 'closed'
+      ..pauseReason = null
+      ..closeReason = reason
+      ..closeDetail = detail
+      ..stoppedBy = stoppedBy
+      ..closedAt = stamp();
+    computerSessionChanged(s);
+  }
+
+  /// `computer.device.disable` on [h] (27 4 item 4): the reported generation becomes the
+  /// disabled one, the host's open session ends with `device_disabled`, and the host's version
+  /// rises with `host.updated`; a host without a newer generation changes nothing.
+  void disableComputer(FakeHost h) {
+    final generation = h.computer?['generation'] as int?;
+    final disabled = h.computerDisabledGeneration;
+    if (generation == null || (disabled != null && disabled >= generation)) {
+      return;
+    }
+    h.computerDisabledGeneration = generation;
+    for (final s in terminal.computerSessions.values.toList()) {
+      if (s.hostId == h.id) endComputerSession(s, 'device_disabled');
+    }
+    hostUpdated(h);
+  }
 }

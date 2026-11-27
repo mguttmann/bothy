@@ -1678,6 +1678,7 @@ holds the exclusion, the chapter names it.
 | P-27 | Built-in agents are the stage A1 after the milestones, with ticket IDs `A1-<two-digit number>` and briefs in the same index and the same checks as the milestones (`brief_deps.py`, the brief format test); the plan section gets the next free number (21) so that no reference to sections 18 to 20 changes. | The owner request of 2026-11-05 came after M8; renumbering the sections would break every brief that cites "section 19" of this plan. |
 | P-28 | V1-07 to V1-12 run as tasks from their plan rows without a brief. | V1-07 waits for an owner ruling and changes files outside the repository; V1-08 and V1-09 are small and their cause is read on the day; V1-10 to V1-12 describe a state that exists only after A1-10, and a brief written now would describe what is not built yet. |
 | P-29 | Autonomous runs are the stage AR after the milestones, with ticket IDs `AR-<two-digit number>`, briefs in the same index and the same checks as A1 (P-27), and the plan section 22. A ticket ID never follows a letter, digit or dash, so decision IDs such as `D-AR-12` name no ticket. | The owner request of 2026-11-06 came after A1; a separate stage keeps its order and checks visible, and the design note already uses `D-AR-<n>` for its decisions. |
+| P-30 | Computer use is the stage CU after the milestones, with ticket IDs `CU-<two-digit number>`, briefs in the same index and the same checks as A1 and AR (P-27, P-29), and the plan section 23. CU-02 to CU-07 are built in parallel on the branch of the stage and land with CU-01 in one pull request with one CI round. | The owner ruling OR-1 of 2026-11-26 came after AR; a stage of its own keeps its order and checks visible; one pull request for interdependent tickets is the owner's decision of 2026-11-21 (AGENTS.md). |
 
 ## 20. Defaults for questions to the owner
 
@@ -1922,6 +1923,115 @@ Launch arguments for the build workflow (brief files as in the [brief index](bri
     {"id": "AR-06", "brief": "docs/briefs/AR-06-runner-recovery-usage.md", "deps": ["AR-05"]},
     {"id": "AR-07", "brief": "docs/briefs/AR-07-runner-end-state.md", "deps": ["AR-05"]},
     {"id": "AR-10", "brief": "docs/briefs/AR-10-autonomous-runs-end-to-end.md", "deps": ["AR-06", "AR-07", "AR-08", "AR-09"]}
+  ]
+}
+```
+
+## 23. CU Computer use
+
+### Goal
+
+An agent in a run of the owner sees the screen of a desktop of the owner and operates its mouse and
+keyboard without restriction: the terminal, the browser, any app and the system settings, on macOS
+and Windows. The owner orders it from any client, the phone included, without a confirmation at the
+target; a desktop is reachable only after a one-time enablement at that machine. The server never
+sees a screenshot (owner ruling OR-1, D-CU-01-1).
+
+### Scope
+
+[27-computer-use.md](spec/27-computer-use.md), [07-permissions.md](spec/07-permissions.md) 2.15 and
+SR13, 03 `computer_sessions` and the computer columns of `hosts`, 01 3.9, 05 R-AZ-38, 15 R-CL-18,
+19 11c, 20 sections 2, 4.7, 6 and 9, the threat model 5.18 and 6.10;
+[ADR 0079](adr/0079-agent-computer-use-on-a-paired-desktop.md); design note
+[computer-use.md](design/computer-use.md); rulings [decisions.d/CU-01.md](decisions.d/CU-01.md).
+
+### Out of scope
+
+Later tickets: CU-08 dragging, holding a key or button, several screens; CU-09 the Hermes adapter
+(an MCP toolset counts as `host` there already, `tool_class.py`; taken along in CU-06 if trivial);
+CU-10 a live view for the owner; CU-11 a background mode without the pointer (unverified that one
+exists); CU-12 persons other than the owner (own ADR, consent rule and codetermination check);
+CU-13 a Windows system service for the secure desktop, only if the owner asks (F14). Not at all: a
+screenshot in the thread (F3), unlocking a locked machine (F13), an external penetration test of the
+stage (D-CU-01-9).
+
+### Exit criteria
+
+1. CU-T01 to CU-T25 of 27 section 15 are green; CU-T24 runs in Compose with the Linux test backend
+   in CI.
+2. The native jobs on `macos-15` and `windows-2025` are green, or the probe of CU-02 showed that a
+   hosted runner cannot prove capture and input on a platform and the gap stands in 27 section 16
+   and the stage report.
+3. Without `runner.computer_use`, `host_service.computer_use` and a local enablement, runner, host
+   service and server behave as before.
+4. The red team over the stage attacked T-CU-01 to T-CU-08 and its verdict is `JA`.
+
+### Test strategy
+
+Host and MCP server: Go unit tests with fakes behind the channel to the helper (the native
+helpers have their own fakes behind `Capturer`, `Injector`, `AppInspector`, `LockMonitor` and
+`EnablementStore`, CU-02), the frame and token tests, the race between the lock check and an
+action, chunking at the Noise limit, key release on every end. Server: one test per refusal of
+SR13 and per end path against PostgreSQL, the sentinel test. Runner: the per-turn MCP file, the
+request folder, the end of the Claude Code session against the recorded layout of the pinned CLI.
+End to end: Compose with Xvfb, XTest and a fixture app, a scripted agent without a model. Native:
+CI jobs on hosted macOS and Windows runners after a probe; no GUI or input test on a maintainer's
+machine and no run with a real model as a test. A manual evaluation with a real model on the
+owner's machines is the owner's own step and no gate.
+
+### Red team
+
+No run other than the owner's own `host` run opens or attaches a session; no image, coordinate or
+typed text reaches the server, its logs, audit, telemetry, event log, search, push or the thread; a
+stolen attach token gives nothing; no local process other than the installed, trusted helper drives
+the screen through the host service; every end path releases every key; a remote disable holds
+until a new local switch-on; the Claude Code session of a computer run leaves no screenshot on the
+runner host after the run.
+
+### Dependencies
+
+All product milestones are merged (M1 to M8). CU-01 is this specification; every later ticket
+starts after it, so the column "Depends on" below does not repeat it. The tickets are built in
+parallel on the stage branch and land together in one pull request (P-30).
+
+### Owner
+
+OR-1 of 2026-11-26 and the rulings F3, F13 and F14 are recorded as D-CU-01-1, D-CU-01-10 to
+D-CU-01-12. The helpers are not published; the owner signs them on the owner's own machines (Developer ID on
+the Mac, a self-signed certificate trusted only on the Windows computer, D-CU-01-29). The manual evaluation with a real model on the owner's Mac and Windows computer is the
+owner's step after the merge.
+
+### Risks
+
+A hijacked agent in an owner's run has the owner's full rights on the desktop (T-CU-02, accepted by
+OR-1); hosted CI runners may not prove native capture and input (27 section 16); a change of the
+helper's signature voids the macOS grants silently (doctor and release test); the transcript removal
+depends on the pinned CLI's layout. RISKS.md is updated at the close of the stage (section 4 item 6).
+
+### Tickets
+
+| ID | Title | Goal | Files and modules | Acceptance tests | Depends on |
+|---|---|---|---|---|---|
+| CU-01 | Specification, ADR, decisions and briefs | Chapter 27, 07 2.15 and SR13, the tables of 03, the threat model, the `never` rows of 01 and SPEC sections 4 to 6 per OR-1; ADR 0079; the rulings; briefs CU-02 to CU-07; the brief and configuration tools accept stage CU. | `docs/`, `tools/docs/`, `tools/configdoc/`, `services/server/architecture/modules.yaml`, `services/server/internal/wire` (retention coverage) | `make docs`, `make catalog-check`, `make config-doc-check`, `make diagrams`, `make register-check` and the brief tests green | none |
+| CU-02 | Computer helpers for macOS and Windows | Swift helper and C++ helper: capture, input, app identity, lock state, keeping awake, Esc tap, indicator with stop, enablement switch with generation, the helper side of the local channel, packaging into the host `.pkg` and MSI, signing in `release.yml`, the probe job and native jobs in `host-platform.yml` (27 4, 9). | `services/host/desktop/`, `services/host/Makefile`, `tools/distribution/`, `.github/workflows/release.yml`, `.github/workflows/host-platform.yml` | the helper tests of CU-T13 to CU-T16 against the fake channel; native jobs or the recorded probe result | none |
+| CU-03 | Host service: computer sessions and frames | The frame types of 27 6.3, the session kind `computer` with the checks of 5.3, enablement report, controller lock, pause, coordinate mapping, chunking, the local channel with the peer rule of 9.4, the doctor section `computer`, the refusal of the owner account mode, the Linux test backend. | `services/host/internal/frame`, `services/host/internal/computer`, `services/host/internal/session`, `services/host/internal/control`, `services/host/internal/doctor`, `services/host/test/` | CU-T07 to CU-T16, CU-T23 | none |
+| CU-04 | Server: computer sessions | Catalogue rows, operations, host ops and events of 27 12; migrations for `computer_sessions` and the `hosts` columns; SR13; the attach token; relay pairing; enablement mirror and remote disable; run binding and revocation in the transaction; audit; the sentinel test. | `services/server/internal/terminal`, `internal/runs` (end hook), `internal/authz`, migrations, `docs/api/`, `docs/spec/actions.yaml`, `services/server/api/operations.yaml` | CU-T01 to CU-T06, CU-T16 to CU-T18 server parts, CU-T25 | none |
+| CU-05 | MCP server `bothy-computer-mcp` | `stdio` MCP server with the tools of 27 7, Noise initiator with per-runner pinning, image reassembly, the request folder client, codes and the data line. | `services/host/cmd/bothy-computer-mcp/`, `services/host/internal/computermcp/` | CU-T19, CU-T20 | CU-03, CU-04 |
+| CU-06 | Runner integration and end to end | `runner.computer_use`, the per-turn MCP file, the request folder with nonce, the system prompt block, the end of the Claude Code session after a computer run, the probes of 27 16 for the CLI, the Compose end-to-end test with the Linux backend. | `plugins/claude-code-runner`, `infra/compose/`, `tests/e2e/` | CU-T21, CU-T22, CU-T24 | CU-05 |
+| CU-07 | Clients: status, stop and desktops | Status chip with pause state and stop, the desktop list with "Switch enablement off", the tray entry; desktop, phone and console where 01 3.9 names them. | `apps/client/lib/computer/`, `apps/client/lib/desktop/tray.dart`, `packages/admin_ui`, Dart client | widget and integration tests per platform against the Dart fake server | CU-04 |
+
+Launch arguments for the build workflow (brief files as in the [brief index](briefs/README.md)):
+
+```json
+{
+  "parallel": 4,
+  "tickets": [
+    {"id": "CU-02", "brief": "docs/briefs/CU-02-computer-helpers.md", "deps": []},
+    {"id": "CU-03", "brief": "docs/briefs/CU-03-host-computer-sessions.md", "deps": []},
+    {"id": "CU-04", "brief": "docs/briefs/CU-04-server-computer-sessions.md", "deps": []},
+    {"id": "CU-05", "brief": "docs/briefs/CU-05-computer-mcp-server.md", "deps": ["CU-03", "CU-04"]},
+    {"id": "CU-07", "brief": "docs/briefs/CU-07-computer-use-clients.md", "deps": ["CU-04"]},
+    {"id": "CU-06", "brief": "docs/briefs/CU-06-runner-computer-use.md", "deps": ["CU-05"]}
   ]
 }
 ```

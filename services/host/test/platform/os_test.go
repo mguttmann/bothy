@@ -184,6 +184,7 @@ func uninstall(t *testing.T, users []string) {
 		for _, u := range users {
 			_, _ = try("sc.exe", "stop", "bothy-host-helper-"+u)
 			_, _ = try("sc.exe", "delete", "bothy-host-helper-"+u)
+			deleteWindowsProfile(u)
 			_, _ = try("net", "user", u, "/delete")
 		}
 	}

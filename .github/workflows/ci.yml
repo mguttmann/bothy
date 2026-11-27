@@ -950,7 +950,7 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-adapters-e2e ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -970,6 +970,10 @@ jobs:
           cache-dependency-path: services/*/go.sum
       - name: make adapters-e2e
         run: make adapters-e2e
+      # CU-T24: computer use end to end in the Compose stack of the terminal suite (server, host
+      # service with the Linux test backend, the runner with a scripted Fake-Claude; CU-06).
+      - name: make computer-e2e
+        run: make computer-e2e
       # Background sessions of the CLI the runner runs with, against the stand-in API
       # (FIX-RUNNER-BG-NO-PROMPT).
       - name: make runner-real-cli

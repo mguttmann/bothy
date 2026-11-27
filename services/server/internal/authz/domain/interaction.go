@@ -71,6 +71,9 @@ type InteractionFacts struct {
 	ComponentRunActive bool
 	// RunStarterID is the person who started that run; zero without a run.
 	RunStarterID ids.ID
+	// ComputerHeld reports that that run has a computer session that is not closed (CU-04, 07
+	// SR13 item 5).
+	ComputerHeld bool
 }
 
 // interactionGuard is the guard of interaction.create: the agent.invoke guard with the interaction
@@ -125,6 +128,11 @@ func checkInteraction(f *InteractionFacts) error {
 func componentRules(in *Input, f *InteractionFacts) Reason {
 	if f.Stage == InteractionStageAccept && !componentActive(f, in.Now) {
 		return ReasonComponentInactive
+	}
+	if f.Stage == InteractionStageAccept && f.ComputerHeld && (f.RunStarterID.IsZero() || f.RunStarterID != in.Principal.ID) {
+		// SR13 item 5 (CU-04): while the run holds a computer session only the person who
+		// triggered it operates its components, owners included.
+		return ReasonComputerNotOwnerRun
 	}
 	if f.RequiredCapability != "" {
 		// checkInteraction has parsed the name before.
