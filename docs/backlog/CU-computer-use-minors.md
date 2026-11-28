@@ -73,3 +73,14 @@ Collected minors without a reproduced harm; the next run in this area reads and 
   may leave the window behind others.
 - (28.11., same review) `visible_windows_windows` in `tools/ci/computer_probe.py` calls `user32`
   without `argtypes`; an HWND above 2^31 would raise.
+- (28.11., red team of FIX-CU-HELPER-NO-ICON) Windows settings window: a double click of the agent
+  on the switch could give two `BN_CLICKED`, off (ending the session) and on again (generation +1);
+  the end state equals the start state, but FIX-CU-NOICON/2 says the agent can only switch off. The
+  window is not excluded from the capture on Windows.
+- (28.11., same red team) macOS: while a helper started by hand runs, the LaunchAgent's own start
+  ends at once and launchd restarts it about every 10 s (silent, `KeepAlive`).
+- (28.11., same red team) That Spotlight finds the installed bundle is seen on one Mac
+  (`mdfind` lists it), not as a search in the Spotlight window.
+- (28.11., same red team) macOS: a click pulse that began before `hide` stays up to 400 ms.
+- (28.11., same red team) Spec 27 section 15 has no CU-T row for R-CU-13; the tests exist (Swift,
+  C++ core, CI probe window checks).
