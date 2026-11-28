@@ -54,3 +54,11 @@ Collected minors without a reproduced harm; the next run in this area reads and 
 - (27.11., same review) `plugins/claude-code-runner/tests/unit/test_computer.py`
   `test_a_request_link_is_not_followed`: the fixed wait before the "not answered" check can only
   let the test pass wrongly on a slow machine, never fail it.
+- (28.11., red team of FIX-CU-BLACK-CAPTURE) The bound of 8 Desktop Duplication frames
+  (`kMaxDuplicationFrames`) is a fixed value in code that D-CU-02-19 does not list yet.
+- (28.11., red team of FIX-CU-BLACK-CAPTURE) Only the core loop has a test; that the frame lambda in
+  `capturer.cpp` releases a pointer-only frame and its resource is proven on a real desktop only.
+- (28.11., red team of FIX-CU-BLACK-CAPTURE) A driver whose first frame has `LastPresentTime` 0 but a
+  valid image would cost one 500 ms wait on a still desktop and end in GDI (not seen).
+- (28.11., red team of FIX-CU-BLACK-CAPTURE) The comment in `duplication.hpp` mentions four monitors;
+  whether the monitor count matters is unproven, only the pointer-only first frame is.

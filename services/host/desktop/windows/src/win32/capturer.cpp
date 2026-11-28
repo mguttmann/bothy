@@ -9,6 +9,8 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 
+#include "bothy/helper/duplication.hpp"
+
 
 namespace bothy::helper::win32 {
 
@@ -25,7 +27,8 @@ struct Com {
 };
 
 // Desktop Duplication delivers the first frame of a new duplication at once; the wait only bounds a
-// driver that never answers, after which the GDI path takes over.
+// driver that never answers, after which the GDI path takes over. That first frame can be
+// pointer-only and black (duplication.hpp); acquire_desktop_image() skips it.
 constexpr UINT kAcquireWaitMs = 500;
 
 HMONITOR monitor_of(const ScreenInfo& s) {
@@ -57,9 +60,19 @@ bool capture_dxgi(HMONITOR monitor, int width, int height, std::vector<std::uint
         return false;
       Com<IDXGIOutputDuplication> dup;
       if (FAILED(output1->DuplicateOutput(device.p, dup.put()))) return false;
-      DXGI_OUTDUPL_FRAME_INFO info{};
       Com<IDXGIResource> resource;
-      if (FAILED(dup->AcquireNextFrame(kAcquireWaitMs, &info, resource.put()))) return false;
+      bool image = acquire_desktop_image([&] {
+        if (resource.p != nullptr) {
+          resource.p->Release();
+          resource.p = nullptr;
+        }
+        DXGI_OUTDUPL_FRAME_INFO info{};
+        if (FAILED(dup->AcquireNextFrame(kAcquireWaitMs, &info, resource.put()))) return DuplicationFrame::Failed;
+        if (info.LastPresentTime.QuadPart != 0) return DuplicationFrame::Image;
+        dup->ReleaseFrame();  // pointer-only: the texture holds no desktop image
+        return DuplicationFrame::NoImage;
+      });
+      if (!image) return false;
       bool ok = false;
       Com<ID3D11Texture2D> texture;
       if (SUCCEEDED(resource->QueryInterface(IID_PPV_ARGS(texture.put())))) {

@@ -4,8 +4,10 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include "bothy/helper/codec.hpp"
+#include "bothy/helper/duplication.hpp"
 #include "bothy/helper/escape.hpp"
 #include "bothy/helper/geometry.hpp"
 #include "bothy/helper/keys.hpp"
@@ -277,4 +279,38 @@ CHECK_TEST(a_stale_tap_never_changes_the_filter) {
   EscFilter fresh(kInjectedMarker);
   CHECK(tap_decide(gens, new_tap, fresh, real, true) == TapDecision::Pass);
   CHECK(!fresh.holding());
+}
+
+namespace {
+// Plays a fixed sequence of frames and counts the AcquireNextFrame calls.
+struct FrameScript {
+  std::vector<DuplicationFrame> frames;
+  int calls = 0;
+  DuplicationFrame operator()() { return frames.at(static_cast<std::size_t>(calls++)); }
+};
+}  // namespace
+
+// The first frame of a new duplication was pointer-only and all black, and the helper sent it.
+CHECK_TEST(duplication_skips_pointer_only_first_frame) {
+  FrameScript s{{DuplicationFrame::NoImage, DuplicationFrame::Image}};
+  CHECK(acquire_desktop_image(std::ref(s)));
+  CHECK_EQ(s.calls, 2);
+}
+
+CHECK_TEST(duplication_takes_an_image_at_once) {
+  FrameScript s{{DuplicationFrame::Image}};
+  CHECK(acquire_desktop_image(std::ref(s)));
+  CHECK_EQ(s.calls, 1);
+}
+
+CHECK_TEST(duplication_failure_falls_back) {
+  FrameScript s{{DuplicationFrame::NoImage, DuplicationFrame::Failed}};
+  CHECK(!acquire_desktop_image(std::ref(s)));
+  CHECK_EQ(s.calls, 2);
+}
+
+CHECK_TEST(duplication_only_pointer_frames_fall_back_after_the_bound) {
+  FrameScript s{std::vector<DuplicationFrame>(kMaxDuplicationFrames, DuplicationFrame::NoImage)};
+  CHECK(!acquire_desktop_image(std::ref(s)));
+  CHECK_EQ(s.calls, kMaxDuplicationFrames);
 }
