@@ -70,7 +70,7 @@ func TestPipeWritesWhileAReadIsPending(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s write: %v", end.name, err)
 			}
-		case <-time.After(10 * time.Second):
+		case <-time.After(testkit.Patience):
 			t.Fatalf("%s: the write waited behind its own pending read", end.name)
 		}
 		got := make([]byte, 1)
@@ -108,7 +108,7 @@ func TestPipeCloseEndsAccept(t *testing.T) {
 		if !errors.Is(err, net.ErrClosed) {
 			t.Fatalf("Accept after Close: %v, want net.ErrClosed", err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("Close did not end the waiting Accept")
 	}
 }
