@@ -799,10 +799,11 @@ jobs:
     if: needs.resolve.outputs.component == 'client' || needs.resolve.outputs.component == 'host'
     environment: release-apple
     runs-on: macos-15
-    # Above the sum of the waits of its steps: the macOS app with its notarization, the iOS build
-    # and upload (each command up to COMMAND_PATIENCE_SECONDS, 40 minutes) and App Store Connect's
-    # processing of the build (PROCESSING_PATIENCE_SECONDS, 90 minutes), with the host packages
-    # after them (#1478; tools/distribution/storeapi.py).
+    # Room for App Store Connect's processing of the build (PROCESSING_PATIENCE_SECONDS, 90
+    # minutes) after the macOS app with its notarization and the iOS build and upload, and the host
+    # packages after them; the 90 minutes before equalled the processing wait alone (#1478). Each
+    # command may wait up to COMMAND_PATIENCE_SECONDS (40 minutes), so the bound is a practical
+    # one, not the sum of every worst case.
     timeout-minutes: 240
     outputs:
       dist_id: ${{ steps.upload.outputs.artifact-id }}

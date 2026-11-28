@@ -88,7 +88,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `ci/plugin_release.py` | release ZIP of the Grafana panel plugin | `make -C plugins/grafana-bothy-live` | `ci/tests/` |
 | `ci/pr_mode.py` | whether a `ci.yml` run gets the checks that need repository secrets | CI job of `ci.yml` | `ci/tests/` |
 | `ci/release_chain.py` | supply-chain steps of a component release: join, SBOM, sign, verify, tag | workflow `release.yml` | `ci/tests/` |
-| `ci/compose_images.py` | the third-party images of the Compose files at their default versions, for the daily image scan | workflow `advisories.yml` (job `images`) | `ci/tests/test_compose_images.py` |
+| `ci/compose_images.py` | the third-party images of the Compose files at their default versions, for the daily image scan | workflow `images.yml` | `ci/tests/test_compose_images.py` |
 | `ci/release_prep.py` | release preparation of one component | `release-prep` | `ci/tests/` |
 | `ci/release_trial.py` | trial release on the build host | `release-trial` | `ci/tests/` |
 | `ci/scancode_policy.py` | license gate over a ScanCode report | `scancode` | `ci/tests/` |

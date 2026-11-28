@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The third-party images an instance runs from the Compose files, one reference per line.
 
-The daily image scan of `advisories.yml` (job `images`, docs/quality/gates.md "Advisories",
+The daily image scan of the workflow `images.yml` (docs/quality/gates.md "Advisories",
 #908) runs `make trivy-image` over the images the product builds and over these. A Compose
 file names a third-party image as `image: <name>:${BOTHY_<X>_VERSION:-<default>}`, the form
 the Renovate manager of `renovate.json` reads; the scan takes the default, the version an

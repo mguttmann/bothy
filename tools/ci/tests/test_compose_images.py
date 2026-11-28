@@ -2,7 +2,7 @@
 """The daily image scan covers the images of an instance (#908, docs/quality/gates.md "Advisories").
 
 tools/ci/compose_images.py lists the third-party images of the Compose files at their default
-versions; the job `images` of advisories.yml builds the two images of the product and runs
+versions; the workflow images.yml builds the two images of the product and runs
 `make trivy-image` over them and over that list.
 """
 
@@ -67,11 +67,12 @@ def test_main_prints_one_image_per_line(tmp_path: Path, capsys: pytest.CaptureFi
 
 
 def test_the_daily_workflow_scans_the_built_and_the_third_party_images() -> None:
-    wf = yaml.safe_load((REPO / ".github/workflows/advisories.yml").read_text(encoding="utf-8"))
+    wf = yaml.safe_load((REPO / ".github/workflows/images.yml").read_text(encoding="utf-8"))
     on = wf[True]  # YAML 1.1 reads the key `on` as true
     assert "schedule" in on
     job = wf["jobs"]["images"]
-    assert job["if"] == wf["jobs"]["scan"]["if"]
+    lock_scan = yaml.safe_load((REPO / ".github/workflows/advisories.yml").read_text("utf-8"))
+    assert job["if"] == lock_scan["jobs"]["scan"]["if"]
     runs = "\n".join(step.get("run", "") for step in job["steps"])
     assert "make image " in runs
     assert "make postgres-image " in runs

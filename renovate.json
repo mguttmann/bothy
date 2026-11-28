@@ -27,7 +27,7 @@
     {
       "description": "Python development tools of the repository gates",
       "matchManagers": ["pep621"],
-      "matchFileNames": ["tools/pyproject.toml"],
+      "matchFileNames": ["tools/pyproject.toml", "tools/semgrep/pyproject.toml"],
       "groupName": "dev tools (Python)"
     },
     {

@@ -1,6 +1,6 @@
 ### Added
 
-- A daily scan of the images an instance runs: `advisories.yml` builds bothy-server and
+- A daily scan of the images an instance runs: the workflow `images.yml` builds bothy-server and
   bothy-postgres and runs Trivy over them and over the third-party images of the Compose files.
 - `tools/distribution/ios.py promote --group beta` adds an uploaded build to the TestFlight group
   beta when a release stopped before that step.
