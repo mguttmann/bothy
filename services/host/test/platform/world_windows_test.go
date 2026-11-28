@@ -148,9 +148,8 @@ func homeOpen(t *testing.T, p string) bool {
 
 // removeAddedUser removes what session-user add created for user (its helper service and the
 // account), never the host service, its state or its configuration.
-func removeAddedUser(_ *testing.T, user string) {
-	_, _ = try("sc.exe", "stop", "bothy-host-helper-"+user)
-	_, _ = try("sc.exe", "delete", "bothy-host-helper-"+user)
+func removeAddedUser(t *testing.T, user string) {
+	removeWindowsService(t, "bothy-host-helper-"+user)
 	deleteWindowsProfile(user)
 	_, _ = try("net", "user", user, "/delete")
 }

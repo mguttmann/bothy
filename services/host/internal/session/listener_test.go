@@ -41,8 +41,9 @@ func TestNoInboundNetworkListener(t *testing.T) {
 				if !ok || !banned[sel.Sel.Name] {
 					return true
 				}
-				// The listeners of internal/confirm and internal/localchan are unix sockets or named pipes.
-				if id, ok := sel.X.(*ast.Ident); ok && (id.Name == "confirm" || id.Name == "localchan") {
+				// The listeners of internal/confirm, internal/localchan and internal/winpipe are unix
+				// sockets or named pipes that reject remote clients.
+				if id, ok := sel.X.(*ast.Ident); ok && (id.Name == "confirm" || id.Name == "localchan" || id.Name == "winpipe") {
 					return true
 				}
 				if d == "internal/confirm" && len(call.Args) >= 2 {

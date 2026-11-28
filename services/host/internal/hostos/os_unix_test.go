@@ -7,9 +7,12 @@ package hostos
 import (
 	"context"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"testing"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 func TestUnixAdapters(t *testing.T) {
@@ -58,5 +61,22 @@ func TestUnixAdapters(t *testing.T) {
 	}
 	if _, err := p.PtraceScope(); err != nil {
 		t.Error(err)
+	}
+}
+
+// TestSudoProbeMatchesSudo: HD3 answers what sudo answers for the calling account. The probe runs
+// sudo with an empty environment; "sudo -n true" then found no "true" on macOS, which sets no
+// secure_path, so passwordless sudo was never reported there (run 46103059338,
+// docs/decisions.d/V1-13.md). The answer of sudo with the environment of the test is the reference.
+func TestSudoProbeMatchesSudo(t *testing.T) {
+	if _, err := os.Stat("/usr/bin/sudo"); err != nil {
+		t.Skip("no sudo on this host")
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
+	defer cancel()
+	want := exec.CommandContext(ctx, "/usr/bin/sudo", "-n", "--", "true").Run() == nil
+	got, err := UnixProbe{Runner: ExecRunner{}}.SudoWithoutPassword(ctx)
+	if err != nil || got != want {
+		t.Errorf("SudoWithoutPassword = %v, %v; sudo -n true with the environment of the test: %v", got, err, want)
 	}
 }

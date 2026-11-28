@@ -20,32 +20,15 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
-// The commands the suite types into a PTY on Linux and macOS (bash and zsh, the login shells
-// install gives the session users). Each regular expression needs digits or a word where the
-// typed command line has a quote or a dollar sign, so the echo of the input never matches.
-const (
-	enter       = "\n"
-	identityCmd = `echo "UID=$(id -u)"`
-	parentCmd   = `echo "PP=$PPID"`
-	shellPIDCmd = `echo "SH=$$"`
-	sizeCmd     = `echo "SZ=$(stty size)"`
-)
+// sizeCmd prints the size of the terminal; it needs the PTY, so it is not with the commands of
+// typed_unix.go.
+const sizeCmd = `echo "SZ=$(stty size)"`
 
 var (
-	identityRe = regexp.MustCompile(`UID=(\d+)`)
-	parentRe   = regexp.MustCompile(`PP=(\d+)`)
-	shellPIDRe = regexp.MustCompile(`SH=(\d+)`)
-	sizeRe     = regexp.MustCompile(`SZ=(\d+) (\d+)`)
-	authRe     = regexp.MustCompile(`"authMethod": "(\w[\w.]*)"`)
-	listRe     = regexp.MustCompile(`LS=(\d+)`)
-	loginRe    = regexp.MustCompile(`Login (successful)`)
-	// backgroundCmds start a nohup child and a child that left the session with setsid (perl is on
-	// every hosted runner); each prints its process ID.
-	backgroundCmds = []string{
-		`nohup sleep 3000 >/dev/null 2>&1 & echo "BG=$!"`,
-		`perl -e 'use POSIX; if (fork) { exit 0 } POSIX::setsid(); print "SID=$$\n"; exec "sleep", "3001"'; sleep 1`,
-	}
-	backgroundRes = []*regexp.Regexp{regexp.MustCompile(`BG=(\d+)`), regexp.MustCompile(`SID=(\d+)`)}
+	sizeRe  = regexp.MustCompile(`SZ=(\d+) (\d+)`)
+	authRe  = regexp.MustCompile(`"authMethod": "(\w[\w.]*)"`)
+	listRe  = regexp.MustCompile(`LS=(\d+)`)
+	loginRe = regexp.MustCompile(`Login (successful)`)
 )
 
 // wantIdentity returns what identityCmd prints for user.

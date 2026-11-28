@@ -147,9 +147,22 @@ func TestPlatform_TMT26(t *testing.T) {
 	if c != 1 || !strings.Contains(out, "HD10 FAIL peer_mismatch session_user="+userB) && !strings.Contains(out, "HD10 FAIL helper_unreachable session_user="+userB) {
 		t.Errorf("replaced helper:\n%s", out)
 	}
-	if attachSucceeds(t, userA) {
+	switch {
+	case runtime.GOOS == "darwin" && sipDisabled():
+		// Without System Integrity Protection macOS lets a debugger of the same user attach to a
+		// process with the hardened runtime, so this part has nothing to prove here; the hosted
+		// macOS runner runs without it (docs/decisions.d/V1-13.md, V1-13/7).
+		t.Log("System Integrity Protection is off on this machine: the attach part of TM-T26 is not provable here")
+	case attachSucceeds(t, userA):
 		t.Error("a process of the session user attached to its helper")
 	}
+}
+
+// sipDisabled reports whether csrutil names System Integrity Protection as disabled; any other
+// answer counts as enabled, so the attach part of TM-T26 runs.
+func sipDisabled() bool {
+	out, _ := try("/usr/bin/csrutil", "status")
+	return strings.Contains(out, "status: disabled")
 }
 
 func TestPlatform_TMT27(t *testing.T) {

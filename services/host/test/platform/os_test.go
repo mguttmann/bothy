@@ -8,9 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // serviceExit returns the exit code of the stopped host service.
@@ -32,14 +36,7 @@ func serviceExit() (int, bool) {
 		}
 	case "darwin":
 		out, _ := try("/bin/launchctl", "print", "system/bothy-host")
-		if strings.Contains(out, "state = not running") {
-			for _, l := range strings.Split(out, "\n") {
-				if v, ok := strings.CutPrefix(strings.TrimSpace(l), "last exit code = "); ok {
-					n, _ := strconv.Atoi(strings.Fields(v)[0])
-					return n, true
-				}
-			}
-		}
+		return launchdExitCode(out)
 	case "windows":
 		out, _ := try("sc.exe", "query", "bothy-host")
 		if strings.Contains(out, "STOPPED") {
@@ -179,16 +176,130 @@ func uninstall(t *testing.T, users []string) {
 		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Users/"+"bothy-host")
 		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Groups/bothy-host")
 	case "windows":
-		_, _ = try("sc.exe", "stop", "bothy-host")
-		_, _ = try("sc.exe", "delete", "bothy-host")
+		if t.Failed() {
+			windowsFailureState(t, users)
+		}
+		removeWindowsService(t, "bothy-host")
 		for _, u := range users {
-			_, _ = try("sc.exe", "stop", "bothy-host-helper-"+u)
-			_, _ = try("sc.exe", "delete", "bothy-host-helper-"+u)
+			removeWindowsService(t, "bothy-host-helper-"+u)
 			deleteWindowsProfile(u)
 			_, _ = try("net", "user", u, "/delete")
 		}
 	}
+	if t.Failed() && runtime.GOOS != "linux" {
+		// macOS and Windows keep the log of the host service in the state directory, which goes
+		// next; the journal of Linux stays and track prints it.
+		for _, l := range lastLines(filepath.Join(stateDir(), "bothy-host.log"), maxServiceLog) {
+			t.Log(l)
+		}
+	}
 	_ = os.RemoveAll(stateDir())
 	_ = os.Remove(configPath())
-	_ = t
+}
+
+// lastLines returns the last n lines of the file p that are not empty (none when it is missing).
+func lastLines(p string, n int) []string {
+	b, err := os.ReadFile(p) //nolint:gosec // the log of the host service under test
+	if err != nil {
+		return nil
+	}
+	return tailLines(string(b), n)
+}
+
+// windowsFailureState prints, for a failed test, the state of each helper service and the last
+// lines the services of bothy-host wrote to the Application event log: a PTY helper has no log
+// file and writes the reason it stopped there (serviceStderr), and the host service refused its
+// start with helper_unreachable in run 46116195975 without a trace of the helper side.
+func windowsFailureState(t *testing.T, users []string) {
+	t.Helper()
+	for _, u := range users {
+		out, _ := try("sc.exe", "queryex", "bothy-host-helper-"+u)
+		for _, l := range strings.Split(out, "\n") {
+			if f := strings.TrimSpace(l); strings.HasPrefix(f, "STATE") || strings.HasPrefix(f, "WIN32_EXIT_CODE") || strings.HasPrefix(f, "SERVICE_EXIT_CODE") {
+				t.Logf("bothy-host-helper-%s %s", u, f)
+			}
+		}
+	}
+	out, _ := try("powershell", "-NoProfile", "-Command",
+		"Get-EventLog -LogName Application -Source bothy-host -Newest 10 -ErrorAction SilentlyContinue | "+
+			"ForEach-Object { $_.TimeGenerated.ToString('o') + ' ' + ($_.ReplacementStrings -join ' ').Trim() }")
+	for _, l := range tailLines(out, maxServiceLog) {
+		t.Log("event log: " + l)
+	}
+	// HD11 shared_location names no path (24 2.2): the owner and ACL of each folder on the way to
+	// the home and the working directories of the session users show which one another session
+	// user owns or can write (run 46128962469, V1-13/11).
+	places := []string{`C:\`, `C:\Users`}
+	for _, u := range users {
+		places = append(places, home(u))
+	}
+	work, _ := filepath.Glob(programDir("*"))
+	for _, p := range append(places, work...) {
+		out, _ := try("icacls", p)
+		for _, l := range tailLines(out, 40) {
+			t.Log("acl: " + l)
+		}
+	}
+}
+
+// tailLines returns the last n lines of out that are not empty.
+func tailLines(out string, n int) []string {
+	lines := slices.DeleteFunc(strings.Split(out, "\n"), func(l string) bool { return strings.TrimSpace(l) == "" })
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return lines
+}
+
+// scMissing is the exit code of sc.exe for a service the service control manager does not know
+// (ERROR_SERVICE_DOES_NOT_EXIST).
+const scMissing = 1060
+
+// removeWindowsService stops the service name, ends its process when it does not stop, deletes it
+// and waits until the service control manager forgot it. "sc.exe delete" of a service whose
+// process still runs only marks it for deletion, and the next install then failed with "The
+// specified service has been marked for deletion" in every later test (run 46103059338,
+// docs/decisions.d/V1-13.md).
+func removeWindowsService(t *testing.T, name string) {
+	t.Helper()
+	if _, c := try("sc.exe", "query", name); c == scMissing {
+		return
+	}
+	_, _ = try("sc.exe", "stop", name)
+	if !waitSC(name, func(out string, c int) bool { return c == scMissing || strings.Contains(out, "STOPPED") }) {
+		if pid := windowsServicePID(name); pid > 0 {
+			_, _ = try("taskkill", "/F", "/PID", strconv.Itoa(pid))
+		}
+	}
+	_, _ = try("sc.exe", "delete", name)
+	if !waitSC(name, func(_ string, c int) bool { return c == scMissing }) {
+		t.Logf("the service %s is still installed after its delete", name)
+	}
+}
+
+// waitSC polls "sc.exe query name" until done holds for its output and exit code or the bound
+// of the suite passes.
+func waitSC(name string, done func(out string, code int) bool) bool {
+	deadline := testkit.Deadline()
+	for {
+		if out, c := try("sc.exe", "query", name); done(out, c) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(pollEvery)
+	}
+}
+
+// windowsServicePID returns the process ID of the service name (0 when none runs).
+func windowsServicePID(name string) int {
+	out, _ := try("sc.exe", "queryex", name)
+	if i := strings.Index(out, "PID"); i >= 0 {
+		if f := strings.Fields(out[i:]); len(f) >= 3 {
+			n, _ := strconv.Atoi(f[2])
+			return n
+		}
+	}
+	return 0
 }

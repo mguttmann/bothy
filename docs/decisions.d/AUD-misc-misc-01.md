@@ -23,7 +23,8 @@ Work package of the audit of 2026-11-11 for the workflows and rules outside one 
 
 ## Open
 
-For the next run in each area. None of these is a known wrong result of the product.
+For the next run in each area. None of these is a known wrong result of the product (the one
+found on macOS, HD3, is fixed by V1-13/3).
 
 Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cbd84`:
 
@@ -34,23 +35,33 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   program_location_untrusted`, which would also explain the refused starts. First step: on the
   runner, print the owner and the ACL of the program folder, the state directory and the folders
   above them after `install`, and the groups of the service account and of a session user.
-  Since AUD-host-01 the service keeps `bothy-host.log` in the state directory on Windows; the
-  suite does not print it for a failed test yet (it prints the journal on Linux only).
+  Since AUD-host-01 the service keeps `bothy-host.log` in the state directory on Windows; since
+  V1-13/6 a failed test prints its last lines, since V1-13/8 also the helper services and their
+  event log lines. In run 46116195975 every test that pairs ends with `pair: the running service
+  did not answer: EOF` because the host service refuses its start with `HD10 helper_unreachable`
+  for every session user, and the suite ends at its bound of one hour after seven tests, each of
+  whose cleanups waits for helper services that do not stop. Run 46122005337 showed the helpers
+  running; the cause, the synchronous pipe handles of the local channel, is V1-13/9.
+- Windows, cause not known: in run 46128962469 (after V1-13/9) the tests that open a session
+  end with `HD11 shared_location` for the session users, already at the first opening of a shell
+  in an untouched home; `TestPlatform_TMT13` also reports `HD11 drive_root_writable`,
+  `HD10 helper_untrusted` and `HD8 state_access_for_session_user`, and
+  `TestPlatform_ServiceAccountGroups` got no answer of the host service. Since V1-13/11 a failed
+  test prints the ACLs of the folders on the way to the homes and working directories.
 - Windows, cause not known: from `TestPlatform_TMT29_Parts` on every `install` fails with
   `win.profile <session user>: profile 80070070` (the disk is full). Either the profiles of
   earlier tests stay behind or the system drive of the runner is too small for the suite.
-- macOS: the tests after `TestPlatform_EntryScanMeasurement` have never run on a hosted runner.
-- Linux, cause not known, read from run 45105747612 of 2026-11-23 (after the reset of `/opt` of
-  ruling 1): `helper_untrusted` is gone, but the eight tests that set `claude_bin` or working
-  directories below the folder of the suite fail with `claude_bin_untrusted`,
-  `program_location_untrusted` and `shared_location` for both session users, which points to a
-  folder on the way to `/opt/bothy-platform` that a session user can write. Since
-  AUD-PKG-P10-repo-ops-host a failed job prints the owner, mode and ACL of every folder on the way
-  to the program folders (and the free disk space on Windows), so the next red run names the place.
+- macOS: run 46103059338 ran the whole suite; its causes are V1-13/2 to V1-13/5. The attach part
+  of TM-T26 is not provable on the hosted runner, which runs without System Integrity Protection
+  (V1-13/7). Decided for the owner on 2026-11-28 (V1-13/10): `doctor` reports such a host as a
+  warning (`ok:true`), and TM-T26 checks that warning there; built with the follow-up ticket of
+  the remaining Windows causes.
+- Linux: the folder a session user could write was `/opt` with its default ACL (V1-13/1).
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
-- Windows: the three findings of D-M2-42-29 (no deadline and no cancel of `Accept` and `Read` on
-  the synchronous pipe handles of the local channel) stay open with this row, not with M2-48;
-  they need overlapped handles and a Windows run to prove them.
+- Windows: of the three findings of D-M2-42-29, the overlapped handles of V1-13/9 settle the
+  first two (`Accept` and `Read` on synchronous pipe handles); the third, the impostor of
+  `TestPlatform_TMT26` on Windows created by the administrator of the suite, stays open with
+  this row.
 - A failed scheduled run of `host-platform.yml` reports to nobody. AUD-misc-testing-01 built the
   report (`red-runs.yml`); it writes the issue "Red runs of host-platform.yml" only once the
   owner switched it on (AUD-MISC-TESTING-01/11, AUD-CG1/7).

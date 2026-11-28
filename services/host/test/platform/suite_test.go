@@ -105,7 +105,8 @@ func track(t *testing.T) {
 const maxServiceLog = 30
 
 // failureLog returns the last maxServiceLog lines of the log of the host service since start
-// (Linux: the journal of bothy-host.service; other platforms: none). The service logs codes, IDs
+// (Linux: the journal of bothy-host.service; macOS and Windows keep the log in the state
+// directory, and uninstall prints it before it removes that folder). The service logs codes, IDs
 // and names only (24 10.1).
 func failureLog(start time.Time) []string {
 	if runtime.GOOS != "linux" {
