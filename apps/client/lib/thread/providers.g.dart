@@ -559,12 +559,20 @@ final class ThreadWindowFamily extends $Family
 
 /// The outbox entries of [threadId] that are not confirmed, with their display state
 /// (04 13.2 item 3).
+///
+/// The draft writes of the thread are left out and an equal list is not given again: the
+/// composer writes the draft on every key press (D-M4-20-2), no reader shows a draft entry,
+/// and without this the history and the composer would rebuild on every keystroke.
 
 @ProviderFor(threadOutbox)
 final threadOutboxProvider = ThreadOutboxFamily._();
 
 /// The outbox entries of [threadId] that are not confirmed, with their display state
 /// (04 13.2 item 3).
+///
+/// The draft writes of the thread are left out and an equal list is not given again: the
+/// composer writes the draft on every key press (D-M4-20-2), no reader shows a draft entry,
+/// and without this the history and the composer would rebuild on every keystroke.
 
 final class ThreadOutboxProvider
     extends
@@ -578,6 +586,10 @@ final class ThreadOutboxProvider
         $StreamProvider<List<OutboxEntryView>> {
   /// The outbox entries of [threadId] that are not confirmed, with their display state
   /// (04 13.2 item 3).
+  ///
+  /// The draft writes of the thread are left out and an equal list is not given again: the
+  /// composer writes the draft on every key press (D-M4-20-2), no reader shows a draft entry,
+  /// and without this the history and the composer would rebuild on every keystroke.
   ThreadOutboxProvider._({
     required ThreadOutboxFamily super.from,
     required String super.argument,
@@ -622,10 +634,14 @@ final class ThreadOutboxProvider
   }
 }
 
-String _$threadOutboxHash() => r'ec67b53030a083697215af42bcd7eb686bde2ba1';
+String _$threadOutboxHash() => r'69a5944196509f82878f64026f2e412236608287';
 
 /// The outbox entries of [threadId] that are not confirmed, with their display state
 /// (04 13.2 item 3).
+///
+/// The draft writes of the thread are left out and an equal list is not given again: the
+/// composer writes the draft on every key press (D-M4-20-2), no reader shows a draft entry,
+/// and without this the history and the composer would rebuild on every keystroke.
 
 final class ThreadOutboxFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<OutboxEntryView>>, String> {
@@ -640,6 +656,10 @@ final class ThreadOutboxFamily extends $Family
 
   /// The outbox entries of [threadId] that are not confirmed, with their display state
   /// (04 13.2 item 3).
+  ///
+  /// The draft writes of the thread are left out and an equal list is not given again: the
+  /// composer writes the draft on every key press (D-M4-20-2), no reader shows a draft entry,
+  /// and without this the history and the composer would rebuild on every keystroke.
 
   ThreadOutboxProvider call(String threadId) =>
       ThreadOutboxProvider._(argument: threadId, from: this);
