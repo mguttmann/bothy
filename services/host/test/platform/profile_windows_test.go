@@ -16,7 +16,9 @@ import (
 
 var (
 	userenv              = windows.NewLazySystemDLL("userenv.dll")
-	procCreateProfile    = userenv.NewProc("CreateProfileW")
+	// userenv exports CreateProfile only (Unicode), but DeleteProfileW with its suffix; the
+	// product calls the same name (internal/install/ops_windows.go).
+	procCreateProfile    = userenv.NewProc("CreateProfile")
 	procDeleteProfile    = userenv.NewProc("DeleteProfileW")
 	errorAlreadyExistsHR = uintptr(0x800700b7)
 )

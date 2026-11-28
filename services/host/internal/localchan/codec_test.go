@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -91,8 +92,10 @@ func TestVerifyPeer(t *testing.T) {
 			t.Errorf("%+v accepted", p)
 		}
 	}
-	if HelperEndpoint("linux", "a") != "/run/bothy-host/helper-a.sock" || HelperEndpoint("windows", "a") != `\\.\pipe\bothy-host-helper-a` ||
-		HelperEndpoint("darwin", "a") != "/Library/Application Support/bothy-host/run/helper-a.sock" {
+	// The Unix endpoints are joined with the separator of the build host (V1-13: this test runs on
+	// Windows too).
+	if HelperEndpoint("linux", "a") != filepath.FromSlash("/run/bothy-host/helper-a.sock") || HelperEndpoint("windows", "a") != `\\.\pipe\bothy-host-helper-a` ||
+		HelperEndpoint("darwin", "a") != filepath.FromSlash("/Library/Application Support/bothy-host/run/helper-a.sock") {
 		t.Error("endpoints")
 	}
 	if EndpointDir("windows") != "" || EndpointDir("linux") != LinuxRunDir || EndpointDir("darwin") != DarwinRunDir {

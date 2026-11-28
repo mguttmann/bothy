@@ -18,3 +18,7 @@ them along.
   of `WaitForMultipleObjects` is reported as `net.ErrClosed`.
 - D-M2-42-29 (`docs/decisions.d/M2-42.md`) could point to V1-13/9 and AUD-misc-misc-01, which
   now carry its state.
+- `TestConnectionEndsWhileIdle` (`internal/computermcp/faults_test.go:61`) failed once in the unit
+  step of the macOS platform job (run 46128962469, "after the close: ... connection_lost") and
+  passed in the runs before; the package is not part of V1-13. A flake to look at when that
+  package is next touched.

@@ -226,6 +226,20 @@ func windowsFailureState(t *testing.T, users []string) {
 	for _, l := range tailLines(out, maxServiceLog) {
 		t.Log("event log: " + l)
 	}
+	// HD11 shared_location names no path (24 2.2): the owner and ACL of each folder on the way to
+	// the home and the working directories of the session users show which one another session
+	// user owns or can write (run 46128962469, V1-13/11).
+	places := []string{`C:\`, `C:\Users`}
+	for _, u := range users {
+		places = append(places, home(u))
+	}
+	work, _ := filepath.Glob(programDir("*"))
+	for _, p := range append(places, work...) {
+		out, _ := try("icacls", p)
+		for _, l := range tailLines(out, 40) {
+			t.Log("acl: " + l)
+		}
+	}
 }
 
 // tailLines returns the last n lines of out that are not empty.

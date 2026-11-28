@@ -42,6 +42,12 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   for every session user, and the suite ends at its bound of one hour after seven tests, each of
   whose cleanups waits for helper services that do not stop. Run 46122005337 showed the helpers
   running; the cause, the synchronous pipe handles of the local channel, is V1-13/9.
+- Windows, cause not known: in run 46128962469 (after V1-13/9) the tests that open a session
+  end with `HD11 shared_location` for the session users, already at the first opening of a shell
+  in an untouched home; `TestPlatform_TMT13` also reports `HD11 drive_root_writable`,
+  `HD10 helper_untrusted` and `HD8 state_access_for_session_user`, and
+  `TestPlatform_ServiceAccountGroups` got no answer of the host service. Since V1-13/11 a failed
+  test prints the ACLs of the folders on the way to the homes and working directories.
 - Windows, cause not known: from `TestPlatform_TMT29_Parts` on every `install` fails with
   `win.profile <session user>: profile 80070070` (the disk is full). Either the profiles of
   earlier tests stay behind or the system drive of the runner is too small for the suite.
