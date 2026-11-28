@@ -61,3 +61,15 @@ Collected minors without a reproduced harm; the next run in this area reads and 
   valid image would cost one 500 ms wait on a still desktop and end in GDI (not seen).
 - (28.11., red team of FIX-CU-BLACK-CAPTURE) The comment in `duplication.hpp` mentions four monitors;
   whether the monitor count matters is unproven, only the pointer-only first frame is.
+- (28.11., review of FIX-CU-HELPER-NO-ICON) The settings window opens at every login for every
+  account of the machine that never switched on (machine Run key, `/Library/LaunchAgents`), not
+  only for the owner; on a shared computer the other persons see it each time.
+- (28.11., same review) The reopen path on macOS (Finder or Spotlight against the helper launchd
+  started) is shown in CI only for a helper started with `open -n`; one manual try on the owner's
+  Mac would show it for the LaunchAgent case.
+- (28.11., same review) `doctor` prints "open Computer Helper" also when the helper is not installed.
+- (28.11., same review) The Windows settings window has no `IsDialogMessage`, so Tab does not move
+  between its controls; at a start by the installer `SetForegroundWindow` and `NSApp.activate()`
+  may leave the window behind others.
+- (28.11., same review) `visible_windows_windows` in `tools/ci/computer_probe.py` calls `user32`
+  without `argtypes`; an HWND above 2^31 would raise.

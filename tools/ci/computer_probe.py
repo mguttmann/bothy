@@ -14,8 +14,8 @@ host service on its own channel endpoint and a fixture window (`computer_fixture
 4. `show`, `capture` (PNG): the image shows the fixture's color at its center and no pixel of the
    indicator color (D-CU-02-9); `do left_click` on the entry, `do type`, `do key Return` and an
    injected `do key Escape`, each seen by the fixture, the Escape without a `stop` of the helper
-   (CU-T14); `position`; `hide`. The click lands under the pointer ring of the indicator, so it
-   also shows that the ring lets clicks through;
+   (CU-T14); `position`; `hide`. The click lands where the pointer ring of the indicator is
+   about to follow, so a ring that caught clicks near the pointer would fail it;
 5. the visible windows of the helper process (decisions.d/FIX-CU-HELPER-NO-ICON.md): none before
    `show` and after `hide` (no menu bar item, no window), some while the session shows, and the
    settings window once the helper is opened again (macOS `open` of the running app, Windows a
