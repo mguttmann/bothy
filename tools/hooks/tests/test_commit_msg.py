@@ -193,7 +193,7 @@ def test_commitlint_recipe_checks_the_pull_request_title(title: str, *, passes: 
     env.update(
         COMMIT_RANGE="HEAD..HEAD",
         PR_TITLE=title,
-        PR_BODY="Body.\n\nSigned-off-by: Alex Example <alex@example.com>\n",
+        PR_BODY="Body.\n\nSigned-off-by: Alex Example <1+alex@users.noreply.github.com>\n",
     )
     run = subprocess.run(
         ["make", "-s", "-C", str(REPO), "commitlint"],
@@ -317,7 +317,25 @@ def test_commitlint_recipe_passes_the_pull_request_author(
 
 
 # ---- the squash commit text: pull request body (#872) ------------------------------------
-SIGNED = "Fixes the gate.\n\nSigned-off-by: Alex Example <alex@example.com>\n"
+JANE = "Jane Example <12345+jane-example@users.noreply.github.com>"
+SIGNED = f"Fixes the gate.\n\nSigned-off-by: {JANE}\n"
+# The default squash text GitHub offers in the merge dialog and to a merge without a body
+# (viewerMergeBodyText, as it reached main in two commits of 2026-11-25 and 2026-11-26):
+# the body wrapped at 72 columns, so the sign-off breaks over two lines, then "---------" and
+# the trailers of the branch commits.
+WRAPPED = (
+    "Fixes the gate and keeps the text of the pull request as the message of\n"
+    "the squash commit.\n\n"
+    "Signed-off-by: Jane Example\n"
+    "<12345+jane-example@users.noreply.github.com>\n\n"
+    "---------\n\n"
+    f"Signed-off-by: {JANE}\n"
+)
+# A branch commit signed with the git identity of the machine (a work address) adds its own
+# trailer to that default text (2026-11-18 and 2026-11-22).
+OTHER_ADDRESS = (
+    f"Fixes the gate.\n\nSigned-off-by: Jane Example <jane@corp.example>\nSigned-off-by: {JANE}\n"
+)
 
 
 @pytest.mark.parametrize(
@@ -327,11 +345,21 @@ SIGNED = "Fixes the gate.\n\nSigned-off-by: Alex Example <alex@example.com>\n"
         ("Fixes the gate.\n", False),
         ("", False),
         # A sign-off inside an HTML comment of the template is not part of the commit text.
-        ("Text\n<!--\nSigned-off-by: Alex Example <alex@example.com>\n-->\n", False),
-        ("Signed-off-by: Alex Example\n", False),
+        (f"Text\n<!--\nSigned-off-by: {JANE}\n-->\n", False),
+        ("Signed-off-by: Jane Example\n", False),
         # Git reads a sign-off only in the trailer block at the end of the message.
-        ("Signed-off-by: Alex Example <alex@example.com>\n\nMore text.\n", False),
+        (f"Signed-off-by: {JANE}\n\nMore text.\n", False),
         (SIGNED + "<!-- a closing comment of the template -->\n", True),
+        (SIGNED.replace("\n", "\r\n"), True),
+        (WRAPPED, False),
+        (
+            "Fixes the gate.\n\nSigned-off-by: Jane Example\n"
+            "<12345+jane-example@users.noreply.github.com>\n",
+            False,
+        ),
+        ("Fixes the gate.\n\nSigned-off-by: Jane Example <jane@corp.example>\n", False),
+        (OTHER_ADDRESS, False),
+        (SIGNED + f"Signed-off-by: {JANE}\n", False),
     ],
     ids=[
         "signed",
@@ -341,10 +369,38 @@ SIGNED = "Fixes the gate.\n\nSigned-off-by: Alex Example <alex@example.com>\n"
         "without e-mail",
         "text after the sign-off",
         "comment after the sign-off",
+        "CRLF line ends",
+        "GitHub default text, wrapped",
+        "sign-off wrapped over two lines",
+        "not the no-reply address",
+        "a second identity",
+        "the sign-off twice",
     ],
 )
 def test_pull_request_body_needs_a_signoff(body: str, *, passes: bool) -> None:
     assert (commit_msg.check_pr_body(body, author="alex") == []) is passes
+
+
+@pytest.mark.parametrize(
+    ("identity", "passes"),
+    [
+        (JANE, True),
+        ("Jane Example <99+jane@users.noreply.github.com>", False),
+        ("Jo <1+jo@users.noreply.github.com>", False),
+    ],
+    ids=["the identity", "another address", "another name"],
+)
+def test_squash_body_with_an_identity_needs_exactly_that_signoff(
+    identity: str, *, passes: bool
+) -> None:
+    assert (commit_msg.check_squash_body(SIGNED, identity=identity) == []) is passes
+
+
+def test_squash_body_errors_never_echo_an_address() -> None:
+    """CI logs are public: the error names the rule, never the rejected line."""
+    errors = commit_msg.check_squash_body(OTHER_ADDRESS) + commit_msg.check_squash_body(WRAPPED)
+    assert errors
+    assert not any("corp.example" in e or "12345+" in e for e in errors)
 
 
 @pytest.mark.parametrize("login", ["dependabot[bot]", "renovate[bot]", "github-actions[bot]"])
@@ -354,7 +410,7 @@ def test_pull_request_body_of_a_bot_needs_no_signoff(login: str) -> None:
 
 def test_pr_body_mode_reads_the_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     body = tmp_path / "BODY"
-    body.write_text("Fixes the gate.\n", encoding="utf-8")
+    body.write_text(WRAPPED, encoding="utf-8")
     assert commit_msg.main(["--pr-body", str(body), "--pr-author", "alex"]) == 1
     assert "pull request body: " in capsys.readouterr().out
     body.write_text(SIGNED, encoding="utf-8")
@@ -362,7 +418,14 @@ def test_pr_body_mode_reads_the_file(tmp_path: Path, capsys: pytest.CaptureFixtu
 
 
 @pytest.mark.parametrize(
-    ("body", "passes"), [(SIGNED, True), ("Fixes the gate.\n", False), ("", False)]
+    ("body", "passes"),
+    [
+        (SIGNED, True),
+        ("Fixes the gate.\n", False),
+        ("", False),
+        (WRAPPED, False),
+        (OTHER_ADDRESS, False),
+    ],
 )
 def test_commitlint_recipe_checks_the_pull_request_body(body: str, *, passes: bool) -> None:
     """With PR_TITLE set (every pull request) the body, the rest of the squash text, is checked."""

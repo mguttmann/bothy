@@ -1294,7 +1294,7 @@ the change of the repository location.
 
 ### Owner
 
-Go for the switchover; location of the repository and name; costs of the external test. The commit identity of the commits so far is decided (D-W-06); the identity of new commits and the allow list of authors is open (OQ-25, V1-07). The test from zero by a third person needs a person the owner arranges (OQ-26, V1-10).
+Go for the switchover; location of the repository and name; costs of the external test. The commit identity of the commits so far is decided (D-W-06); new commits carry the hosting service's no-reply address (OQ-25, decided 2026-11-07, V1-07). The test from zero by a third person needs a person the owner arranges (OQ-26, V1-10).
 
 ### Risks
 
@@ -1311,7 +1311,7 @@ remaining placeholders `OWNER` (V1-03).
 | V1-04 | Publishing checklist, part A | Check and clean up before the first push according to public-switch.md part A. | Evidence in the ops repo | `make denylist-history` and `make gitleaks GITLEAKS_LOG_OPTS=--all` green; ScanCode without an unexpected license; red team `JA` | V1-02, V1-03 |
 | V1-05 | Push, switch to public and public services (owner go) | Parts B to E of public-switch.md after the owner's go. | Repository settings, evidence in the ops repo | all items of public-switch.md with evidence; probe pull requests from fork and repository green; the DCO probe fails as expected | V1-04 |
 | V1-06 | Name and trademark (owner) | Final product name after a trademark check; on a change only the places from ADR 0044 change. | Places from ADR 0044 | the list of name-bound places equals ADR 0044, held by a test; `make check` green | V1-01 |
-| V1-07 | Deny list on `main` green | `denylist-main` passes on every new squash commit: the allow list of authors and the landing step follow the owner's ruling on the commit identity (OQ-25). | allow list of authors (operations repository and its CI secret, owner), the landing step of the operations repository | `denylist-main` green on the next commit on `main`; a commit with an identity outside the allow list still fails | none (owner decision OQ-25) |
+| V1-07 | Deny list on `main` green | `denylist-main` passes on every new squash commit: the allow list of authors and the landing step follow the owner's ruling on the commit identity (OQ-25). | allow list of authors (operations repository and its CI secret, owner), the landing step of the operations repository | `denylist-main` green on the next commit on `main`; a commit with an identity outside the allow list still fails | none (OQ-25 decided 2026-11-07) |
 | V1-08 | `ci` on `main` green | The job `apps (iOS)` of `ci.yml` passes on `main`. | `apps/client`, `.github/workflows/ci.yml` as the cause demands | `ci` green on `main` for the commit of the fix; no job skipped or weakened | none |
 | V1-09 | Install command everywhere | `make release-prep` rewrites every page that shows the install command with the released version, held by a test. | `tools/ci/release_prep.py` with tests, the pages with the command (`README.md`, `docs/index.md`, `docs/operations/install-compose.md` and every other page the test finds) | test: a fixture repository with the command on every listed page gets the new version on each; a page with the command outside the list fails the test | none |
 | V1-10 | Test from zero | A script and a recorded run on a fresh host that follows only the README, through install, first owner, a built-in agent from a template and its first answer; findings fixed. | `tests/from-zero/` (script and checklist), findings as fixes with tests | the recorded run passes on a fresh host; every finding fixed or ruled with a reason; the run by a third person is the owner's step (OQ-26) | A1-10, V1-09 |
@@ -1323,8 +1323,8 @@ remaining placeholders `OWNER` (V1-03).
 | V1-16 | Privacy link and AI notice before third parties | V3-30 (`privacy.notice_url` and `privacy.ai_notice_enabled`) is built before the first release to third parties. | the files of V3-30 | the acceptance tests of V3-30 | none |
 
 V1-07 to V1-12 come from the design note of the built-in agents ([builtin-agents.md](design/builtin-agents.md)
-section 10) and run as tasks from their rows here, without a brief (P-28): V1-07 waits for the
-owner's ruling OQ-25 and changes files outside this repository; V1-08 and V1-09 are small fixes
+section 10) and run as tasks from their rows here, without a brief (P-28): V1-07 follows the
+owner's ruling OQ-25 of 2026-11-07 and changes files outside this repository; V1-08 and V1-09 are small fixes
 whose cause is read on the day; V1-10 to V1-12 depend on the state after A1-10. A session that
 starts one of them reads its row, the design note and `AGENTS.md`. V1-13 comes from the audit of
 2026-11-11 and runs from its row in the same way; it belongs to the maintainers of
@@ -1699,7 +1699,6 @@ defaults:
 | Personal subscription in dev environments | no; V2-06 is dropped without a decision | V2 |
 | Recording of terminal content for evidence obligations | no, only metadata (24 "Privacy") | M2-46 |
 | Grafana Cloud account for the signature of the plugin | unsigned and provisioned locally until V1; account at publication (ruling T11) | V3-17 |
-| Identity of new commits and the allow list of authors | the identity of the commits so far stays; `denylist-main` stays red on new commits until the ruling (OQ-25) | V1-07 |
 | Test from zero by a third person | the recorded run of the session on a fresh host; the third person after A1-10 and V1-09 (OQ-26) | V1-10 |
 
 ## 21. A1 Built-in agents
@@ -1765,7 +1764,7 @@ arguments of the design note leave it out for the same reason).
 ### Owner
 
 The owner decisions of the design note section 12 stay with the owner, each with its
-recommendation: the identity of new commits (OQ-25, V1-07), the target of `OWNER` (OQ-12, V1-03),
+recommendation: the target of `OWNER` (OQ-12, V1-03),
 the penetration test (OQ-11, V1-02), the trademark check (OQ-16, V1-06), the repository settings
 and the first release (V1-05, after V1-07 and V1-08 are green, with a probe pull request before
 signed commits are required) and the test from zero by a third person (OQ-26, V1-10). Before
