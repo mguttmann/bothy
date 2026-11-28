@@ -20,6 +20,7 @@ export 'src/daos/recent_targets_dao.dart';
 export 'src/daos/runs_dao.dart';
 export 'src/daos/search_dao.dart';
 export 'src/daos/share_inbox_dao.dart';
+export 'src/daos/share_targets_dao.dart';
 export 'src/daos/structure_dao.dart';
 export 'src/daos/sync_state_dao.dart';
 export 'src/daos/threads_dao.dart';

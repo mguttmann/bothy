@@ -17,12 +17,6 @@ import 'package:local_store/local_store.dart';
 
 import 'share_target.dart';
 
-/// The SQL condition of a writable text or forum channel `c` (the stored level and
-/// `read_only` of the server; direct messages are no share target).
-const String _writable =
-    "c.level IN ('write', 'trigger') AND c.read_only = 0 "
-    "AND c.kind IN ('text', 'forum')";
-
 /// One hit of `searchThreadTitles` (14).
 final class ThreadTitleHit {
   /// Creates the hit.
@@ -86,8 +80,8 @@ final class ApiThreadTitleSearch implements ThreadTitleSearch {
 /// final recent = await source.recent(me: me, max: config.shareRecentTargets);
 /// ```
 final class ShareTargetSource {
-  /// Creates the source over [_db]; the queries use only the public API of the database
-  /// (`customSelect` over the mirror tables), so `local_store` needs no change.
+  /// Creates the source over [_db]; the queries are the share reads of `local_store`
+  /// (`ShareTargetsDao`), which bind their values and are tested against the schema there.
   ///
   /// [loadThread] stores a thread the database does not hold yet (`getThread`, stored by the
   /// version rule), so its title can name a recent target: the sync engine stores a message
@@ -110,31 +104,16 @@ final class ShareTargetSource {
     required PrincipalId me,
     required int max,
   }) async {
-    if (max <= 0) return const [];
-    // The app has no drift dependency of its own, so the query takes no bound variables:
-    // the person's ID is a canonical UUID (checked by `PrincipalId.parse`) and [max] an
-    // integer, and nothing else enters the SQL text.
-    final rows = await _db
-        .customSelect(
-          'SELECT m.thread_id AS thread_id, c.id AS channel_id, '
-          'c.name AS channel_name, c.main_thread_id AS main_thread_id, '
-          't.title AS title, MAX(m.created_at) AS sent_at, MAX(m.id) AS last_id '
-          'FROM messages m '
-          'LEFT JOIN threads t ON t.id = m.thread_id '
-          'JOIN channels c ON c.id = COALESCE(t.channel_id, m.channel_id) '
-          "WHERE m.author_principal_id = '${_uuid(me.value)}' AND $_writable "
-          'GROUP BY m.thread_id '
-          'ORDER BY sent_at DESC, last_id DESC '
-          'LIMIT $max',
-          readsFrom: {_db.messages, _db.threads, _db.channels},
-        )
-        .get();
+    final rows = await _db.shareTargetsDao.recentWrites(
+      me: me.value,
+      max: max,
+    );
     final targets = <ShareTarget>[];
     for (final r in rows) {
-      final channel = ChannelId.parse(r.read<String>('channel_id'));
-      final thread = ThreadId.parse(r.read<String>('thread_id'));
-      final name = r.read<String>('channel_name');
-      if (r.read<String?>('main_thread_id') == thread.value) {
+      final channel = ChannelId.parse(r.channelId);
+      final thread = ThreadId.parse(r.threadId);
+      final name = r.channelName;
+      if (r.mainThreadId == thread.value) {
         targets.add(
           ShareTarget(
             kind: ShareTargetKind.channel,
@@ -145,7 +124,7 @@ final class ShareTargetSource {
         );
         continue;
       }
-      final title = r.read<String?>('title') ?? await _titleOf(thread);
+      final title = r.title ?? await _titleOf(thread);
       if (title == null) continue;
       targets.add(
         ShareTarget(
@@ -215,51 +194,23 @@ final class ShareTargetSource {
     );
   }
 
-  Future<List<_Channel>> _writableChannels() async {
-    final rows = await _db
-        .customSelect(
-          'SELECT c.id AS id, c.name AS name, c.kind AS kind, '
-          'c.main_thread_id AS main_thread_id '
-          'FROM channels c WHERE $_writable ORDER BY lower(c.name), c.id',
-          readsFrom: {_db.channels},
-        )
-        .get();
-    return [
-      for (final r in rows)
-        _Channel(
-          id: ChannelId.parse(r.read<String>('id')),
-          name: r.read<String>('name'),
-          forum: r.read<String>('kind') == ChannelKind.forum.code,
-          mainThreadId: switch (r.read<String?>('main_thread_id')) {
-            final String id => ThreadId.parse(id),
-            null => null,
-          },
-        ),
-    ];
-  }
+  Future<List<_Channel>> _writableChannels() async => [
+    for (final r in await _db.shareTargetsDao.writableChannels())
+      _Channel(
+        id: ChannelId.parse(r.id),
+        name: r.name,
+        forum: r.kind == ChannelKind.forum.code,
+        mainThreadId: switch (r.mainThreadId) {
+          final String id => ThreadId.parse(id),
+          null => null,
+        },
+      ),
+  ];
 
   /// One value on listen and after every change of the stored channels: their names, levels
   /// and `read_only` decide the targets, and `access.changed` changes them (04 8.3).
-  Stream<void> changes() => _db
-      .customSelect(
-        'SELECT c.id, c.name, c.level, c.read_only, c.kind, c.main_thread_id '
-        'FROM channels c',
-        readsFrom: {_db.channels},
-      )
-      .watch()
-      .map((_) {});
-
-  /// [text], a canonical UUID, unchanged; anything else is a programming error.
-  static String _uuid(String text) {
-    if (!RegExp(
-      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-    ).hasMatch(text)) {
-      throw ArgumentError.value(text.length, 'uuid', 'not a canonical UUID');
-    }
-    return text;
-  }
+  Stream<void> changes() => _db.shareTargetsDao.watchChannels();
 }
-
 /// A writable channel of the local database.
 final class _Channel {
   const _Channel({
