@@ -1053,7 +1053,8 @@ On the schedule `backup.restore_test.schedule`, `bothy-backupd` restores the las
 `backup-scratch`, starts a database there only on a Unix socket and checks:
 
 1. `pgbackrest verify` and the checksums during the restore.
-2. Schema version and row counts against the manifest.
+2. Schema version, tables and the row counts of `event_log` and `audit_events` against the
+   manifest.
 3. Event log without gaps: per partition `count(*) = max(seq) - min(seq) + 1`, and
    `sequence_counters` is at least as large as every assigned number.
 4. Audit chain: the same check as `audit.verify` from the anchor to the end.
@@ -1158,7 +1159,7 @@ counts per kind, never an ID.
 
 Relocation. A relocation without data loss (section 11) also starts on a new timeline or a new
 cluster, so the start lock holds it as well. `bothy restore finalize --relocation <manifest>` takes
-the manifest of the final backup (`backup_manifest.v1`) and compares `event_log.head_seq`,
+the manifest of the final backup (`backup_manifest.v2`, or `v1` of an earlier run) and compares `event_log.head_seq`,
 `audit.last_seq`, `audit.last_hash` and `sync_epoch` with the restored database; only when all are
 equal does it store the new identity, keeping the epoch and every cursor (audit action
 `instance.restore.finalize_relocation`). Any difference exits `1`, names the field and changes

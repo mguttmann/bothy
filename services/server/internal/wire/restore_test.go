@@ -616,7 +616,7 @@ func relocationManifest(t *testing.T, db *pgtest.DB, change func(m *statusdomain
 	m := statusdomain.Manifest{
 		Schema: statusdomain.ManifestSchema, BackupID: ids.New().String(), Kind: statusdomain.KindLogical,
 		StartedAt: time.Now().Add(-time.Minute).UTC(), FinishedAt: time.Now().UTC(), ServerVersion: "0.0.0",
-		RowCounts: map[string]int64{}, Restic: &statusdomain.ResticRef{SnapshotID: strings.Repeat("a", 64)},
+		RowCounts: map[string]int64{}, Tables: []string{}, Restic: &statusdomain.ResticRef{SnapshotID: strings.Repeat("a", 64)},
 	}
 	if err := super.QueryRow(ctx, `SELECT instance_id::text, sync_epoch::text, schema_version FROM instance`).Scan(&m.InstanceID, &m.SyncEpoch, &m.SchemaVersion); err != nil {
 		t.Fatal(err)

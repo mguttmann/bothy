@@ -2710,7 +2710,7 @@ table.
 | `started_at` | `timestamptz` | no | `now()` | |
 | `finished_at` | `timestamptz` | yes | | |
 | `size_bytes` | `bigint` | yes | | |
-| `manifest` | `jsonb` | no | `'{}'` | schema `backup_manifest.v1`: row count per table, `head_seq`, last audit `seq` and `hash`, schema and server version, `sync_epoch`, count and sum of the file sizes; never content |
+| `manifest` | `jsonb` | no | `'{}'` | schema `backup_manifest.v2`: the names of every table, the row counts of `event_log` and `audit_events` (`backup_manifest.v1` of earlier runs: row count per table), `head_seq`, last audit `seq` and `hash`, schema and server version, `sync_epoch`, count and sum of the file sizes; never content |
 | `checks` | `jsonb` | no | `'{}'` | schema `restore_test_checks.v1`: result and duration per check (only for `restore_test`) |
 | `error` | `text` | yes | | code without content or secrets |
 

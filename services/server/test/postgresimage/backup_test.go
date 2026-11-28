@@ -186,7 +186,7 @@ func TestBackupKinds(t *testing.T) {
 			(manifest->>'schema') || ':' || (size_bytes is not null)::text, ',' order by started_at) from backup_runs`)
 		var want []string
 		for _, k := range kinds {
-			want = append(want, k+":succeeded:-:backup_manifest.v1:true")
+			want = append(want, k+":succeeded:-:backup_manifest.v2:true")
 		}
 		if got != strings.Join(want, ",") {
 			t.Errorf("backup_runs = %s\nwant      %s", got, strings.Join(want, ","))
@@ -197,9 +197,12 @@ func TestBackupKinds(t *testing.T) {
 		if got := psql(t, db, `select count(*) from backup_runs where kind in ('logical', 'objects') and manifest->'restic'->>'snapshot_id' is null`); got != "0" {
 			t.Errorf("%s restic runs without restic.snapshot_id", got)
 		}
-		rowCounts := psql(t, db, `select manifest->'row_counts'->>'backup_runs' from backup_runs order by started_at limit 1`)
-		if rowCounts != "1" {
-			t.Errorf("row_counts.backup_runs of the first manifest = %q, want 1 (the running row itself)", rowCounts)
+		// backup_manifest.v2 names every table and counts only event_log and audit_events
+		// (AUD srv-stats-status-19).
+		first := psql(t, db, `select (manifest->'tables') ? 'backup_runs', (select string_agg(k, ',' order by k)
+			from jsonb_object_keys(manifest->'row_counts') k) from backup_runs order by started_at limit 1`)
+		if first != "t|audit_events,event_log" {
+			t.Errorf("tables has backup_runs | counted tables of the first manifest = %q, want t|audit_events,event_log", first)
 		}
 	})
 

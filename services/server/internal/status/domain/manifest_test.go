@@ -28,7 +28,8 @@ func validManifest(kind domain.Kind) domain.Manifest {
 		SyncEpoch:     "0192f4a0-7b1c-7000-8a00-000000000003",
 		EventLog:      domain.EventLogBounds{HeadSeq: 120, MinRetainedSeq: 1},
 		Audit:         domain.AuditHead{LastSeq: 42, LastHash: strings.Repeat("ab", 32)},
-		RowCounts:     map[string]int64{"messages": 100, "audit_events": 42, "event_log": 120},
+		RowCounts:     map[string]int64{"audit_events": 42, "event_log": 120},
+		Tables:        []string{"audit_events", "event_log", "messages"},
 		Files:         domain.FileTotals{Count: 3, TotalBytes: 4096},
 		// M7-07: the position of the deletion journal.
 		DeletionJournal: &domain.DeletionJournalRef{NextNumber: 8},
@@ -46,13 +47,13 @@ func validManifest(kind domain.Kind) domain.Manifest {
 	return m
 }
 
-// manifestKeys are the JSON keys of backup_manifest.v1: the fields of
+// manifestKeys are the JSON keys of backup_manifest.v2: the fields of
 // docs/spec/03-data-model.md 4.12 and docs/operations/backup-restore.md 3, nested keys with a
 // dot.
 var manifestKeys = []string{
 	"schema", "backup_id", "kind", "started_at", "finished_at", "server_version", "schema_version",
 	"instance_id", "sync_epoch", "event_log", "event_log.head_seq", "event_log.min_retained_seq",
-	"audit", "audit.last_seq", "audit.last_hash", "row_counts", "files", "files.count",
+	"audit", "audit.last_seq", "audit.last_hash", "row_counts", "tables", "files", "files.count",
 	"files.total_bytes", "pgbackrest", "pgbackrest.label", "restic", "restic.snapshot_id",
 	"deletion_journal", "deletion_journal.next_number",
 }
@@ -82,7 +83,7 @@ func jsonKeys(t *testing.T, b []byte) []string {
 	return keys
 }
 
-// TestManifestSchema holds backup_manifest.v1 (03 4.12, backup-restore.md 3, brief M7-02 rule 13):
+// TestManifestSchema holds backup_manifest.v2 (03 4.12, backup-restore.md 3, brief M7-02 rule 13):
 // a marshalled manifest has exactly the listed keys, ParseManifest returns what Marshal wrote,
 // and a field with message text, an extra key or a reference of the wrong kind fails without
 // echoing the value.
@@ -99,7 +100,7 @@ func TestManifestSchema(t *testing.T) {
 		}
 		for _, k := range jsonKeys(t, b) {
 			if !slices.Contains(manifestKeys, k) {
-				t.Errorf("%s: key %q is not a field of backup_manifest.v1", kind, k)
+				t.Errorf("%s: key %q is not a field of backup_manifest.v2", kind, k)
 			}
 			seen[k] = true
 		}
@@ -107,7 +108,7 @@ func TestManifestSchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: ParseManifest: %v", kind, err)
 		}
-		if !back.StartedAt.Equal(m.StartedAt) || back.BackupID != m.BackupID || !maps.Equal(back.RowCounts, m.RowCounts) ||
+		if !back.StartedAt.Equal(m.StartedAt) || back.BackupID != m.BackupID || !maps.Equal(back.RowCounts, m.RowCounts) || !slices.Equal(back.Tables, m.Tables) ||
 			(m.PgBackRest != nil) != (back.PgBackRest != nil) || (m.Restic != nil) != (back.Restic != nil) {
 			t.Errorf("%s: round trip changed the manifest:\n got %+v\nwant %+v", kind, back, m)
 		}
@@ -139,7 +140,7 @@ func TestManifestSchema(t *testing.T) {
 		name, field string
 		mut         func(m *domain.Manifest)
 	}{
-		{"schema", "schema", func(m *domain.Manifest) { m.Schema = "backup_manifest.v2" }},
+		{"schema", "schema", func(m *domain.Manifest) { m.Schema = "backup_manifest.v3" }},
 		{"backup_id text", "backup_id", func(m *domain.Manifest) { m.BackupID = leak }},
 		{"instance_id", "instance_id", func(m *domain.Manifest) { m.InstanceID = "" }},
 		{"sync_epoch", "sync_epoch", func(m *domain.Manifest) { m.SyncEpoch = leak }},
@@ -160,8 +161,15 @@ func TestManifestSchema(t *testing.T) {
 		{"audit hash missing", "audit.last_hash", func(m *domain.Manifest) { m.Audit.LastHash = "" }},
 		{"audit hash without seq", "audit.last_hash", func(m *domain.Manifest) { m.Audit = domain.AuditHead{LastHash: strings.Repeat("ab", 32)} }},
 		{"row_counts key", "row_counts", func(m *domain.Manifest) { m.RowCounts[leak] = 1 }},
-		{"row_counts value", "row_counts", func(m *domain.Manifest) { m.RowCounts["messages"] = -1 }},
+		{"row_counts value", "row_counts", func(m *domain.Manifest) { m.RowCounts["event_log"] = -1 }},
 		{"row_counts nil", "row_counts", func(m *domain.Manifest) { m.RowCounts = nil }},
+		{"row_counts of an uncounted table", "row_counts", func(m *domain.Manifest) { m.RowCounts["messages"] = 100 }},
+		{"row_counts of an unnamed table", "row_counts", func(m *domain.Manifest) { m.Tables = []string{"audit_events", "messages"} }},
+		{"tables nil", "tables", func(m *domain.Manifest) { m.Tables = nil }},
+		{"tables text", "tables", func(m *domain.Manifest) { m.Tables = append(m.Tables, leak) }},
+		{"tables unsorted", "tables", func(m *domain.Manifest) { m.Tables = []string{"event_log", "audit_events"} }},
+		{"tables twice", "tables", func(m *domain.Manifest) { m.Tables = []string{"audit_events", "audit_events", "event_log"} }},
+		{"tables in v1", "tables", func(m *domain.Manifest) { m.Schema = domain.ManifestSchemaV1 }},
 		{"files.count", "files.count", func(m *domain.Manifest) { m.Files.Count = -1 }},
 		{"files.total_bytes", "files.total_bytes", func(m *domain.Manifest) { m.Files.TotalBytes = -1 }},
 		{"pgbackrest on logical", "pgbackrest", func(m *domain.Manifest) { m.PgBackRest = &domain.PgBackRestRef{Label: "20261018-020000F"} }},
@@ -173,6 +181,7 @@ func TestManifestSchema(t *testing.T) {
 	for _, c := range bad {
 		m := validManifest(domain.KindLogical)
 		m.RowCounts = maps.Clone(m.RowCounts)
+		m.Tables = slices.Clone(m.Tables)
 		c.mut(&m)
 		assertInvalid(t, c.name, c.field, leak, m)
 	}
@@ -244,5 +253,34 @@ func assertInvalid(t *testing.T, name, field, leak string, m domain.Manifest) {
 	}
 	if b, err := m.Marshal(); !errors.Is(err, domain.ErrInvalidManifest) || b != nil {
 		t.Errorf("%s: Marshal = %q, %v, want no bytes and ErrInvalidManifest", name, b, err)
+	}
+}
+
+// TestManifestV1StillParses holds the reader of the older version (AUD srv-stats-status-19): a
+// backup_manifest.v1 as runs before backup_manifest.v2 stored it, with an exact count of every
+// table and no tables, still parses, and TableNames returns the keys of its row_counts sorted; a
+// v2 manifest names its tables through tables.
+func TestManifestV1StillParses(t *testing.T) {
+	t.Parallel()
+	v1 := validManifest(domain.KindPGFull)
+	v1.Schema = domain.ManifestSchemaV1
+	v1.RowCounts = map[string]int64{"messages": 100, "audit_events": 42, "event_log": 120}
+	v1.Tables = nil
+	b, err := json.Marshal(v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"tables"`) {
+		t.Fatalf("a v1 manifest carries tables: %s", b)
+	}
+	back, err := domain.ParseManifest(b)
+	if err != nil {
+		t.Fatalf("ParseManifest(v1): %v", err)
+	}
+	if got, want := back.TableNames(), []string{"audit_events", "event_log", "messages"}; !slices.Equal(got, want) {
+		t.Errorf("v1 TableNames = %q, want %q", got, want)
+	}
+	if got := validManifest(domain.KindPGFull).TableNames(); !slices.Equal(got, []string{"audit_events", "event_log", "messages"}) {
+		t.Errorf("v2 TableNames = %q", got)
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/status/app"
+	"github.com/OWNER/bothy/services/server/internal/status/domain"
 )
 
 // ManifestSource implements app.ManifestSource over a pool of migrate.bootstrap_user, the
@@ -31,25 +32,29 @@ var _ app.ManifestSource = (*ManifestSource)(nil)
 // every table of schema public (migrate.bootstrap_user).
 func NewManifestSource(pool *pg.Pool) *ManifestSource { return &ManifestSource{pool: pool} }
 
-// rowCountsQuery returns every table of the domain schema with its exact row count: ordinary and
-// partitioned tables of schema public that are not partitions, so the partitions of event_log
-// are counted through their parent. The count runs inside the database with format('%I'), so no
-// statement is built here (ADR 0007); inside the snapshot of ReadSnapshot the nested queries of
-// query_to_xml see the same snapshot as every other statement.
+// rowCountsQuery returns every table of the domain schema, ordinary and partitioned tables of
+// schema public that are not partitions, with the exact row count of the tables in $1
+// (domain.ExactCountTables) and NULL for the others: backup_manifest.v2 counts only what the
+// restore test compares (AUD srv-stats-status-19). The partitions of event_log are counted through
+// their parent. The count runs inside the database with format('%I'), so no statement is built
+// here (ADR 0007); inside the snapshot of ReadSnapshot the nested queries of query_to_xml see the
+// same snapshot as every other statement.
 const rowCountsQuery = `SELECT c.relname::text,
+	CASE WHEN c.relname = ANY($1::text[]) THEN
 	(xpath('/row/n/text()', query_to_xml(format('SELECT count(*) AS n FROM %I.%I', n.nspname, c.relname), false, true, '')))[1]::text::bigint
+	END
 	FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-	WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition ORDER BY c.relname`
+	WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition ORDER BY c.relname COLLATE "C"`
 
 // Snapshot implements app.ManifestSource: every fact in one READ ONLY transaction with
 // REPEATABLE READ (pg.ReadSnapshot), so the counts, heads and totals belong to one snapshot
 // (brief M7-02 design note 3). Row counts are exact count(*), not pg_class.reltuples, because the
-// restore test compares them.
+// restore test compares them, and only of domain.ExactCountTables; the other tables are named.
 //
 // It fails when a query fails or the instance row is missing (a database that bothy migrate up
 // has not set up).
 func (s *ManifestSource) Snapshot(ctx context.Context) (app.ManifestFacts, error) {
-	facts := app.ManifestFacts{RowCounts: map[string]int64{}}
+	facts := app.ManifestFacts{RowCounts: map[string]int64{}, Tables: []string{}}
 	err := pg.ReadSnapshot(ctx, s.pool, func(ctx context.Context, q pg.DBTX) error {
 		return readFacts(ctx, q, &facts)
 	})
@@ -62,12 +67,12 @@ func (s *ManifestSource) Snapshot(ctx context.Context) (app.ManifestFacts, error
 // tableCount is one row of rowCountsQuery.
 type tableCount struct {
 	name string
-	n    int64
+	n    *int64
 }
 
 // readFacts reads the facts of Snapshot with q into facts.
 func readFacts(ctx context.Context, q pg.DBTX, facts *app.ManifestFacts) error {
-	rows, err := q.Query(ctx, rowCountsQuery)
+	rows, err := q.Query(ctx, rowCountsQuery, domain.ExactCountTables)
 	if err != nil {
 		return fmt.Errorf("status: counting the tables: %w", err)
 	}
@@ -80,7 +85,10 @@ func readFacts(ctx context.Context, q pg.DBTX, facts *app.ManifestFacts) error {
 		return fmt.Errorf("status: counting the tables: %w", err)
 	}
 	for _, c := range counts {
-		facts.RowCounts[c.name] = c.n
+		facts.Tables = append(facts.Tables, c.name)
+		if c.n != nil {
+			facts.RowCounts[c.name] = *c.n
+		}
 	}
 	// The bounds as internal/sync reads them: 0 for an empty log.
 	if err := q.QueryRow(ctx, `SELECT COALESCE(max(seq), 0)::bigint, COALESCE(min(seq), 0)::bigint FROM public.event_log`).

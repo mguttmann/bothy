@@ -158,7 +158,7 @@ func TestRunWritesRowAndManifest(t *testing.T) {
 				m.SchemaVersion != facts.SchemaVersion || m.InstanceID != facts.InstanceID || m.SyncEpoch != facts.SyncEpoch ||
 				m.EventLog != (domain.EventLogBounds{HeadSeq: 120, MinRetainedSeq: 1}) ||
 				m.Audit != (domain.AuditHead{LastSeq: 42, LastHash: hex.EncodeToString(facts.AuditLastHash)}) ||
-				m.RowCounts["messages"] != 100 || m.Files != (domain.FileTotals{Count: 3, TotalBytes: 4096}) {
+				m.RowCounts["event_log"] != 120 || !slices.Equal(m.Tables, []string{"event_log", "messages"}) || m.Files != (domain.FileTotals{Count: 3, TotalBytes: 4096}) {
 				t.Errorf("manifest %+v does not describe the run %+v and the facts %+v", m, row, facts)
 			}
 			if c.label != "" && (m.PgBackRest == nil || m.PgBackRest.Label != c.label) {
@@ -688,7 +688,13 @@ func TestSample(t *testing.T) {
 	e.src.archived, e.src.archivedOK = archived, true
 	e.exec.usage["/var/lib/bothy/files"] = app.VolumeUsage{FreeBytes: 10, SizeBytes: 100}
 	e.exec.err["VolumeUsage:/var/lib/postgresql/data"] = &app.ExecError{Code: "statfs_failed"}
+	before := time.Now()
 	e.svc.Sample(ctx)
+	// The read of pg_stat_archiver has its own deadline (AUD srv-stats-status-19), even under a
+	// context without one.
+	if d := e.src.archiveDeadline; d.IsZero() || d.Sub(before) > time.Minute {
+		t.Errorf("LastArchived deadline %v, want one within a minute", d)
+	}
 	if !slices.Equal(e.m.wal, []time.Time{archived}) {
 		t.Errorf("WAL samples %v, want %v", e.m.wal, archived)
 	}

@@ -217,10 +217,10 @@ func TestRestoreChecksDetectDamage(t *testing.T) {
 		{"other schema version", func(r *restoreEnv) { r.scratch.db.facts.SchemaVersion = 48 }, domain.CheckManifest, "schema_version_mismatch"},
 		{"other instance", func(r *restoreEnv) { r.scratch.db.facts.InstanceID = "0192f4a0-7b1c-7000-8a00-0000000000ff" }, domain.CheckManifest, "instance_mismatch"},
 		{"a table is missing", func(r *restoreEnv) {
-			r.scratch.db.facts.RowCounts = map[string]int64{"event_log": 120}
+			r.scratch.db.facts.Tables = []string{"event_log"}
 		}, domain.CheckManifest, "table_missing"},
 		{"an event row is missing", func(r *restoreEnv) {
-			r.scratch.db.facts.RowCounts = map[string]int64{"messages": 100, "event_log": 119}
+			r.scratch.db.facts.RowCounts = map[string]int64{"event_log": 119}
 		}, domain.CheckManifest, "row_counts_differ"},
 		{"the copy is newer than its manifest", func(r *restoreEnv) { r.scratch.db.facts.HeadSeq = 121 }, domain.CheckManifest, "copy_newer_than_manifest"},
 		{"gap in a partition", func(r *restoreEnv) { r.scratch.db.events.Partitions[0].Count = 98 }, domain.CheckEventLog, "event_log_gap"},
@@ -262,25 +262,29 @@ func TestRestoreManifestWindow(t *testing.T) {
 	t.Parallel()
 	r := newRestoreEnv(t, nil)
 	r.scratch.db.facts.HeadSeq = 110
-	r.scratch.db.facts.RowCounts = map[string]int64{"messages": 90, "event_log": 110}
+	r.scratch.db.facts.RowCounts = map[string]int64{"event_log": 110}
 	if _, checks, err := r.test(t); err != nil || !checks.Passed() {
 		t.Errorf("copy behind its manifest: %v %v", err, outcomes(checks))
 	}
-	q := newRestoreEnv(t, nil)
-	q.scratch.db.facts.RowCounts = map[string]int64{"messages": 100, "event_log": 120, "backup_runs": 3}
-	q.src.facts.RowCounts = map[string]int64{"messages": 100, "event_log": 120, "backup_runs": 1}
-	if err := q.svc.Run(context.Background(), domain.KindPGFull); err != nil {
-		t.Fatal(err)
-	}
-	if _, checks, err := q.test(t); err != nil || !checks.Passed() {
-		t.Errorf("backup_runs differs: %v %v", err, outcomes(checks))
-	}
 	// Tables written without an event or audit row (sessions, tokens, cleanup jobs) may change
-	// while the heads stay: their counts are never compared, only event_log and audit_events.
+	// while the heads stay: their counts are never compared, only event_log and audit_events. A
+	// backup_manifest.v1 of an earlier run still holds them, and the test still passes on it.
 	s := newRestoreEnv(t, nil)
-	s.scratch.db.facts.RowCounts = map[string]int64{"messages": 97, "event_log": 120}
+	s.runs.setManifest(t, s.backup.ID, func(m *domain.Manifest) {
+		m.Schema, m.Tables = domain.ManifestSchemaV1, nil
+		m.RowCounts = map[string]int64{"messages": 97, "event_log": 120}
+	})
 	if _, checks, err := s.test(t); err != nil || !checks.Passed() {
-		t.Errorf("a table without events differs at equal heads: %v %v", err, outcomes(checks))
+		t.Errorf("v1 manifest, a table without events differs at equal heads: %v %v", err, outcomes(checks))
+	}
+	// The tables of a v1 manifest are the keys of its row_counts: a table the copy lacks fails.
+	v := newRestoreEnv(t, nil)
+	v.runs.setManifest(t, v.backup.ID, func(m *domain.Manifest) {
+		m.Schema, m.Tables = domain.ManifestSchemaV1, nil
+		m.RowCounts = map[string]int64{"messages": 100, "event_log": 120, "sessions": 4}
+	})
+	if _, checks, err := v.test(t); err == nil || result(checks, domain.CheckManifest).Reason != "table_missing" {
+		t.Errorf("v1 manifest with a table the copy lacks: %v %v", err, outcomes(checks))
 	}
 }
 

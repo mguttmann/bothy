@@ -80,8 +80,8 @@ is handled like a restore with a new epoch ([16-operations.md](../spec/16-operat
    `cancelled` itself.
 3. Final backup: `pg_dump`, object backup, manifest. Note the point in time: every
    emergency revocation after it is missing on the target.
-4. Target: restore of the logical dump and of the objects; compare the manifest (row counts,
-   `head_seq`, audit head, file count). A difference means: abort, make the old instance writable again.
+4. Target: restore of the logical dump and of the objects; compare the manifest (row counts
+   of `event_log` and `audit_events`, `head_seq`, audit head, file count). A difference means: abort, make the old instance writable again.
    Then save the manifest of the final backup (`backup_runs.manifest` of that run on the old
    instance; the command is in [backup-restore.md](backup-restore.md#11-state-of-the-runs)) as
    `manifest.json` next to the Compose file and run

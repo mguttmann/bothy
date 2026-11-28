@@ -30,7 +30,7 @@ func IdentityMismatch(stored, current Identity) bool {
 }
 
 // The fields RelocationDifference names, in the order it compares them: the names of the
-// manifest backup_manifest.v1 (docs/operations/backup-restore.md section 3).
+// manifest backup_manifest.v2 (docs/operations/backup-restore.md section 3).
 const (
 	FieldHeadSeq       = "event_log.head_seq"
 	FieldAuditLastSeq  = "audit.last_seq"

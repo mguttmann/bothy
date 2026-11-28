@@ -107,7 +107,7 @@ func TestFinalizeRestore_RefusesWithConnectedApp(t *testing.T) {
 	}
 }
 
-// TestRestoreFinalize_RelocationMismatchExits1: a manifest that is not backup_manifest.v1, or
+// TestRestoreFinalize_RelocationMismatchExits1: a manifest that is not backup_manifest.v2 or v1, or
 // whose facts differ from the database, is exit 1 and changes nothing.
 func TestRestoreFinalize_RelocationMismatchExits1(t *testing.T) {
 	t.Parallel()

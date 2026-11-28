@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -35,12 +36,13 @@ func invalid(field, rule string) error {
 	return fmt.Errorf("%w: %s %s", ErrInvalidManifest, field, rule)
 }
 
-// Validate checks m against backup_manifest.v1 (docs/spec/03-data-model.md 4.12,
-// docs/operations/backup-restore.md 3): the schema name; backup_id, instance_id and sync_epoch
+// Validate checks m against backup_manifest.v2 or backup_manifest.v1 (docs/spec/03-data-model.md
+// 4.12, docs/operations/backup-restore.md 3): the schema name; backup_id, instance_id and sync_epoch
 // as UUIDs; kind one of Kinds(); both times set with finished_at not before started_at;
 // server_version of version characters only; schema_version, the seqs, the counts and the sizes
 // not negative; min_retained_seq not above head_seq; audit.last_hash lowercase hex, empty exactly
-// when audit.last_seq is 0; row_counts keyed by table names; pgbackrest set exactly for pg_full
+// when audit.last_seq is 0; row_counts keyed by table names; for v2 tables sorted, unique table
+// names and row_counts only over ExactCountTables that tables names, for v1 no tables; pgbackrest set exactly for pg_full
 // and pg_diff with a pgBackRest label; restic required for logical, optional for objects (absent
 // for the driver s3) and absent for the physical kinds, with a full snapshot id;
 // deletion_journal.next_number at least 1 when the member is present (M7-07).
@@ -62,8 +64,8 @@ func (m Manifest) Validate() error {
 // validateRun checks the fields that describe the run and the instance.
 func (m Manifest) validateRun() error {
 	switch {
-	case m.Schema != ManifestSchema:
-		return invalid("schema", "must be "+ManifestSchema)
+	case m.Schema != ManifestSchema && m.Schema != ManifestSchemaV1:
+		return invalid("schema", "must be "+ManifestSchema+" or "+ManifestSchemaV1)
 	case !uuidPattern.MatchString(m.BackupID):
 		return invalid("backup_id", "must be a UUID")
 	case !validKind(m.Kind):
@@ -107,6 +109,33 @@ func (m Manifest) validateFacts() error {
 	for table, n := range m.RowCounts {
 		if !tableNamePattern.MatchString(table) || n < 0 {
 			return invalid("row_counts", "must map table names to counts that are not negative")
+		}
+	}
+	return m.validateTables()
+}
+
+// validateTables checks tables and the counted tables of the schema version.
+func (m Manifest) validateTables() error {
+	if m.Schema == ManifestSchemaV1 {
+		if m.Tables != nil {
+			return invalid("tables", "must be absent in "+ManifestSchemaV1)
+		}
+		return nil
+	}
+	if m.Tables == nil {
+		return invalid("tables", "must be an array")
+	}
+	for i, table := range m.Tables {
+		if !tableNamePattern.MatchString(table) || (i > 0 && m.Tables[i-1] >= table) {
+			return invalid("tables", "must hold sorted, unique table names")
+		}
+	}
+	for table := range m.RowCounts {
+		if !slices.Contains(ExactCountTables, table) {
+			return invalid("row_counts", "must count only "+strings.Join(ExactCountTables, " and "))
+		}
+		if _, ok := slices.BinarySearch(m.Tables, table); !ok {
+			return invalid("row_counts", "must count only tables that tables names")
 		}
 	}
 	return nil
@@ -181,11 +210,14 @@ func decodeError(err error) error {
 		if strings.HasPrefix(typeErr.Field, "row_counts") {
 			return invalid("row_counts", "has the wrong type")
 		}
+		if strings.HasPrefix(typeErr.Field, "tables") {
+			return invalid("tables", "has the wrong type")
+		}
 		if fieldPathPattern.MatchString(typeErr.Field) {
 			return invalid(typeErr.Field, "has the wrong type")
 		}
 	}
-	return fmt.Errorf("%w: not a JSON object of backup_manifest.v1", ErrInvalidManifest)
+	return fmt.Errorf("%w: not a JSON object of backup_manifest.v2 or v1", ErrInvalidManifest)
 }
 
 // Marshal validates m and returns its JSON, the stored form of the manifest.
