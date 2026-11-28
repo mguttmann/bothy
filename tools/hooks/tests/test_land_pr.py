@@ -26,7 +26,15 @@ WRAPPED = (
 OTHER_ADDRESS = (
     f"Fixes the gate.\n\nSigned-off-by: Jane Example <jane@corp.example>\nSigned-off-by: {JANE}\n"
 )
+JANE_GH = {"is_bot": False, "login": "jane-example", "name": "Jane Example"}
+# What gh pr view reports for a pull request of hermes-pin.yml (CI sees github-actions[bot]).
+ACTIONS_GH = {"is_bot": True, "login": "app/github-actions"}
+ACTIONS = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
 TITLE = "fix(ci): keep the gates green"
+REPO = Path(__file__).resolve().parents[3]
+# The squash commit of #1784 on main, a pull request of hermes-pin.yml that landed with the
+# maintainer's sign-off and the bot as author, so denylist-main failed (FIX-LAND-IDENTITY).
+LEAKED = "0117ec48c63ac7670175f09c48e6305fbd60977a"
 HEAD = "0123456789abcdef0123456789abcdef01234567"
 MERGED = "fedcba9876543210fedcba9876543210fedcba98"
 
@@ -42,8 +50,12 @@ class FakeGh:
         on_main: str | None = None,
         fail: str = "",
         merged_anyway: bool = False,
+        author: dict[str, object] | None = None,
+        landed_author: str | None = None,
     ) -> None:
         self.body = body
+        self.author = JANE_GH if author is None else author
+        self.landed_author = landed_author
         self.fail = fail
         self.merged_anyway = merged_anyway
         self.state = state
@@ -66,7 +78,13 @@ class FakeGh:
             return json.dumps({"mergeCommit": {"oid": MERGED}})
         if args[:2] == ["pr", "view"]:
             return json.dumps(
-                {"title": TITLE, "body": self.body, "headRefOid": HEAD, "state": self.state}
+                {
+                    "title": TITLE,
+                    "body": self.body,
+                    "headRefOid": HEAD,
+                    "state": self.state,
+                    "author": self.author,
+                }
             )
         if args[:2] == ["pr", "merge"]:
             self.body_file_text = Path(args[args.index("--body-file") + 1]).read_text(
@@ -77,7 +95,13 @@ class FakeGh:
                 self.on_main = f"{subject}\n\n{self.body_file_text}"
             return ""
         if args[0] == "api":
-            return self.on_main or ""
+            # GitHub writes the squash commit with the --author-email of a maintainer's own
+            # pull request and otherwise as the pull request author (bots: always).
+            merge = self.merge_call() or []
+            author = self.landed_author or (JANE if "--author-email" in merge else ACTIONS)
+            name, email = author[:-1].split(" <")
+            message = self.on_main or ""
+            return json.dumps({"message": message, "author": {"name": name, "email": email}})
         raise AssertionError(args)
 
     def merge_call(self) -> list[str] | None:
@@ -120,11 +144,86 @@ def test_refuses_a_signoff_of_another_identity() -> None:
     assert gh.merge_call() is None
 
 
-def test_bot_pull_request_needs_the_maintainer_signoff_too() -> None:
-    """CI exempts a bot's body; the squash commit on main still carries the sign-off."""
-    gh = FakeGh("Bumps example from 1.0 to 1.1.\n")
+def _leaked_commit() -> tuple[str, str]:
+    """Message and author of the real squash commit of #1784, read from the repository."""
+    fmt = "--format=%an <%ae>%x00%B"
+    run = subprocess.run(
+        ["git", "-C", str(REPO), "show", "-s", fmt, LEAKED],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if run.returncode != 0:
+        pytest.skip(f"commit {LEAKED[:9]} is not in this clone (shallow or no history)")
+    author, message = run.stdout.split("\0", 1)
+    return message, author
+
+
+def test_refuses_the_real_text_of_the_bot_pull_request_1784(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Counter-check against the real artifact: the body that reached main as 0117ec48c."""
+    message, _ = _leaked_commit()
+    body = message.split("\n\n", 1)[1]
+    gh = FakeGh(body, author=ACTIONS_GH)
     assert _land(gh) == 1
     assert gh.merge_call() is None
+    out = capsys.readouterr().out
+    assert "github-actions[bot]" in out
+    assert "noreply" not in out
+
+
+def test_the_real_commit_of_1784_has_a_signoff_that_does_not_repeat_its_author() -> None:
+    """The readback rule is the one of denylist-main, checked on the commit that failed it."""
+    message, author = _leaked_commit()
+    assert land_pr.foreign_signoffs(message, author) == 1
+    assert land_pr.foreign_signoffs(f"{TITLE}\n\n{SIGNED}", JANE) == 0
+
+
+def test_bot_pull_request_lands_without_signoff_and_without_author_email() -> None:
+    """GitHub keeps the bot as author, so no sign-off of the maintainer may reach main."""
+    body = "Bumps example from 1.0 to 1.1.\n"
+    gh = FakeGh(body, author=ACTIONS_GH)
+    assert _land(gh) == 0
+    call = gh.merge_call()
+    assert call is not None
+    assert "--author-email" not in call
+    assert gh.body_file_text == body
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        SIGNED,
+        f"Bumps example.\n\nCo-authored-by: {JANE}\n",
+        "Bumps.\n\nsigned-off-by: x <y@z.example>\n",
+    ],
+    ids=["maintainer sign-off", "co-author", "lower case sign-off"],
+)
+def test_bot_pull_request_with_an_identity_trailer_is_refused(body: str) -> None:
+    gh = FakeGh(body, author=ACTIONS_GH)
+    assert _land(gh) == 1
+    assert gh.merge_call() is None
+
+
+@pytest.mark.parametrize(
+    "author",
+    [{"is_bot": False, "login": "alex"}, {"is_bot": True, "login": "app/unknown"}, {}],
+    ids=["another person", "a bot not on the list", "no author"],
+)
+def test_pull_request_of_another_account_is_refused(author: dict[str, object]) -> None:
+    """GitHub would make that account the author, which the maintainer's sign-off misses."""
+    gh = FakeGh(SIGNED, author=author)
+    assert _land(gh) == 1
+    assert gh.merge_call() is None
+
+
+def test_reports_a_landed_commit_whose_signoff_misses_its_author(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    gh = FakeGh(SIGNED, landed_author=ACTIONS)
+    assert _land(gh) == 2
+    assert "does not repeat its author" in capsys.readouterr().out
 
 
 def test_refuses_a_pull_request_that_is_not_open() -> None:

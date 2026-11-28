@@ -378,7 +378,7 @@ OTHER_ADDRESS = (
     ],
 )
 def test_pull_request_body_needs_a_signoff(body: str, *, passes: bool) -> None:
-    assert (commit_msg.check_pr_body(body, author="alex") == []) is passes
+    assert (commit_msg.check_pr_body(body, author="jane-example") == []) is passes
 
 
 @pytest.mark.parametrize(
@@ -408,13 +408,66 @@ def test_pull_request_body_of_a_bot_needs_no_signoff(login: str) -> None:
     assert commit_msg.check_pr_body("Bumps example.\n", author=login) == []
 
 
+@pytest.mark.parametrize("login", ["dependabot[bot]", "renovate[bot]", "github-actions[bot]"])
+@pytest.mark.parametrize(
+    "body",
+    [SIGNED, f"Bumps example.\n\nCo-authored-by: {JANE}\n", "Bumps.\n\nsigned-off-by:x\n"],
+    ids=["sign-off", "co-author", "lower case, no space"],
+)
+def test_pull_request_body_of_a_bot_carries_no_identity_trailer(login: str, body: str) -> None:
+    """GitHub makes the bot the author of the squash commit; another identity fails on main."""
+    errors = commit_msg.check_pr_body(body, author=login)
+    assert errors
+    assert not any("12345+" in e for e in errors)
+
+
+def test_pull_request_body_of_a_bot_may_name_an_identity_in_a_comment() -> None:
+    assert (
+        commit_msg.check_pr_body(
+            f"Bumps.\n<!--\nSigned-off-by: {JANE}\n-->\n", author="dependabot[bot]"
+        )
+        == []
+    )
+
+
+def test_real_body_of_the_bot_pull_request_1784_fails() -> None:
+    """Counter-check against the real artifact: the body that reached main as 0117ec48c."""
+    run = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(REPO),
+            "show",
+            "-s",
+            "--format=%B",
+            "0117ec48c63ac7670175f09c48e6305fbd60977a",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if run.returncode != 0:
+        pytest.skip("commit 0117ec48c is not in this clone (shallow or no history)")
+    body = run.stdout.split("\n\n", 1)[1]
+    assert commit_msg.check_pr_body(body, author="github-actions[bot]")
+    # The sign-off itself is well formed: only the author it lands with makes it a finding.
+    assert commit_msg.check_squash_body(body) == []
+
+
+def test_human_pull_request_body_signs_off_as_its_author() -> None:
+    """The login of the no-reply address is the pull request author, the squash author."""
+    assert commit_msg.check_pr_body(SIGNED, author="Jane-Example") == []
+    assert commit_msg.check_pr_body(SIGNED, author="alex")
+    assert commit_msg.check_pr_body(SIGNED, author="") == []
+
+
 def test_pr_body_mode_reads_the_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     body = tmp_path / "BODY"
     body.write_text(WRAPPED, encoding="utf-8")
-    assert commit_msg.main(["--pr-body", str(body), "--pr-author", "alex"]) == 1
+    assert commit_msg.main(["--pr-body", str(body), "--pr-author", "jane-example"]) == 1
     assert "pull request body: " in capsys.readouterr().out
     body.write_text(SIGNED, encoding="utf-8")
-    assert commit_msg.main(["--pr-body", str(body), "--pr-author", "alex"]) == 0
+    assert commit_msg.main(["--pr-body", str(body), "--pr-author", "jane-example"]) == 0
 
 
 @pytest.mark.parametrize(

@@ -35,8 +35,11 @@ commit per feature, signed and linear.
    commit, so it ends with a `Signed-off-by: Name <e-mail>` line outside HTML comments, which
    `make commitlint` requires (`PR_BODY`; not for a pull request of `dependabot[bot]`,
    `renovate[bot]` or `github-actions[bot]`, `PR_BODY_BOTS` in `tools/hooks/commit_msg.py`).
-   That line is the only `Signed-off-by` line of the body, in one line, with a GitHub no-reply
-   address (OQ-25; `check_squash_body`), and title and body are written fresh, in your own words: what and why, how it
+   That line is the only `Signed-off-by` line of the body, in one line, with the GitHub no-reply
+   address of the pull request author (OQ-25; `check_squash_body`, `check_pr_body`): GitHub
+   makes the pull request author the author of the squash commit, and `denylist-main` accepts a
+   sign-off only when it repeats that author, so the body of a bot's pull request carries no
+   `Signed-off-by` or `Co-authored-by` line at all (FIX-LAND-IDENTITY). And title and body are written fresh, in your own words: what and why, how it
    was verified, which commit the independent review covered with which verdict and what
    was fixed. Never paste a raw review report, bot or agent output, local paths, user or
    machine names, temporary folder names or notes about tools. Section
@@ -46,10 +49,15 @@ commit per feature, signed and linear.
    results (`tools/ci/ci_ok.py`), so it reports on every run; the job `plan` marks it pending
    for the head commit at the start of a pull request run.
 8. **Merge.** The maintainer lands with `python3 tools/hooks/land_pr.py <number> --delete-branch`
-   and `BOTHY_SIGNOFF_IDENTITY="Name <no-reply address>"`: it checks that the body ends with
-   exactly that sign-off, squash-merges with the pull request title plus ` (#<number>)` and the
-   body without the template's HTML comments as a file, that address as author and the checked head commit, and reads the
-   message of the commit on `main` back. Never the "Squash and merge" button and never
+   and `BOTHY_SIGNOFF_IDENTITY="Name <no-reply address>"`, for every pull request, also one of a
+   bot: for the maintainer's own pull request it checks that the body ends with exactly that
+   sign-off and passes that address as author; a bot's pull request (`PR_BODY_BOTS`) lands
+   without any sign-off or co-author line and without an author address, because GitHub keeps
+   the bot as author; a pull request of any other account is refused (FIX-LAND-IDENTITY). It
+   squash-merges with the pull request title plus ` (#<number>)` and the body without the
+   template's HTML comments as a file and the checked head commit, and reads the commit on
+   `main` back: its message must equal the checked text and each sign-off must repeat its
+   author. Never the "Squash and merge" button and never
    `gh pr merge --squash` without `--body-file`: both take GitHub's default squash text, which
    wraps the body at 72 columns (the sign-off breaks over two lines and becomes plain text for
    the deny list) and appends the trailers of the branch commits after a `---------` line, with
@@ -274,11 +282,14 @@ So that such a pull request passes for the right reasons, and only such a pull r
   branch, still needs its sign-off; a bot address in a person's pull request or in a fork
   exempts nothing, because only GitHub sets the pull request author. Locally `PR_AUTHOR` is
   unset, so `make check` exempts nothing.
-- **Before the merge.** The maintainer replaces the bot's body with a short text of their own
-  (what changed and how it was verified) that ends with their `Signed-off-by` line, and
-  checks that the title is a Conventional Commit header. The squash commit on `main` takes
-  title and body, so it carries the maintainer's sign-off, and the edit starts a run with every
-  check, which `ci-ok` must pass before the merge. After the merge, `denylist-main.yml` scans
+- **Before the merge.** The maintainer may replace the bot's body with a short text of their
+  own (what changed and how it was verified), without any `Signed-off-by` or `Co-authored-by`
+  line, and checks that the title is a Conventional Commit header. The squash commit on `main`
+  takes title and body and has the bot as author (GitHub sets the pull request author), so a
+  sign-off of the maintainer would not repeat its author and fail `denylist-main` (0117ec48c,
+  FIX-LAND-IDENTITY); `make commitlint` refuses such a line in a bot's body. The edit starts a
+  run with every check, which `ci-ok` must pass before the merge, and the maintainer lands
+  with `land_pr.py` (step 8). After the merge, `denylist-main.yml` scans
   the pushed commit with the private list as for every push.
 
 What this does not cover: nothing enforces the maintainer's rewrite of the body; as with a
@@ -286,7 +297,11 @@ fork pull request, a merge straight after a reduced run has not seen the private
 SonarQube before the merge, and only `denylist-main.yml` checks afterwards. Anyone with write
 access can push a commit with a forged bot author address to a bot branch, and that commit
 then needs no sign-off; the push is a run of a person, so it gets every other check, and the
-squash commit on `main` carries the maintainer's sign-off from the body.
+squash commit on `main` carries the bot as author and no sign-off. A merge with the button or
+with `gh pr merge --squash` without a body takes GitHub's default text, which appends the
+trailers of the branch commits; a signed maintainer commit on a bot branch then puts the
+maintainer's sign-off on a commit authored by the bot, which `ci-ok` cannot see and only
+`denylist-main.yml` reports afterwards; `land_pr.py` passes the checked body instead.
 
 ## Deny-list hit on `main`
 

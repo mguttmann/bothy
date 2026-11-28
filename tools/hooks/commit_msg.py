@@ -25,8 +25,11 @@ Rules (docs/quality/push-discipline.md):
     reads a sign-off only in the trailer block at the end of a message), unless
     the author is a bot of PR_BODY_BOTS (#872). That line is the only `Signed-off-by` line of
     the body, in one line, with a GitHub no-reply address (owner decision of 2026-11-07,
-    OQ-25): a sign-off wrapped over two lines or a second identity fails. The landing step
-    (land_pr.py) also requires the exact identity of the maintainer who lands.
+    OQ-25): a sign-off wrapped over two lines or a second identity fails. GitHub makes the
+    pull request author the author of the squash commit, so the address is the one of
+    --pr-author, and a bot's body carries no Signed-off-by or Co-authored-by line at all
+    (FIX-LAND-IDENTITY). The landing step (land_pr.py) also requires the exact identity of
+    the maintainer who lands.
 """
 
 from __future__ import annotations
@@ -71,6 +74,8 @@ BOT_AUTHORS = {
 # repository's own workflows (hermes-pin.yml opens its pull requests as github-actions[bot]).
 PR_BODY_BOTS = frozenset({*BOT_AUTHORS, "github-actions[bot]"})
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+# A line that names an identity as a trailer, as git and the deny list read it.
+_IDENTITY_TRAILER = re.compile(r"^(?:signed-off-by|co-authored-by)\s*:", re.IGNORECASE)
 # GitHub's no-reply address of an account: `<id>+<login>@users.noreply.github.com`.
 NOREPLY = re.compile(r"^\d+\+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?@users\.noreply\.github\.com$")
 
@@ -106,14 +111,37 @@ def check_squash_body(body: str, *, identity: str | None = None) -> list[str]:
 
 
 def check_pr_body(body: str, *, author: str) -> list[str]:
-    """Return the errors of a pull request body; empty means it passes (#872).
+    """Return the errors of a pull request body; empty means it passes (#872, FIX-LAND-IDENTITY).
 
-    The body becomes the message of the squash commit on `main`, so it needs a DCO sign-off
-    of its own (check_squash_body); a body of a bot of PR_BODY_BOTS needs none.
+    The body becomes the message of the squash commit on `main`, and GitHub makes the pull
+    request author the author of that commit. `denylist-main` accepts a sign-off only when it
+    repeats the author of its commit, so the sign-off must sign as the pull request author:
+    a human body ends with that account's sign-off (check_squash_body, and the login of the
+    no-reply address is `author` when it is given); a body of a bot of PR_BODY_BOTS carries no
+    identity trailer at all, because the squash commit is the bot's and anyone else's
+    sign-off or co-author line is a finding on `main` (0117ec48c, #1784).
     """
     if author in PR_BODY_BOTS:
+        text = _HTML_COMMENT.sub("", body.replace("\r\n", "\n"))
+        if any(_IDENTITY_TRAILER.match(ln.strip()) for ln in text.splitlines()):
+            return [
+                f"a pull request of {author} lands with {author} as the author of the squash "
+                "commit: remove every Signed-off-by and Co-authored-by line from the body, "
+                "denylist-main reports a sign-off that does not repeat the author"
+            ]
         return []
-    return check_squash_body(body)
+    errors = check_squash_body(body)
+    if author and not errors:
+        lines = [ln.strip() for ln in _HTML_COMMENT.sub("", body).splitlines() if ln.strip()]
+        match = _SIGNOFF.fullmatch(lines[-1])
+        login = match.group("email").split("@", 1)[0].split("+", 1)[-1] if match else ""
+        if login.lower() != author.lower():
+            errors.append(
+                "the sign-off must use the no-reply address of the pull request author: "
+                "GitHub makes that account the author of the squash commit, and denylist-main "
+                "reports a sign-off that does not repeat it"
+            )
+    return errors
 
 
 def _clean(message: str) -> str:

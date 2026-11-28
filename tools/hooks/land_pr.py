@@ -13,10 +13,14 @@ whatever identity those commits carry (docs/quality/push-discipline.md, step 8).
 always passes the body as a file and never lets GitHub compose it.
 
 The maintainer who lands sets BOTHY_SIGNOFF_IDENTITY ("Name <address>", a GitHub no-reply
-address, OQ-25). Before the merge the body must end with exactly `Signed-off-by: ` plus that
-identity, the only sign-off line (commit_msg.check_squash_body); the address is also the
-author of the squash commit. The merge is bound to the checked head commit. After the merge
-the message of the commit on `main` is read back and compared with the checked text; a
+address, OQ-25). GitHub makes the pull request author the author of the squash commit, and
+denylist-main accepts a sign-off only when it repeats that author (FIX-LAND-IDENTITY). So a
+pull request the maintainer opened must end with exactly `Signed-off-by: ` plus that
+identity, the only sign-off line (commit_msg.check_squash_body), and the address is passed as
+author; a pull request of a bot of PR_BODY_BOTS lands without any Signed-off-by or
+Co-authored-by line (commit_msg.check_pr_body); one of any other account is refused. The
+merge is bound to the checked head commit. After the merge the message of the commit on `main`
+is read back and compared with the checked text, and its sign-offs with its author; a
 difference exits with 2, because a commit on `main` is never rewritten without the owner.
 """
 
@@ -32,13 +36,15 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from commit_msg import NOREPLY, check_squash_body
+from commit_msg import NOREPLY, PR_BODY_BOTS, check_pr_body, check_squash_body
 
 Gh = Callable[[list[str]], str]
 _IDENTITY = re.compile(r"^(?P<name>[^<>]*\S) <(?P<address>[^<>\s]+)>$")
 IDENTITY_VARIABLE = "BOTHY_SIGNOFF_IDENTITY"
 # A comment that fills its lines alone; removing it never joins text that was around it.
 _STANDALONE_COMMENT = re.compile(r"^[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*(?:\n|\Z)", re.MULTILINE)
+# A Signed-off-by trailer as the deny list reads it on main.
+_SIGNOFF_LINE = re.compile(r"^signed-off-by:[ \t]*(?P<identity>.*?)[ \t]*$", re.IGNORECASE)
 
 
 class LandError(Exception):
@@ -57,6 +63,28 @@ def parse_identity(identity: str) -> tuple[str, str]:
         msg = f"{IDENTITY_VARIABLE} must be 'Name <id+login@users.noreply.github.com>' (OQ-25)"
         raise LandError(msg)
     return match.group("name"), match.group("address")
+
+
+def pr_author(author: dict[str, object] | None) -> str:
+    """The login of the pull request author as CI sees it (`app/x` of gh is `x[bot]`)."""
+    login = str((author or {}).get("login") or "")
+    if (author or {}).get("is_bot") and login.startswith("app/"):
+        return login.removeprefix("app/") + "[bot]"
+    return login
+
+
+def foreign_signoffs(message: str, author: str) -> int:
+    """Count the Signed-off-by lines of `message` that do not repeat `author` ("Name <address>").
+
+    denylist-main accepts a sign-off only when it repeats the author or committer of its
+    commit; GitHub commits as itself, so the author is the one identity a sign-off can repeat.
+    """
+    wanted = author.strip().lower()
+    return sum(
+        1
+        for line in message.splitlines()
+        if (m := _SIGNOFF_LINE.match(line.strip())) and m.group("identity").lower() != wanted
+    )
 
 
 def normalize(body: str) -> str:
@@ -78,6 +106,28 @@ def squash_body(body: str) -> str:
     return normalize(re.sub(r"\n{3,}", "\n\n", text).strip("\n"))
 
 
+def check_author(
+    author: dict[str, object] | None, body: str, identity: str, address: str
+) -> tuple[str | None, list[str]]:
+    """Return the --author-email to pass (None: none) and the errors of the body for `author`.
+
+    GitHub makes the pull request author the author of the squash commit, and denylist-main
+    accepts a sign-off only when it repeats that author (FIX-LAND-IDENTITY): a bot's pull
+    request lands without any sign-off, a human one only when the maintainer who lands opened
+    it, with exactly the maintainer's sign-off.
+    """
+    login = pr_author(author)
+    if login in PR_BODY_BOTS:
+        return None, check_pr_body(body, author=login)
+    if login.lower() == address.split("@", 1)[0].split("+", 1)[1].lower():
+        return address, check_squash_body(body, identity=identity)
+    return None, [
+        f"the pull request was opened by {login or 'an unknown account'}, not by the "
+        f"maintainer of {IDENTITY_VARIABLE}: GitHub makes its author the author of the "
+        "squash commit, which the maintainer's sign-off would not repeat"
+    ]
+
+
 def land(
     number: str,
     *,
@@ -91,12 +141,13 @@ def land(
     where = ["--repo", repo] if repo else []
     try:
         _, address = parse_identity(identity)
-        pr = json.loads(gh(["pr", "view", number, *where, "--json", "title,body,headRefOid,state"]))
+        fields = "title,body,headRefOid,state,author"
+        pr = json.loads(gh(["pr", "view", number, *where, "--json", fields]))
         if pr["state"] != "OPEN":
             raise LandError(f"the pull request is {pr['state']}, not OPEN")
         subject = f"{pr['title']} (#{number})"
         body = squash_body(pr["body"] or "")
-        errors = check_squash_body(body, identity=identity.strip())
+        author_email, errors = check_author(pr.get("author"), body, identity.strip(), address)
         if errors:
             raise LandError("; ".join(errors))
     except LandError as err:
@@ -106,7 +157,9 @@ def land(
         body_file = Path(tmp) / "squash-body.md"
         body_file.write_text(body, encoding="utf-8")
         cmd = ["pr", "merge", number, *where, "--squash", "--subject", subject]
-        cmd += ["--body-file", str(body_file), "--author-email", address]
+        cmd += ["--body-file", str(body_file)]
+        if author_email is not None:
+            cmd += ["--author-email", author_email]
         cmd += ["--match-head-commit", pr["headRefOid"]]
         if delete_branch:
             cmd.append("--delete-branch")
@@ -127,8 +180,10 @@ def land(
         merged = json.loads(gh(["pr", "view", number, *where, "--json", "mergeCommit"]))
         oid = merged["mergeCommit"]["oid"]
         api_repo = repo or "{owner}/{repo}"
-        on_main = gh(["api", f"repos/{api_repo}/commits/{oid}", "--jq", ".commit.message"])
-    except (subprocess.CalledProcessError, KeyError, TypeError):
+        commit = json.loads(gh(["api", f"repos/{api_repo}/commits/{oid}", "--jq", ".commit"]))
+        on_main = commit["message"]
+        landed_author = f"{commit['author']['name']} <{commit['author']['email']}>"
+    except (subprocess.CalledProcessError, KeyError, TypeError, ValueError):
         print(
             "land_pr: merged, but the commit on main could not be read back: compare its "
             "message with the pull request text by hand (gh pr view --json mergeCommit)"
@@ -138,6 +193,13 @@ def land(
         print(
             f"land_pr: merged as {oid}, but its message differs from the checked text; "
             "a commit on main is not rewritten without the owner: report it"
+        )
+        return 2
+    if foreign_signoffs(on_main, landed_author):
+        print(
+            f"land_pr: merged as {oid}, but a sign-off of its message does not repeat its "
+            "author, which denylist-main reports; a commit on main is not rewritten without "
+            "the owner: report it"
         )
         return 2
     print(f"land_pr: merged as {oid} with the checked text")
