@@ -78,7 +78,7 @@ func (h ExtractRefreshHandler) Work(ctx context.Context, job jobs.Job[ExtractRef
 	return h.Refresh.Run(ctx, job.Args.After)
 }
 
-// RegisterExtract adds files.extract_text on the queue files without a River job timeout (the use
+// RegisterExtract adds files.extract_text on the queue files_text without a River job timeout (the use
 // case bounds reading and parsing with search.extract.timeout, and River's default could cut the
 // result write; docs/decisions.d/M3-15.md), and files.extract_text_refresh on the queue
 // maintenance, periodic every interval (search.extract.refresh_interval) and once at the start,
@@ -88,7 +88,7 @@ func RegisterExtract(reg *jobs.Registry, text TextRunner, refresh RefreshRunner,
 	if interval <= 0 {
 		return errors.New("files: search.extract.refresh_interval must be positive")
 	}
-	if err := jobs.Register[ExtractText](reg, ExtractTextHandler{Text: text}, jobs.HandlerOptions{Queue: jobs.QueueFiles, Timeout: -1}); err != nil {
+	if err := jobs.Register[ExtractText](reg, ExtractTextHandler{Text: text}, jobs.HandlerOptions{Queue: jobs.QueueFilesText, Timeout: -1}); err != nil {
 		return err
 	}
 	if err := jobs.Register[ExtractRefresh](reg, ExtractRefreshHandler{Refresh: refresh}, jobs.HandlerOptions{Queue: jobs.QueueMaintenance}); err != nil {

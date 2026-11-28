@@ -20,10 +20,6 @@ import (
 // copyChunk bounds the buffer of one write; the context is checked between chunks.
 const copyChunk = 64 << 10
 
-// errParentGone reports that the directory of a write without directory creation vanished
-// before the rename: for a part, the upload was aborted or completed meanwhile.
-var errParentGone = errors.New("parent directory vanished")
-
 // Put writes key from exactly size bytes of body (docs/spec/12-files.md "4.2"): a temporary
 // file in <root>/.tmp with mode 0600, a copy with a bounded buffer, Sync, the missing directories
 // with mode 0700, rename to the key and Sync of the directory. A reader never sees half an
@@ -39,7 +35,7 @@ func (s *Store) Put(ctx context.Context, key string, body io.Reader, size int64)
 	if size < 0 {
 		return opErr("put", key, app.ErrSizeMismatch)
 	}
-	err := s.commit(ctx, key, true, func(w io.Writer) error { return copyExactly(ctx, w, body, size) })
+	err := s.commit(ctx, key, func(w io.Writer) error { return copyExactly(ctx, w, body, size) })
 	if err != nil {
 		return opErr("put", key, err)
 	}
@@ -47,11 +43,10 @@ func (s *Store) Put(ctx context.Context, key string, body io.Reader, size int64)
 }
 
 // commit writes the object key through a temporary file that fill writes, then syncs, renames
-// and syncs the directory, in this order. With makeDirs it creates the missing directories of
-// the key and creates them again when a concurrent Delete removed the emptied directory before
-// the rename (place, docs/DECISIONS.md M3-01/11); without makeDirs a missing directory gives
-// errParentGone. On every error the temporary file is removed.
-func (s *Store) commit(ctx context.Context, key string, makeDirs bool, fill func(io.Writer) error) error {
+// and syncs the directory, in this order. It creates the missing directories of the key and
+// creates them again when a concurrent Delete removed the emptied directory before the rename
+// (place, docs/DECISIONS.md M3-01/11). On every error the temporary file is removed.
+func (s *Store) commit(ctx context.Context, key string, fill func(io.Writer) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -62,7 +57,7 @@ func (s *Store) commit(ctx context.Context, key string, makeDirs bool, fill func
 	if err != nil {
 		return err
 	}
-	if err := s.place(ctx, tmp, key, makeDirs); err != nil {
+	if err := s.place(ctx, tmp, key); err != nil {
 		_ = s.root.Remove(osPath(tmp))
 		return err
 	}
@@ -117,27 +112,24 @@ func (s *Store) rename(tmp, key string) error {
 	return s.root.Rename(osPath(tmp), osPath(key))
 }
 
-// place renames the temporary file to the key. With makeDirs it first creates the missing
-// directories of the key, and when the rename fails because a concurrent Delete removed the
-// emptied file directory in between (docs/DECISIONS.md M3-01/11), it creates the directory again
-// and renames again, until the rename succeeds, fails for another reason, the temporary file is
-// gone or ctx ends. Each repetition needs another Delete that empties and removes the directory
-// in that window, so the loop ends as soon as the deletes stop. Without makeDirs a vanished
-// directory gives errParentGone.
-func (s *Store) place(ctx context.Context, tmp, key string, makeDirs bool) error {
+// place renames the temporary file to the key. It first creates the missing directories of the
+// key, and when the rename fails because a concurrent Delete removed the emptied file directory
+// in between (docs/DECISIONS.md M3-01/11), it creates the directory again and renames again,
+// until the rename succeeds, fails for another reason, the temporary file is gone or ctx ends.
+// Each repetition needs another Delete that empties and removes the directory in that window, so
+// the loop ends as soon as the deletes stop.
+func (s *Store) place(ctx context.Context, tmp, key string) error {
 	dir := path.Dir(key)
 	for {
-		if makeDirs {
-			if err := s.mkdirs(ctx, dir); err != nil {
-				return err
-			}
+		if err := s.mkdirs(ctx, dir); err != nil {
+			return err
 		}
 		s.event("before-rename", key)
 		err := s.rename(tmp, key)
 		if err == nil {
 			return nil
 		}
-		if err := s.retryable(ctx, tmp, dir, err, makeDirs); err != nil {
+		if err := s.retryable(ctx, tmp, dir, err); err != nil {
 			return err
 		}
 	}
@@ -145,12 +137,9 @@ func (s *Store) place(ctx context.Context, tmp, key string, makeDirs bool) error
 
 // retryable returns nil when place should create the directory again and repeat the rename
 // that failed with err, and otherwise the error to return.
-func (s *Store) retryable(ctx context.Context, tmp, dir string, err error, makeDirs bool) error {
-	switch {
-	case !s.vanished(dir, err):
+func (s *Store) retryable(ctx context.Context, tmp, dir string, err error) error {
+	if !s.vanished(dir, err) {
 		return err
-	case !makeDirs:
-		return errParentGone
 	}
 	if _, terr := s.root.Lstat(osPath(tmp)); terr != nil {
 		return err

@@ -46,20 +46,12 @@ const (
 	gifColorTableFlag = 0x80
 	// gifColorTableBits in a packed byte hold log2(entries) - 1 of the colour table.
 	gifColorTableBits = 0x07
-	// gifLoopSubBlockSize is the size of the loop sub-block of a NETSCAPE2.0 extension: the
-	// sub-block id 1 and a 16-bit little-endian loop count.
-	gifLoopSubBlockSize = 3
 )
-
-// gifLoopApps are the identifiers of the application extensions that carry the loop count.
-var gifLoopApps = []string{"NETSCAPE2.0", "ANIMEXTS1.0"}
 
 // gifInfo is what scanGIF reads from the block structure of a GIF.
 type gifInfo struct {
 	Width, Height int // logical screen size
 	Frames        int // number of image descriptors
-	LoopCount     int // from the NETSCAPE2.0 (or ANIMEXTS1.0) application extension; 0 = forever
-	HasLoop       bool
 }
 
 // gifScanner reads the blocks of one GIF; it keeps nothing but the small fixed-size headers.
@@ -193,7 +185,8 @@ func (s *gifScanner) extension() error {
 }
 
 // application reads an application extension: the identifier block of the length its size byte
-// gives, then the sub-blocks; a loop extension sets the loop count.
+// gives, then the sub-blocks. The loop count is not read here: reencodeGIF keeps the one
+// image/gif decodes.
 func (s *gifScanner) application() error {
 	n, err := s.r.ReadByte()
 	if err != nil {
@@ -203,35 +196,7 @@ func (s *gifScanner) application() error {
 	if _, err := io.ReadFull(s.r, id); err != nil {
 		return err
 	}
-	if !gifIsLoopApp(id) {
-		return s.skipSubBlocks()
-	}
-	return s.loopCount()
-}
-
-// loopCount reads the sub-blocks after a loop extension identifier: the loop sub-block (id 1)
-// sets the loop count, the rest is skipped.
-func (s *gifScanner) loopCount() error {
-	for {
-		data, err := s.subBlock()
-		if err != nil || data == nil {
-			return err
-		}
-		if len(data) == gifLoopSubBlockSize && data[0] == 1 {
-			s.info.LoopCount = int(data[1]) | int(data[2])<<8
-			s.info.HasLoop = true
-		}
-	}
-}
-
-// gifIsLoopApp reports whether id is the identifier of a loop count extension.
-func gifIsLoopApp(id []byte) bool {
-	for _, name := range gifLoopApps {
-		if string(id) == name {
-			return true
-		}
-	}
-	return false
+	return s.skipSubBlocks()
 }
 
 // subBlock reads one data sub-block (at most 255 bytes, the size byte bounds it) and returns its

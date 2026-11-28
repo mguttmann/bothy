@@ -19,20 +19,8 @@ var _ app.DeliveryReader = (*Repository)(nil)
 
 // FileForDelivery implements app.DeliveryReader: one file by id, deleted or not.
 func (r *Repository) FileForDelivery(ctx context.Context, fileID ids.ID) (app.FileRecord, bool, error) {
-	row, err := r.read(ctx).GetFileForDelivery(ctx, uuid(fileID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return app.FileRecord{}, false, nil
-	}
-	if err != nil {
-		return app.FileRecord{}, false, mapError(err, "reading a file for a delivery")
-	}
-	return app.FileRecord{
-		ID: idOf(row.ID), ObjectKey: row.ObjectKey, SHA256: digest(row.Sha256), SizeBytes: row.SizeBytes, MIMEType: row.MimeType,
-		OriginalName: row.OriginalName, UploadedBy: idOf(row.UploadedBy), Purpose: row.Purpose, ScopeChannelID: idOf(row.ScopeChannelID),
-		UploadState: row.UploadState, ScanStatus: row.ScanStatus, TranscriptStatus: row.TranscriptStatus,
-		TranscriptText: row.TranscriptText.String, TranscriptLanguage: row.TranscriptLanguage.String,
-		TranscriptSource: row.TranscriptSource.String, CreatedAt: timeOf(row.CreatedAt), Deleted: row.DeletedAt.Valid,
-	}, true, nil
+	row, err := r.read(ctx).GetFileByID(ctx, uuid(fileID))
+	return readFile(row, err)
 }
 
 // Thumbnail implements app.DeliveryReader: one row of file_thumbnails.

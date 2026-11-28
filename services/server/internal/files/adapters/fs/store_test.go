@@ -5,8 +5,6 @@ package fs_test
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	iofs "io/fs"
@@ -265,19 +263,11 @@ func allOps(ctx context.Context, s app.ObjectStore, key string) map[string]error
 		_ = rc.Close()
 	}
 	_, headErr := s.Head(ctx, key)
-	_, createErr := s.CreateMultipart(ctx, key)
-	_, partErr := s.UploadPart(ctx, key, "", 1, strings.NewReader("x"), 1)
-	_, presignErr := s.PresignUploadPart(ctx, key, "", 1, 1, time.Minute)
 	return map[string]error{
-		"Put":               s.Put(ctx, key, strings.NewReader("x"), 1),
-		"Get":               getErr,
-		"Head":              headErr,
-		"Delete":            s.Delete(ctx, key),
-		"CreateMultipart":   createErr,
-		"UploadPart":        partErr,
-		"CompleteMultipart": s.CompleteMultipart(ctx, key, "", []app.Part{{Number: 1, ETag: `"x"`}}),
-		"AbortMultipart":    s.AbortMultipart(ctx, key, ""),
-		"PresignUploadPart": presignErr,
+		"Put":    s.Put(ctx, key, strings.NewReader("x"), 1),
+		"Get":    getErr,
+		"Head":   headErr,
+		"Delete": s.Delete(ctx, key),
 	}
 }
 
@@ -342,7 +332,7 @@ func TestNoSymbolicLinkFollowed(t *testing.T) {
 		}
 	}
 	writeCanary()
-	ops := []string{"Put", "Get", "Head", "Delete", "CreateMultipart", "UploadPart"}
+	ops := []string{"Put", "Get", "Head", "Delete"}
 
 	type setup func(t *testing.T, root string, s *fs.Store) (key string)
 	setups := map[string]setup{
@@ -382,7 +372,7 @@ func TestNoSymbolicLinkFollowed(t *testing.T) {
 			}
 			return key
 		},
-		"uploads directory links outside": func(t *testing.T, root string, _ *fs.Store) string {
+		"upload directory of a part links outside": func(t *testing.T, root string, _ *fs.Store) string {
 			id := ids.New()
 			if err := os.MkdirAll(filepath.Join(root, "uploads"), 0o700); err != nil {
 				t.Fatal(err)
@@ -390,7 +380,7 @@ func TestNoSymbolicLinkFollowed(t *testing.T) {
 			if err := os.Symlink(outside, filepath.Join(root, "uploads", id.String())); err != nil {
 				t.Fatal(err)
 			}
-			return origKey(t, id)
+			return partKey(t, id, 1)
 		},
 	}
 	for name, mk := range setups {
@@ -399,9 +389,6 @@ func TestNoSymbolicLinkFollowed(t *testing.T) {
 		key := mk(t, root, s)
 		errs := allOps(t.Context(), s, key)
 		for _, op := range ops {
-			if name == "uploads directory links outside" && (op == "Get" || op == "Head" || op == "Delete" || op == "Put") {
-				continue // these do not touch uploads/
-			}
 			err := errs[op]
 			if err == nil || errors.Is(err, app.ErrNotFound) || errors.Is(err, app.ErrInvalidKey) {
 				t.Errorf("%s: %s err = %v, want a storage failure", name, op, err)
@@ -519,23 +506,9 @@ func TestPutSyncOrder(t *testing.T) {
 	id := ids.New()
 	putBytes(t, s, origKey(t, id), []byte("x"))
 	take("Put")
-	k2 := origKey(t, ids.New())
-	up, err := s.CreateMultipart(t.Context(), k2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mu.Lock()
-	events = nil
-	mu.Unlock()
-	p, err := s.UploadPart(t.Context(), k2, up, 1, strings.NewReader("part"), 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	take("UploadPart")
-	if err := s.CompleteMultipart(t.Context(), k2, up, []app.Part{p}); err != nil {
-		t.Fatal(err)
-	}
-	take("CompleteMultipart")
+	// A part of the fs part strategy is an object under uploads/<file_id>/<n> (D-M3-03-2).
+	putBytes(t, s, partKey(t, ids.New(), 1), []byte("part"))
+	take("Put of a part")
 }
 
 type errBody struct{ n int }
@@ -585,20 +558,15 @@ func TestFailedWritesLeaveNothing(t *testing.T) {
 		{"cancelled context", cancelled, strings.NewReader("abcd"), 4},
 		{"body error", t.Context(), &errBody{n: 100000}, 200000},
 	} {
-		id := ids.New()
-		key := origKey(t, id)
-		up, err := s.CreateMultipart(t.Context(), key)
-		if err != nil {
-			t.Fatal(err)
+		key := partKey(t, ids.New(), 1)
+		if err := s.Put(a.ctx, key, a.body, a.size); err == nil {
+			t.Errorf("Put of a part with %s succeeded", a.name)
 		}
-		if _, err := s.UploadPart(a.ctx, key, up, 1, a.body, a.size); err == nil {
-			t.Errorf("UploadPart with %s succeeded", a.name)
-		}
-		if _, err := s.Head(t.Context(), partKey(t, id, 1)); !errors.Is(err, app.ErrNotFound) {
-			t.Errorf("UploadPart with %s left a part: %v", a.name, err)
+		if _, err := s.Head(t.Context(), key); !errors.Is(err, app.ErrNotFound) {
+			t.Errorf("Put of a part with %s left a part: %v", a.name, err)
 		}
 		if n := len(tmpEntries(t, root)); n != 0 {
-			t.Errorf("UploadPart with %s left %d temporary files", a.name, n)
+			t.Errorf("Put of a part with %s left %d temporary files", a.name, n)
 		}
 	}
 }
@@ -695,153 +663,31 @@ func TestPutRecreatesVanishedDirectory(t *testing.T) {
 	}
 }
 
-func quotedSHA256(b []byte) string {
-	sum := sha256.Sum256(b)
-	return `"` + hex.EncodeToString(sum[:]) + `"`
-}
-
-func TestMultipartLayout(t *testing.T) {
-	t.Parallel()
-	root := newRoot(t)
-	s := openStore(t, root)
-	for _, finish := range []string{"complete", "abort"} {
-		id := ids.New()
-		key := origKey(t, id)
-		up, err := s.CreateMultipart(t.Context(), key)
-		if err != nil || up != "" {
-			t.Fatalf("CreateMultipart = %q, %v; want \"\"", up, err)
-		}
-		if again, err := s.CreateMultipart(t.Context(), key); err != nil || again != "" {
-			t.Fatalf("second CreateMultipart = %q, %v", again, err)
-		}
-		data := [][]byte{[]byte("first part"), []byte("second")}
-		var parts []app.Part
-		for i, d := range data {
-			p, err := s.UploadPart(t.Context(), key, up, i+1, bytes.NewReader(d), int64(len(d)))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if p.ETag != quotedSHA256(d) {
-				t.Errorf("ETag = %s, want %s", p.ETag, quotedSHA256(d))
-			}
-			parts = append(parts, p)
-			pk := partKey(t, id, i+1)
-			raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(pk))) //nolint:gosec // G304: a path below the test's own TempDir
-			if err != nil || !bytes.Equal(raw, d) {
-				t.Errorf("part file %s = %q, %v", pk, raw, err)
-			}
-			if got := getBytes(t, s, pk); !bytes.Equal(got, d) {
-				t.Errorf("Get(%s) = %q", pk, got)
-			}
-			if info, err := s.Head(t.Context(), pk); err != nil || info.Size != int64(len(d)) {
-				t.Errorf("Head(%s) = %+v, %v", pk, info, err)
-			}
-		}
-		if finish == "complete" {
-			if err := s.CompleteMultipart(t.Context(), key, up, parts); err != nil {
-				t.Fatal(err)
-			}
-		} else if err := s.AbortMultipart(t.Context(), key, up); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := os.Lstat(filepath.Join(root, "uploads", id.String())); !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("after %s uploads/<file_id> still exists: %v", finish, err)
-		}
-	}
-}
-
-func TestMultipartOnlyForOriginalKeys(t *testing.T) {
-	t.Parallel()
-	s := openStore(t, newRoot(t))
-	id := ids.New()
-	small, _ := domain.VariantKey(id, domain.VariantSmall)
-	for _, k := range []string{small, partKey(t, id, 1), "a/b"} {
-		if _, err := s.CreateMultipart(t.Context(), k); !errors.Is(err, app.ErrInvalidKey) {
-			t.Errorf("CreateMultipart(%s) err = %v, want ErrInvalidKey", k, err)
-		}
-	}
-}
-
-func TestUploadPartWithForeignUploadID(t *testing.T) {
+// TestDeleteOfOriginalRemovesLeftParts holds docs/DECISIONS.md M3-01/18 for the part layout of
+// D-M3-03-2: parts left at uploads/<file_id>/<n> go with the Delete of the original, also when the
+// original is already gone.
+func TestDeleteOfOriginalRemovesLeftParts(t *testing.T) {
 	t.Parallel()
 	root := newRoot(t)
 	s := openStore(t, root)
 	id := ids.New()
 	key := origKey(t, id)
-	up, err := s.CreateMultipart(t.Context(), key)
-	if err != nil {
+	putBytes(t, s, partKey(t, id, 1), []byte("part one"))
+	putBytes(t, s, partKey(t, id, 2), []byte("part two"))
+	putBytes(t, s, key, []byte("part onepart two"))
+	dir := filepath.Join(root, "uploads", id.String())
+	if err := s.Delete(t.Context(), key); err != nil {
 		t.Fatal(err)
 	}
-	p, err := s.UploadPart(t.Context(), key, up, 1, strings.NewReader("abc"), 3)
-	if err != nil {
+	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("Delete of the original left the parts: %v", err)
+	}
+	putBytes(t, s, partKey(t, id, 1), []byte("part one"))
+	if err := s.Delete(t.Context(), key); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.UploadPart(t.Context(), key, "foreign", 2, strings.NewReader("x"), 1); !errors.Is(err, app.ErrUploadNotFound) {
-		t.Errorf("UploadPart err = %v, want ErrUploadNotFound", err)
-	}
-	if err := s.CompleteMultipart(t.Context(), key, "foreign", []app.Part{p}); !errors.Is(err, app.ErrUploadNotFound) {
-		t.Errorf("CompleteMultipart err = %v, want ErrUploadNotFound", err)
-	}
-	if err := s.AbortMultipart(t.Context(), key, "foreign"); err != nil {
-		t.Errorf("AbortMultipart = %v, want nil", err)
-	}
-	if got := getBytes(t, s, partKey(t, id, 1)); string(got) != "abc" {
-		t.Errorf("open upload touched: part = %q", got)
-	}
-}
-
-func TestUploadPartReplacesSameNumber(t *testing.T) {
-	t.Parallel()
-	s := openStore(t, newRoot(t))
-	key := origKey(t, ids.New())
-	up, err := s.CreateMultipart(t.Context(), key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	up1 := func(body string) app.Part {
-		p, err := s.UploadPart(t.Context(), key, up, 1, strings.NewReader(body), int64(len(body)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-	a := up1("same")
-	if b := up1("same"); b != a {
-		t.Errorf("same bytes gave %+v, then %+v", a, b)
-	}
-	c := up1("other")
-	if c.ETag == a.ETag {
-		t.Error("other bytes kept the ETag")
-	}
-	if err := s.CompleteMultipart(t.Context(), key, up, []app.Part{a}); !errors.Is(err, app.ErrInvalidPart) {
-		t.Errorf("CompleteMultipart with the old ETag err = %v, want ErrInvalidPart", err)
-	}
-	if err := s.CompleteMultipart(t.Context(), key, up, []app.Part{c}); err != nil {
-		t.Fatal(err)
-	}
-	if got := getBytes(t, s, key); string(got) != "other" {
-		t.Errorf("object = %q", got)
-	}
-}
-
-func TestPresignNotSupported(t *testing.T) {
-	t.Parallel()
-	root := newRoot(t)
-	s := openStore(t, root)
-	_, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 1, 1, time.Minute)
-	if !errors.Is(err, app.ErrNotSupported) {
-		t.Errorf("PresignUploadPart err = %v, want ErrNotSupported", err)
-	}
-	// The port contract refuses a part number below 1 first, on every driver.
-	if _, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 0, 1, time.Minute); !errors.Is(err, app.ErrInvalidPart) {
-		t.Errorf("PresignUploadPart(0) err = %v, want ErrInvalidPart", err)
-	}
-	// So is a size below 1 (docs/DECISIONS.md M3-02/9).
-	if _, err := s.PresignUploadPart(t.Context(), origKey(t, ids.New()), "", 1, 0, time.Minute); !errors.Is(err, app.ErrSizeMismatch) {
-		t.Errorf("PresignUploadPart(size 0) err = %v, want ErrSizeMismatch", err)
-	}
-	if got := entries(t, root); !slices.Equal(got, []string{".tmp/"}) {
-		t.Errorf("entries = %v", got)
+	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("Delete of a missing original left the parts: %v", err)
 	}
 }
 
@@ -976,90 +822,6 @@ func TestGetAcceptsConcurrentReplace(t *testing.T) {
 	})
 	if got := getBytes(t, s, key); string(got) != "new object" {
 		t.Errorf("Get = %q, want the new object", got)
-	}
-}
-
-// TestCompleteSurvivesCleanupFailure: when the parts cannot be removed after the rename, the
-// completion still succeeds (the object is done), and Delete of the original removes the parts
-// left behind, so deleting a file removes all its bytes (12 "12").
-func TestCompleteSurvivesCleanupFailure(t *testing.T) {
-	t.Parallel()
-	if os.Geteuid() == 0 {
-		t.Skip("root ignores the read-only directory that makes the cleanup fail")
-	}
-	root := newRoot(t)
-	s := openStore(t, root)
-	id := ids.New()
-	key := origKey(t, id)
-	up, err := s.CreateMultipart(t.Context(), key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err := s.UploadPart(t.Context(), key, up, 1, strings.NewReader("part bytes"), 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir := filepath.Join(root, "uploads", id.String())
-	if err := os.Chmod(dir, 0o500); err != nil { //nolint:gosec // G302: a read-only upload directory is the case under test
-		t.Fatal(err)
-	}
-	if err := s.CompleteMultipart(t.Context(), key, up, []app.Part{p}); err != nil {
-		t.Fatalf("CompleteMultipart with a failing cleanup: %v", err)
-	}
-	if got := getBytes(t, s, key); string(got) != "part bytes" {
-		t.Errorf("object = %q", got)
-	}
-	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a directory needs the x bit
-		t.Fatal(err)
-	}
-	if _, err := os.Lstat(dir); err != nil {
-		t.Fatalf("the parts were removed although the directory was read-only: %v", err)
-	}
-	if err := s.Delete(t.Context(), key); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("Delete of the original left the parts: %v", err)
-	}
-	// Also when the object is already gone, as for a retried delete.
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Delete(t.Context(), key); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("Delete of a missing original left the parts: %v", err)
-	}
-}
-
-// TestUploadPartAgainstConcurrentAbort: an abort that removes uploads/<file_id> while a part is
-// written gives ErrUploadNotFound, recreates nothing and leaves no temporary file.
-func TestUploadPartAgainstConcurrentAbort(t *testing.T) {
-	t.Parallel()
-	root := newRoot(t)
-	s := openStore(t, root)
-	id := ids.New()
-	key := origKey(t, id)
-	up, err := s.CreateMultipart(t.Context(), key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.SetHook(func(event, _ string) {
-		if event == "before-rename" {
-			if err := os.RemoveAll(filepath.Join(root, "uploads", id.String())); err != nil {
-				t.Error(err)
-			}
-		}
-	})
-	if _, err := s.UploadPart(t.Context(), key, up, 1, strings.NewReader("part"), 4); !errors.Is(err, app.ErrUploadNotFound) {
-		t.Errorf("UploadPart err = %v, want ErrUploadNotFound", err)
-	}
-	if _, err := os.Lstat(filepath.Join(root, "uploads", id.String())); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("the aborted upload directory came back: %v", err)
-	}
-	if n := len(tmpEntries(t, root)); n != 0 {
-		t.Errorf(".tmp holds %d entries", n)
 	}
 }
 

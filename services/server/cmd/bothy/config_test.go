@@ -428,7 +428,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.scan.clamd_address = unix:///run/clamav/clamd.sock  # default\n" +
 		"file.scan.clamd_stream_max_bytes = 104857600  # default\n" +
 		"file.scan.health_interval = 30s  # default\n" +
-		"file.scan.max_concurrent = 4  # default\n" +
+		"file.scan.max_concurrent = 2  # default\n" +
 		"file.scan.mode = required  # default\n" +
 		"file.scan.retry_backoff_cap = 5m  # default\n" +
 		"file.scan.timeout = 2m  # default\n" +
@@ -464,6 +464,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"jobs.queue.default.max_workers = 8  # default\n" +
 		"jobs.queue.delivery.max_workers = 16  # default\n" +
 		"jobs.queue.files.max_workers = 2  # default\n" +
+		"jobs.queue.files_text.max_workers = 2  # default\n" +
 		"jobs.queue.maintenance.max_workers = 2  # default\n" +
 		"jobs.queue.privacy.max_workers = 1  # default\n" +
 		"jobs.schema = jobs  # default\n" +

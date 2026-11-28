@@ -266,7 +266,7 @@ func buildAPNG(tb testing.TB) []byte {
 	}
 	out := []byte(pngSignature)
 	out = append(out, pngChunk(chunkIHDR, first[0].Data)...)
-	out = append(out, pngChunk(chunkACTL, be.AppendUint64(nil, 2<<32))...) // two frames, endless
+	out = append(out, pngChunk("acTL", be.AppendUint64(nil, 2<<32))...) // two frames, endless
 	out = append(out, pngChunk("fcTL", fcTL(0))...)
 	for _, c := range first {
 		if c.Type == testChunkIDAT {

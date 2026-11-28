@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -49,6 +48,10 @@ func TestS3Conformance(t *testing.T) {
 	t.Parallel()
 	srv := sharedSeaweed(t)
 	filestest.RunObjectStoreConformance(t, func(t *testing.T) app.ObjectStore {
+		store, _ := seaweedStore(t, srv, srv.newBucket(t), nil)
+		return store
+	}, filestest.Options{PartSize: minPartSize})
+	filestest.RunMultipartConformance(t, func(t *testing.T) filestest.MultipartDriver {
 		store, _ := seaweedStore(t, srv, srv.newBucket(t), nil)
 		return store
 	}, filestest.Options{PartSize: minPartSize})
@@ -100,12 +103,14 @@ func TestS3RequestsAreCoreS3(t *testing.T) {
 	srv := sharedSeaweed(t)
 	var recs []*s3.Recorder
 	var buckets []string
-	filestest.RunObjectStoreConformance(t, func(t *testing.T) app.ObjectStore {
+	newStore := func(t *testing.T) *s3.Store {
 		bucket := srv.newBucket(t)
 		store, rec := seaweedStore(t, srv, bucket, nil)
 		recs, buckets = append(recs, rec), append(buckets, bucket)
 		return store
-	}, filestest.Options{PartSize: minPartSize})
+	}
+	filestest.RunObjectStoreConformance(t, func(t *testing.T) app.ObjectStore { return newStore(t) }, filestest.Options{PartSize: minPartSize})
+	filestest.RunMultipartConformance(t, func(t *testing.T) filestest.MultipartDriver { return newStore(t) }, filestest.Options{PartSize: minPartSize})
 	total := 0
 	for i, rec := range recs {
 		for _, r := range rec.Requests() {
@@ -334,82 +339,5 @@ func TestS3UploadPartSizeMismatch(t *testing.T) {
 	}
 	if err := store.AbortMultipart(ctx, key, upload); err != nil {
 		t.Fatal(err)
-	}
-}
-
-// putPresigned sends body to a presigned URL with a plain client of the test and returns the
-// status and the ETag; chunked forces chunked transfer encoding without Content-Length.
-func putPresigned(t *testing.T, rawURL string, body []byte, chunked bool) (int, string, error) {
-	t.Helper()
-	var r io.Reader = bytes.NewReader(body)
-	if chunked {
-		r = unseekable{bytes.NewReader(body)}
-	}
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, rawURL, r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if chunked {
-		req.ContentLength = -1
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	return resp.StatusCode, resp.Header.Get("ETag"), nil
-}
-
-// TestPresignedPartBindsLength is the proof 12 "3.3" asks for (R-FI-02, RK-42): against SeaweedFS
-// at the pinned version, a presigned part URL accepts exactly the signed length and refuses one
-// byte more, chunked transfer encoding and a request after its validity, leaving no part.
-func TestPresignedPartBindsLength(t *testing.T) {
-	t.Parallel()
-	srv := sharedSeaweed(t)
-	bucket := srv.newBucket(t)
-	store, _ := seaweedStore(t, srv, bucket, nil)
-	ctx := t.Context()
-	const size = 1024
-	data := bytes.Repeat([]byte("p"), size+1)
-
-	key := newKey(t)
-	upload, err := store.CreateMultipart(ctx, key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	refused := func(name string, body []byte, chunked bool, ttl time.Duration, wait time.Duration) {
-		t.Helper()
-		p, err := store.PresignUploadPart(ctx, key, upload, 2, size, ttl)
-		if err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(wait)
-		status, _, err := putPresigned(t, p.URL, body, chunked)
-		if err == nil && status < 300 {
-			t.Errorf("%s: status %d, want a refusal", name, status)
-		}
-		if parts := listParts(t, srv, bucket, key, upload); len(parts) != 0 {
-			t.Errorf("%s: parts %v stored, want none", name, parts)
-		}
-	}
-	refused("one byte more", data, false, time.Minute, 0)
-	refused("one byte less", data[:size-1], false, time.Minute, 0)
-	refused("chunked", data[:size], true, time.Minute, 0)
-	refused("after ttl", data[:size], false, time.Second, 3*time.Second)
-
-	p, err := store.PresignUploadPart(ctx, key, upload, 1, size, time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
-	status, etag, err := putPresigned(t, p.URL, data[:size], false)
-	if err != nil || status != http.StatusOK || etag == "" {
-		t.Fatalf("exact length: status %d, ETag %q, %v", status, etag, err)
-	}
-	if err := store.CompleteMultipart(ctx, key, upload, []app.Part{{Number: 1, ETag: etag}}); err != nil {
-		t.Fatalf("CompleteMultipart: %v", err)
-	}
-	if info, err := store.Head(ctx, key); err != nil || info.Size != size {
-		t.Errorf("Head = %+v, %v; want size %d", info, err, size)
 	}
 }

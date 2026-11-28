@@ -20,12 +20,12 @@ import (
 )
 
 // The values of bothy.outcome on the span "job <bothy.job.kind>" and on bothy.job.duration
-// (docs/observability/signals.md "Spans", 4.4). The catalogue also lists snoozed; it stays unused
-// until the River-free interface offers a snooze (README.md "Spans").
+// (docs/observability/signals.md "Spans", 4.4). snoozed is a handler that returned Snooze.
 const (
 	outcomeCompleted = "completed"
 	outcomeFailed    = "failed"
 	outcomeCancelled = "cancelled"
+	outcomeSnoozed   = "snoozed"
 )
 
 // Log messages of the handler wrapper; constant text (signals.md "Logs").
@@ -71,7 +71,8 @@ func newWorker[A Args](h Handler[A], o HandlerOptions, kind string, d workerDeps
 // the cancellation would otherwise mark an unfinished job as done, and a rerun is safe because
 // jobs are idempotent (docs/DECISIONS.md M1-14). In maintenance mode (Config.Maintenance) a kind
 // that does not run is held with River's snooze for Maintenance.Pause, and a kind that runs gets
-// txn.WithWriteInMaintenance, so its units of work may write (ADR 0065 item 4).
+// txn.WithWriteInMaintenance, so its units of work may write (ADR 0065 item 4). A handler that
+// returns Snooze gets River's snooze: the attempt is snoozed, uses up no attempt and logs nothing.
 func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 	if m := w.d.maintenance; m != nil {
 		if !m.runs(w.kind) {
@@ -105,6 +106,9 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 	if err != nil && outcomeOf(ctx, err) == outcomeFailed && !errors.Is(err, errPanicked) {
 		w.logFailed(ctx, j, err)
 	}
+	if pause, ok := SnoozePause(err); ok {
+		return river.JobSnooze(pause)
+	}
 	return err
 }
 
@@ -123,6 +127,12 @@ func (w *worker[A]) logFailed(ctx context.Context, j *river.Job[A], err error) {
 // lastAttempt reports whether j runs its last attempt, after which River discards a failed job.
 func lastAttempt[A Args](j *river.Job[A]) bool {
 	return j.JobRow != nil && j.Attempt >= j.MaxAttempts
+}
+
+// isSnooze reports whether err is or wraps the result of Snooze.
+func isSnooze(err error) bool {
+	_, ok := SnoozePause(err)
+	return ok
 }
 
 // errPanicked marks the error of an attempt whose handler panicked.
@@ -183,6 +193,8 @@ func outcomeOf(ctx context.Context, err error) string {
 	switch {
 	case err == nil:
 		return outcomeCompleted
+	case isSnooze(err):
+		return outcomeSnoozed
 	case errors.Is(ctx.Err(), context.Canceled) && errors.Is(err, context.Canceled):
 		return outcomeCancelled
 	default:

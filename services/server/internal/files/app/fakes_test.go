@@ -282,7 +282,7 @@ func (r *repo) File(_ context.Context, fileID ids.ID) (app.FileRecord, bool, err
 	return f, true, nil
 }
 
-// store is an in-memory app.ObjectStore that records every call and fails, with a test error, a
+// store is an in-memory app.ObjectStore and app.MultipartStore that records every call and fails, with a test error, a
 // call made inside a unit of work (02 8.5).
 type store struct {
 	t       testing.TB
@@ -450,13 +450,6 @@ func (s *store) AbortMultipart(ctx context.Context, _, uploadID string) error {
 	defer s.mu.Unlock()
 	delete(s.uploads, uploadID)
 	return nil
-}
-
-func (s *store) PresignUploadPart(ctx context.Context, _, _ string, _ int, _ int64, _ time.Duration) (app.PresignedPart, error) {
-	if err := s.enter(ctx, "PresignUploadPart"); err != nil {
-		return app.PresignedPart{}, err
-	}
-	return app.PresignedPart{}, app.ErrNotSupported
 }
 
 // authorizer decides by a rule per action; nil rules allow. A channel in allowIn is allowed for

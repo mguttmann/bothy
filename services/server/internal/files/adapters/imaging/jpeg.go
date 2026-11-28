@@ -80,11 +80,9 @@ type jfifHeader struct {
 // jpegInfo are the facts of one JPEG.
 type jpegInfo struct {
 	Width, Height int                // from the (first) frame header SOFn
-	Components    int                // number of components of the frame header
 	Orientation   domain.Orientation // from the first APP1 "Exif\0\0"; 1 when absent, unreadable or out of range
 	ICC           []byte             // the profile reassembled from all APP2 ICC_PROFILE parts in sequence order; nil when none or the parts are inconsistent
 	JFIF          *jfifHeader        // nil without a JFIF APP0
-	Adobe         bool               // an APP14 Adobe segment exists
 }
 
 // scanJPEG reads the whole structure of r without writing and validates it exactly like stripJPEG,
@@ -294,7 +292,6 @@ func (j *jpegWalker) frameHeader(m byte, payload []byte) error {
 	if j.frames == 0 {
 		j.info.Height = int(binary.BigEndian.Uint16(payload[1:]))
 		j.info.Width = int(binary.BigEndian.Uint16(payload[3:]))
-		j.info.Components = int(payload[5])
 	}
 	j.frames++
 	return nil
@@ -307,7 +304,7 @@ func isFrameHeader(m byte) bool {
 }
 
 // note collects the facts of the application segments while scanning: the first JFIF APP0, the
-// orientation of the first Exif APP1, the ICC parts and an Adobe APP14.
+// orientation of the first Exif APP1 and the ICC parts.
 func (j *jpegWalker) note(m byte, payload []byte) {
 	switch m {
 	case markerAPP0:
@@ -326,8 +323,6 @@ func (j *jpegWalker) note(m byte, payload []byte) {
 		if isICCSegment(payload) {
 			j.icc.add(payload)
 		}
-	case markerAPP14:
-		j.info.Adobe = j.info.Adobe || bytes.HasPrefix(payload, []byte(adobeIdentifier))
 	}
 }
 

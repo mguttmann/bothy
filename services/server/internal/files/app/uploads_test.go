@@ -168,7 +168,7 @@ func uploadAll(t *testing.T, e *env, ctx context.Context) (files.UploadSession, 
 		hi := min(lo+s.PartSizeBytes, int64(len(content)))
 		part := content[lo:hi]
 		ref, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: s.FileID, PartNumber: n, ContentDigest: digestOf(part),
-			ContentLength: int64(len(part)), Body: bytes.NewReader(part)})
+			Body: bytes.NewReader(part)})
 		if err != nil {
 			t.Fatalf("part %d: %v", n, err)
 		}
@@ -198,7 +198,7 @@ func TestNoObjectStoreCallInUnitOfWork(t *testing.T) {
 				lo := int64(n-1) * s.PartSizeBytes
 				part := content[lo:min(lo+s.PartSizeBytes, int64(len(content)))]
 				ref, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: s.FileID, PartNumber: n, ContentDigest: digestOf(part),
-					ContentLength: -1, Body: bytes.NewReader(part)})
+					Body: bytes.NewReader(part)})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -249,7 +249,7 @@ func TestS3PartStrategy(t *testing.T) {
 	}
 	stale, _, _ := e.repo.Session(e.ctx, s.FileID, e.alex.ID)
 	ref, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: s.FileID, PartNumber: 1, ContentDigest: digestOf(content[:4]),
-		ContentLength: 4, Body: bytes.NewReader(content[:4])})
+		Body: bytes.NewReader(content[:4])})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,16 +398,14 @@ func TestPutPartLengthAndDigest(t *testing.T) {
 		name    string
 		body    []byte
 		digest  string
-		length  int64
 		pointer string
 	}{
-		{"short", good[:3], digestOf(good[:3]), -1, ""},
-		{"long", append([]byte{}, content[:5]...), digestOf(content[:5]), -1, ""},
-		{"wrong digest", good, digestOf([]byte("abcd")), -1, "#header/Content-Digest"},
-		{"wrong Content-Length", good, digestOf(good), 5, ""},
+		{"short", good[:3], digestOf(good[:3]), ""},
+		{"long", append([]byte{}, content[:5]...), digestOf(content[:5]), ""},
+		{"wrong digest", good, digestOf([]byte("abcd")), "#header/Content-Digest"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: s.FileID, PartNumber: 1, ContentDigest: c.digest, ContentLength: c.length,
+			_, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: s.FileID, PartNumber: 1, ContentDigest: c.digest,
 				Body: bytes.NewReader(c.body)})
 			pe, ok := errs.As(err)
 			if !ok || pe.PublicCode() != errs.CodeValidationFailed || len(pe.Fields) != 1 || pe.Fields[0].Code != "part_digest_mismatch" ||

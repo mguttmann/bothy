@@ -7,12 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/riverqueue/river"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 )
@@ -94,6 +96,35 @@ func TestWorker_LogsFailedAttempt(t *testing.T) {
 	_ = jobs.WorkFailingForTest(slog.New(slog.NewJSONHandler(&buf, nil)), nil, 1, 3)
 	if lines := logLines(t, &buf); len(lines) != 1 || lines[0]["msg"] != "job panicked" {
 		t.Errorf("panic: log %v, want the panic line only", lines)
+	}
+}
+
+// TestWorker_SnoozeHoldsTheJob: a handler that returns jobs.Snooze, also wrapped, gives River's
+// snooze with the pause (which uses up no attempt), the outcome snoozed and no log line, even on
+// the last attempt; a negative pause counts as 0.
+func TestWorker_SnoozeHoldsTheJob(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name string
+		err  error
+		want time.Duration
+	}{
+		{"plain", jobs.Snooze(3 * time.Second), 3 * time.Second},
+		{"wrapped", fmt.Errorf("busy: %w", jobs.Snooze(time.Second)), time.Second},
+		{"negative", jobs.Snooze(-time.Second), 0},
+	} {
+		var buf bytes.Buffer
+		err := jobs.WorkFailingForTest(slog.New(slog.NewJSONHandler(&buf, nil)), c.err, 3, 3)
+		var snooze *river.JobSnoozeError
+		if !errors.As(err, &snooze) || snooze.Duration != c.want {
+			t.Errorf("%s: Work = %v, want River's snooze of %v", c.name, err, c.want)
+		}
+		if buf.Len() != 0 {
+			t.Errorf("%s: a snooze logged %s", c.name, buf.String())
+		}
+		if got := jobs.OutcomeOfForTest(context.Background(), c.err); got != "snoozed" {
+			t.Errorf("%s: outcome %q, want snoozed", c.name, got)
+		}
 	}
 }
 

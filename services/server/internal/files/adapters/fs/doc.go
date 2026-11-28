@@ -6,8 +6,8 @@
 // Objects are regular files below file.fs.root at the path of their key; directories have mode
 // 0700 and files 0600. Writes go through a temporary file in <root>/.tmp, Sync, rename and Sync
 // of the directory, so a reader never sees half an object. No symbolic link is followed at any
-// level, and every key is checked against the key grammar before any file system call. Parts of a
-// multipart upload lie at uploads/<file_id>/<n>. Encryption at rest is a task of operations.
+// level, and every key is checked against the key grammar before any file system call. The parts of an
+// open upload are objects at uploads/<file_id>/<n>, written with Put (D-M3-03-2). Encryption at rest is a task of operations.
 //
 // Example:
 //

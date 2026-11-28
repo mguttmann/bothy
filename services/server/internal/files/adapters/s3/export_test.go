@@ -17,9 +17,6 @@ var ObjectName = objectName
 // CoreAPI returns the type of the narrow core interface the driver holds.
 func CoreAPI() reflect.Type { return reflect.TypeFor[coreAPI]() }
 
-// PresignAPI returns the type of the narrow presign interface the driver holds.
-func PresignAPI() reflect.Type { return reflect.TypeFor[presignAPI]() }
-
 // ChecksumModes is checksumModes for TestChecksumModeMapping.
 func ChecksumModes(mode string) (aws.RequestChecksumCalculation, aws.ResponseChecksumValidation, error) {
 	return checksumModes(mode)

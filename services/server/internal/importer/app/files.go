@@ -220,7 +220,7 @@ func (s *Service) UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, 
 		return importer.PartRef{}, err
 	}
 	ref, err := s.d.Files.UploadPart(ctx, files.PutPart{FileID: cmd.FileID, PartNumber: cmd.PartNumber, ContentDigest: cmd.ContentDigest,
-		ContentLength: -1, Body: cmd.Body})
+		Body: cmd.Body})
 	return importer.PartRef{PartNumber: ref.PartNumber, ETag: ref.ETag}, err
 }
 

@@ -68,7 +68,7 @@ func TestStripJPEGRemovesMetadata(t *testing.T) {
 	in := buildJPEG(t, twoColour(64, 32, color.RGBA{R: 200, A: 255}, color.RGBA{B: 200, A: 255}), x)
 	info, out := stripTestJPEG(t, in)
 
-	if info.Width != 64 || info.Height != 32 || info.Components != 3 || info.Orientation != 6 || !info.Adobe || info.JFIF == nil {
+	if info.Width != 64 || info.Height != 32 || info.Orientation != 6 || info.JFIF == nil {
 		t.Fatalf("info = %+v", info)
 	}
 	if !bytes.Equal(info.ICC, x.ICC) {

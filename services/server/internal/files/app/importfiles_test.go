@@ -58,7 +58,7 @@ func TestImportSlotReopenAbortsTheOldMultipartUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: s.FileID, PartNumber: 1, ContentDigest: digestOf(content[:4]),
-		ContentLength: 4, Body: bytes.NewReader(content[:4])}); err != nil {
+		Body: bytes.NewReader(content[:4])}); err != nil {
 		t.Fatal(err)
 	}
 	if len(e.store.uploads) != 1 {

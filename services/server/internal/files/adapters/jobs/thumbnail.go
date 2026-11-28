@@ -29,9 +29,14 @@ type ImageRunner interface {
 	ProcessImage(ctx context.Context, fileID ids.ID) error
 }
 
+// imageSlotPause is how long files.thumbnail waits when every image slot of the process is taken
+// (app.ErrImageSlotsBusy); the snooze uses up no attempt.
+const imageSlotPause = 5 * time.Second
+
 // ThumbnailHandler runs files.thumbnail. The span job files.thumbnail comes from the handler
 // wrapper of platform/jobs; the use case logs only the file id and an error class. An error makes
-// River retry with its default attempts and backoff.
+// River retry with its default attempts and backoff; app.ErrImageSlotsBusy snoozes the job for
+// imageSlotPause instead, so a job never waits for a slot under its job timeout.
 type ThumbnailHandler struct {
 	// Images is the use case; nil in a role that does not run jobs.
 	Images ImageRunner
@@ -45,7 +50,11 @@ func (h ThumbnailHandler) Work(ctx context.Context, job jobs.Job[ThumbnailArgs])
 	if h.Images == nil {
 		return errNoImages
 	}
-	return h.Images.ProcessImage(ctx, job.Args.FileID)
+	err := h.Images.ProcessImage(ctx, job.Args.FileID)
+	if errors.Is(err, app.ErrImageSlotsBusy) {
+		return jobs.Snooze(imageSlotPause)
+	}
+	return err
 }
 
 // RegisterThumbnail adds files.thumbnail on the queue files to reg (every role builds the same

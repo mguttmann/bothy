@@ -182,16 +182,6 @@ func webpTestVP8Header(w, h int) []byte {
 	return binary.LittleEndian.AppendUint32(b, webpTestU32(w|h<<16))
 }
 
-func TestWebPConfig(t *testing.T) {
-	w, h, err := webpConfig(buildWebP(t, webpTestImage(6, 2, false), webpOptions{EXIF: webpTestEXIF()}))
-	if err != nil || w != 6 || h != 2 {
-		t.Fatalf("webpConfig = %d, %d, %v; want 6, 2, nil", w, h, err)
-	}
-	if _, _, err := webpConfig([]byte("RIFF")); !errors.Is(err, app.ErrImageMalformed) {
-		t.Fatalf("webpConfig error = %v, want ErrImageMalformed", err)
-	}
-}
-
 func TestScanWebPMalformed(t *testing.T) {
 	good := buildWebP(t, webpTestImage(3, 3, false), webpOptions{})
 	vp8x := webpTestChunk("VP8X", make([]byte, 10))

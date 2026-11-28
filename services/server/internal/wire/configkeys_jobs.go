@@ -9,7 +9,7 @@ const maxQueueWorkers = "10000"
 
 // jobsConfigKeys returns the keys of the background jobs from docs/spec/02-architecture.md
 // "Configuration values of this chapter" (M1-14): the schema of River's tables and the
-// parallelism of the five queues of 02 "Queues". The cross-check jobs_schema
+// parallelism of the queues of 02 "Queues". The cross-check jobs_schema
 // (configchecks.go) holds the schema name to an unquoted identifier.
 func jobsConfigKeys() []config.Key {
 	return []config.Key{
@@ -19,7 +19,8 @@ func jobsConfigKeys() []config.Key {
 			Chapter: chapter02,
 		},
 		queueKey("default", "8", "Parallel workers of the queue default for short domain jobs."),
-		queueKey("files", "2", "Parallel workers of the queue files for scans, thumbnails and transcription."),
+		queueKey("files", "2", "Parallel workers of the queue files for scans and thumbnails."),
+		queueKey("files_text", "2", "Parallel workers of the queue files_text for transcription and text extraction."),
 		queueKey("delivery", "16", "Parallel workers of the queue delivery for push and webhooks."),
 		queueKey("maintenance", "2", "Parallel workers of the queue maintenance for cleanup, partitions and checks."),
 		queueKey("privacy", "1", "Parallel workers of the queue privacy for export and erasure."),

@@ -36,6 +36,7 @@ type jobsKeys struct {
 	Schema          string        `config:"jobs.schema"`
 	Default         int           `config:"jobs.queue.default.max_workers"`
 	Files           int           `config:"jobs.queue.files.max_workers"`
+	FilesText       int           `config:"jobs.queue.files_text.max_workers"`
 	Delivery        int           `config:"jobs.queue.delivery.max_workers"`
 	Maintenance     int           `config:"jobs.queue.maintenance.max_workers"`
 	Privacy         int           `config:"jobs.queue.privacy.max_workers"`
@@ -45,7 +46,7 @@ type jobsKeys struct {
 }
 
 // JobsConfig binds the configuration of the job runtime from v: jobs.schema, the parallelism of
-// the five queues (jobs.queue.<queue>.max_workers), shutdown.jobs_soft_timeout and
+// the queues (jobs.queue.<queue>.max_workers), shutdown.jobs_soft_timeout and
 // database.statement_timeout (the bound of the count query of bothy.job.queue). The logger and
 // the meter provider (nil: the global one) are left to the caller. The error names the key whose binding failed, never a value.
 func JobsConfig(v *config.Values) (jobs.Config, error) {
@@ -56,7 +57,7 @@ func JobsConfig(v *config.Values) (jobs.Config, error) {
 	return jobs.Config{
 		Schema: k.Schema,
 		MaxWorkers: map[string]int{
-			jobs.QueueDefault: k.Default, jobs.QueueFiles: k.Files, jobs.QueueDelivery: k.Delivery,
+			jobs.QueueDefault: k.Default, jobs.QueueFiles: k.Files, jobs.QueueFilesText: k.FilesText, jobs.QueueDelivery: k.Delivery,
 			jobs.QueueMaintenance: k.Maintenance, jobs.QueuePrivacy: k.Privacy,
 		},
 		SoftStopTimeout:  k.SoftStopTimeout,

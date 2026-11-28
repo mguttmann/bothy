@@ -65,14 +65,14 @@ func (p fsPartStore) DiscardUnconfirmed(ctx context.Context, s SessionRecord, n 
 // file_upload_sessions.storage_upload_id, and a request that loses the race aborts its own upload
 // and uses the stored one. CompleteMultipart runs in the verify pass of M3-04.
 type s3PartStore struct {
-	store ObjectStore
+	store MultipartStore
 	repo  Repository
 	uow   txn.UnitOfWork
 }
 
-// NewS3PartStore returns the part strategy of the S3 driver over store, with the repository and
-// unit of work that store the multipart upload id.
-func NewS3PartStore(store ObjectStore, repo Repository, uow txn.UnitOfWork) PartStore {
+// NewS3PartStore returns the part strategy of the S3 driver over its multipart port store, with
+// the repository and unit of work that store the multipart upload id.
+func NewS3PartStore(store MultipartStore, repo Repository, uow txn.UnitOfWork) PartStore {
 	return s3PartStore{store: store, repo: repo, uow: uow}
 }
 

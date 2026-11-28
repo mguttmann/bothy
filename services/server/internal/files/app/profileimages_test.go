@@ -287,7 +287,7 @@ func TestSessionRoutesRefuseImageFiles(t *testing.T) {
 		t.Errorf("getUpload: %v", err)
 	}
 	if _, err := e.svc.PutPart(e.ctx, files.PutPart{FileID: id, PartNumber: 1, ContentDigest: digestOf([]byte("abc")),
-		ContentLength: 3, Body: strings.NewReader("abc")}); errs.KindOf(err) != errs.KindNotFound {
+		Body: strings.NewReader("abc")}); errs.KindOf(err) != errs.KindNotFound {
 		t.Errorf("uploadPart: %v", err)
 	}
 	if _, err := e.svc.Complete(e.ctx, files.CompleteUpload{FileID: id}); errs.KindOf(err) != errs.KindNotFound {

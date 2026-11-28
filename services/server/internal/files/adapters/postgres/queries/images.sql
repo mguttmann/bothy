@@ -1,24 +1,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- The job files.thumbnail of M3-06 (docs/spec/12-files.md 7, brief M3-06 design note 10). The
--- job has no principal, so its reads are keyed by the file id only (the exceptions of AZ-P12 in
--- tools/lint/sql_visibility.yaml); only the files row is locked (03 6.3).
-
--- name: GetImageFile :one
--- One file by id, deleted or not (design note 3b).
-SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
-       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status,
-       transcript_language, transcript_source, created_at, (deleted_at IS NOT NULL)::boolean AS deleted
-FROM files
-WHERE id = sqlc.arg(id);
-
--- name: LockImageFile :one
--- GetImageFile with the files row locked FOR UPDATE (design note 10).
-SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
-       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status,
-       transcript_language, transcript_source, created_at, (deleted_at IS NOT NULL)::boolean AS deleted
-FROM files
-WHERE id = sqlc.arg(id)
-FOR UPDATE;
+-- job has no principal; it reads and locks its file with GetFileByID and LockFileByID (files.sql,
+-- the exceptions of AZ-P12 in tools/lint/sql_visibility.yaml); only the files row is locked
+-- (03 6.3).
 
 -- name: StoreImageOriginal :execrows
 -- T1 (design note 10a): the cleaned original becomes the stored object and the file deliverable.

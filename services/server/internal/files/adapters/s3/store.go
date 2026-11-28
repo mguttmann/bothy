@@ -40,18 +40,19 @@ type Deps struct {
 	TransferTimeout time.Duration
 }
 
-// Store is the S3 driver of app.ObjectStore (docs/spec/12-files.md "4.3"). It holds only the
-// narrow interfaces coreAPI and presignAPI, so it can send nothing but core S3 requests. It is
-// safe for concurrent use and keeps no state of its own besides the SDK clients.
+// Store is the S3 driver of app.ObjectStore and app.MultipartStore (docs/spec/12-files.md "4.3").
+// It holds only the narrow interface coreAPI, so it can send nothing but core S3 requests. It is
+// safe for concurrent use and keeps no state of its own besides the SDK client.
 type Store struct {
-	api     coreAPI
-	presign presignAPI
-	bucket  string
-	prefix  string
-	now     func() time.Time
+	api    coreAPI
+	bucket string
+	prefix string
 }
 
-var _ app.ObjectStore = (*Store)(nil)
+var (
+	_ app.ObjectStore    = (*Store)(nil)
+	_ app.MultipartStore = (*Store)(nil)
+)
 
 // New builds the S3 driver (docs/DECISIONS.md M3-02/1 to M3-02/3 and M3-02/6), in this order:
 // cfg.Validate against deps.Egress.AllowedHosts; both secret references resolved once, so a key
@@ -121,11 +122,9 @@ func newStore(ctx context.Context, cfg Config, deps Deps, wrap func(httpDoer) ht
 		Logger:                      logging.Nop{},
 	})
 	return &Store{
-		api:     api,
-		presign: awss3.NewPresignClient(api),
-		bucket:  cfg.Bucket,
-		prefix:  cfg.Prefix,
-		now:     time.Now,
+		api:    api,
+		bucket: cfg.Bucket,
+		prefix: cfg.Prefix,
 	}, nil
 }
 
@@ -370,35 +369,4 @@ func (s *Store) AbortMultipart(ctx context.Context, key, uploadID string) error 
 		return fail(opAbort, key, err, mapping{})
 	}
 	return nil
-}
-
-// PresignUploadPart presigns UploadPart of part n with ContentLength size and the expiry ttl
-// (callers pass file.s3.presign_ttl), so the signature binds the part length (12 "3.3", R-FI-02,
-// docs/DECISIONS.md M3-02/9). ExpiresAt is the signing time plus ttl. The URL goes to the caller
-// only; it is never part of an error. No request is sent.
-func (s *Store) PresignUploadPart(ctx context.Context, key, uploadID string, n int, size int64, ttl time.Duration) (app.PresignedPart, error) {
-	name, err := s.name(opPresign, key)
-	if err != nil {
-		return app.PresignedPart{}, err
-	}
-	switch {
-	case n < 1 || n > maxPartNumber:
-		return app.PresignedPart{}, refused(opPresign, key, app.ErrInvalidPart)
-	case size < 1:
-		return app.PresignedPart{}, refused(opPresign, key, app.ErrSizeMismatch)
-	case ttl <= 0 || ttl%time.Second != 0:
-		return app.PresignedPart{}, &opError{op: opPresign, key: key, detail: "the validity must be a positive whole number of seconds"}
-	case uploadID == "":
-		return app.PresignedPart{}, refused(opPresign, key, app.ErrUploadNotFound)
-	}
-	// Taken before signing, so ExpiresAt never lies after the end the URL carries.
-	signedAt := s.now()
-	req, err := s.presign.PresignUploadPart(ctx, &awss3.UploadPartInput{
-		Bucket: aws.String(s.bucket), Key: aws.String(name), UploadId: aws.String(uploadID),
-		PartNumber: aws.Int32(int32(n)), ContentLength: aws.Int64(size), // #nosec G115 -- n is at most maxPartNumber
-	}, awss3.WithPresignExpires(ttl))
-	if err != nil {
-		return app.PresignedPart{}, fail(opPresign, key, err, mapping{})
-	}
-	return app.PresignedPart{URL: req.URL, ExpiresAt: signedAt.Add(ttl)}, nil
 }

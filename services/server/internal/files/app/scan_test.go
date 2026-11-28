@@ -67,7 +67,7 @@ func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *
 	})
 	trigger, extracts, xqueue := newTestTrigger(t)
 	e.extracts, e.xqueue = extracts, xqueue
-	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, UoW: u, Events: e.events, Audit: e.audit, Extracts: trigger,
+	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, Multipart: e.store, UoW: u, Events: e.events, Audit: e.audit, Extracts: trigger,
 		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Purge: e.purges, Metrics: e.metrics, Clock: e.clk,
 		Log: slog.New(slog.NewJSONHandler(e.logs, nil))})
 	if err != nil {

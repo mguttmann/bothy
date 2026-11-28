@@ -44,7 +44,7 @@ func TestExtractArgsAndRegistration(t *testing.T) {
 	if err := filesjobs.RegisterExtract(reg, &idRunner{}, &idRunner{}, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
-	if q, ok := reg.Queue("files.extract_text"); !ok || q != jobs.QueueFiles {
+	if q, ok := reg.Queue("files.extract_text"); !ok || q != jobs.QueueFilesText {
 		t.Fatalf("extract queue %q %v", q, ok)
 	}
 	if q, ok := reg.Queue("files.extract_text_refresh"); !ok || q != jobs.QueueMaintenance {

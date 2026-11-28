@@ -21,7 +21,7 @@ func TestTranscribeJobRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q, ok := reg.Queue(filesjobs.KindTranscribe); !ok || q != jobs.QueueFiles {
+	if q, ok := reg.Queue(filesjobs.KindTranscribe); !ok || q != jobs.QueueFilesText {
 		t.Fatalf("queue = %q, %v", q, ok)
 	}
 	if typ := reg.ArgTypes()[filesjobs.KindTranscribe]; typ != reflect.TypeFor[filesjobs.TranscribeArgs]() {

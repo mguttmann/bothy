@@ -51,7 +51,8 @@ delivers an error and `internal/wire` ends the process with exit code 1 (02 "Hea
 | Queue | Content | Parallelism |
 |---|---|---|
 | `default` | short domain jobs | `jobs.queue.default.max_workers` |
-| `files` | scan, thumbnails, transcription | `jobs.queue.files.max_workers` |
+| `files` | scan, thumbnails | `jobs.queue.files.max_workers` |
+| `files_text` | transcription, text extraction | `jobs.queue.files_text.max_workers` |
 | `delivery` | push, webhooks | `jobs.queue.delivery.max_workers` |
 | `maintenance` | cleanup, partitions, checks | `jobs.queue.maintenance.max_workers` |
 | `privacy` | export and erasure | `jobs.queue.privacy.max_workers` |
@@ -125,15 +126,16 @@ it as before. Tests: `TestMaintenance_WorkerHoldsOtherKinds`, `TestMaintenance_C
 
 Every attempt runs inside the CONSUMER span `job <bothy.job.kind>` with `bothy.job.kind` and
 `bothy.outcome`: `completed` (nil), `cancelled` (the context was canceled with a cancellation
-error, at shutdown or by a cancellation of the job) or `failed` (any other error, River's job
-timeout, which uses up an attempt, or a panic). `snoozed` of the catalogue stays
-unused until this interface offers a snooze. The tracer is the global provider's unless `New`
-gets one.
+error, at shutdown or by a cancellation of the job), `failed` (any other error, River's job
+timeout, which uses up an attempt, or a panic) or `snoozed` (the handler returned `jobs.Snooze`:
+River runs the job again after the pause, without using up an attempt and without the line of a
+failed attempt; `files.thumbnail` snoozes while every image slot of the process is taken). The
+tracer is the global provider's unless `New` gets one.
 
 ## Metrics (M1-68)
 
 Every attempt records `bothy.job.duration` with `bothy.job.kind` (the kinds registered at start)
-and `bothy.outcome` (`completed`, `failed`, `cancelled`; `snoozed` stays unused like on the span).
+and `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`, as on the span).
 A runtime that works jobs (roles `worker` and `all`) observes `bothy.job.queue` from `Start` to
 `Stop`: one grouped count over River's job table in the states `available`, `scheduled` and
 `retryable` per collection, bounded by `database.statement_timeout` (`Config.StatementTimeout`),

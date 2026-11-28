@@ -6,7 +6,6 @@ import (
 	"context"
 	"net/http"
 
-	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -26,13 +25,6 @@ type coreAPI interface {
 	AbortMultipartUpload(ctx context.Context, params *awss3.AbortMultipartUploadInput, optFns ...func(*awss3.Options)) (*awss3.AbortMultipartUploadOutput, error)
 }
 
-// presignAPI is the only part of the presign client the driver holds: presigned part uploads.
-// There is no presigned GET, HEAD, DELETE or whole-object PUT, because clients read only through
-// the server (R-FI-03, ADR 0048). *awss3.PresignClient implements it.
-type presignAPI interface {
-	PresignUploadPart(ctx context.Context, params *awss3.UploadPartInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
-}
-
 // httpDoer is the HTTP client the SDK sends with: the *http.Client of the egress client
 // (awss3.HTTPClient has the same method).
 type httpDoer interface {
@@ -40,7 +32,6 @@ type httpDoer interface {
 }
 
 var (
-	_ coreAPI    = (*awss3.Client)(nil)
-	_ presignAPI = (*awss3.PresignClient)(nil)
-	_ httpDoer   = awss3.HTTPClient(nil)
+	_ coreAPI  = (*awss3.Client)(nil)
+	_ httpDoer = awss3.HTTPClient(nil)
 )

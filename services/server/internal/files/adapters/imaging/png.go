@@ -29,8 +29,6 @@ const (
 	// ihdrLen is the data length of IHDR: width, height, bit depth, colour type, compression,
 	// filter and interlace method.
 	ihdrLen = 13
-	// ihdrColourTypeAt is the offset of the colour type in the IHDR data.
-	ihdrColourTypeAt = 9
 )
 
 // The chunk types the filter reads besides copying them.
@@ -38,7 +36,6 @@ const (
 	chunkIHDR = "IHDR"
 	chunkIEND = "IEND"
 	chunkICCP = "iCCP"
-	chunkACTL = "acTL"
 )
 
 // The reasons of the structure errors that occur at several places.
@@ -51,8 +48,6 @@ const (
 type pngInfo struct {
 	Width, Height int    // from IHDR
 	ICCP          []byte // the data of the iCCP chunk (name, NUL, method, compressed profile), nil when none
-	Animated      bool   // an acTL chunk exists
-	ColourType    byte   // IHDR colour type
 }
 
 // stripPNG streams the cleaned PNG of r into w (brief M3-06 design note 6): it checks the
@@ -144,8 +139,6 @@ func (p *pngWalker) data(typ string, n int, keep bool) error {
 			return err
 		}
 		return p.emit(keep, data)
-	case chunkACTL:
-		p.info.Animated = true
 	}
 	return p.stream(n, keep)
 }
@@ -177,7 +170,6 @@ func (p *pngWalker) noteSmall(typ string, data []byte) error {
 	}
 	p.info.Width = int(binary.BigEndian.Uint32(data[0:]))
 	p.info.Height = int(binary.BigEndian.Uint32(data[4:]))
-	p.info.ColourType = data[ihdrColourTypeAt]
 	return nil
 }
 

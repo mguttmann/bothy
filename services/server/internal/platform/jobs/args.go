@@ -4,6 +4,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -45,13 +46,41 @@ type Job[A Args] struct {
 // the job as done, any error makes River retry it (item 2).
 type Handler[A Args] interface {
 	// Work runs the job once. The error is recorded on the job row (never logged with the
-	// arguments); nil means success.
+	// arguments); nil means success, and Snooze holds the job for a while without using up an
+	// attempt.
 	Work(ctx context.Context, job Job[A]) error
+}
+
+// snoozeError is the result of Snooze.
+type snoozeError struct{ pause time.Duration }
+
+func (e *snoozeError) Error() string { return "jobs: job snoozed" }
+
+// Snooze is the result a Handler returns to run its job again after pause instead of now, without
+// using up an attempt and without the line of a failed attempt (River's snooze). A handler uses it
+// for a job that cannot start yet, for example while a per-process limit is reached. A negative
+// pause counts as 0.
+//
+// Example:
+//
+//	if !slots.TryAcquire() {
+//		return jobs.Snooze(5 * time.Second)
+//	}
+func Snooze(pause time.Duration) error { return &snoozeError{pause: max(pause, 0)} }
+
+// SnoozePause reports whether err is or wraps the result of Snooze, and its pause; the tests of a
+// handler read it.
+func SnoozePause(err error) (time.Duration, bool) {
+	var s *snoozeError
+	if !errors.As(err, &s) {
+		return 0, false
+	}
+	return s.pause, true
 }
 
 // HandlerOptions configure how the jobs of one kind are queued and retried.
 type HandlerOptions struct {
-	// Queue is one of the five queues (QueueDefault and the others); empty means QueueDefault.
+	// Queue is one of the queues of Queues; empty means QueueDefault.
 	Queue string
 	// MaxAttempts is how often a job runs before it is discarded; 0 means River's default.
 	MaxAttempts int
@@ -69,8 +98,11 @@ type HandlerOptions struct {
 const (
 	// QueueDefault holds short domain jobs.
 	QueueDefault = "default"
-	// QueueFiles holds scans, thumbnails and transcription (CPU and memory).
+	// QueueFiles holds scans and thumbnails (CPU and memory).
 	QueueFiles = "files"
+	// QueueFilesText holds transcription and text extraction, the long runs of the files module,
+	// so they never hold the workers of the scans (srv-files-adapters-12).
+	QueueFilesText = "files_text"
 	// QueueDelivery holds push and webhook delivery (network).
 	QueueDelivery = "delivery"
 	// QueueMaintenance holds cleanup, partitions and checks.
@@ -79,15 +111,15 @@ const (
 	QueuePrivacy = "privacy"
 )
 
-// Queues returns the five queue names in the order of 02 "Queues".
+// Queues returns the queue names in the order of 02 "Queues".
 func Queues() []string {
-	return []string{QueueDefault, QueueFiles, QueueDelivery, QueueMaintenance, QueuePrivacy}
+	return []string{QueueDefault, QueueFiles, QueueFilesText, QueueDelivery, QueueMaintenance, QueuePrivacy}
 }
 
-// knownQueue reports whether q is one of the five queues.
+// knownQueue reports whether q is one of the queues of Queues.
 func knownQueue(q string) bool {
 	switch q {
-	case QueueDefault, QueueFiles, QueueDelivery, QueueMaintenance, QueuePrivacy:
+	case QueueDefault, QueueFiles, QueueFilesText, QueueDelivery, QueueMaintenance, QueuePrivacy:
 		return true
 	default:
 		return false

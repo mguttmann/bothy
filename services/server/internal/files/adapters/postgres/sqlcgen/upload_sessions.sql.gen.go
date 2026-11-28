@@ -66,23 +66,20 @@ func (q *Queries) CountOpenSessions(ctx context.Context, arg CountOpenSessionsPa
 	return i, err
 }
 
-const getSession = `-- name: GetSession :one
+const getSessionByID = `-- name: GetSessionByID :one
+
 SELECT s.file_id, s.mode, s.state, s.declared_size_bytes, s.declared_sha256, s.part_size_bytes, s.part_count,
        s.storage_upload_id, s.created_at, s.completed_at, s.expires_at,
        f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
-       f.transcript_status, f.transcript_language, f.transcript_source, f.created_at AS file_created_at
+       f.transcript_status, f.transcript_text, f.transcript_language, f.transcript_source, f.created_at AS file_created_at,
+       (f.deleted_at IS NOT NULL)::boolean AS deleted
 FROM file_upload_sessions s
 JOIN files f ON f.id = s.file_id
-WHERE s.file_id = $1 AND f.uploaded_by = $2 AND f.deleted_at IS NULL
+WHERE s.file_id = $1
 `
 
-type GetSessionParams struct {
-	FileID     pgtype.UUID
-	UploadedBy pgtype.UUID
-}
-
-type GetSessionRow struct {
+type GetSessionByIDRow struct {
 	FileID             pgtype.UUID
 	Mode               string
 	State              string
@@ -109,15 +106,23 @@ type GetSessionRow struct {
 	Height             pgtype.Int4
 	DurationMs         pgtype.Int8
 	TranscriptStatus   string
+	TranscriptText     pgtype.Text
 	TranscriptLanguage pgtype.Text
 	TranscriptSource   pgtype.Text
 	FileCreatedAt      pgtype.Timestamptz
+	Deleted            bool
 }
 
-// The session of one file of the uploader, with the file, when the file is not deleted.
-func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (GetSessionRow, error) {
-	row := q.db.QueryRow(ctx, getSession, arg.FileID, arg.UploadedBy)
-	var i GetSessionRow
+// The row shape of one session with its file (srv-files-adapters-18): the four session reads
+// select the same columns, so their generated rows convert into each other and one mapping
+// (sessionOf) reads them all. The file columns equal those of GetFileByID (files.sql);
+// TestSessionRowCarriesTheFileRow holds that.
+// The session of one file with the file, deleted or not. Session keeps it only for the uploader
+// and a file that is not deleted (authorize of the upload operations, M3-03); the job files.scan
+// reads the session it was inserted for (design notes 2 and 6a of M3-04).
+func (q *Queries) GetSessionByID(ctx context.Context, fileID pgtype.UUID) (GetSessionByIDRow, error) {
+	row := q.db.QueryRow(ctx, getSessionByID, fileID)
+	var i GetSessionByIDRow
 	err := row.Scan(
 		&i.FileID,
 		&i.Mode,
@@ -145,9 +150,11 @@ func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (GetSess
 		&i.Height,
 		&i.DurationMs,
 		&i.TranscriptStatus,
+		&i.TranscriptText,
 		&i.TranscriptLanguage,
 		&i.TranscriptSource,
 		&i.FileCreatedAt,
+		&i.Deleted,
 	)
 	return i, err
 }
@@ -189,12 +196,101 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 	return err
 }
 
+const lockScanTarget = `-- name: LockScanTarget :one
+SELECT s.file_id, s.mode, s.state, s.declared_size_bytes, s.declared_sha256, s.part_size_bytes, s.part_count,
+       s.storage_upload_id, s.created_at, s.completed_at, s.expires_at,
+       f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
+       f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
+       f.transcript_status, f.transcript_text, f.transcript_language, f.transcript_source, f.created_at AS file_created_at,
+       (f.deleted_at IS NOT NULL)::boolean AS deleted
+FROM file_upload_sessions s
+JOIN files f ON f.id = s.file_id
+WHERE s.file_id = $1
+FOR UPDATE OF s, f
+`
+
+type LockScanTargetRow struct {
+	FileID             pgtype.UUID
+	Mode               string
+	State              string
+	DeclaredSizeBytes  int64
+	DeclaredSha256     []byte
+	PartSizeBytes      int64
+	PartCount          int32
+	StorageUploadID    pgtype.Text
+	CreatedAt          pgtype.Timestamptz
+	CompletedAt        pgtype.Timestamptz
+	ExpiresAt          pgtype.Timestamptz
+	ObjectKey          string
+	Sha256             []byte
+	SizeBytes          int64
+	MimeType           string
+	DeclaredMimeType   pgtype.Text
+	OriginalName       string
+	UploadedBy         pgtype.UUID
+	Purpose            string
+	ScopeChannelID     pgtype.UUID
+	UploadState        string
+	ScanStatus         string
+	Width              pgtype.Int4
+	Height             pgtype.Int4
+	DurationMs         pgtype.Int8
+	TranscriptStatus   string
+	TranscriptText     pgtype.Text
+	TranscriptLanguage pgtype.Text
+	TranscriptSource   pgtype.Text
+	FileCreatedAt      pgtype.Timestamptz
+	Deleted            bool
+}
+
+// The session of one file with the file, deleted or not, with the session row and then the files
+// row locked FOR UPDATE, the order of the completion and the abort of M3-03 (session, then file).
+func (q *Queries) LockScanTarget(ctx context.Context, fileID pgtype.UUID) (LockScanTargetRow, error) {
+	row := q.db.QueryRow(ctx, lockScanTarget, fileID)
+	var i LockScanTargetRow
+	err := row.Scan(
+		&i.FileID,
+		&i.Mode,
+		&i.State,
+		&i.DeclaredSizeBytes,
+		&i.DeclaredSha256,
+		&i.PartSizeBytes,
+		&i.PartCount,
+		&i.StorageUploadID,
+		&i.CreatedAt,
+		&i.CompletedAt,
+		&i.ExpiresAt,
+		&i.ObjectKey,
+		&i.Sha256,
+		&i.SizeBytes,
+		&i.MimeType,
+		&i.DeclaredMimeType,
+		&i.OriginalName,
+		&i.UploadedBy,
+		&i.Purpose,
+		&i.ScopeChannelID,
+		&i.UploadState,
+		&i.ScanStatus,
+		&i.Width,
+		&i.Height,
+		&i.DurationMs,
+		&i.TranscriptStatus,
+		&i.TranscriptText,
+		&i.TranscriptLanguage,
+		&i.TranscriptSource,
+		&i.FileCreatedAt,
+		&i.Deleted,
+	)
+	return i, err
+}
+
 const lockSessionForShare = `-- name: LockSessionForShare :one
 SELECT s.file_id, s.mode, s.state, s.declared_size_bytes, s.declared_sha256, s.part_size_bytes, s.part_count,
        s.storage_upload_id, s.created_at, s.completed_at, s.expires_at,
        f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
-       f.transcript_status, f.transcript_language, f.transcript_source, f.created_at AS file_created_at
+       f.transcript_status, f.transcript_text, f.transcript_language, f.transcript_source, f.created_at AS file_created_at,
+       (f.deleted_at IS NOT NULL)::boolean AS deleted
 FROM file_upload_sessions s
 JOIN files f ON f.id = s.file_id
 WHERE s.file_id = $1 AND f.uploaded_by = $2 AND f.deleted_at IS NULL
@@ -233,12 +329,15 @@ type LockSessionForShareRow struct {
 	Height             pgtype.Int4
 	DurationMs         pgtype.Int8
 	TranscriptStatus   string
+	TranscriptText     pgtype.Text
 	TranscriptLanguage pgtype.Text
 	TranscriptSource   pgtype.Text
 	FileCreatedAt      pgtype.Timestamptz
+	Deleted            bool
 }
 
-// GetSession with the session row locked FOR SHARE (the confirmation of a part, design note 9 h).
+// LockSessionForUpdate with the session row locked FOR SHARE (the confirmation of a part, design
+// note 9 h).
 func (q *Queries) LockSessionForShare(ctx context.Context, arg LockSessionForShareParams) (LockSessionForShareRow, error) {
 	row := q.db.QueryRow(ctx, lockSessionForShare, arg.FileID, arg.UploadedBy)
 	var i LockSessionForShareRow
@@ -269,9 +368,11 @@ func (q *Queries) LockSessionForShare(ctx context.Context, arg LockSessionForSha
 		&i.Height,
 		&i.DurationMs,
 		&i.TranscriptStatus,
+		&i.TranscriptText,
 		&i.TranscriptLanguage,
 		&i.TranscriptSource,
 		&i.FileCreatedAt,
+		&i.Deleted,
 	)
 	return i, err
 }
@@ -281,7 +382,8 @@ SELECT s.file_id, s.mode, s.state, s.declared_size_bytes, s.declared_sha256, s.p
        s.storage_upload_id, s.created_at, s.completed_at, s.expires_at,
        f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
-       f.transcript_status, f.transcript_language, f.transcript_source, f.created_at AS file_created_at
+       f.transcript_status, f.transcript_text, f.transcript_language, f.transcript_source, f.created_at AS file_created_at,
+       (f.deleted_at IS NOT NULL)::boolean AS deleted
 FROM file_upload_sessions s
 JOIN files f ON f.id = s.file_id
 WHERE s.file_id = $1 AND f.uploaded_by = $2 AND f.deleted_at IS NULL
@@ -320,12 +422,15 @@ type LockSessionForUpdateRow struct {
 	Height             pgtype.Int4
 	DurationMs         pgtype.Int8
 	TranscriptStatus   string
+	TranscriptText     pgtype.Text
 	TranscriptLanguage pgtype.Text
 	TranscriptSource   pgtype.Text
 	FileCreatedAt      pgtype.Timestamptz
+	Deleted            bool
 }
 
-// GetSession with the session row locked FOR UPDATE (abort and completion, design notes 12 and 13).
+// The session of one file of the uploader, not deleted, with the session row locked FOR UPDATE
+// (abort and completion, design notes 12 and 13).
 func (q *Queries) LockSessionForUpdate(ctx context.Context, arg LockSessionForUpdateParams) (LockSessionForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, lockSessionForUpdate, arg.FileID, arg.UploadedBy)
 	var i LockSessionForUpdateRow
@@ -356,9 +461,11 @@ func (q *Queries) LockSessionForUpdate(ctx context.Context, arg LockSessionForUp
 		&i.Height,
 		&i.DurationMs,
 		&i.TranscriptStatus,
+		&i.TranscriptText,
 		&i.TranscriptLanguage,
 		&i.TranscriptSource,
 		&i.FileCreatedAt,
+		&i.Deleted,
 	)
 	return i, err
 }

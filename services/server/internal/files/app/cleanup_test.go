@@ -66,7 +66,7 @@ var cleanupCfg = app.CleanupConfig{UnattachedTTL: time.Hour, FailedRowTTL: 2 * t
 	ObjectDeleteDelay: 3 * time.Hour, BatchSize: 2}
 
 // newCleanupEnv builds the purge and the cleanup with the part strategy of driver over objects
-// (nil: the store of env).
+// (nil: the store of env); the s3 strategy always uses the multipart port of the store of env.
 func newCleanupEnv(t *testing.T, driver string, objects app.ObjectStore) *cleanupEnv {
 	t.Helper()
 	e := &cleanupEnv{env: newEnv(t, driver, testCfg), drafts: &drafts{held: map[ids.ID]ids.ID{}}, sweep: &sweeper{},
@@ -77,7 +77,7 @@ func newCleanupEnv(t *testing.T, driver string, objects app.ObjectStore) *cleanu
 	e.objects = objects
 	parts := app.NewFSPartStore(objects)
 	if driver == "s3" {
-		parts = app.NewS3PartStore(objects, e.repo, e.uow)
+		parts = app.NewS3PartStore(e.store, e.repo, e.uow)
 	}
 	log := slog.New(slog.NewJSONHandler(e.logs, nil))
 	p, err := app.NewPurge(app.PurgeDeps{Store: e.repo, Objects: objects, Parts: parts, UoW: e.uow, Log: log})

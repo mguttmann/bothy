@@ -54,7 +54,7 @@ func ValidateSchema(schema string) error {
 type Config struct {
 	// Schema is jobs.schema, the PostgreSQL schema of River's tables.
 	Schema string
-	// MaxWorkers maps each of the five queues to its parallelism,
+	// MaxWorkers maps each queue of Queues to its parallelism,
 	// jobs.queue.<queue>.max_workers; every queue needs a positive value.
 	MaxWorkers map[string]int
 	// SoftStopTimeout is shutdown.jobs_soft_timeout: how long Stop lets running jobs finish
@@ -242,7 +242,7 @@ type Runtime struct {
 // spans; nil means the tracer of the global provider, which platform/otel sets at the start.
 //
 // RoleAPI builds an insert-only River client (Workers, no Queues) that is never started.
-// RoleWorker and RoleAll build a full client with the five queues and their parallelism, the
+// RoleWorker and RoleAll build a full client with the queues of Queues and their parallelism, the
 // periodic jobs, cfg.Schema and cfg.SoftStopTimeout; Start starts it.
 //
 // The error reports an invalid cfg (naming the configuration key), an unknown role, a nil pool
@@ -335,7 +335,7 @@ func periodicJob(p PeriodicJob, e *entry) *river.PeriodicJob {
 // Inserter returns the inserter of the runtime; every role has one.
 func (rt *Runtime) Inserter() Inserter { return inserter{rt: rt} }
 
-// Start starts River for RoleWorker and RoleAll: the producers of the five queues, the leader
+// Start starts River for RoleWorker and RoleAll: the producers of the queues, the leader
 // election, periodic jobs and River's maintenance. It returns once River runs; River keeps
 // running independent of ctx until Stop. For RoleAPI, and for a worker without registered kinds
 // (nothing to run, and River refuses such a client), it does nothing. A second Start does
