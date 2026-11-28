@@ -83,21 +83,24 @@ func TestToolsListEqualsChapter27(t *testing.T) {
 	if len(names) != len(wantTools) {
 		t.Errorf("tools %v, want the %d of chapter 27 7", names, len(wantTools))
 	}
-	// The descriptions steer toward fewer model rounds (27 7): a batch with its wait, the host
-	// ID of list_desktops, the first screenshot of open_session, keys instead of the pointer.
+	// The descriptions steer toward fewer model rounds (27 7): a batch up to the next decision with
+	// its wait, the host ID of list_desktops, the first screenshot of open_session, keys instead of
+	// the pointer in every program, and a wait that ends on a quiet screen.
 	desc := map[string]string{}
 	for _, tool := range res.Tools {
 		desc[tool.Name] = tool.Description
 	}
-	for name, phrase := range map[string]string{
-		toolBatch:        "with the wait that follows it as the last item",
-		toolListDesktops: "Pass the host ID to open_session",
-		toolOpenSession:  "Returns the first screenshot",
-		actKey:           "cmd+l (ctrl+l on Windows)",
-		actType:          "type its full address",
+	for _, c := range []struct{ name, phrase string }{
+		{toolBatch, "up to the next decision that needs a look at the screen into one batch, with the wait that follows it as the last item"},
+		{toolListDesktops, "Pass the host ID to open_session"},
+		{toolOpenSession, "Returns the first screenshot"},
+		{actKey, "cmd+l (ctrl+l on Windows)"},
+		{actType, "type its full address"},
+		{actKey, "Tab and shift+Tab between fields"},
+		{actWait, "Wait until the screen is quiet, at most duration_ms"},
 	} {
-		if !strings.Contains(desc[name], phrase) {
-			t.Errorf("description of %s lacks %q", name, phrase)
+		if !strings.Contains(desc[c.name], c.phrase) {
+			t.Errorf("description of %s lacks %q", c.name, c.phrase)
 		}
 	}
 	r.stop()

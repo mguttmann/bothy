@@ -1730,7 +1730,7 @@
       "min": "0s",
       "max": "",
       "chapter": "27-computer-use.md",
-      "doc": "Wait after an action before its automatic image."
+      "doc": "Longest wait after an action before its automatic image; it ends earlier once the screen is quiet."
     },
     {
       "name": "computer.status_interval",

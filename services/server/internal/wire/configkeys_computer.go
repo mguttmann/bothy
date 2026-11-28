@@ -23,7 +23,7 @@ func computerConfigKeys() []config.Key {
 		{Name: "computer.jpeg_quality", Kind: config.KindInt, Default: "80", Min: "1", Max: "100", Chapter: chapter27,
 			Doc: "JPEG quality of a screenshot."},
 		{Name: "computer.settle", Kind: config.KindDuration, Default: "500ms", Min: "0s", Chapter: chapter27,
-			Doc: "Wait after an action before its automatic image."},
+			Doc: "Longest wait after an action before its automatic image; it ends earlier once the screen is quiet."},
 		{Name: "computer.auto_screenshot", Kind: config.KindBool, Default: defaultTrue, Chapter: chapter27,
 			Doc: "An image after every action that changes the screen."},
 		{Name: "computer.wait_max", Kind: config.KindDuration, Default: computerWaitMaxDefault, Min: "1s", Chapter: chapter27,

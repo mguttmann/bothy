@@ -185,7 +185,7 @@ func (s *csession) act(a frame.Action) {
 }
 
 // run1 executes a and returns its outcome; quick drops the image of an input action and of wait
-// (27 6.4).
+// (27 6.4). wait ends early on a quiet screen (quiet.go).
 func (s *csession) run1(a frame.Action) outcome {
 	ar, ok := s.parseArgs(a.Action, a.Args)
 	if !ok {
@@ -203,16 +203,22 @@ func (s *csession) run1(a frame.Action) outcome {
 	case actCursorPosition:
 		return s.position()
 	case actWait:
-		if !s.sleep(time.Duration(ar.DurationMs)*time.Millisecond) || a.Quick {
+		o, end := s.quiet(time.Duration(ar.DurationMs)*time.Millisecond, quietIdleWait)
+		switch {
+		case end == quietGone || a.Quick:
+			clear(o.img)
 			return outcome{code: CodeOK}
+		case end == quietStable:
+			return o
 		}
 		return s.capture(nil, -1)
 	}
 	return s.input(a.Action, ar, a.Quick)
 }
 
-// input runs an action that injects input (do), then the automatic image after computer.settle
-// when computer.auto_screenshot is on; with quick only the pause of quickPause and no image.
+// input runs an action that injects input (do), then the automatic image when
+// computer.auto_screenshot is on, after the screen became quiet but at most computer.settle
+// (quiet.go); with quick only the pause of quickPause and no image.
 func (s *csession) input(action string, ar args, quick bool) outcome {
 	d := Do{Op: OpDo, Action: action, Modifiers: ar.Modifiers, Direction: ar.Direction, Amount: ar.Amount, Text: ar.Text, Keys: ar.Keys}
 	if ar.Repeat != nil {
@@ -244,8 +250,13 @@ func (s *csession) input(action string, ar args, quick bool) outcome {
 		s.sleep(min(settle, quickPause))
 		return outcome{code: CodeOK}
 	}
-	if !s.sleep(settle) {
+	o, end := s.quiet(settle, quietIdleSettle)
+	switch end {
+	case quietGone:
 		return outcome{code: CodeOK}
+	case quietStable:
+		return o
+	case quietCapped:
 	}
 	if o := s.capture(nil, -1); o.code == CodeOK {
 		return o
@@ -271,7 +282,11 @@ func (s *csession) capture(region *Rect, zoomID int64) outcome {
 		c.Format, c.Quality, format = frame.FormatPNG, 100, formatPNG
 	}
 	c.Seq = s.m.c.Helper.NextSeq()
+	began := s.m.c.Clock.Now()
 	r, err := s.m.c.Helper.Request(s.ctx, c.Seq, c)
+	if region == nil {
+		s.captureCost.Store(int64(s.m.c.Clock.Now().Sub(began)))
+	}
 	if err != nil {
 		return outcome{code: CodeOSRefused}
 	}

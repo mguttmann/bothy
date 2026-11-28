@@ -275,7 +275,7 @@ var argSchemas = map[string]map[string]any{
 	argText:       {keyType: typeString, keyMinLength: 1, keyDescription: "text typed as Unicode input, whatever the keyboard layout"},
 	argKeys:       {keyType: typeString, keyMinLength: 1, keyDescription: "a key or combination, for example cmd+shift+t, Return or F5"},
 	argRepeat:     {keyType: typeInteger, keyMinimum: 1, keyDescription: "how often to press; the host caps it"},
-	argDurationMS: {keyType: typeInteger, keyMinimum: 0, keyDescription: "milliseconds to wait before the image; the host caps it"},
+	argDurationMS: {keyType: typeInteger, keyMinimum: 0, keyDescription: "the longest wait in milliseconds; it ends earlier once the screen is quiet; the host caps it"},
 }
 
 // actionDescriptions are the descriptions of the thirteen action tools.
@@ -291,8 +291,8 @@ var actionDescriptions = map[string]string{
 	actCursorPosition: "Return the position of the pointer in pixels of the last screenshot.",
 	actScroll:         "Scroll at a point. To move through a page, Page_Down or space with key is often faster.",
 	actType:           "Type text. To open a page, type its full address (a search page with the search words in its address) into the address bar instead of clicking through a start page.",
-	actKey:            "Press and release a key or a key combination. Prefer keys to the pointer: cmd+l (ctrl+l on Windows) for the address bar, cmd+f (ctrl+f) to find text, Page_Down or space to scroll a page.",
-	actWait:           "Wait, then take a screenshot (inside a batch only as its last item). After an action that loads a page, put the wait into the same batch instead of calling it alone.",
+	actKey:            "Press and release a key or a key combination. Prefer keys to the pointer in every program: cmd+l (ctrl+l on Windows) for the address bar, cmd+f (ctrl+f) to find text, Tab and shift+Tab between fields, Return to confirm, Escape to close a dialog or menu, the program's own shortcuts (alt opens the menu bar on Windows), Page_Down or space to scroll.",
+	actWait:           "Wait until the screen is quiet, at most duration_ms, then take a screenshot. It ends about 0.3 s after the screen stopped changing (1.5 s when nothing changes at all), so give the longest time the step may need, for example 5000 for a page or a program that opens, instead of guessing a short one. After an action that loads or opens something, put the wait last into the same batch instead of calling it alone.",
 }
 
 // actionSchema returns the input schema of an action tool.
@@ -322,7 +322,7 @@ func toolDefs() []toolDef {
 	}
 	defs = append(defs,
 		toolDef{Name: toolBatch, Title: "Run several actions",
-			Description: "Run a list of actions in order, each an object with action and its arguments. Put every step whose result you can foresee into one batch, with the wait that follows it as the last item (for example key cmd+l, type the address, key Return, wait 1500). Only the last item waits for the screen to settle and returns the one image; the items before it run back to back without images. The first failure stops the batch.",
+			Description: "Run a list of actions in order, each an object with action and its arguments. Put every step up to the next decision that needs a look at the screen into one batch, with the wait that follows it as the last item: for example key cmd+l, type the address, key Return, wait 5000; or a whole form: click the first field, type, key Tab, type, key Return, wait 5000. The wait ends as soon as the screen is quiet, so a long limit costs nothing on a fast screen. Only the last item waits for the screen to settle and returns the one image; the items before it run back to back without images. The first failure stops the batch.",
 			InputSchema: schema(map[string]any{"actions": map[string]any{keyType: typeArray, keyMinItems: 1,
 				keyItems: map[string]any{keyType: "object", "properties": item, "required": []string{argAction}, "additionalProperties": false}}}, "actions")},
 		toolDef{Name: toolDone, Title: "End the computer session", Description: "End the computer session of this run.", InputSchema: schema(nil)},
