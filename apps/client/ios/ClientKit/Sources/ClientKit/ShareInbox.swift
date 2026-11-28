@@ -107,6 +107,9 @@ public enum ShareInboxError: Error, Equatable {
 public final class ShareInbox {
     /// The version of the manifest format.
     public static let manifestVersion = 1
+    /// How old a staging folder or a half-written entry must be before `removeStale(before:)`
+    /// of the app deletes it: far longer than a share sheet stays open.
+    public static let staleAfter: TimeInterval = 24 * 60 * 60
     /// The most characters kept of a file name in the entry, so a long name cannot exceed the
     /// file system's name length with the number prefix; a storage detail, not a limit.
     static let storedNameLength = 100
@@ -209,6 +212,65 @@ public final class ShareInbox {
         return names.filter { !$0.hasPrefix(".") }
             .compactMap { read(inboxFolder.appendingPathComponent($0, isDirectory: true)) }
             .sorted { ($0.createdAt, $0.clientMsgID) < ($1.createdAt, $1.clientMsgID) }
+    }
+
+    /// The finished entry of `clientMsgID`, or nil.
+    ///
+    /// - Parameter clientMsgID: the entry's ID.
+    /// - Returns: the entry.
+    public func entry(clientMsgID: String) -> ShareInboxEntry? {
+        guard (try? Self.check(clientMsgID)) != nil else { return nil }
+        return read(inboxFolder.appendingPathComponent(clientMsgID, isDirectory: true))
+    }
+
+    /// Records the IDs of the uploads completed so far in the entry of `clientMsgID`, in the order
+    /// of its files (nil: not completed); the manifest is replaced atomically, so a reader sees
+    /// the old or the new one.
+    ///
+    /// - Parameters:
+    ///   - clientMsgID: the entry's ID.
+    ///   - fileIDs: one ID or nil per file.
+    /// - Throws: `ShareInboxError.invalidID`, or a file system failure; then the old manifest stays.
+    public func recordCompleted(clientMsgID: String, fileIDs: [String?]) throws {
+        try Self.check(clientMsgID)
+        let manifest = inboxFolder.appendingPathComponent(clientMsgID, isDirectory: true)
+            .appendingPathComponent("manifest.json")
+        guard var object = ShareAPI.object(try Data(contentsOf: manifest)),
+              var listed = object["files"] as? [[String: Any]]
+        else {
+            throw ShareInboxError.invalidID
+        }
+        for (index, id) in fileIDs.enumerated() where index < listed.count {
+            listed[index]["completed_file_id"] = id
+        }
+        object["files"] = listed
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes])
+        try data.write(to: manifest, options: .atomic)
+    }
+
+    /// Deletes the staging folders and the half-written entries last changed before `cutoff`:
+    /// what a share sheet left when iOS ended its process before it could clean up. Finished
+    /// entries stay for the app.
+    ///
+    /// - Parameter cutoff: the age limit; a sheet still open is younger.
+    public func removeStale(before cutoff: Date) {
+        var stale: [URL] = []
+        if let staged = try? files.contentsOfDirectory(
+            at: stagingRoot, includingPropertiesForKeys: [.contentModificationDateKey]) {
+            stale += staged
+        }
+        if let entries = try? files.contentsOfDirectory(
+            at: inboxFolder, includingPropertiesForKeys: [.contentModificationDateKey]) {
+            stale += entries.filter { $0.lastPathComponent.hasPrefix(".tmp-") }
+        }
+        for url in stale {
+            guard let changed = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                  changed < cutoff
+            else {
+                continue
+            }
+            try? files.removeItem(at: url)
+        }
     }
 
     /// Deletes the entry of `clientMsgID` with its files; a missing entry is not an error.

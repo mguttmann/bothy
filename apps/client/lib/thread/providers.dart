@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 
 import 'package:domain/domain.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 import 'package:local_store/local_store.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -103,13 +104,31 @@ Stream<ContiguousWindow> threadWindow(Ref ref, String threadId) {
 
 /// The outbox entries of [threadId] that are not confirmed, with their display state
 /// (04 13.2 item 3).
+///
+/// The draft writes of the thread are left out and an equal list is not given again: the
+/// composer writes the draft on every key press (D-M4-20-2), no reader shows a draft entry,
+/// and without this the history and the composer would rebuild on every keystroke.
 @riverpod
 Stream<List<OutboxEntryView>> threadOutbox(Ref ref, String threadId) {
   final engine = ref.watch(syncEngineProvider);
   return engine == null
       ? Stream.value(const [])
-      : engine.outbox.watchThread(ThreadId.parse(threadId));
+      : withoutDraftWrites(engine.outbox.watchThread(ThreadId.parse(threadId)));
 }
+
+/// [views] without the draft writes (`putThreadDraft`), each list only when it differs from
+/// the one before.
+@visibleForTesting
+Stream<List<OutboxEntryView>> withoutDraftWrites(
+  Stream<List<OutboxEntryView>> views,
+) => views
+    .map(
+      (list) => [
+        for (final v in list)
+          if (v.entry.kind != PersonalOps.putThreadDraft) v,
+      ],
+    )
+    .distinct(listEquals);
 
 /// The pinned messages of [threadId] (the section "Pinned" of the session column).
 @riverpod

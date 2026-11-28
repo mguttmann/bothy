@@ -103,6 +103,7 @@ class MessageCard extends ConsumerWidget {
       sheets: phone,
       permitted: permission.permitted,
       deniedReasonText: permission.reason,
+      lockedCustomIds: permission.locked,
       header: componentHeader(
         message,
         components,

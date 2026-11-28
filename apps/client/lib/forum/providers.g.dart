@@ -717,7 +717,7 @@ final class PendingPostsProvider
   }
 }
 
-String _$pendingPostsHash() => r'51cf1872c6664efcfdfdacbcc2528d7fc917f450';
+String _$pendingPostsHash() => r'0dd11fd4c43ef5bf766ac3a1f9514601a074d0f1';
 
 /// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
 /// Threads from a message (`parent_message_id`) are not posts of the forum's list.
@@ -810,7 +810,7 @@ final class UnsentChannelDraftProvider
 }
 
 String _$unsentChannelDraftHash() =>
-    r'26f0c109140a25a2f22a449c9dbc50cafcb6e43c';
+    r'9f6116f4a20bfa74f258a4ac4b281e147a024479';
 
 /// The text of the newest draft write of the person's draft of a new post in [channelId] that
 /// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer

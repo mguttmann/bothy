@@ -191,8 +191,14 @@ class FakePlayer implements TicketPlayer {
   @override
   Future<void> pause() async => _phases.add(PlayerPhase.paused);
 
+  /// How often [resume] ran.
+  int resumed = 0;
+
   @override
-  Future<void> resume() async => _phases.add(PlayerPhase.playing);
+  Future<void> resume() async {
+    resumed++;
+    _phases.add(PlayerPhase.playing);
+  }
 
   @override
   Future<void> setSpeed(double speed) async => speeds.add(speed);
@@ -228,7 +234,7 @@ FilePorts fakeFilePorts({
   opener: opener ?? FakeOpener(),
   recorder: () => recorder ?? FakeRecorder(),
   player: FakePlayer.new,
-  video: (url) => const SizedBox(key: ValueKey('file.video.surface')),
+  video: (url, renew) => const SizedBox(key: ValueKey('file.video.surface')),
   media: () => media ?? FakeMediaPort(),
   // The phone's temporary folder (brief M5-07): the test's own, or one below the host's.
   temporary: () async =>

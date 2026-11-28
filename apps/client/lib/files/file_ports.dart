@@ -61,8 +61,12 @@ abstract interface class FileOpener {
 }
 
 /// Builds the video surface of a ticket URL (12 9.2); the URL is a bearer secret for a short
-/// time, so the surface keeps it in memory only.
-typedef VideoSurfaceBuilder = Widget Function(Uri ticketUrl);
+/// time, so the surface keeps it in memory only, and `renew` mints a new one when it expired
+/// during the playback.
+typedef VideoSurfaceBuilder = Widget Function(
+  Uri ticketUrl,
+  Future<Uri> Function() renew,
+);
 
 /// The ports of files and voice.
 ///
@@ -83,7 +87,8 @@ final class FilePorts {
        opener = opener ?? const LauncherFileOpener(),
        recorder = recorder ?? RecordVoiceRecorder.new,
        player = player ?? AudioTicketPlayer.new,
-       video = video ?? ((url) => TicketVideoView(url: url)),
+       video =
+           video ?? ((url, renew) => TicketVideoView(url: url, renew: renew)),
        media = media ?? ImagePickerPort.new,
        temporary = temporary ?? getTemporaryDirectory;
 

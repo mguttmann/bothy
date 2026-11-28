@@ -106,6 +106,9 @@ final class ShareApple: NSObject, ShareAppleHostApi {
 
     func readInbox() throws -> [ShareInboxEntryRecord] {
         guard state != nil, keychain != nil, let inbox else { throw Self.unavailable }
+        // What a share sheet left when iOS ended its process goes (the copies of a sheet and
+        // half-written entries); finished entries stay for this read.
+        inbox.removeStale(before: Date().addingTimeInterval(-ShareInbox.staleAfter))
         return inbox.entries().map { entry in
             ShareInboxEntryRecord(
                 clientMsgId: entry.clientMsgID, instanceId: entry.instanceID,

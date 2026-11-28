@@ -463,6 +463,86 @@ void main() {
       expect(copy.existsSync(), isFalse);
     });
 
+    // AUD-PKG-Q03 (#805): a removed attachment whose upload ran deletes its file on the
+    // server, so it does not wait there for file.unattached_ttl.
+    test(
+      'removing an uploaded attachment deletes its file on the server',
+      () async {
+        expect(await attach.add([await picked('a.bin', 5)]), isTrue);
+        final first = attach.attachments.single;
+        await h.outbox.start();
+        await eventually('upload confirmed', () => gone(first.entryId!));
+        final fileId = h.progress.completedFileOf(first.key)!;
+        expect(h.server.world.files.containsKey(fileId), isTrue);
+        await attach.remove(first.key);
+        await eventually(
+          'released',
+          () async => (await h.db.outboxDao.allEntries()).isEmpty,
+        );
+        expect(h.server.requestsOf('deleteFile').single.status, 204);
+        expect(h.server.world.files.containsKey(fileId), isFalse);
+      },
+    );
+
+    // AUD-PKG-Q03 (#805): "Upload again" ends the session the failed upload left open.
+    test('Upload again releases the session of the failed upload', () async {
+      h.server.faults.onRequest(
+        'uploadPart',
+        status: 409,
+        code: 'conflict',
+        reason: 'part_conflict',
+      );
+      expect(await attach.add([await picked('a.bin', 4)]), isTrue);
+      final first = attach.attachments.single;
+      await h.outbox.start();
+      await eventually(
+        'failed',
+        () async =>
+            (await h.db.outboxDao.byId(first.entryId!))?.state ==
+            OutboxState.failed,
+      );
+      final session = h.progress.sessionFileOf(first.key)!;
+      await attach.retry(first.key);
+      final release = (await h.db.outboxDao.allEntries()).firstWhere(
+        (e) => e.kind == UploadOps.releaseUpload,
+      );
+      expect(decodePayload(release.payload)['file_id'], session);
+    });
+
+    // AUD-PKG-Q03 (#1247): all or none, and two calls at once respect the limit.
+    test('a copy that fails takes back the files attached before it', () async {
+      final good = await picked('a.bin', 3);
+      final second = await picked('b.bin', 3);
+      // A plain file where the folder of the second key would go makes its copy fail.
+      final blocker = File('${h.folder.path}/outgoing/key${keys + 1}');
+      await blocker.create(recursive: true);
+      expect(await attach.add([good, second]), isFalse);
+      expect(attach.refusal, isA<FileUnreadable>());
+      expect(attach.attachments, isEmpty);
+      expect(await h.db.outboxDao.allEntries(), isEmpty);
+      expect(
+        Directory('${h.folder.path}/outgoing').listSync().map((e) => e.path),
+        [blocker.path],
+      );
+    });
+
+    test('two adds at once stay within message_max_attachments', () async {
+      attach.limits = const InstanceLimits(
+        messageMaxContentBytes: 1000,
+        messageMaxAttachments: 1,
+        fileMaxUploadBytes: 100,
+        threadTitleMaxChars: 100,
+        voiceMaxDurationMs: 1000,
+      );
+      final results = await Future.wait([
+        attach.add([await picked('a.bin', 3)]),
+        attach.add([await picked('b.bin', 3)]),
+      ]);
+      expect(results, [isTrue, isFalse]);
+      expect(attach.attachments, hasLength(1));
+      expect(attach.refusal, isA<TooManyFiles>());
+    });
+
     test('files within the limits become upload entries', () async {
       final ok = await attach.add([await picked('a.bin', 3)]);
       expect(ok, isTrue);

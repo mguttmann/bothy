@@ -19219,6 +19219,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop computer control ({desktops})'**
   String trayComputerStop(String desktops);
+
+  /// Starts or continues the video in the video dialog; the video never starts by itself (WCAG 1.4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get fileVideoPlay;
+
+  /// Turns the sound of the video in the video dialog off.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get fileVideoMute;
+
+  /// Turns the sound of the video in the video dialog on again.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound on'**
+  String get fileVideoUnmute;
+
+  /// Label of the slider that moves the position of the video in the video dialog; the arrow keys move it as well.
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get fileVideoPosition;
+
+  /// Position and length of the video in the video dialog, both as m:ss or h:mm:ss.
+  ///
+  /// In en, this message translates to:
+  /// **'{position} of {duration}'**
+  String fileVideoTime(String position, String duration);
 }
 
 class _AppLocalizationsDelegate

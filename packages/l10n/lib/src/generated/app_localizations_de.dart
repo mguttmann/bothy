@@ -12178,4 +12178,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String trayComputerStop(String desktops) {
     return 'Computer-Steuerung stoppen ($desktops)';
   }
+
+  @override
+  String get fileVideoPlay => 'Abspielen';
+
+  @override
+  String get fileVideoMute => 'Ton aus';
+
+  @override
+  String get fileVideoUnmute => 'Ton an';
+
+  @override
+  String get fileVideoPosition => 'Position';
+
+  @override
+  String fileVideoTime(String position, String duration) {
+    return '$position von $duration';
+  }
 }

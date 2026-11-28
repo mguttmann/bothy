@@ -21,14 +21,16 @@ import 'package:local_store/local_store.dart';
 typedef ReaderFacts = ({AccessView? access, PrincipalId? me, bool owner});
 
 /// Whether the reader may use [components] and, if not, the translated reason (09 11.2;
-/// components.md 8 "active, not permitted").
+/// components.md 8 "active, not permitted"), decided per component: [locked] names the
+/// `custom_id` of each component the reader may not use, and the card is [permitted] while at
+/// least one component is usable. [reason] is the note of the first locked component.
 ///
 /// No own derivation from grants (15 1 principle 1): the check reads only the level and the
-/// capabilities the server reported for the channel, the component's `required_capability`
+/// capabilities the server reported for the channel, each component's `required_capability`
 /// and `restricted_to`, the `triggered_by` of its [run] and the owner flag of `getMe`.
 /// Effective owners hold every capability and meet every restriction (09 11.2). The server
 /// checks again; its refusal shows as the card's error (the outbox entry's problem).
-({bool permitted, String? reason}) cardPermission(
+({bool permitted, String? reason, Set<String> locked}) cardPermission(
   AppLocalizations l,
   List<MessageComponent> components,
   ReaderFacts reader, {
@@ -37,37 +39,70 @@ typedef ReaderFacts = ({AccessView? access, PrincipalId? me, bool owner});
 }) {
   final access = reader.access;
   if (access == null || access.level != AccessLevel.trigger) {
-    return (permitted: false, reason: l.componentsDeniedLevel);
-  }
-  if (reader.owner) return (permitted: true, reason: null);
-  final first = components.isEmpty ? null : components.first;
-  final capability = first?.requiredCapability;
-  if (capability != null && !access.capabilities.contains(capability)) {
     return (
       permitted: false,
-      reason: l.componentsDeniedCapability(capabilityLabel(l, capability)),
+      reason: l.componentsDeniedLevel,
+      locked: const <String>{},
     );
   }
-  switch (first?.restrictedTo) {
+  if (reader.owner) {
+    return (permitted: true, reason: null, locked: const <String>{});
+  }
+  if (components.isEmpty) {
+    return (permitted: true, reason: null, locked: const <String>{});
+  }
+  String? reason;
+  final locked = <String>{};
+  for (final c in components) {
+    final denied = _deniedReason(
+      l,
+      c,
+      access,
+      reader.me,
+      run: run,
+      runStarterName: runStarterName,
+    );
+    if (denied == null) continue;
+    locked.add(c.customId);
+    reason ??= denied;
+  }
+  if (locked.length == components.length) {
+    return (permitted: false, reason: reason, locked: const <String>{});
+  }
+  return (permitted: true, reason: reason, locked: locked);
+}
+
+/// The translated reason why a reader with the trigger level may not use [component], or null
+/// when it may.
+String? _deniedReason(
+  AppLocalizations l,
+  MessageComponent component,
+  AccessView access,
+  PrincipalId? me, {
+  RunSummary? run,
+  String? runStarterName,
+}) {
+  final capability = component.requiredCapability;
+  if (capability != null && !access.capabilities.contains(capability)) {
+    return l.componentsDeniedCapability(capabilityLabel(l, capability));
+  }
+  switch (component.restrictedTo) {
     case ComponentRestriction.runStarter:
-      if (run == null || run.triggeredBy != reader.me) {
-        return (
-          permitted: false,
-          reason: runStarterName == null
-              ? l.componentsApproverOwner
-              : l.componentsApproverRunStarter(dsIsolate(runStarterName)),
-        );
+      if (run == null || run.triggeredBy != me) {
+        return runStarterName == null
+            ? l.componentsApproverOwner
+            : l.componentsApproverRunStarter(dsIsolate(runStarterName));
       }
     case ComponentRestriction.owner:
-      return (permitted: false, reason: l.componentsApproverOwner);
-    // A restriction of a newer server is not guessed: the card stays locked (owners pass
-    // above).
+      return l.componentsApproverOwner;
+    // A restriction of a newer server is not guessed: the component stays locked (owners
+    // pass above).
     case ComponentRestriction.unknown:
-      return (permitted: false, reason: l.componentsUnsupported);
-    case ComponentRestriction.any || null:
+      return l.componentsUnsupported;
+    case ComponentRestriction.any:
       break;
   }
-  return (permitted: true, reason: null);
+  return null;
 }
 
 /// The translated name of [capability] for the header and the lock note.

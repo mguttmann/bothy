@@ -42,6 +42,7 @@ Widget _card(
   DsComponentData data, {
   bool permitted = true,
   String? denied,
+  Set<String> locked = const {},
   String agentText = 'Deploy to staging?',
   void Function(String, Object?)? onActivate,
 }) {
@@ -49,6 +50,7 @@ Widget _card(
     data,
     permitted: permitted,
     deniedReasonText: denied,
+    lockedCustomIds: locked,
     header: _header,
     agentText: agentText,
     onOpenLink: (_) {},
@@ -97,6 +99,29 @@ void main() {
       ),
     );
     expect(stepUp.first.glyph, DsIcons.securityStepUp);
+  });
+
+  // AUD-PKG-Q03 (#778): a component the reader may not use is locked on its own.
+  testWidgets('a locked component is disabled with the note, the others stay '
+      'operable', (tester) async {
+    final calls = <String>[];
+    await pumpDs(
+      tester,
+      _card(
+        _buttons,
+        locked: const {'allow'},
+        denied: 'Only an owner can approve this',
+        onActivate: (id, _) => calls.add(id),
+      ),
+    );
+    expect(find.text('Only an owner can approve this'), findsOneWidget);
+    final allow = find.byKey(const ValueKey('ds-component-allow'));
+    final deny = find.byKey(const ValueKey('ds-component-deny'));
+    expect(tester.widget<DsButton>(allow).onPressed, isNull);
+    await tester.tap(allow);
+    await tester.tap(deny);
+    await tester.pump();
+    expect(calls, ['deny']);
   });
 
   testWidgets('not permitted: lock note and disabled buttons', (tester) async {

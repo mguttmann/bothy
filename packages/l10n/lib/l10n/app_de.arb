@@ -3182,5 +3182,10 @@
   "computerOnlyLocal": "Einschalten geht nur am Gerät selbst, mit \"Computer-Steuerung erlauben\" im Computer-Helfer.",
   "computerDisableFailed": "Erlaubnis konnte nicht ausgeschaltet werden: {problem}",
   "computerDisabledDone": "Computer-Steuerung von {desktop} ist ausgeschaltet.",
-  "trayComputerStop": "Computer-Steuerung stoppen ({desktops})"
+  "trayComputerStop": "Computer-Steuerung stoppen ({desktops})",
+  "fileVideoPlay": "Abspielen",
+  "fileVideoMute": "Ton aus",
+  "fileVideoUnmute": "Ton an",
+  "fileVideoPosition": "Position",
+  "fileVideoTime": "{position} von {duration}"
 }

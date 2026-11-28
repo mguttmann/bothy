@@ -32,6 +32,7 @@ import 'daos/recent_targets_dao.dart';
 import 'daos/runs_dao.dart';
 import 'daos/search_dao.dart';
 import 'daos/share_inbox_dao.dart';
+import 'daos/share_targets_dao.dart';
 import 'daos/structure_dao.dart';
 import 'daos/sync_state_dao.dart';
 import 'daos/threads_dao.dart';
@@ -365,6 +366,9 @@ class LocalDatabase extends _$LocalDatabase {
 
   /// Share inbox.
   late final ShareInboxDao shareInboxDao = ShareInboxDao(this);
+
+  /// The reads of the share sheet's targets.
+  late final ShareTargetsDao shareTargetsDao = ShareTargetsDao(this);
 
   /// How forums and channel groups look on this device: the Done section, the collapsed
   /// thread groups and the pinned forum overview.

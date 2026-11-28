@@ -207,10 +207,23 @@ final class AttachController extends ChangeNotifier {
     return _refuse(TooManyFiles(maxCount));
   }
 
+  /// The end of the last [add] or [addText]; the next one waits for it, so two at once (a drop
+  /// and a paste) never both pass the count check before either appended its files.
+  Future<void> _adding = Future.value();
+
+  Future<bool> _serial(Future<bool> Function() step) {
+    final next = _adding.then((_) => step());
+    _adding = next.then<void>((_) {}, onError: (Object _) {});
+    return next;
+  }
+
   /// Attaches [files]: refuses all of them with [refusal] when one is over a limit or cannot
   /// be read, before any entry is written (15 14, 04 13.2); otherwise writes one upload entry
-  /// per file and returns true.
-  Future<bool> add(List<PickedFile> files) async {
+  /// per file and returns true. All or none: when a copy fails after earlier files of the same
+  /// call were attached, those are removed again. Calls run one after another.
+  Future<bool> add(List<PickedFile> files) => _serial(() => _add(files));
+
+  Future<bool> _add(List<PickedFile> files) async {
     refusal = null;
     if (files.isEmpty) return false;
     final maxCount = limits?.messageMaxAttachments;
@@ -230,13 +243,14 @@ final class AttachController extends ChangeNotifier {
         return _refuse(FileTooLarge(f.name, maxBytes), files);
       }
     }
+    final added = <String>[];
     for (final f in files) {
       final key = _newKey();
       final UploadSource source;
+      final dir = Directory(
+        '${(await _copies()).path}${Platform.pathSeparator}$key',
+      );
       try {
-        final dir = Directory(
-          '${(await _copies()).path}${Platform.pathSeparator}$key',
-        );
         await dir.create(recursive: true);
         final copy = await File(f.path).copy(
           '${dir.path}${Platform.pathSeparator}${FileCache.safeFileName(f.name)}',
@@ -244,19 +258,43 @@ final class AttachController extends ChangeNotifier {
         if (f.owned) await File(f.path).delete();
         source = await prepareUpload(copy.path, name: f.name);
       } on FileSystemException {
-        return _refuse(FileUnreadable(f.name));
+        // All or none: the files of this call attached so far go again, with their copies.
+        await _deleteFolder(dir);
+        for (final done in added) {
+          await remove(done);
+        }
+        return _refuse(FileUnreadable(f.name), files);
       }
       _items.add(await _hold(source, key: key));
+      added.add(key);
       notifyListeners();
     }
     return true;
   }
 
+  static Future<void> _deleteFolder(Directory dir) async {
+    try {
+      if (dir.existsSync()) await dir.delete(recursive: true);
+    } on FileSystemException {
+      // A copy that cannot be deleted now goes with the instance folder (D-M4-22-5).
+    }
+  }
+
   /// Attaches [content] as a text file [name] the app writes itself (M4-47: a long paste, or
   /// the rest of a draft over `message_max_content_bytes`), declared as [mimeType];
   /// [pastedText] is kept on the attachment for "Insert as text". Refuses like [add] (count,
-  /// size) before anything is written and returns false then.
+  /// size) before anything is written and returns false then. Runs after an [add] or
+  /// [addText] that is under way.
   Future<bool> addText(
+    String name,
+    String content, {
+    required String mimeType,
+    String? pastedText,
+  }) => _serial(
+    () => _addText(name, content, mimeType: mimeType, pastedText: pastedText),
+  );
+
+  Future<bool> _addText(
     String name,
     String content, {
     required String mimeType,
@@ -367,7 +405,10 @@ final class AttachController extends ChangeNotifier {
   }
 
   /// Removes the attachment [key], discards its upload entry and deletes its copy in the
-  /// outgoing folder.
+  /// outgoing folder. When an attempt of this run started the upload, a `releaseUpload` entry
+  /// deletes on the server what it created (an open session or the completed file, 12 12), so
+  /// it does not count against `file.upload_max_open_sessions` until it expires; the entry runs
+  /// in the uploads' lane after an attempt under way and goes when the device is back online.
   Future<void> remove(String key) async {
     final i = _items.indexWhere((a) => a.key == key);
     if (i < 0) return;
@@ -376,7 +417,20 @@ final class AttachController extends ChangeNotifier {
     refusal = null;
     notifyListeners();
     final entry = item.entryId;
-    if (entry != null) await _outbox.discard(entry);
+    if (entry != null) {
+      await _outbox.discard(entry);
+      final fileId =
+          _progress.completedFileOf(key) ?? _progress.sessionFileOf(key);
+      if (fileId != null || _progress.fractionOf(key) != null) {
+        await _outbox.enqueue(
+          UploadOps.releaseRequest(
+            channelId: channel.value,
+            key: key,
+            fileId: fileId,
+          ),
+        );
+      }
+    }
     final copy = Directory(
       '${(await (entry == null ? _copies() : _outgoing())).path}'
       '${Platform.pathSeparator}$key',
@@ -389,12 +443,23 @@ final class AttachController extends ChangeNotifier {
   }
 
   /// "Upload again": a failed upload of [key] becomes a new entry with a new session
-  /// (brief M4-22 Design note 1).
+  /// (brief M4-22 Design note 1); the session the failed one ended with is released on the
+  /// server first (12 3.8 item 1), as "Upload again" of a new post does.
   Future<void> retry(String key) async {
     final i = _items.indexWhere((a) => a.key == key);
     final entry = i < 0 ? null : _items[i].entryId;
     // A staged file has no upload yet.
     if (entry == null) return;
+    final session = _progress.sessionFileOf(key);
+    if (session != null && _progress.completedFileOf(key) == null) {
+      await _outbox.enqueue(
+        UploadOps.releaseRequest(
+          channelId: channel.value,
+          key: key,
+          fileId: session,
+        ),
+      );
+    }
     final fresh = await _outbox.retry(entry);
     _items[i] = _items[i].withEntry(fresh);
     notifyListeners();

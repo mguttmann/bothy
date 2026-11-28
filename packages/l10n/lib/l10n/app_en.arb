@@ -18024,5 +18024,35 @@
         "example": "Desk"
       }
     }
+  },
+  "fileVideoPlay": "Play",
+  "@fileVideoPlay": {
+    "description": "Starts or continues the video in the video dialog; the video never starts by itself (WCAG 1.4.2)."
+  },
+  "fileVideoMute": "Mute",
+  "@fileVideoMute": {
+    "description": "Turns the sound of the video in the video dialog off."
+  },
+  "fileVideoUnmute": "Sound on",
+  "@fileVideoUnmute": {
+    "description": "Turns the sound of the video in the video dialog on again."
+  },
+  "fileVideoPosition": "Position",
+  "@fileVideoPosition": {
+    "description": "Label of the slider that moves the position of the video in the video dialog; the arrow keys move it as well."
+  },
+  "fileVideoTime": "{position} of {duration}",
+  "@fileVideoTime": {
+    "description": "Position and length of the video in the video dialog, both as m:ss or h:mm:ss.",
+    "placeholders": {
+      "position": {
+        "type": "String",
+        "example": "0:12"
+      },
+      "duration": {
+        "type": "String",
+        "example": "1:30"
+      }
+    }
   }
 }
