@@ -52,9 +52,10 @@ type Manifest struct {
 	// RowCounts is count(*) per table, keyed by table name: in backup_manifest.v2 exactly the
 	// tables of ExactCountTables, in backup_manifest.v1 every table of the domain schema.
 	RowCounts map[string]int64 `json:"row_counts"`
-	// Tables are the names of every table of the domain schema, sorted (backup_manifest.v2);
-	// absent in backup_manifest.v1, whose row_counts names them.
-	Tables []string `json:"tables,omitempty"`
+	// Tables are the names of every table of the domain schema, sorted (backup_manifest.v2),
+	// always written, also when empty; absent or null in backup_manifest.v1, whose row_counts
+	// names them.
+	Tables []string `json:"tables"`
 	// Files are the objects the table files names.
 	Files FileTotals `json:"files"`
 	// PgBackRest refers to the pgBackRest backup; set exactly for pg_full and pg_diff.

@@ -266,12 +266,19 @@ func TestManifestV1StillParses(t *testing.T) {
 	v1.Schema = domain.ManifestSchemaV1
 	v1.RowCounts = map[string]int64{"messages": 100, "audit_events": 42, "event_log": 120}
 	v1.Tables = nil
-	b, err := json.Marshal(v1)
+	raw, err := json.Marshal(v1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(b), `"tables"`) {
-		t.Fatalf("a v1 manifest carries tables: %s", b)
+	// A stored v1 manifest has no key tables at all.
+	var obj map[string]any
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		t.Fatal(err)
+	}
+	delete(obj, "tables")
+	b, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
 	}
 	back, err := domain.ParseManifest(b)
 	if err != nil {
@@ -282,5 +289,20 @@ func TestManifestV1StillParses(t *testing.T) {
 	}
 	if got := validManifest(domain.KindPGFull).TableNames(); !slices.Equal(got, []string{"audit_events", "event_log", "messages"}) {
 		t.Errorf("v2 TableNames = %q", got)
+	}
+}
+
+// TestManifestEmptyTablesRoundTrip: a v2 manifest with no table names keeps the key tables, so it
+// parses again (the relocation manifest of a test schema).
+func TestManifestEmptyTablesRoundTrip(t *testing.T) {
+	t.Parallel()
+	m := validManifest(domain.KindLogical)
+	m.Tables, m.RowCounts = []string{}, map[string]int64{}
+	b, err := m.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := domain.ParseManifest(b); err != nil {
+		t.Errorf("ParseManifest of an empty tables array: %v\n%s", err, b)
 	}
 }
