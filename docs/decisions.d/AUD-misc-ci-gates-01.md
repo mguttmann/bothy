@@ -62,10 +62,8 @@ Red runs (ruling 7):
 
 Tool versions (ruling 4):
 
-- Semgrep runs through `uvx --from semgrep==<version>`: its own version is pinned, the packages
-  it depends on are resolved at run time without hashes. A lock of its own (a small uv project
-  for Semgrep with `uv.lock`) brings a second Python lock into the lists of the advisory and
-  license gates and their tests.
+- Done in AUD-Q04/1 (`docs/decisions.d/AUD-PKG-Q04-ci-workflows-pins.md`): Semgrep runs from
+  its own locked project `tools/semgrep` (#755).
 
 CI manifests (ruling 2): the item of AUD-misc-misc-01 "Open" stands unchanged.
 

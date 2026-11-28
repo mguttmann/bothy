@@ -560,6 +560,25 @@ def test_cli_appcast_flow(
     )
 
 
+def test_the_appcast_is_replaced_in_one_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1601: an abort while writing leaves the old appcast and no stray file."""
+    appcast = tmp_path / "appcast.xml"
+    appcast.write_bytes(b"old")
+    dist.write_atomically(appcast, b"new")
+    assert appcast.read_bytes() == b"new"
+
+    def broken(self: Path, target: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(dist.Path, "replace", broken)
+    with pytest.raises(OSError, match="disk full"):
+        dist.write_atomically(appcast, b"newer")
+    assert appcast.read_bytes() == b"new"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["appcast.xml"]
+
+
 def test_cli_promote_appinstaller(tmp_path: Path, cfg: dict[str, Any]) -> None:
     path = _write_cfg(tmp_path, cfg)
     beta = tmp_path / "beta.appinstaller"

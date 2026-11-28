@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -158,6 +159,34 @@ def test_branded_tree_restores_the_branding_after_a_failure(
     ):
         raise RuntimeError
     assert [c[-1] for c in run.calls] == ["b.yaml", "a.yaml"]
+
+
+def test_a_failed_restore_does_not_hide_the_error_of_the_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1601: the build's error is raised, the restore's error is a note on it."""
+    monkeypatch.setattr(common, "CLIENT", tmp_path)
+    (tmp_path / "a.yaml").write_text("a: 1\n", encoding="utf-8")
+    (tmp_path / "b.yaml").write_text("b: 1\n", encoding="utf-8")
+
+    def dart(args: list[str], _: dict[str, object]) -> subprocess.CompletedProcess[str] | None:
+        failed = args[-1] == "a.yaml"
+        return subprocess.CompletedProcess(args, 1 if failed else 0, "", "")
+
+    run = FakeRun({"dart": dart})
+    with (
+        pytest.raises(RuntimeError, match="the build") as caught,
+        common.branded_tree(run, tmp_path / "a.yaml", tmp_path / "b.yaml"),
+    ):
+        raise RuntimeError("the build")
+    notes = caught.value.__notes__
+    assert any("restoring the native branding files failed too" in n for n in notes)
+    # Without an error of the build, a failed restore is the error.
+    with (
+        pytest.raises(common.StepError, match="exited with 1"),
+        common.branded_tree(run, tmp_path / "a.yaml", tmp_path / "b.yaml"),
+    ):
+        pass
 
 
 def test_the_dart_code_of_a_build_must_report_its_version(tmp_path: Path) -> None:

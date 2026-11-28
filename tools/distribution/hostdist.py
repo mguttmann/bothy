@@ -125,6 +125,7 @@ DARWIN_PLIST = Path("/Library/LaunchDaemons/bothy-host.plist")
 DARWIN_SHARE = Path("/Library/Application Support/bothy-host/share")
 # WiX Toolset: the nupkg of the .NET tool, checked against its SHA-256 before use (brief rule 9).
 # Version 5 is the last one without the maintenance fee agreement of later versions.
+# renovate: datasource=nuget depName=wix
 WIX_VERSION = "5.0.2"
 WIX_SHA256 = "f30ef0c74e2a986126539c5780be93ac24e8136eaf723b1937b26272703ae173"
 WIX_URL = f"https://api.nuget.org/v3-flatcontainer/wix/{WIX_VERSION}/wix.{WIX_VERSION}.nupkg"

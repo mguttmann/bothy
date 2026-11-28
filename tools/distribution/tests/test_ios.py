@@ -527,6 +527,25 @@ def test_promote_adds_the_build_to_stable(tmp_path: Path, cfg: dict[str, Any], p
     assert http.calls[-1][1] == f"{API}/betaGroups/g-stable/relationships/builds"
 
 
+def test_promote_catches_up_the_beta_group_of_a_release_that_stopped_half_way(
+    tmp_path: Path, cfg: dict[str, Any], p8: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1478: the upload reached App Store Connect, the job ended before the group step."""
+    http = FakeHttp(asc_routes())
+    ios.promote(
+        distribution=write_cfg(tmp_path, cfg),
+        build=1002003,
+        environ={k: v for k, v in environ(p8).items() if k.startswith("APPLE_NOTARY")},
+        group=ios.BETA_GROUP,
+        http=http,
+    )
+    assert http.calls[-1][1] == f"{API}/betaGroups/g-beta/relationships/builds"
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(ios, "promote", lambda **kw: seen.update(kw))
+    assert ios.main(["promote", "--build", "7", "--group", "beta"], run=FakeRun()) == 0
+    assert (seen["build"], seen["group"]) == (7, ios.BETA_GROUP)
+
+
 def test_trial_checks_the_unsigned_archive_of_the_template(
     tmp_path: Path, tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

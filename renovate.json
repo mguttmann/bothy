@@ -31,6 +31,12 @@
       "groupName": "dev tools (Python)"
     },
     {
+      "description": "WiX stays on version 5, the last one without the maintenance fee agreement of the later versions (docs/quality/toolchain.md, section \"WiX: keep the version\")",
+      "matchFileNames": ["tools/distribution/hostdist.py"],
+      "matchPackageNames": ["wix"],
+      "allowedVersions": "<6"
+    },
+    {
       "description": "Node development tools of the repository gates",
       "matchManagers": ["npm"],
       "matchFileNames": ["tools/node/package.json"],
@@ -118,6 +124,14 @@
       ],
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^(?:lychee-)?v?(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Release downloads of the app and host builds in tools/distribution (Sparkle, bundletool, WiX), each marked with a renovate comment; the SHA-256 constant next to the version is raised in the same pull request",
+      "managerFilePatterns": ["/^tools/distribution/[a-z_]+\\.py$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[A-Z_]+_VERSION = \"(?<currentValue>[^\"]+)\""
+      ]
     },
     {
       "customType": "regex",

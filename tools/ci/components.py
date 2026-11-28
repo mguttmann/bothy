@@ -197,6 +197,9 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     "tools/opscheck/": (),
     # The runner of the portability test (M7-14) runs in the release workflow only.
     "tools/portability/": (),
+    # Semgrep's locked project (#755): `make semgrep` runs in the job of the security gates on
+    # every change.
+    "tools/semgrep/": (),
     # The showcase capture (M7-28) runs by hand only (`make showcase`); its check runs in
     # `make docs`.
     "tools/showcase/": (),

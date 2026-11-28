@@ -29,8 +29,10 @@ import argparse
 import base64
 import email.utils
 import hashlib
+import os
 import re
 import sys
+import tempfile
 import uuid
 
 # Only update files this tool wrote or the publisher's own; expat resolves no external entities.
@@ -763,6 +765,25 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def write_atomically(path: Path, data: bytes) -> None:
+    """Replace `path` with `data` in one step: a file next to it, then a rename (#1601).
+
+    An abort while writing leaves the old appcast as it was instead of a truncated feed, which
+    the apps would refuse as unsigned.
+
+    Raises:
+        OSError: the file cannot be written or renamed; the temporary file is removed.
+    """
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        Path(name).replace(path)
+    except BaseException:
+        Path(name).unlink(missing_ok=True)
+        raise
+
+
 def _command(args: argparse.Namespace, cfg: dict[str, Any]) -> str:
     """Run the subcommand of `args` with the distribution `cfg`; return its result line."""
     if args.command == "validate":
@@ -778,7 +799,7 @@ def _command(args: argparse.Namespace, cfg: dict[str, Any]) -> str:
             result = merge_appcast(cfg, current, args.add.read_bytes(), key)
         else:
             result = promote_appcast(current, args.build, key)
-        args.appcast.write_bytes(result)
+        write_atomically(args.appcast, result)
         return f"{args.appcast}: written and signed"
     if args.command == "promote-appinstaller":
         beta = args.beta.read_text(encoding="utf-8")

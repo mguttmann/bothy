@@ -86,6 +86,7 @@ from common import (
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 # The pinned Sparkle release: version, archive and its SHA-256 (brief M7-12 rule 9).
+# renovate: datasource=github-releases depName=sparkle-project/Sparkle
 SPARKLE_VERSION = "2.10.1"
 SPARKLE_URL = (
     "https://github.com/sparkle-project/Sparkle/releases/download/"

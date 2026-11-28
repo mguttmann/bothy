@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Accepted advisories of the Semgrep project (tools/semgrep/uv.lock, #755): packages that
+# Semgrep pins exactly or in a narrow range, so no fixed version can be locked without breaking
+# its requirements. Semgrep is a gate tool and never ships. Each entry names one advisory, why
+# the gate does not reach the vulnerable code, and an expiry that asks for a new check
+# (tools/ci/tests/test_osv_ignores.py).
+
+[[IgnoredVulns]]
+id = "GHSA-5h93-6whr-6q8j"
+ignoreUntil = 2027-02-28
+reason = "mcp 1.29.0, which Semgrep 1.180.0 pins exactly (mcp==1.29.0) for its subcommand `semgrep mcp`. The gate runs only `semgrep scan` and `semgrep --test` over the repository's own files (Makefile, target semgrep) and never starts the MCP client or server of the SDK, so the transport, OAuth and schema code of the advisory does not run. Not shipped. Re-check when Semgrep raises its mcp pin; until then the expiry asks for a new check (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-84m7-p3x7-pcfv"
+ignoreUntil = 2027-02-28
+reason = "mcp 1.29.0, which Semgrep 1.180.0 pins exactly (mcp==1.29.0) for its subcommand `semgrep mcp`. The gate runs only `semgrep scan` and `semgrep --test` over the repository's own files (Makefile, target semgrep) and never starts the MCP client or server of the SDK, so the transport, OAuth and schema code of the advisory does not run. Not shipped. Re-check when Semgrep raises its mcp pin; until then the expiry asks for a new check (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-qx49-fqc8-xw99"
+ignoreUntil = 2027-02-28
+reason = "mcp 1.29.0, which Semgrep 1.180.0 pins exactly (mcp==1.29.0) for its subcommand `semgrep mcp`. The gate runs only `semgrep scan` and `semgrep --test` over the repository's own files (Makefile, target semgrep) and never starts the MCP client or server of the SDK, so the transport, OAuth and schema code of the advisory does not run. Not shipped. Re-check when Semgrep raises its mcp pin; until then the expiry asks for a new check (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-rwrf-2pqf-9j8j"
+ignoreUntil = 2027-02-28
+reason = "mcp 1.29.0, which Semgrep 1.180.0 pins exactly (mcp==1.29.0) for its subcommand `semgrep mcp`. The gate runs only `semgrep scan` and `semgrep --test` over the repository's own files (Makefile, target semgrep) and never starts the MCP client or server of the SDK, so the transport, OAuth and schema code of the advisory does not run. Not shipped. Re-check when Semgrep raises its mcp pin; until then the expiry asks for a new check (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-w4fh-qvv9-3v23"
+ignoreUntil = 2027-02-28
+reason = "mcp 1.29.0, which Semgrep 1.180.0 pins exactly (mcp==1.29.0) for its subcommand `semgrep mcp`. The gate runs only `semgrep scan` and `semgrep --test` over the repository's own files (Makefile, target semgrep) and never starts the MCP client or server of the SDK, so the transport, OAuth and schema code of the advisory does not run. Not shipped. Re-check when Semgrep raises its mcp pin; until then the expiry asks for a new check (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-mf5v-w3w3-f6cg"
+ignoreUntil = 2027-02-28
+reason = "opentelemetry-api 1.37.0, which Semgrep 1.180.0 pins (~=1.37.0) for its own tracing. The gate runs with --metrics=off and without an OTLP endpoint, and Semgrep parses no traceparent or tracestate header of a request it serves (it serves none). Not shipped. Re-check when Semgrep raises its OpenTelemetry pins (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-xcq7-p3pf-p88h"
+ignoreUntil = 2027-02-28
+reason = "opentelemetry-api 1.37.0, which Semgrep 1.180.0 pins (~=1.37.0) for its own tracing. The gate runs with --metrics=off and without an OTLP endpoint, and Semgrep parses no traceparent or tracestate header of a request it serves (it serves none). Not shipped. Re-check when Semgrep raises its OpenTelemetry pins (#755)."
+
+[[IgnoredVulns]]
+id = "GHSA-53pm-wgxf-c6qf"
+ignoreUntil = 2027-02-28
+reason = "wcmatch 8.5.2, which Semgrep 1.180.0 pins (~=8.3) for its path filters. The patterns and the names it matches are the repository's own (.semgrepignore, the paths of the rules and the tracked files), never untrusted input; the fix exists only in wcmatch 11, outside Semgrep's range. Not shipped. Re-check when Semgrep allows wcmatch 11 (#755)."
