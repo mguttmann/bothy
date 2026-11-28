@@ -998,7 +998,10 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
    `logical`: `pg_dump -Fc` as `migrate.bootstrap_user` into the volume
    `backup-scratch`, stored as a restic snapshot and removed. `objects`: driver `fs` restic over
    the read-only volume `files`; driver `s3` a mirror into the off-site bucket that copies new
-   objects and never deletes or overwrites.
+   objects and never deletes or overwrites; it retries a failed call a bounded number of times,
+   skips an object that still fails and ends the run `failed` with
+   `s3_mirror_objects_failed_<n>` after the other objects
+   ([backup-restore.md](../operations/backup-restore.md) 9).
 3. The off-site target `backup.offsite.target` is an S3-compatible bucket with versioning and
    Object Lock, written `s3:https://<host>[:<port>]/<bucket>[/<prefix>]`; repo2 lies below
    `<prefix>/pgbackrest`, the restic repository below `<prefix>/restic`, the object mirror below

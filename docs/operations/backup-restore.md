@@ -476,6 +476,12 @@ versions after the Object Lock period:
    bucket's version listing shows when the rule has run.
 4. Remove the temporary copy of the key afterwards.
 
-The object mirror of the driver `s3` (below `<prefix>/objects/`) keeps objects deleted from the
+The object mirror of the driver `s3` (below `<prefix>/objects/`) tries each list, head, get and
+put again when it fails with a network error, `408`, `429` or a `5xx`, a bounded number of times
+with a doubling pause (the values `attempts` and `firstBackoff` in
+`services/server/internal/status/adapters/s3mirror/mirror.go`). An object that still cannot be copied is skipped and the pass goes on
+with the next key; the run then ends `failed` with the code `s3_mirror_objects_failed_<n>` (`n`
+objects not copied), and the next run tries them again. A list page that still fails ends the run
+with `s3_mirror_failed`. The mirror keeps objects deleted from the
 file bucket as current versions; the owner deletes them by hand with the same key, and the rule of
 section 2 removes the old versions `NoncurrentDays` later.

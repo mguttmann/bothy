@@ -7,8 +7,11 @@
 // implements the S3Mirror step of app.Executor (adapters/executor delegates to it).
 //
 // The client holds only the four calls a mirror needs (list, head, get, put); it has no delete.
-// Every error is the *app.ExecError s3_mirror_failed (or canceled), without keys, endpoint or
-// the text of the SDK.
+// Each call is tried up to attempts times with a growing pause when it fails with a network
+// error, 429 or a 5xx; an object that still fails is counted and skipped, and the pass goes on
+// with the next key (AUD srv-stats-status-7). Every error is an *app.ExecError without keys,
+// endpoint or the text of the SDK: s3_mirror_failed when the list fails, s3_mirror_objects_failed_<n>
+// when n objects could not be copied, or canceled.
 package s3mirror
 
 import (
@@ -43,6 +46,17 @@ const egressPurpose = "backup_mirror"
 const (
 	codeFailed   = "s3_mirror_failed"
 	codeCanceled = "canceled"
+	// codeObjectsFailedPrefix is followed by the number of objects the pass could not copy.
+	codeObjectsFailedPrefix = "s3_mirror_objects_failed_"
+)
+
+// The retry of one call (AUD srv-stats-status-7): the SDK client runs without retries
+// (aws.NopRetryer, as the files driver, D-M3-02-3), so the mirror, a background job outside the
+// request path, retries a failed list, head, get or put itself: attempts tries in all, the pause
+// before the second is firstBackoff and doubles before each further one.
+const (
+	attempts     = 4
+	firstBackoff = 2 * time.Second
 )
 
 // Credentials returns the access key ID and the secret access key on every call, so rotated
@@ -117,6 +131,9 @@ type Mirror struct {
 	srcBucket, dstBkt  string
 	srcPrefix, dstBase string
 	scratch            string
+	// sleep waits d or until ctx ends and reports whether d passed; nil means a timer (tests
+	// replace it, so they do not wait).
+	sleep func(ctx context.Context, d time.Duration) bool
 }
 
 // New builds the mirror of cfg; it sends no request. The error names a field, never a value.
@@ -283,6 +300,11 @@ func fail(ctx context.Context) error {
 // whose destination key <target prefix>/objects/<key without source prefix> does not exist yet.
 // It never deletes and never overwrites: the destination is checked with HeadObject and written
 // with If-None-Match: *, and a 412 means another pass copied the object first.
+//
+// Every call is retried (retry). An object that still fails is skipped, so one object that never
+// copies (for example one above file.max_upload_bytes after the limit was lowered) does not stop
+// the keys after it; the pass then ends with s3_mirror_objects_failed_<n> and the result of what
+// it copied. A list page that still fails ends the pass with s3_mirror_failed.
 func (m *Mirror) S3Mirror(ctx context.Context) (app.MirrorResult, error) {
 	var res app.MirrorResult
 	in := &awss3.ListObjectsV2Input{Bucket: aws.String(m.srcBucket)}
@@ -290,21 +312,37 @@ func (m *Mirror) S3Mirror(ctx context.Context) (app.MirrorResult, error) {
 		in.Prefix = aws.String(m.srcPrefix)
 	}
 	pages := awss3.NewListObjectsV2Paginator(m.src, in)
+	var failed int64
 	for pages.HasMorePages() {
-		page, err := pages.NextPage(ctx)
+		var page *awss3.ListObjectsV2Output
+		// A failed NextPage keeps the continuation token, so the retry asks for the same page.
+		err := m.retry(ctx, func() error {
+			var err error
+			page, err = pages.NextPage(ctx)
+			return err
+		})
 		if err != nil {
 			return res, fail(ctx)
 		}
-		if err := m.copyPage(ctx, page, &res); err != nil {
+		failed += m.copyPage(ctx, page, &res)
+		if ctx.Err() != nil {
 			return res, fail(ctx)
 		}
+	}
+	if failed > 0 {
+		return res, &app.ExecError{Code: codeObjectsFailedPrefix + strconv.FormatInt(failed, 10)}
 	}
 	return res, nil
 }
 
-// copyPage copies the missing objects of one list page and adds them to res.
-func (m *Mirror) copyPage(ctx context.Context, page *awss3.ListObjectsV2Output, res *app.MirrorResult) error {
+// copyPage copies the missing objects of one list page, adds them to res and returns the number
+// of objects it could not copy.
+func (m *Mirror) copyPage(ctx context.Context, page *awss3.ListObjectsV2Output, res *app.MirrorResult) int64 {
+	var failed int64
 	for _, obj := range page.Contents {
+		if ctx.Err() != nil {
+			return failed
+		}
 		key := aws.ToString(obj.Key)
 		rel := strings.TrimPrefix(key, m.srcPrefix)
 		if rel == "" || strings.HasSuffix(key, "/") {
@@ -312,27 +350,84 @@ func (m *Mirror) copyPage(ctx context.Context, page *awss3.ListObjectsV2Output, 
 		}
 		copied, size, err := m.copyMissing(ctx, key, m.dstBase+rel)
 		if err != nil {
-			return err
+			failed++
+			continue
 		}
 		if copied {
 			res.Copied++
 			res.SizeBytes += size
 		}
 	}
-	return nil
+	return failed
+}
+
+// retry runs call up to attempts times while it fails with a transient error (transient),
+// pausing firstBackoff before the second try and twice as long before each further one. It
+// returns the last error, or the error of call at once when it is not transient or ctx ended.
+func (m *Mirror) retry(ctx context.Context, call func() error) error {
+	pause := firstBackoff
+	for try := 1; ; try++ {
+		err := call()
+		if err == nil || try == attempts || !transient(err) || ctx.Err() != nil {
+			return err
+		}
+		if !m.wait(ctx, pause) {
+			return err
+		}
+		pause *= 2
+	}
+}
+
+// wait sleeps d or until ctx ends and reports whether d passed.
+func (m *Mirror) wait(ctx context.Context, d time.Duration) bool {
+	if m.sleep != nil {
+		return m.sleep(ctx, d)
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+// transient reports whether a retry may succeed: a network error without an HTTP status, 408,
+// 429 or a 5xx. Any other status (404, 403, 412, a 400 for an object too large) answers the same
+// again.
+func transient(err error) bool {
+	switch code := status(err); {
+	case code == 0, code == http.StatusRequestTimeout, code == http.StatusTooManyRequests:
+		return true
+	default:
+		return code >= http.StatusInternalServerError
+	}
 }
 
 // copyMissing copies src to dst unless dst exists; it reports whether it wrote the object and
-// its size.
+// its size. Each call is retried (retry).
 func (m *Mirror) copyMissing(ctx context.Context, src, dst string) (bool, int64, error) {
-	_, err := m.dst.HeadObject(ctx, &awss3.HeadObjectInput{Bucket: aws.String(m.dstBkt), Key: aws.String(dst)})
+	err := m.retry(ctx, func() error {
+		_, err := m.dst.HeadObject(ctx, &awss3.HeadObjectInput{Bucket: aws.String(m.dstBkt), Key: aws.String(dst)})
+		return err
+	})
 	if err == nil {
 		return false, 0, nil
 	}
 	if status(err) != http.StatusNotFound {
 		return false, 0, err
 	}
-	f, sum, size, err := m.spool(ctx, src)
+	var (
+		f    *os.File
+		sum  string
+		size int64
+	)
+	err = m.retry(ctx, func() error {
+		var err error
+		f, sum, size, err = m.spool(ctx, src)
+		return err
+	})
 	if status(err) == http.StatusNotFound {
 		return false, 0, nil // deleted from the file bucket after the list: nothing to back up
 	}
@@ -343,13 +438,20 @@ func (m *Mirror) copyMissing(ctx context.Context, src, dst string) (bool, int64,
 		_ = f.Close()
 		_ = os.Remove(f.Name())
 	}()
-	_, err = m.dst.PutObject(ctx, &awss3.PutObjectInput{
-		Bucket:         aws.String(m.dstBkt),
-		Key:            aws.String(dst),
-		Body:           f,
-		ContentLength:  aws.Int64(size),
-		IfNoneMatch:    aws.String("*"),
-		ChecksumSHA256: aws.String(sum),
+	err = m.retry(ctx, func() error {
+		// A retry sends the spooled file again from its start.
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		_, err := m.dst.PutObject(ctx, &awss3.PutObjectInput{
+			Bucket:         aws.String(m.dstBkt),
+			Key:            aws.String(dst),
+			Body:           f,
+			ContentLength:  aws.Int64(size),
+			IfNoneMatch:    aws.String("*"),
+			ChecksumSHA256: aws.String(sum),
+		})
+		return err
 	})
 	switch {
 	case err == nil:
