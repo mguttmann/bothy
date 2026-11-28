@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import land_pr
@@ -33,8 +34,16 @@ MERGED = "fedcba9876543210fedcba9876543210fedcba98"
 class FakeGh:
     """Answers the gh calls of land_pr; `on_main` is the message GitHub writes on main."""
 
-    def __init__(self, body: str, *, state: str = "OPEN", on_main: str | None = None) -> None:
+    def __init__(
+        self,
+        body: str,
+        *,
+        state: str = "OPEN",
+        on_main: str | None = None,
+        fail: str = "",
+    ) -> None:
         self.body = body
+        self.fail = fail
         self.state = state
         self.on_main = on_main
         self.calls: list[list[str]] = []
@@ -42,6 +51,8 @@ class FakeGh:
 
     def __call__(self, args: list[str]) -> str:
         self.calls.append(args)
+        if self.fail and args[: len(self.fail.split())] == self.fail.split():
+            raise subprocess.CalledProcessError(1, ["gh", *args])
         if args[:2] == ["pr", "view"] and "mergeCommit" in args:
             return json.dumps({"mergeCommit": {"oid": MERGED}})
         if args[:2] == ["pr", "view"]:
@@ -125,6 +136,26 @@ def test_template_comments_stay_out_of_the_commit() -> None:
     gh = FakeGh(f"<!-- What and why -->\n{body}<!-- end -->\n")
     assert _land(gh) == 0
     assert gh.body_file_text == SIGNED
+
+
+def test_refuses_a_comment_that_would_join_text(capsys: pytest.CaptureFixture[str]) -> None:
+    """CI scans the raw body; removing an inline comment would join text it saw apart."""
+    gh = FakeGh(SIGNED.replace("Fixes the gate.", "Fixes node<!-- x -->.example the gate."))
+    assert _land(gh) == 1
+    assert gh.merge_call() is None
+    assert "HTML comment" in capsys.readouterr().out
+
+
+def test_failed_merge_is_not_merged(capsys: pytest.CaptureFixture[str]) -> None:
+    gh = FakeGh(SIGNED, fail="pr merge")
+    assert _land(gh) == 1
+    assert "not merged" in capsys.readouterr().out
+
+
+def test_failed_readback_after_the_merge_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
+    gh = FakeGh(SIGNED, fail="api")
+    assert _land(gh) == 2
+    assert "merged, but" in capsys.readouterr().out
 
 
 def test_reports_a_commit_on_main_that_differs_from_the_checked_text(

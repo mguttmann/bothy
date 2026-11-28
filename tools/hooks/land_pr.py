@@ -32,11 +32,13 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from commit_msg import HTML_COMMENT, NOREPLY, check_squash_body
+from commit_msg import NOREPLY, check_squash_body
 
 Gh = Callable[[list[str]], str]
 _IDENTITY = re.compile(r"^(?P<name>[^<>]*\S) <(?P<address>[^<>\s]+)>$")
 IDENTITY_VARIABLE = "BOTHY_SIGNOFF_IDENTITY"
+# A comment that fills its lines alone; removing it never joins text that was around it.
+_STANDALONE_COMMENT = re.compile(r"^[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*(?:\n|\Z)", re.MULTILINE)
 
 
 class LandError(Exception):
@@ -66,9 +68,13 @@ def squash_body(body: str) -> str:
     """The pull request body without the template's HTML comments, which the page hides.
 
     A comment after the sign-off would end the message, and git would no longer read the
-    sign-off as a trailer.
+    sign-off as a trailer. Only comments that fill their lines alone are removed, so no text
+    is joined that CI scanned apart; any other comment refuses the landing.
     """
-    text = HTML_COMMENT.sub("", body.replace("\r\n", "\n"))
+    text = _STANDALONE_COMMENT.sub("", body.replace("\r\n", "\n"))
+    if "<!--" in text:
+        msg = "an HTML comment inside a line of the body: move it to lines of its own or remove it"
+        raise LandError(msg)
     return normalize(re.sub(r"\n{3,}", "\n\n", text).strip("\n"))
 
 
@@ -108,11 +114,22 @@ def land(
             print("land_pr: would run: gh " + " ".join(cmd))
             print(f"{subject}\n\n{body}", end="")
             return 0
-        gh(cmd)
-    merged = json.loads(gh(["pr", "view", number, *where, "--json", "mergeCommit"]))
-    oid = merged["mergeCommit"]["oid"]
-    api_repo = repo or "{owner}/{repo}"
-    on_main = gh(["api", f"repos/{api_repo}/commits/{oid}", "--jq", ".commit.message"])
+        try:
+            gh(cmd)
+        except subprocess.CalledProcessError:
+            print("land_pr: not merged: gh pr merge failed (head moved, checks or a thread open?)")
+            return 1
+    try:
+        merged = json.loads(gh(["pr", "view", number, *where, "--json", "mergeCommit"]))
+        oid = merged["mergeCommit"]["oid"]
+        api_repo = repo or "{owner}/{repo}"
+        on_main = gh(["api", f"repos/{api_repo}/commits/{oid}", "--jq", ".commit.message"])
+    except (subprocess.CalledProcessError, KeyError, TypeError):
+        print(
+            "land_pr: merged, but the commit on main could not be read back: compare its "
+            "message with the pull request text by hand (gh pr view --json mergeCommit)"
+        )
+        return 2
     if normalize(on_main) != normalize(f"{subject}\n\n{body}"):
         print(
             f"land_pr: merged as {oid}, but its message differs from the checked text; "

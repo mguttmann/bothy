@@ -70,7 +70,7 @@ BOT_AUTHORS = {
 # Pull request authors whose body needs no sign-off: the dependency bots and the bot of the
 # repository's own workflows (hermes-pin.yml opens its pull requests as github-actions[bot]).
 PR_BODY_BOTS = frozenset({*BOT_AUTHORS, "github-actions[bot]"})
-HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # GitHub's no-reply address of an account: `<id>+<login>@users.noreply.github.com`.
 NOREPLY = re.compile(r"^\d+\+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?@users\.noreply\.github\.com$")
 
@@ -83,7 +83,7 @@ def check_squash_body(body: str, *, identity: str | None = None) -> list[str]:
     the template never reach the commit and do not count. The errors never repeat a rejected
     line: CI logs are public.
     """
-    text = HTML_COMMENT.sub("", body.replace("\r\n", "\n"))
+    text = _HTML_COMMENT.sub("", body.replace("\r\n", "\n"))
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     last = lines[-1] if lines else ""
     match = _SIGNOFF.fullmatch(last)
