@@ -117,8 +117,12 @@ def land(
         try:
             gh(cmd)
         except subprocess.CalledProcessError:
-            print("land_pr: not merged: gh pr merge failed (head moved, checks or a thread open?)")
-            return 1
+            # gh can merge and then fail on a later step (deleting a branch that a worktree
+            # holds), so the state decides, not the exit code.
+            after = json.loads(gh(["pr", "view", number, *where, "--json", "state"]))
+            if after["state"] != "MERGED":
+                print("land_pr: not merged: gh pr merge failed (head moved, checks or a thread?)")
+                return 1
     try:
         merged = json.loads(gh(["pr", "view", number, *where, "--json", "mergeCommit"]))
         oid = merged["mergeCommit"]["oid"]

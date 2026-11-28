@@ -41,9 +41,11 @@ class FakeGh:
         state: str = "OPEN",
         on_main: str | None = None,
         fail: str = "",
+        merged_anyway: bool = False,
     ) -> None:
         self.body = body
         self.fail = fail
+        self.merged_anyway = merged_anyway
         self.state = state
         self.on_main = on_main
         self.calls: list[list[str]] = []
@@ -52,7 +54,14 @@ class FakeGh:
     def __call__(self, args: list[str]) -> str:
         self.calls.append(args)
         if self.fail and args[: len(self.fail.split())] == self.fail.split():
+            if args[:2] == ["pr", "merge"] and self.merged_anyway:
+                self.state = "MERGED"
+                self.on_main = f"{args[args.index('--subject') + 1]}\n\n" + Path(
+                    args[args.index("--body-file") + 1]
+                ).read_text(encoding="utf-8")
             raise subprocess.CalledProcessError(1, ["gh", *args])
+        if args[:2] == ["pr", "view"] and args[-1] == "state":
+            return json.dumps({"state": self.state})
         if args[:2] == ["pr", "view"] and "mergeCommit" in args:
             return json.dumps({"mergeCommit": {"oid": MERGED}})
         if args[:2] == ["pr", "view"]:
@@ -150,6 +159,12 @@ def test_failed_merge_is_not_merged(capsys: pytest.CaptureFixture[str]) -> None:
     gh = FakeGh(SIGNED, fail="pr merge")
     assert _land(gh) == 1
     assert "not merged" in capsys.readouterr().out
+
+
+def test_merge_that_failed_after_merging_is_read_back() -> None:
+    """gh can merge and then fail to delete a branch a worktree holds."""
+    gh = FakeGh(SIGNED, fail="pr merge", merged_anyway=True)
+    assert _land(gh, delete_branch=True) == 0
 
 
 def test_failed_readback_after_the_merge_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
