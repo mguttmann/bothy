@@ -137,7 +137,8 @@ class DsButton extends StatelessWidget {
 /// labeled "Text from {agent}" the agent's [agentText] renders as Markdown, so a line that
 /// imitates a header stays visibly agent text. Then the components by
 /// [DsComponentData.state]: active and [permitted] operable; active and not permitted visible
-/// but disabled with the lock note [deniedReasonText]; sent and waiting (the pressed button
+/// but disabled with the lock note [deniedReasonText] (a component in [lockedCustomIds] is
+/// disabled on its own, with the same note, while the others stay operable); sent and waiting (the pressed button
 /// loads, every other one is locked); used ("{Name} chose '{Choice}', {Time}"); expired;
 /// disabled ("No longer available"); an error banner, after which an active card is operable
 /// again.
@@ -169,6 +170,7 @@ class DsMessageComponents extends StatefulWidget {
     required this.onActivate,
     this.stacked = false,
     this.sheets = false,
+    this.lockedCustomIds = const {},
   });
 
   /// The key of the framed header area (tests check that no agent text is inside).
@@ -200,6 +202,11 @@ class DsMessageComponents extends StatefulWidget {
 
   /// Whether forms and selects open in sheets (mobile).
   final bool sheets;
+
+  /// The `custom_id` of each component the reader may not use although [permitted] holds for
+  /// the card (09 11.2 per component: an owner-only "Always allow" next to a "Deny" anyone
+  /// with the trigger level may press).
+  final Set<String> lockedCustomIds;
 
   @override
   State<DsMessageComponents> createState() => DsMessageComponentsState();
@@ -248,8 +255,12 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
       widget.data.state == DsComponentState.active &&
       _pending == null;
 
+  /// Whether the component [customId] can be used now.
+  bool _operableItem(String customId) =>
+      _operable && !widget.lockedCustomIds.contains(customId);
+
   void _activate(String customId, Object? value) {
-    if (!_operable) return;
+    if (!_operableItem(customId)) return;
     setState(() => _pressed = customId);
     widget.onActivate(customId, value);
   }
@@ -438,7 +449,8 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         )
         ..add(const SizedBox(height: DsSpace.s8));
     }
-    if (!widget.permitted && widget.deniedReasonText != null) {
+    if ((!widget.permitted || widget.lockedCustomIds.isNotEmpty) &&
+        widget.deniedReasonText != null) {
       out
         ..add(
           Row(
@@ -472,7 +484,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
               style: item.style,
               loading: _pending == item.customId,
               expand: widget.stacked,
-              onPressed: _operable
+              onPressed: _operableItem(item.customId)
                   ? () => _activate(item.customId, null)
                   : null,
             ),
@@ -525,7 +537,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
       for (final o in item.options)
         if (chosen.contains(o.value)) o.label,
     ];
-    final enabled = _operable;
+    final enabled = _operableItem(item.customId);
     if (widget.sheets) {
       return _selectField(
         context,
@@ -605,7 +617,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
       loading: _pending == item.customId,
       expand: after != null,
       onPressed:
-          _operable &&
+          _operableItem(item.customId) &&
               chosen.length >= item.minValues &&
               chosen.length <= item.maxValues
           ? () {
@@ -790,7 +802,9 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
           style: DsButtonStyle.primary,
           expand: true,
           loading: _pending == item.customId,
-          onPressed: _operable ? () => _openFormSheet(context, item) : null,
+          onPressed: _operableItem(item.customId)
+              ? () => _openFormSheet(context, item)
+              : null,
         ),
       ],
     );
@@ -831,7 +845,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
   }) {
     final l = dsL10n(context);
     final c = context.dsColors;
-    final enabled = _operable;
+    final enabled = _operableItem(item.customId);
     final labelStyle = dsTextStyle(DsType.label).copyWith(color: c.textPrimary);
     final fields = <Widget>[];
     for (final f in item.fields) {
@@ -997,7 +1011,7 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         ..removeWhere((k, _) => k.startsWith('${item.customId}/'))
         ..addAll(errors);
     });
-    if (errors.isNotEmpty || !_operable) return false;
+    if (errors.isNotEmpty || !_operableItem(item.customId)) return false;
     _activate(item.customId, values);
     return true;
   }

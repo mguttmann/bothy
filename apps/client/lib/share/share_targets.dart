@@ -104,10 +104,7 @@ final class ShareTargetSource {
     required PrincipalId me,
     required int max,
   }) async {
-    final rows = await _db.shareTargetsDao.recentWrites(
-      me: me.value,
-      max: max,
-    );
+    final rows = await _db.shareTargetsDao.recentWrites(me: me.value, max: max);
     final targets = <ShareTarget>[];
     for (final r in rows) {
       final channel = ChannelId.parse(r.channelId);
@@ -211,6 +208,7 @@ final class ShareTargetSource {
   /// and `read_only` decide the targets, and `access.changed` changes them (04 8.3).
   Stream<void> changes() => _db.shareTargetsDao.watchChannels();
 }
+
 /// A writable channel of the local database.
 final class _Channel {
   const _Channel({

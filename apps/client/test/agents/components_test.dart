@@ -224,6 +224,117 @@ void main() {
     await host.dispose(tester);
   });
 
+  // AUD-PKG-Q03 (#778): the permission is decided per component, so the approval card of 09
+  // 11.5 locks "Always allow" (owner) for the run starter and keeps "Deny" (no capability)
+  // usable for a starter without approve_actions.
+  List<MessageComponent> approvalCard() => [
+    button(
+      1,
+      cardId,
+      customId: 'once',
+      label: 'Allow once',
+      capability: Capability.approveActions,
+      restrictedTo: ComponentRestriction.runStarter,
+    ),
+    button(
+      2,
+      cardId,
+      customId: 'session',
+      label: 'Allow for this session',
+      capability: Capability.approveActions,
+      restrictedTo: ComponentRestriction.runStarter,
+    ),
+    button(
+      3,
+      cardId,
+      customId: 'always',
+      label: 'Always allow',
+      capability: Capability.approveActions,
+      restrictedTo: ComponentRestriction.owner,
+    ),
+    button(
+      4,
+      cardId,
+      customId: 'deny',
+      label: 'Deny',
+      style: 'danger',
+      restrictedTo: ComponentRestriction.runStarter,
+    ),
+  ];
+
+  Map<String, bool> enabledButtons(WidgetTester tester) => {
+    for (final id in ['once', 'session', 'always', 'deny'])
+      id: tester.widget<DsButton>(buttonOf(id)).onPressed != null,
+  };
+
+  testWidgets('approval card: the run starter with approve_actions may use '
+      'everything but "Always allow"', (tester) async {
+    final host = await openCard(
+      tester,
+      text: 'Run rm -rf build?',
+      components: approvalCard(),
+      capabilities: const [Capability.approveActions],
+    );
+    expect(enabledButtons(tester), {
+      'once': true,
+      'session': true,
+      'always': false,
+      'deny': true,
+    });
+    expect(find.text(en.componentsApproverOwner), findsWidgets);
+    await tester.tap(buttonOf('always'));
+    await tester.tap(buttonOf('deny'));
+    await host.settle(tester);
+    final entries = await entriesOf(tester, host, AgentOps.createInteraction);
+    expect(entries.single.payload, contains('"custom_id":"deny"'));
+    await host.dispose(tester);
+  });
+
+  testWidgets(
+    'approval card: a starter without approve_actions may still deny',
+    (tester) async {
+      final host = await openCard(
+        tester,
+        text: 'Run rm -rf build?',
+        components: approvalCard(),
+      );
+      expect(enabledButtons(tester), {
+        'once': false,
+        'session': false,
+        'always': false,
+        'deny': true,
+      });
+      await host.dispose(tester);
+    },
+  );
+
+  testWidgets('approval card: a third person may use nothing', (tester) async {
+    final host = await openCard(
+      tester,
+      text: 'Run rm -rf build?',
+      components: approvalCard(),
+      capabilities: const [Capability.approveActions],
+      starter: sam,
+    );
+    expect(enabledButtons(tester), {
+      'once': false,
+      'session': false,
+      'always': false,
+      'deny': false,
+    });
+    await host.dispose(tester);
+  });
+
+  test('approval card: an owner may use every component', () {
+    final answer = cardPermission(en, approvalCard(), (
+      access: const AccessView(level: AccessLevel.trigger, capabilities: []),
+      me: sam,
+      owner: true,
+    ));
+    expect(answer.permitted, isTrue);
+    expect(answer.locked, isEmpty);
+  });
+
   test('the values of a select and a form follow InteractionCreate', () {
     final select = button(
       1,

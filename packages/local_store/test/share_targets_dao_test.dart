@@ -58,14 +58,11 @@ void main() {
 
   test('recentWrites gives the writable threads of the author, newest first, '
       'at most max', () async {
-    final rows = await db.shareTargetsDao.recentWrites(
-      me: alex.value,
-      max: 8,
+    final rows = await db.shareTargetsDao.recentWrites(me: alex.value, max: 8);
+    expect(
+      [for (final r in rows) r.threadId],
+      [threadId(2).value, threadId(1).value],
     );
-    expect([for (final r in rows) r.threadId], [
-      threadId(2).value,
-      threadId(1).value,
-    ]);
     expect(rows.first.channelName, 'Channel 2');
     expect(rows.first.title, 'Two');
     expect(
@@ -90,13 +87,16 @@ void main() {
     expect(rows, isEmpty);
   });
 
-  test('writableChannels leaves out a channel without the write level', () async {
-    final rows = await db.shareTargetsDao.writableChannels();
-    expect(
-      [for (final r in rows) (r.name, r.kind)],
-      [('Channel 1', 'text'), ('Channel 2', 'forum')],
-    );
-  });
+  test(
+    'writableChannels leaves out a channel without the write level',
+    () async {
+      final rows = await db.shareTargetsDao.writableChannels();
+      expect(
+        [for (final r in rows) (r.name, r.kind)],
+        [('Channel 1', 'text'), ('Channel 2', 'forum')],
+      );
+    },
+  );
 
   test('watchChannels reports a change of the stored channels', () async {
     final seen = <void>[];
