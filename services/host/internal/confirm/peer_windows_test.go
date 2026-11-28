@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
+	"github.com/OWNER/bothy/services/host/internal/winpipe"
 )
 
 // TestListenSetsTheTokenUserAsPipeOwner holds the owner rule of docs/spec/27-computer-use.md 9.4:
@@ -22,7 +23,7 @@ func TestListenSetsTheTokenUserAsPipeOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	sd, err := windows.GetSecurityInfo(l.(*pipeListener).next, windows.SE_KERNEL_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	sd, err := windows.GetSecurityInfo(l.(*winpipe.Listener).Waiting(), windows.SE_KERNEL_OBJECT, windows.OWNER_SECURITY_INFORMATION)
 	if err != nil {
 		t.Fatal(err)
 	}

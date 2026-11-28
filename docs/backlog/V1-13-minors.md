@@ -11,11 +11,11 @@ them along.
 - `TestSudoProbeMatchesSudo` cannot catch a regression on a host without passwordless sudo (both
   answers are "no" there); it does on the hosted runners and on hosts with such a rule.
 - The `OVERLAPPED` of `connectOnce` lies on the goroutine stack while `ConnectNamedPipe` is
-  pending (`internal/localchan/pipe_windows.go`, the same in `internal/confirm/peer_windows.go`);
+  pending (`internal/winpipe/pipe_windows.go`, shared by the local channel and the confirmation
+  endpoint);
   a stack shrink between the wait and `CancelIoEx` could leave a closed listener's `Accept`
   waiting. Not reproduced; a heap-allocated `Overlapped` and event would remove the window.
-- `ListenPipe` does not close the event `closed` when the first instance fails, and a real error
-  of `WaitForMultipleObjects` is reported as `net.ErrClosed`.
+- In `winpipe` a real error of `WaitForMultipleObjects` is reported as `net.ErrClosed`.
 - D-M2-42-29 (`docs/decisions.d/M2-42.md`) could point to V1-13/9 and AUD-misc-misc-01, which
   now carry its state.
 - `TestConnectionEndsWhileIdle` (`internal/computermcp/faults_test.go:61`) failed once in the unit

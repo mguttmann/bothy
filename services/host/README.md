@@ -375,6 +375,7 @@ with its generation, and the two permissions.
 | `internal/hostos/` (+ `hostostest`) | port to the operating system and its fake |
 | `internal/doctor/` | HD1 to HD11, report, local output, the entry scan |
 | `internal/localchan/` | local channel, peer check, admin endpoint, codec |
+| `internal/winpipe/` | named pipe of Windows with overlapped handles, shared by the local channel and the confirmation endpoint |
 | `internal/helper/` | the `pty-helper` process |
 | `internal/install/` | plans and executors, service definitions in `units/` |
 | `internal/startup/` | `run`, the `Control` port and `NoControl` |

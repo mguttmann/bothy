@@ -27,6 +27,7 @@ components:
   hostostest:  { in: internal/hostos/hostostest }
   doctor:      { in: internal/doctor }
   localchan:   { in: internal/localchan }
+  winpipe:     { in: internal/winpipe }
   helper:      { in: internal/helper }
   install:     { in: internal/install }
   startup:     { in: internal/startup }
@@ -53,7 +54,8 @@ deps:
   state:      { canUse: [v-sys] }
   hostos:     { canUse: [v-sys] }
   hostostest: { mayDependOn: [hostos] }
-  localchan:  { mayDependOn: [frame], canUse: [v-sys] }
+  localchan:  { mayDependOn: [frame, winpipe], canUse: [v-sys] }
+  winpipe:    { canUse: [v-sys] }
   doctor:     { mayDependOn: [clock, config, hostos, state] }
   helper:     { mayDependOn: [config, doctor, frame, hostos, localchan, noise, profiles, pty, state], canUse: [v-sys] }
   install:    { mayDependOn: [config, hostos, localchan], canUse: [v-sys] }
@@ -73,7 +75,7 @@ deps:
   # may use every component and vendor; no production component names it (02 6).
   platformtest: { anyProjectDeps: true, anyVendorDeps: true }
   profiles:    { mayDependOn: [config, doctor, hostos, state], canUse: [v-sys] }
-  confirm:     { mayDependOn: [hostos], canUse: [v-sys] }
+  confirm:     { mayDependOn: [hostos, winpipe], canUse: [v-sys] }
   # CU-03: computer sessions reuse the data connection and the JWS step of session, the control
   # ops, Noise, the frames and the console-user rule of confirm; the peer's executable and
   # signature are read through golang.org/x/sys.

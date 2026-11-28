@@ -7,38 +7,20 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"runtime"
-	"sync"
-	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/OWNER/bothy/services/host/internal/winpipe"
 )
 
-// Pipe modes of this package: byte streams, local clients only (PIPE_REJECT_REMOTE_CLIENTS).
-const (
-	pipeRejectRemote = 0x8
-	pipeBuffer       = 64 * 1024
-)
+// pipeBuffer is the buffer size of each pipe instance of this package.
+const pipeBuffer = 64 * 1024
 
-// pipeListener creates instances of a named pipe; the first instance is created with
-// FILE_FLAG_FIRST_PIPE_INSTANCE, so a pipe created first by another process makes the listener
-// fail instead of sharing the name. Every handle is overlapped (both ends): on a synchronous
-// handle Windows queues a write behind a read of the same handle that still waits, so an end that
-// reads and writes at once, as a session channel does, never sent its answer (V1-13/9). The
-// confirm channel does the same (internal/confirm/peer_windows.go).
-type pipeListener struct {
-	path string
-	sa   *windows.SecurityAttributes
-	mu   sync.Mutex
-	next windows.Handle
-	// closed is a manual-reset event that Close sets; it lives as long as the process, because an
-	// Accept may still wait on it.
-	closed windows.Handle
-	once   sync.Once
-}
-
-// ListenPipe creates the named pipe path with the security descriptor sddl.
+// ListenPipe creates the named pipe path with the security descriptor sddl, plus the creating
+// account as owner and as creator of further instances (WithCreator). The instances, the Accept
+// that Close can end and the overlapped handles of both ends live in internal/winpipe, which the
+// confirmation endpoint shares (V1-13/9).
 func ListenPipe(path, sddl string) (net.Listener, error) {
 	if u, err := windows.GetCurrentProcessToken().GetTokenUser(); err == nil {
 		sddl = WithCreator(sddl, u.User.Sid.String())
@@ -47,137 +29,12 @@ func ListenPipe(path, sddl string) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("localchan: pipe security: %w", err)
 	}
-	closed, err := windows.CreateEvent(nil, 1, 0, nil)
+	l, err := winpipe.Listen(path, sd, pipeBuffer)
 	if err != nil {
-		return nil, fmt.Errorf("localchan: pipe: %w", err)
+		return nil, fmt.Errorf("localchan: %w", err)
 	}
-	l := &pipeListener{path: path, sa: &windows.SecurityAttributes{Length: 0, SecurityDescriptor: sd}, closed: closed}
-	h, err := l.instance(true)
-	if err != nil {
-		return nil, err
-	}
-	l.next = h
 	return l, nil
 }
-
-func (l *pipeListener) instance(first bool) (windows.Handle, error) {
-	name, err := windows.UTF16PtrFromString(l.path)
-	if err != nil {
-		return 0, err
-	}
-	flags := uint32(windows.PIPE_ACCESS_DUPLEX | windows.FILE_FLAG_OVERLAPPED)
-	if first {
-		flags |= windows.FILE_FLAG_FIRST_PIPE_INSTANCE
-	}
-	h, err := windows.CreateNamedPipe(name, flags, windows.PIPE_TYPE_BYTE|windows.PIPE_READMODE_BYTE|windows.PIPE_WAIT|pipeRejectRemote,
-		windows.PIPE_UNLIMITED_INSTANCES, pipeBuffer, pipeBuffer, 0, l.sa)
-	if err != nil {
-		return 0, fmt.Errorf("localchan: create pipe: %w", err)
-	}
-	return h, nil
-}
-
-func (l *pipeListener) Accept() (net.Conn, error) {
-	l.mu.Lock()
-	h := l.next
-	l.next = 0
-	l.mu.Unlock()
-	if h == 0 {
-		var err error
-		if h, err = l.instance(false); err != nil {
-			return nil, err
-		}
-	}
-	if err := l.connect(h); err != nil {
-		_ = windows.CloseHandle(h)
-		return nil, err
-	}
-	return &pipeConn{f: os.NewFile(uintptr(h), l.path), h: h, server: true}, nil
-}
-
-// connect waits until a client connects to h or the listener closes. A client that connected and
-// left before the wait is dropped with DisconnectNamedPipe and the instance waits again.
-func (l *pipeListener) connect(h windows.Handle) error {
-	for {
-		err := l.connectOnce(h)
-		if !errors.Is(err, errClientGone) {
-			return err
-		}
-		if err := windows.DisconnectNamedPipe(h); err != nil {
-			return fmt.Errorf("localchan: connect pipe: %w", err)
-		}
-	}
-}
-
-// errClientGone marks a client that left before the connection was complete.
-var errClientGone = errors.New("localchan: pipe client gone")
-
-func (l *pipeListener) connectOnce(h windows.Handle) error {
-	ev, err := windows.CreateEvent(nil, 1, 0, nil)
-	if err != nil {
-		return fmt.Errorf("localchan: connect pipe: %w", err)
-	}
-	defer func() { _ = windows.CloseHandle(ev) }()
-	ov := windows.Overlapped{HEvent: ev}
-	err = windows.ConnectNamedPipe(h, &ov)
-	switch {
-	case err == nil, errors.Is(err, windows.ERROR_PIPE_CONNECTED):
-		return nil
-	case errors.Is(err, windows.ERROR_NO_DATA):
-		return errClientGone
-	case !errors.Is(err, windows.ERROR_IO_PENDING):
-		return fmt.Errorf("localchan: connect pipe: %w", err)
-	}
-	r, err := windows.WaitForMultipleObjects([]windows.Handle{ev, l.closed}, false, windows.INFINITE)
-	if err != nil || r != windows.WAIT_OBJECT_0 {
-		_ = windows.CancelIoEx(h, &ov)
-		var n uint32
-		_ = windows.GetOverlappedResult(h, &ov, &n, true)
-		return net.ErrClosed
-	}
-	var n uint32
-	if err := windows.GetOverlappedResult(h, &ov, &n, false); err != nil && !errors.Is(err, windows.ERROR_PIPE_CONNECTED) {
-		return errClientGone
-	}
-	return nil
-}
-
-// Close ends a pending Accept and frees the waiting instance; connected clients stay.
-func (l *pipeListener) Close() error {
-	l.once.Do(func() {
-		_ = windows.SetEvent(l.closed)
-		l.mu.Lock()
-		if l.next != 0 {
-			_ = windows.CloseHandle(l.next)
-			l.next = 0
-		}
-		l.mu.Unlock()
-	})
-	return nil
-}
-
-func (l *pipeListener) Addr() net.Addr { return pipeAddr(l.path) }
-
-type pipeAddr string
-
-func (a pipeAddr) Network() string { return "pipe" }
-func (a pipeAddr) String() string  { return string(a) }
-
-// pipeConn is one end of a pipe instance.
-type pipeConn struct {
-	f      *os.File
-	h      windows.Handle
-	server bool
-}
-
-func (c *pipeConn) Read(b []byte) (int, error)         { return c.f.Read(b) }
-func (c *pipeConn) Write(b []byte) (int, error)        { return c.f.Write(b) }
-func (c *pipeConn) Close() error                       { return c.f.Close() }
-func (c *pipeConn) LocalAddr() net.Addr                { return pipeAddr(c.f.Name()) }
-func (c *pipeConn) RemoteAddr() net.Addr               { return pipeAddr(c.f.Name()) }
-func (c *pipeConn) SetDeadline(t time.Time) error      { return c.f.SetDeadline(t) }
-func (c *pipeConn) SetReadDeadline(t time.Time) error  { return c.f.SetReadDeadline(t) }
-func (c *pipeConn) SetWriteDeadline(t time.Time) error { return c.f.SetWriteDeadline(t) }
 
 // pipeOwner returns the owner SID of the pipe behind client handle h: the account that created the
 // server end. The client reads it from the pipe itself, because the token of a helper process gives
@@ -221,24 +78,12 @@ func tokenUser(tok windows.Token) string {
 	return u.User.Sid.String()
 }
 
-func dialPipe(ctx context.Context, path string) (*pipeConn, error) {
-	name, err := windows.UTF16PtrFromString(path)
+func dialPipe(ctx context.Context, path string) (*winpipe.Conn, error) {
+	c, err := winpipe.Dial(ctx, path, windows.GENERIC_READ|windows.GENERIC_WRITE)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("localchan: %w", err)
 	}
-	for {
-		// SECURITY_SQOS_PRESENT makes SECURITY_IDENTIFICATION count: the server can identify the
-		// client but never act as it.
-		h, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING,
-			windows.FILE_FLAG_OVERLAPPED|windows.SECURITY_SQOS_PRESENT|windows.SECURITY_IDENTIFICATION, 0)
-		if err == nil {
-			return &pipeConn{f: os.NewFile(uintptr(h), path), h: h}, nil
-		}
-		if !errors.Is(err, windows.ERROR_PIPE_BUSY) || ctx.Err() != nil {
-			return nil, fmt.Errorf("localchan: dial: %w", err)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	return c, nil
 }
 
 // DialHelper connects to the pipe of a helper and compares the server process (its token user
@@ -249,11 +94,11 @@ func DialHelper(ctx context.Context, endpoint string, expect func() (Expect, err
 		return nil, err
 	}
 	var pid uint32
-	if err := windows.GetNamedPipeServerProcessId(c.h, &pid); err != nil {
+	if err := windows.GetNamedPipeServerProcessId(c.Handle(), &pid); err != nil {
 		_ = c.Close()
 		return nil, ErrPeerMismatch
 	}
-	sid, err := pipeOwner(c.h)
+	sid, err := pipeOwner(c.Handle())
 	if err != nil {
 		_ = c.Close()
 		return nil, ErrPeerMismatch
@@ -297,9 +142,9 @@ func servePipeConns(ctx context.Context, l net.Listener, allow func(windows.Toke
 			}
 			return err
 		}
-		pc, _ := c.(*pipeConn)
+		pc, _ := c.(*winpipe.Conn)
 		var pid uint32
-		if pc == nil || windows.GetNamedPipeClientProcessId(pc.h, &pid) != nil || !clientToken(pc.h, allow) {
+		if pc == nil || windows.GetNamedPipeClientProcessId(pc.Handle(), &pid) != nil || !clientToken(pc.Handle(), allow) {
 			_ = c.Close()
 			continue
 		}
@@ -330,11 +175,11 @@ func DialAdmin(ctx context.Context, _ string, serviceUID string) (*Conn, error) 
 		return nil, err
 	}
 	var pid uint32
-	if err := windows.GetNamedPipeServerProcessId(c.h, &pid); err != nil {
+	if err := windows.GetNamedPipeServerProcessId(c.Handle(), &pid); err != nil {
 		_ = c.Close()
 		return nil, ErrPeerMismatch
 	}
-	if sid, err := pipeOwner(c.h); err != nil || sid != serviceUID {
+	if sid, err := pipeOwner(c.Handle()); err != nil || sid != serviceUID {
 		_ = c.Close()
 		return nil, ErrPeerMismatch
 	}
