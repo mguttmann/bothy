@@ -60,6 +60,9 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
   StreamSubscription<PlayerPhase>? _phase;
   bool _playing = false;
 
+  /// Whether the audio was paused (not stopped or completed), so "Play" continues it.
+  bool _paused = false;
+
   @override
   void dispose() {
     unawaited(_phase?.cancel());
@@ -125,8 +128,26 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
     if (tickets == null) return;
     if (_playing) {
       await _player?.pause();
-      setState(() => _playing = false);
+      setState(() {
+        _playing = false;
+        _paused = true;
+      });
       return;
+    }
+    final paused = _player;
+    if (_paused && paused != null) {
+      try {
+        await paused.resume();
+        if (mounted) {
+          setState(() {
+            _playing = true;
+            _paused = false;
+          });
+        }
+        return;
+      } on Object {
+        // The ticket expired during the pause: a new one below, from the start.
+      }
     }
     try {
       // 12 9.2: a new ticket per playback; it stays in memory and goes to the player only.
@@ -137,6 +158,7 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
           context,
           name: widget.file.originalName,
           ticket: url,
+          renew: () => tickets.url(widget.file.id),
           surface: ref.read(filePortsProvider).video,
         );
         return;
@@ -144,11 +166,19 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
       final player = _player ??= ref.read(filePortsProvider).player();
       _phase ??= player.phases.listen((p) {
         if (mounted) {
-          setState(() => _playing = p == PlayerPhase.playing);
+          setState(() {
+            _playing = p == PlayerPhase.playing;
+            _paused = p == PlayerPhase.paused;
+          });
         }
       });
       await player.play(url);
-      if (mounted) setState(() => _playing = true);
+      if (mounted) {
+        setState(() {
+          _playing = true;
+          _paused = false;
+        });
+      }
     } on Object {
       if (mounted) setState(() => _notice = l.fileMediaFailed);
     }

@@ -142,68 +142,215 @@ final class FileTickets {
 
 /// A video from a ticket URL through package `video_player` (BSD-3-Clause); the controller
 /// holds the URL in memory only.
+///
+/// The video does not start by itself (WCAG 1.4.2): labelled controls play and pause it, move
+/// the position (a slider the arrow keys move as well) and mute it, and show the position.
+/// A ticket lives `file.ticket_ttl` and the server checks it on every range request (12 9.2):
+/// when the player fails after the start, [renew] fetches a new ticket and the video goes on
+/// at its position; only a failure without progress since the last renewal ends in the error
+/// text.
 class TicketVideoView extends StatefulWidget {
-  /// Creates the view of [url].
-  const TicketVideoView({super.key, required this.url});
+  /// Creates the view of [url]; [renew] mints a new ticket URL of the same file.
+  const TicketVideoView({
+    super.key,
+    required this.url,
+    this.renew,
+    @visibleForTesting this.open,
+  });
 
   /// The ticket URL.
   final Uri url;
+
+  /// A new ticket URL of the same file, or null (then a failure after the start is final).
+  final Future<Uri> Function()? renew;
+
+  /// Creates the controller of a URL; the network player by default.
+  final VideoPlayerController Function(Uri url)? open;
 
   @override
   State<TicketVideoView> createState() => _TicketVideoViewState();
 }
 
 class _TicketVideoViewState extends State<TicketVideoView> {
-  late final VideoPlayerController _controller =
-      VideoPlayerController.networkUrl(widget.url);
+  VideoPlayerController? _controller;
   bool _ready = false;
   bool _failed = false;
+  bool _renewing = false;
+
+  /// The position and the playing state last seen without an error.
+  Duration _position = Duration.zero;
+  bool _wasPlaying = false;
+
+  /// The position of the last renewal; a failure before the video got past it is final.
+  Duration? _renewedAt;
 
   @override
   void initState() {
     super.initState();
-    unawaited(
-      _controller
-          .initialize()
-          .then((_) async {
-            if (!mounted) return;
-            setState(() => _ready = true);
-            await _controller.play();
-          })
-          .catchError((Object _) {
-            if (mounted) setState(() => _failed = true);
-          }),
-    );
+    unawaited(_start(widget.url));
+  }
+
+  /// Opens [url] and, once ready, moves to [at] and plays when [play].
+  Future<void> _start(
+    Uri url, {
+    Duration at = Duration.zero,
+    bool play = false,
+  }) async {
+    final controller = (widget.open ?? VideoPlayerController.networkUrl)(url);
+    final old = _controller;
+    _controller = controller;
+    old?.removeListener(_changed);
+    if (old != null) unawaited(old.dispose());
+    try {
+      await controller.initialize();
+      if (!mounted || controller != _controller) return;
+      if (at > Duration.zero) await controller.seekTo(at);
+      if (play) await controller.play();
+    } on Object {
+      if (mounted && controller == _controller) {
+        setState(() => _failed = true);
+      }
+      return;
+    }
+    if (!mounted || controller != _controller) return;
+    controller.addListener(_changed);
+    setState(() {
+      _ready = true;
+      _failed = false;
+    });
+  }
+
+  void _changed() {
+    final controller = _controller;
+    if (controller == null || !mounted) return;
+    final value = controller.value;
+    if (value.hasError) {
+      if (!_renewing) unawaited(_recover());
+      return;
+    }
+    _position = value.position;
+    _wasPlaying = value.isPlaying;
+    setState(() {});
+  }
+
+  /// A failure after the start: a new ticket, at the position and in the state of before.
+  Future<void> _recover() async {
+    final renew = widget.renew;
+    final last = _renewedAt;
+    if (renew == null || (last != null && _position <= last)) {
+      setState(() => _failed = true);
+      return;
+    }
+    _renewing = true;
+    _renewedAt = _position;
+    try {
+      final url = await renew();
+      if (!mounted) return;
+      await _start(url, at: _position, play: _wasPlaying);
+    } on Object {
+      if (mounted) setState(() => _failed = true);
+    } finally {
+      _renewing = false;
+    }
   }
 
   @override
   void dispose() {
-    unawaited(_controller.dispose());
+    final controller = _controller;
+    controller?.removeListener(_changed);
+    if (controller != null) unawaited(controller.dispose());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final controller = _controller;
     if (_failed) {
-      return Center(child: Text(l.fileMediaFailed));
+      return Center(
+        child: Text(
+          l.fileMediaFailed,
+          key: const ValueKey('file.video.failed'),
+        ),
+      );
     }
-    if (!_ready) {
+    if (!_ready || controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return AspectRatio(
-      aspectRatio: _controller.value.aspectRatio,
-      child: VideoPlayer(_controller),
+    final value = controller.value;
+    final duration = value.duration;
+    final position = value.position > duration ? duration : value.position;
+    final muted = value.volume == 0;
+    final format = L10nFormat(Localizations.localeOf(context));
+    final time = l.fileVideoTime(
+      format.elapsed(position),
+      format.elapsed(duration),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Flexible(
+          child: AspectRatio(
+            aspectRatio: value.aspectRatio,
+            child: VideoPlayer(controller),
+          ),
+        ),
+        const SizedBox(height: DsSpace.s8),
+        Slider(
+          key: const ValueKey('file.video.position'),
+          value: position.inMilliseconds.toDouble(),
+          max: duration.inMilliseconds <= 0
+              ? 1
+              : duration.inMilliseconds.toDouble(),
+          semanticFormatterCallback: (_) => time,
+          label: l.fileVideoPosition,
+          onChanged: duration.inMilliseconds <= 0
+              ? null
+              : (ms) => unawaited(
+                  controller.seekTo(Duration(milliseconds: ms.round())),
+                ),
+        ),
+        Row(
+          children: [
+            DsButton(
+              key: const ValueKey('file.video.play'),
+              label: value.isPlaying ? l.fileMediaPause : l.fileVideoPlay,
+              style: DsButtonStyle.ghost,
+              onPressed: () => unawaited(
+                value.isPlaying ? controller.pause() : controller.play(),
+              ),
+            ),
+            DsButton(
+              key: const ValueKey('file.video.mute'),
+              label: muted ? l.fileVideoUnmute : l.fileVideoMute,
+              style: DsButtonStyle.ghost,
+              onPressed: () => unawaited(controller.setVolume(muted ? 1 : 0)),
+            ),
+            const SizedBox(width: DsSpace.s8),
+            Expanded(
+              child: Text(
+                time,
+                key: const ValueKey('file.video.time'),
+                textAlign: TextAlign.end,
+                style: dsTextStyle(DsType.caption),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-/// Opens the video [name] of [ticket] in a dialog built by [surface].
+/// Opens the video [name] of [ticket] in a dialog built by [surface]; [renew] mints a new
+/// ticket when the first one expired during the playback.
 Future<void> showVideoDialog(
   BuildContext context, {
   required String name,
   required Uri ticket,
-  required Widget Function(Uri) surface,
+  required Future<Uri> Function() renew,
+  required Widget Function(Uri, Future<Uri> Function()) surface,
 }) => showDialog<void>(
   context: context,
   builder: (context) {
@@ -223,7 +370,7 @@ Future<void> showVideoDialog(
             const SizedBox(height: DsSpace.s12),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 480),
-              child: surface(ticket),
+              child: surface(ticket, renew),
             ),
             const SizedBox(height: DsSpace.s12),
             Align(
