@@ -19,6 +19,15 @@ type StatusComponent struct {
 	UpdatedAt    pgtype.Timestamptz
 }
 
+type StatusComponentProbe struct {
+	ComponentID  pgtype.UUID
+	State        string
+	EnteredAt    pgtype.Timestamptz
+	OutSince     pgtype.Timestamptz
+	FailingSince pgtype.Timestamptz
+	LastRound    pgtype.Timestamptz
+}
+
 type StatusIncident struct {
 	ID         pgtype.UUID
 	Title      string

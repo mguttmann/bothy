@@ -34,6 +34,13 @@ type PageStore interface {
 	SetSortKeys(ctx context.Context, keys map[ids.ID]string) error
 	// SetComponentState writes state and updated_at of the component id.
 	SetComponentState(ctx context.Context, id ids.ID, state domain.ComponentState, at time.Time) error
+	// ProbeTracks returns the memory of the job status.probe per component (domain.Track,
+	// status_component_probe); a component without memory has no entry. The job reads it after
+	// LockComponents, so the rounds of several workers see each other's memory (AUD
+	// srv-stats-status-11).
+	ProbeTracks(ctx context.Context) (map[ids.ID]domain.Track, error)
+	// SetProbeTrack stores the memory tr of the component id.
+	SetProbeTrack(ctx context.Context, id ids.ID, tr domain.Track) error
 	// DeleteComponent removes the component id with its incident links; false when there is none.
 	DeleteComponent(ctx context.Context, id ids.ID) (bool, error)
 	// DeleteAgentComponents removes the components of agent and returns their ids.

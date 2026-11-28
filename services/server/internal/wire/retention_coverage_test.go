@@ -55,6 +55,7 @@ var handledElsewhere = map[string]string{
 // withParent are the tables whose rows go with a parent row by the deletion path of 20 section 2
 // (03 section 6.5 for a message, 4.3 for its files): the parent must be covered itself.
 var withParent = map[string]string{
+	"status_component_probe":    "status_components",
 	"message_revisions":         "messages",
 	"mentions":                  "messages",
 	"reactions":                 "messages",

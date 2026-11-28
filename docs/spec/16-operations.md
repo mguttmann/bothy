@@ -1524,11 +1524,14 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    time, each bounded by `status.check_interval`.
 4. State machine: a passing check sets `operational` at once. A run of failing rounds sets
    `degraded`, or `major_outage` for no answer or an error ratio above `status.error_ratio_outage`,
-   once it has lasted `status.degrade_after`. The run and the times of the timers live in the
-   memory of the worker process and count only while that process ran the rounds without a gap of
-   more than three `status.check_interval` and the stored state is the one it left; otherwise they
-   start again from `updated_at`. A restart, an owner's change of the state or several workers
-   therefore delay a change or an incident, never hasten them. `maintenance` and the states of
+   once it has lasted `status.degrade_after`. The run and the times of the timers are the memory of
+   the job, stored per component in `status_component_probe` and read and written in the
+   transaction of each round after every component is locked, so several workers share one memory
+   and a passing round on one worker ends the run of failing rounds for all (AUD
+   srv-stats-status-11). They count only while the job ran the rounds without a gap of more than
+   three `status.check_interval` and the stored state is the one it left; otherwise they start
+   again from `updated_at`. A stop of every worker or an owner's change of the state therefore
+   delays a change or an incident, never hastens it. `maintenance` and the states of
    manual components belong to the owner.
 5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage. An outage
    begins when the component leaves `operational` and ends after `status.resolve_after` of

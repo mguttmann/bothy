@@ -483,6 +483,39 @@ func (q *Queries) OpenAutomaticIncidents(ctx context.Context) ([]OpenAutomaticIn
 	return items, nil
 }
 
+const probeTracks = `-- name: ProbeTracks :many
+SELECT component_id, state, entered_at, out_since, failing_since, last_round
+FROM status_component_probe
+`
+
+// The memory of status.probe (AUD srv-stats-status-11); the job reads it after LockComponents.
+func (q *Queries) ProbeTracks(ctx context.Context) ([]StatusComponentProbe, error) {
+	rows, err := q.db.Query(ctx, probeTracks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StatusComponentProbe
+	for rows.Next() {
+		var i StatusComponentProbe
+		if err := rows.Scan(
+			&i.ComponentID,
+			&i.State,
+			&i.EnteredAt,
+			&i.OutSince,
+			&i.FailingSince,
+			&i.LastRound,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setComponentSortKeys = `-- name: SetComponentSortKeys :exec
 UPDATE status_components c
 SET sort_key = k.sort_key
@@ -556,6 +589,35 @@ func (q *Queries) UpdateComponent(ctx context.Context, arg UpdateComponentParams
 		arg.AgentID,
 		arg.UpdatedAt,
 		arg.ID,
+	)
+	return err
+}
+
+const upsertProbeTrack = `-- name: UpsertProbeTrack :exec
+INSERT INTO status_component_probe (component_id, state, entered_at, out_since, failing_since, last_round)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (component_id) DO UPDATE
+SET state = EXCLUDED.state, entered_at = EXCLUDED.entered_at, out_since = EXCLUDED.out_since,
+    failing_since = EXCLUDED.failing_since, last_round = EXCLUDED.last_round
+`
+
+type UpsertProbeTrackParams struct {
+	ComponentID  pgtype.UUID
+	State        string
+	EnteredAt    pgtype.Timestamptz
+	OutSince     pgtype.Timestamptz
+	FailingSince pgtype.Timestamptz
+	LastRound    pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertProbeTrack(ctx context.Context, arg UpsertProbeTrackParams) error {
+	_, err := q.db.Exec(ctx, upsertProbeTrack,
+		arg.ComponentID,
+		arg.State,
+		arg.EnteredAt,
+		arg.OutSince,
+		arg.FailingSince,
+		arg.LastRound,
 	)
 	return err
 }

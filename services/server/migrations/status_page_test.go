@@ -179,3 +179,62 @@ func TestMigrationStatusPage(t *testing.T) {
 		t.Fatalf("up again: %v", err)
 	}
 }
+
+// TestMigrationStatusComponentProbe holds status_component_probe against
+// docs/spec/03-data-model.md 4.12 (AUD srv-stats-status-11): its columns, the closed states, the
+// row that goes with its component, and the Down section, which drops the table again.
+func TestMigrationStatusComponentProbe(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	conn := db.SuperConn(t)
+	tz := "timestamp with time zone"
+	want := []principalColumn{
+		{"component_id", "uuid", false, ""}, {"state", "text", false, ""}, {"entered_at", tz, false, ""},
+		{"out_since", tz, true, ""}, {"failing_since", tz, true, ""}, {"last_round", tz, false, ""},
+	}
+	if got := principalColumns(t, conn, "status_component_probe"); !reflect.DeepEqual(got, want) {
+		t.Errorf("columns:\n got %+v\nwant %+v", got, want)
+	}
+	if got, want := indexes(t, conn, "status_component_probe"), []string{
+		"CREATE UNIQUE INDEX status_component_probe_pkey ON public.status_component_probe USING btree (component_id)",
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("indexes:\n got %q\nwant %q", got, want)
+	}
+	var comp string
+	if err := conn.QueryRow(ctx, `INSERT INTO status_components (id, name, sort_key) VALUES (gen_random_uuid(), 'Messages', 'a0') RETURNING id`).Scan(&comp); err != nil {
+		t.Fatal(err)
+	}
+	insert := `INSERT INTO status_component_probe (component_id, state, entered_at, last_round) VALUES ($1, $2, now(), now())`
+	if _, err := conn.Exec(ctx, insert, comp, "down"); err == nil || !strings.Contains(err.Error(), "status_component_probe_state_check") {
+		t.Errorf("insert state down: %v, want the state check", err)
+	}
+	if _, err := conn.Exec(ctx, insert, comp, "operational"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM status_components WHERE id = $1`, comp); err != nil {
+		t.Fatal(err)
+	}
+	var left int
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM status_component_probe`).Scan(&left); err != nil || left != 0 {
+		t.Errorf("memory rows after removing the component: %d, %v", left, err)
+	}
+
+	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(5*time.Second))
+	sqlDB := pool.OpenSQL()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS, goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 127); err != nil {
+		t.Fatalf("down to 127: %v", err)
+	}
+	var exists bool
+	if err := conn.QueryRow(ctx, `SELECT to_regclass('public.status_component_probe') IS NOT NULL`).Scan(&exists); err != nil || exists {
+		t.Errorf("status_component_probe after down: %v, %v", exists, err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
