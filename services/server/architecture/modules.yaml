@@ -188,7 +188,7 @@ modules:
     # bothy.message.created (M1-68).
     adapter_vendors: [pgx, xtext, uniseg, otel]
   status:
-    tables: [status_components, status_incidents, status_incident_updates,
+    tables: [status_components, status_component_probe, status_incidents, status_incident_updates,
              status_incident_components, backup_runs]
     actions: [status.public.read, status.read, status.manage]
     events: [status.updated]

@@ -76,7 +76,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs`.
+`status_components`, `status_component_probe`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs`.
 
 Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
