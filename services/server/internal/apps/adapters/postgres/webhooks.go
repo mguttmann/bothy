@@ -264,6 +264,23 @@ func (r *Repository) ExpirePending(ctx context.Context, subscriptionID ids.ID, b
 	return seqs, nil
 }
 
+// SubscriptionsPendingBelow implements app.WebhookStore.
+func (r *Repository) SubscriptionsPendingBelow(ctx context.Context, belowSeq int64, limit int) ([]ids.ID, error) {
+	lim, err := int32Of(limit)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.read(ctx).SubscriptionsPendingBelow(ctx, sqlcgen.SubscriptionsPendingBelowParams{BelowSeq: belowSeq, RowLimit: lim})
+	if err != nil {
+		return nil, mapError(err, "reading subscriptions with expired deliveries")
+	}
+	out := make([]ids.ID, len(rows))
+	for i, id := range rows {
+		out[i] = ids.ID(id.Bytes)
+	}
+	return out, nil
+}
+
 // Deliveries implements app.WebhookStore.
 func (r *Repository) Deliveries(ctx context.Context, subscriptionID ids.ID, status string, hasAfter bool, afterSeq int64, afterID ids.ID, limit int) ([]app.DeliveryRecord, error) {
 	lim, err := int32Of(limit)

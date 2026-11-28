@@ -722,6 +722,41 @@ func (q *Queries) ShareLiveInstallation(ctx context.Context, appID pgtype.UUID) 
 	return i, err
 }
 
+const subscriptionsPendingBelow = `-- name: SubscriptionsPendingBelow :many
+SELECT s.id FROM webhook_subscriptions s
+WHERE EXISTS (SELECT 1 FROM webhook_deliveries d
+              WHERE d.subscription_id = s.id AND d.status = 'pending' AND d.event_seq < $1)
+ORDER BY s.id
+LIMIT $2
+`
+
+type SubscriptionsPendingBelowParams struct {
+	BelowSeq int64
+	RowLimit int32
+}
+
+// The sweep of the retention job (#893): the subscriptions with a pending row whose event_seq lies
+// below a seq, at most row_limit, in id order; each lookup uses webhook_deliveries_pending_seq_idx.
+func (q *Queries) SubscriptionsPendingBelow(ctx context.Context, arg SubscriptionsPendingBelowParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, subscriptionsPendingBelow, arg.BelowSeq, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateDelivery = `-- name: UpdateDelivery :execrows
 UPDATE webhook_deliveries SET attempt = $1, status = $2, response_code = $3,
     last_error = $4, next_attempt_at = $5, created_at = $6,

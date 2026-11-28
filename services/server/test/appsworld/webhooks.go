@@ -210,11 +210,47 @@ func (m *Metrics) Count(r egress.Reason) int {
 	return m.n[r]
 }
 
+// Signals counts the calls of app.WebhookMetrics (#925) by outcome and by cause.
+type Signals struct {
+	mu          stdsync.Mutex
+	deliveries  map[string]int
+	transitions map[string]int
+}
+
+// Deliveries implements app.WebhookMetrics.
+func (s *Signals) Deliveries(_ context.Context, outcome string, n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deliveries[outcome] += n
+}
+
+// Transition implements app.WebhookMetrics.
+func (s *Signals) Transition(_ context.Context, cause string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.transitions[cause]++
+}
+
+// Delivered returns the deliveries counted with outcome.
+func (s *Signals) Delivered(outcome string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deliveries[outcome]
+}
+
+// Transitions returns the system transitions counted with cause.
+func (s *Signals) Transitions(cause string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.transitions[cause]
+}
+
 // webhookParts are the webhook collaborators of a world.
 type webhookParts struct {
 	Hooks, Alt *Receiver
 	Resolver   *Resolver
 	Metrics    *Metrics
+	Signals    *Signals
 	Config     appsapp.WebhookConfig
 	deps       appsapp.WebhookDeps
 	// Invocations is the fake runs.Delivery of the agent subscriptions (V1-01).
@@ -276,6 +312,9 @@ func (w *World) StartWorker() {
 		_ = rt.Stop(ctx)
 	})
 }
+
+// Signals returns the counts of the webhook metrics of the service.
+func (w *World) Signals() *Signals { return w.web.Signals }
 
 // Hooks is the receiver hooks.example.com; Alt the receiver alt.example.com.
 func (w *World) Hooks() *Receiver { return w.web.Hooks }
@@ -403,14 +442,20 @@ func (w *World) AppendEvent(ev eventlog.Event) int64 {
 	return seq
 }
 
+// TrackerEventsURL is the events_url of TrackerEventsManifest. InstallTracker grants the event
+// subscriptions only after the install, so no subscription to it exists and the tests start
+// without one: the gateway mode, which created none, is refused for apps with events (11
+// section 9).
+const TrackerEventsURL = "https://" + AllowedHost + "/tracker/manifest-events"
+
 // TrackerEventsManifest is Tracker with messages:write required, messages:read and
-// events:subscribe optional, the event message.created and delivery over the gateway (so the
-// install creates no subscription); mods change it.
+// events:subscribe optional, the event message.created and delivery webhook to TrackerEventsURL;
+// mods change it.
 func TrackerEventsManifest(mods ...func(m map[string]any)) map[string]any {
 	return TrackerManifest("1.0.0", append([]func(map[string]any){func(m map[string]any) {
 		m["scopes"] = map[string]any{"required": []string{scopeMessagesWrite}, "optional": []string{scopeMessagesRead, scopeEventsSubscribe}}
 		m["events"] = []any{typeMessageCreated}
-		m["delivery"] = map[string]any{"mode": "gateway"}
+		m["delivery"] = map[string]any{"mode": "webhook", "events_url": TrackerEventsURL}
 		m["data_egress"] = "Messages of the granted channels go to the help desk."
 	}}, mods...)...)
 }
@@ -427,12 +472,22 @@ var TrackerScopes = []string{scopeEventsSubscribe, scopeMessagesRead, scopeMessa
 
 // InstallTracker installs Tracker with TrackerScopes, event_subscriptions [message.created] and G-6
 // (write on Support/Eskalation) as Robin with step-up, and returns the owner client and the app id.
+// With the events_url TrackerEventsURL the event subscription is granted by setAppScopes after the
+// install, so no subscription exists; a mod with another events_url gets it at the install and
+// with it the subscription of the manifest.
 func (w *World) InstallTracker(mods ...func(m map[string]any)) (*Client, ids.ID) {
 	w.t.Helper()
 	o := w.RobinPhone.StepUp()
-	a := w.Want(o.Call(http.MethodPost, "/api/v1/apps", InstallBody(TrackerEventsManifest(mods...), TrackerScopes,
-		[]string{typeMessageCreated}), Idem()...), http.StatusCreated, "")
+	m := TrackerEventsManifest(mods...)
+	subs := []string{typeMessageCreated}
+	if d, _ := m["delivery"].(map[string]any); d["events_url"] == TrackerEventsURL {
+		subs = nil
+	}
+	a := w.Want(o.Call(http.MethodPost, "/api/v1/apps", InstallBody(m, TrackerScopes, subs), Idem()...), http.StatusCreated, "")
 	app := ids.MustParse(a["id"].(string))
+	if subs == nil {
+		w.Want(o.Call(http.MethodPut, "/api/v1/apps/"+app.String()+"/scopes", ScopesBody(TrackerScopes, []string{typeMessageCreated})), http.StatusOK, "")
+	}
 	w.Grant(app, w.Eskalation, "write")
 	return o, app
 }

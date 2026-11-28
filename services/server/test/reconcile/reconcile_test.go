@@ -394,6 +394,17 @@ func unmatched(e *env, token string) {
 			e.t.Fatalf("run %s: %d entries, %d jobs", run, n, e.jobsOf(run))
 		}
 	}
+	// The log names each unmatched run with the first rule that failed (#925).
+	for run, reason := range map[string]string{early: "no_entries", unknown: "no_entries", personal: "personal", other: "provider", euro: "currency"} {
+		found := false
+		for _, line := range strings.Split(e.logs.String(), "\n") {
+			found = found || strings.Contains(line, `"cost reconciliation entry unmatched"`) && strings.Contains(line, `"bothy.run.id":"`+run+`"`) &&
+				strings.Contains(line, `"bothy.reason":"`+reason+`"`)
+		}
+		if !found {
+			e.t.Errorf("no unmatched log line of run %s with reason %s", run, reason)
+		}
+	}
 	e.settle()
 }
 

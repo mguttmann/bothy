@@ -101,7 +101,7 @@ func retentionParticipants(t *testing.T) []retention.Participant {
 	}
 	return []retention.Participant{
 		identitypg.NewRetention(nil), instancepg.NewRepository(nil).Retention(), notifypg.NewRegistrations(nil),
-		terminalpg.NewRetention(nil), appspg.NewRetention(nil), billingpg.NewRetention(nil),
+		terminalpg.NewRetention(nil), appspg.NewRetention(nil, nil), billingpg.NewRetention(nil),
 		new(messagingapp.Service).Retention(), trim, auditapp.NewIPKeys(auditpg.NewRepository(nil), nil),
 		statuspg.NewRetention(nil), privacypg.NewRetention(nil), importerpg.NewRetention(nil),
 		runspg.NewRetention(nil), new(chatapp.Service).TitleRetention(),

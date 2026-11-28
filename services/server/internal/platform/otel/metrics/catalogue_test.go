@@ -298,6 +298,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.run.wake.pending", "bothy.run.wake.ended", "bothy.run.autonomy.cap_reached",
 		// AUD-srv-status-01: the failed backup runs by the kind of their row (4.6).
 		"bothy.backup.failures",
+		// #925: the outgoing webhook deliveries and system transitions (4.2).
+		"bothy.webhook.delivery", "bothy.webhook.transition",
 	}
 	slices.Sort(want)
 	var got []string

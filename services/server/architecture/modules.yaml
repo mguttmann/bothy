@@ -309,7 +309,7 @@ modules:
     # an app may subscribe to. runs (M2-25): apps implements runs.AppDispatcher and disables the
     # components of an app on app.suspend and app.uninstall.
     depends_on: [instance, identity, authz, chat, agents, messaging, sync, runs]
-    adapter_vendors: [pgx, otel]   # sqlc code and the repository (M2-24); the span webhook.deliver (M2-26)
+    adapter_vendors: [pgx, otel]   # sqlc code and the repository (M2-24); the span webhook.deliver (M2-26); adapters/otelmetrics counts the deliveries and transitions (#925)
   gateway:
     tables: [gateway_presence]
     actions: [gateway.connect, gateway.focus, typing.start]

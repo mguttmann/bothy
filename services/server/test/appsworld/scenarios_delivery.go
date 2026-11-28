@@ -355,6 +355,9 @@ func ScenarioDelivery410Disables(t *testing.T) {
 	if got := transitions(w); !slices.Equal(got, []string{"gone"}) {
 		t.Fatalf("transitions %v", got)
 	}
+	if sig := w.Signals(); sig.Delivered("failed") != 1 || sig.Transitions("gone") != 1 {
+		t.Fatalf("signals: %d failed, %d gone", sig.Delivered("failed"), sig.Transitions("gone"))
+	}
 	esk(w, "While disabled")
 	w.Round()
 	w.Pump(10)
@@ -598,6 +601,55 @@ func ScenarioDeliveryGapDisables(t *testing.T) {
 	}
 }
 
+// ScenarioRetentionSweepEndsLostDeliveries (#893, D-M2-26-5): the sweep of the retention job ends
+// the pending rows whose event left the log without waiting for the head: a subscription paused by
+// the quota becomes disabled with cause gap and an entry naming the lost range, a disabled one only
+// gets its lost rows ended; the rows of retained events stay pending, and a second sweep finds
+// nothing.
+func ScenarioRetentionSweepEndsLostDeliveries(t *testing.T) {
+	t.Parallel()
+	w := NewWorldWith(t, Options{Webhook: func(c *appsapp.WebhookConfig) { c.MaxPendingPerSubscription = 2 }})
+	o, app, created := subscribed(t, w, false)
+	paused, disabled := SubscriptionID(created), SubscriptionID(w.Subscribe(o, app, false))
+	e1, e2, e3 := esk(w, "1"), esk(w, "2"), esk(w, "3")
+	w.Round()
+	w.DueJobs()
+	w.SQL(`UPDATE webhook_subscriptions SET state = 'disabled', disabled_at = now() WHERE id = $1`, disabled.String())
+	if r := w.SubscriptionRow(paused); r.State != "paused" {
+		t.Fatalf("subscription %+v", r)
+	}
+	w.SQL(`DELETE FROM event_log WHERE seq <= $1`, e2.Seq)
+	n, err := w.Webhooks().ExpireLost(context.Background(), 10)
+	if err != nil || n != 2 {
+		t.Fatalf("ExpireLost = %d, %v", n, err)
+	}
+	for _, sub := range []ids.ID{paused, disabled} {
+		rows := w.Deliveries(sub)
+		if len(rows) != 3 || rows[0].Status != "dead" || rows[0].LastError != "event_expired" || rows[1].Status != "dead" ||
+			rows[2].Status != "pending" || rows[2].Seq != e3.Seq {
+			t.Fatalf("rows %+v", rows)
+		}
+		if r := w.SubscriptionRow(sub); r.State != "disabled" {
+			t.Fatalf("subscription %+v", r)
+		}
+	}
+	var gaps []AuditRow
+	for _, e := range w.Allows("webhook_out.transition") {
+		if e.Details["cause"] == "gap" {
+			gaps = append(gaps, e)
+		}
+	}
+	if len(gaps) != 1 || int64(gaps[0].Details["from_seq"].(float64)) != e1.Seq || int64(gaps[0].Details["to_seq"].(float64)) != e2.Seq {
+		t.Fatalf("gap entries %v", gaps)
+	}
+	if n, err := w.Webhooks().ExpireLost(context.Background(), 10); err != nil || n != 0 {
+		t.Fatalf("second ExpireLost = %d, %v", n, err)
+	}
+	if sig := w.Signals(); sig.Delivered("dead") != 4 || sig.Transitions("gap") != 1 || sig.Transitions("max_pending") != 2 {
+		t.Fatalf("signals: %d dead, %d gap, %d max_pending", sig.Delivered("dead"), sig.Transitions("gap"), sig.Transitions("max_pending"))
+	}
+}
+
 // ScenarioConsumerLossDisablesSubscriptions (M2-26 design note 3 f): the consumer fell behind
 // retention; the round disables every live subscription with cause gap, expires their pending
 // rows, names the lost range and creates no row for the retained events of that round; a
@@ -681,6 +733,9 @@ func ScenarioDeliveryQuotaPauses(t *testing.T) {
 	if !slices.Equal(order, want) {
 		t.Fatalf("order %v, want %v", order, want)
 	}
+	if sig := w.Signals(); sig.Delivered("succeeded") != len(want) || sig.Transitions("max_pending") != 1 {
+		t.Fatalf("signals: %d succeeded, %d max_pending", sig.Delivered("succeeded"), sig.Transitions("max_pending"))
+	}
 }
 
 // ScenarioDeliverySuspendedInstallation (11 section 4.3): a suspended installation gets rows and sends
@@ -728,17 +783,27 @@ func ScenarioInstallCreatesManifestSubscription(t *testing.T) {
 }
 
 // ScenarioUninstallDisablesSubscriptions (11 section 4.3): uninstallApp disables every subscription of
-// the installation.
+// the installation and ends its pending rows as dead with event_expired, so nothing stays pending
+// for an app that never gets it.
 func ScenarioUninstallDisablesSubscriptions(t *testing.T) {
 	t.Parallel()
 	w := NewWorld(t)
 	o, app, created := subscribed(t, w, false)
 	second := SubscriptionID(w.Subscribe(o, app, true))
+	esk(w, "1")
+	w.Round()
 	w.Want(o.StepUp().Call(http.MethodPost, "/api/v1/apps/"+app.String()+"/uninstall", `{"reason":"Moving on"}`, Idem()...), http.StatusNoContent, "")
 	for _, sub := range []ids.ID{SubscriptionID(created), second} {
 		if r := w.SubscriptionRow(sub); r.State != "disabled" || r.DisabledAt == nil {
 			t.Fatalf("subscription %+v", r)
 		}
+		rows := w.Deliveries(sub)
+		if len(rows) != 1 || rows[0].Status != "dead" || rows[0].LastError != "event_expired" {
+			t.Fatalf("rows %+v", rows)
+		}
+	}
+	if n := w.Signals().Delivered("dead"); n != 2 {
+		t.Fatalf("signals: %d dead", n)
 	}
 }
 

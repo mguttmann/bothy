@@ -5,6 +5,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ func (s *Service) Reconcile(ctx context.Context, in billing.ReconcileInput) (bil
 	}
 	req := toRequest(in)
 	var out billing.ReconcileResult
+	var misses []miss
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		if err := s.check(ctx, in.Action, instance); err != nil {
 			return err
@@ -48,34 +50,54 @@ func (s *Service) Reconcile(ctx context.Context, in billing.ReconcileInput) (bil
 			return violations(v)
 		}
 		var err error
-		out, err = s.reconcile(ctx, in.Action, req)
+		out, misses, err = s.reconcile(ctx, in.Action, req)
 		return err
 	})
 	if err != nil {
 		return billing.ReconcileResult{}, err
 	}
+	for _, m := range misses {
+		s.d.Logger.LogAttrs(ctx, slog.LevelInfo, msgUnmatched, slog.String(logKeyRunID, m.run.String()), slog.String(logKeyReason, string(m.reason)))
+	}
 	return out, nil
 }
 
-// reconcile is Reconcile after authorize and validation, inside its unit of work.
-func (s *Service) reconcile(ctx context.Context, act authorize.Action, req domain.Request) (billing.ReconcileResult, error) {
+// msgUnmatched is the log line of a request entry the reconciliation did not match (#925): the
+// run and the first rule that failed (personal, provider, currency or no_entries), never an amount
+// or a person; the answer lists only the run.
+const (
+	msgUnmatched = "cost reconciliation entry unmatched"
+	logKeyReason = "bothy.reason"
+)
+
+// miss is an unmatched request entry: its run and the reason of domain.Match.
+type miss struct {
+	run    ids.ID
+	reason domain.UnmatchedReason
+}
+
+// reconcile is Reconcile after authorize and validation, inside its unit of work; it also returns
+// the unmatched entries with their reason for the log after the commit.
+func (s *Service) reconcile(ctx context.Context, act authorize.Action, req domain.Request) (billing.ReconcileResult, []miss, error) {
 	runIDs := sortedRuns(req.Entries)
 	if err := s.d.Repo.LockReconcile(ctx, runIDs); err != nil {
-		return billing.ReconcileResult{}, err
+		return billing.ReconcileResult{}, nil, err
 	}
 	valid, err := s.d.Repo.ValidEntries(ctx, runIDs, req.PeriodStart, req.PeriodEnd)
 	if err != nil {
-		return billing.ReconcileResult{}, err
+		return billing.ReconcileResult{}, nil, err
 	}
+	var misses []miss
 	out := billing.ReconcileResult{UnmatchedRunIDs: []ids.ID{}}
 	now := s.d.Clock.Now()
 	totals := map[string]int64{}
 	var rows []domain.Entry
 	var written []ids.ID
 	for _, e := range req.Entries {
-		matched, noop, _ := domain.Match(valid, req, e)
+		matched, noop, reason := domain.Match(valid, req, e)
 		if !matched {
 			out.UnmatchedRunIDs = append(out.UnmatchedRunIDs, e.RunID)
+			misses = append(misses, miss{run: e.RunID, reason: reason})
 			continue
 		}
 		out.Reconciled++
@@ -88,17 +110,17 @@ func (s *Service) reconcile(ctx context.Context, act authorize.Action, req domai
 	}
 	if len(rows) > 0 {
 		if err := s.d.Repo.InsertReconciled(ctx, rows); err != nil {
-			return billing.ReconcileResult{}, err
+			return billing.ReconcileResult{}, nil, err
 		}
 		if s.d.Scheduler == nil {
-			return billing.ReconcileResult{}, errs.New(errs.CodeInternalError, "billing: no scheduler of billing.reconcile")
+			return billing.ReconcileResult{}, nil, errs.New(errs.CodeInternalError, "billing: no scheduler of billing.reconcile")
 		}
 		slices.SortFunc(written, compareIDs)
 		if err := s.d.Scheduler.Schedule(ctx, written); err != nil {
-			return billing.ReconcileResult{}, err
+			return billing.ReconcileResult{}, nil, err
 		}
 	}
-	return out, s.auditReconcile(ctx, act, req, out, totals)
+	return out, misses, s.auditReconcile(ctx, act, req, out, totals)
 }
 
 // successors returns one reconciled entry per valid entry in the period: the copies of the

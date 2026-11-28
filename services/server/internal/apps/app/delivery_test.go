@@ -61,6 +61,11 @@ func TestConsumerLossDisablesSubscriptions(t *testing.T) {
 	appsworld.ScenarioConsumerLossDisablesSubscriptions(t)
 }
 
+// TestRetentionSweepEndsLostDeliveries runs appsworld.ScenarioRetentionSweepEndsLostDeliveries.
+func TestRetentionSweepEndsLostDeliveries(t *testing.T) {
+	appsworld.ScenarioRetentionSweepEndsLostDeliveries(t)
+}
+
 // TestDeliveryQuotaPauses runs appsworld.ScenarioDeliveryQuotaPauses.
 func TestDeliveryQuotaPauses(t *testing.T) { appsworld.ScenarioDeliveryQuotaPauses(t) }
 

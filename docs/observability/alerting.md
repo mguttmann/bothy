@@ -92,6 +92,7 @@ alerts of `bothy-alerts.yaml`.
 | `BothyTelemetryDropped` | ticket | server discards telemetry | |
 | `BothyEventFanoutLag` | page | fan-out lag over 5 s | `status.fanout_lag_degraded` |
 | `BothyEventConsumerLag` | page | the oldest unprocessed event of a worker consumer is older than `consumer.pending_alert_after` | `consumer.pending_alert_after` |
+| `BothyWebhookSubscriptionStopped` | ticket | the system paused or disabled an outgoing webhook subscription in the last 24 hours (`bothy.webhook.transition`), per cause | |
 | `BothyAgentConsumerLag` | ticket | consumer backlog of over 1000 events | |
 | `BothyAgentOffline` | ticket | no heartbeat for 5 minutes | above `agent.presence_timeout` |
 | `BothyBillingModeMismatch` | page | reported mode differs from the configured mode, according to the heartbeat for longer than the threshold or at a run (I3) | `billing.mismatch_alert_after` |
@@ -161,6 +162,18 @@ retention`; is the database reachable? A handler that keeps failing stalls only 
 which catches up by itself after the fix. Never move the cursor in `event_consumer_cursors` by
 hand: the events it jumps over are lost for that consumer for good. A consumer that stands longer
 than `sync.event_retention` loses events ([02-architecture.md](../spec/02-architecture.md) 11.5).
+
+### bothywebhooksubscriptionstopped
+The system stopped an outgoing webhook subscription (`bothy.webhook.transition`, label
+`bothy_reason`): `max_pending` paused it at `webhook.max_pending_per_subscription` open deliveries;
+`max_consecutive_failures`, `retry_max_age` and `gone` (the receiver answered `410`) disabled it
+after failed attempts; `gap` disabled it because events it had not received left the event log
+(`sync.event_retention`). The worker log has the line `webhook subscription state changed` (warn)
+with `bothy.webhook_subscription.id`, `bothy.reason` and `server.address`, and the audit log the
+entry `webhook_out.transition`. Fix the receiver, then the owner of the app resumes (`paused`) or
+re-enables (`disabled`) the subscription in the console or with `updateWebhookSubscription`; a
+paused subscription delivers its backlog in order ([11-extensions.md](../spec/11-extensions.md) 7,
+[webhooks.md](../api/webhooks.md) 5).
 
 ### bothyagentconsumerlag
 The adapter does not process or does not acknowledge. Adapter logs, `ack` behavior, connection.

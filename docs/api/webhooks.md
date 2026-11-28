@@ -184,7 +184,10 @@ M2-30), and so does the Python SDK with the same behaviour (`verify_webhook` and
    subscription keeps it waiting. An event that is no longer in the log answers `409 conflict`
    with `reason: event_expired`.
 9. Retention (M7-05) may delete only `succeeded`, `failed` and `dead` rows older than
-   `retention.webhook_deliveries`, never `pending` ones.
+   `retention.webhook_deliveries`, never `pending` ones. Before it deletes, the job
+   `retention.transient` applies the gap rule (section 5, point 5) to every subscription with a
+   pending row whose event left the log, and an uninstall ends the pending rows of the
+   installation as `dead` with `event_expired`, so no `pending` row stays without a way to end.
 
 ## 5. Order and duplicates
 
@@ -206,7 +209,10 @@ M2-30), and so does the Python SDK with the same behaviour (`verify_webhook` and
 5. Gap (D-M2-26-5): when the event of the head left the log, or when the consumer `webhooks` lost
    a range to retention before reading it, the subscription becomes `disabled` with cause `gap`,
    its expired pending deliveries become `dead` with `event_expired`, and the audit entry names the
-   lost range; nothing is skipped silently.
+   lost range; nothing is skipped silently. The job `retention.transient` applies the rule to every
+   subscription with such a row without waiting for its head, also a paused one; a `disabled`
+   subscription only gets the rows ended. The rows of retained events stay `pending`
+   (D-M2-26-2).
 
 ## 6. Delivery security
 
@@ -492,8 +498,11 @@ events only through the gateway, the REST catch-up and its webhook subscriptions
    to `webhook-id`). Delivery is at least once (04 9 point 1); the app deduplicates by `id`.
    The gateway way is not open yet: `sync.snapshot.read` has no app scope in the catalogue, so an
    app's connection is closed with `4018` at `ready` (docs/decisions.d/M1-64.md M1-64/11,
-   docs/decisions.d/M2-25.md D-M2-25-24); until the contract changes, an app without an
-   interaction address uses the REST catch-up or a webhook subscription.
+   docs/decisions.d/M2-25.md D-M2-25-24). Until the contract changes, `validateManifest`,
+   `installApp` and `upgradeAppManifest` refuse `delivery.mode` `gateway` for a manifest with
+   `events`, or with commands or components without an interaction address (`invalid` on
+   `delivery/mode`, 11 3.2 rule 6); an installation made before keeps its manifest and uses the
+   REST catch-up or a webhook subscription.
 
 10. Forum channels. A command in a forum channel without `thread_id` has no target thread, so a
     `200` with a `MessageCreate` cannot be written and counts as not answered. The app answers

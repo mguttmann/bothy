@@ -106,10 +106,30 @@ type WebhookStore interface {
 	// ExpirePending makes the pending rows of a subscription below belowSeq dead with
 	// event_expired and returns their seqs.
 	ExpirePending(ctx context.Context, subscriptionID ids.ID, belowSeq int64) ([]int64, error)
+	// SubscriptionsPendingBelow returns up to limit subscriptions, in id order, with a pending row
+	// below belowSeq.
+	SubscriptionsPendingBelow(ctx context.Context, belowSeq int64, limit int) ([]ids.ID, error)
 	// Deliveries returns up to limit rows of a subscription, newest first after the keyset
 	// position (afterSeq, afterID) when hasAfter, filtered by status when it is not empty.
 	Deliveries(ctx context.Context, subscriptionID ids.ID, status string, hasAfter bool, afterSeq int64, afterID ids.ID, limit int) ([]DeliveryRecord, error)
 }
+
+// WebhookMetrics counts what the operator watches (signals.md 4.2, #925): the status of a delivery
+// after an attempt or an end without a request (bothy.webhook.delivery) and the changes of a
+// subscription by the system by cause (bothy.webhook.transition). adapters/otelmetrics is the
+// implementation; the service calls it after the commit, and a call never fails.
+type WebhookMetrics interface {
+	// Deliveries adds n deliveries with outcome (succeeded, retrying, failed or dead).
+	Deliveries(ctx context.Context, outcome string, n int)
+	// Transition adds one system change with cause (the cause code of webhook_out.transition).
+	Transition(ctx context.Context, cause string)
+}
+
+// noMetrics counts nothing.
+type noMetrics struct{}
+
+func (noMetrics) Deliveries(context.Context, string, int) {}
+func (noMetrics) Transition(context.Context, string)      {}
 
 // DeliveryScheduler inserts the job apps.webhook_deliver of a subscription in the ambient unit of
 // work (adapters/jobs over jobs.Inserter.InsertTx); the job runs at or after at.

@@ -86,6 +86,17 @@ groups:
           summary: "Worker consumer {{ $labels.bothy_consumer_name }} has an unprocessed event older than consumer.pending_alert_after."
           runbook_url: "docs/observability/alerting.md#bothyeventconsumerlag"
 
+      # The series of bothy.webhook.transition start at 0 with the server (signals.md 4.2), so
+      # the first stop by the system is an increase. Every cause counts: the subscription no
+      # longer delivers until its owner resumes or re-enables it.
+      - alert: BothyWebhookSubscriptionStopped
+        expr: sum by (bothy_reason) (increase(bothy_webhook_transition_total{job="bothy/bothy-server"}[1d])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "The system paused or disabled an outgoing webhook subscription with cause {{ $labels.bothy_reason }} in the last 24 hours."
+          runbook_url: "docs/observability/alerting.md#bothywebhooksubscriptionstopped"
+
       - alert: BothyAgentConsumerLag
         expr: max by (bothy_agent_handle) (bothy_agent_consumer_lag{job="bothy/bothy-server"}) > 1000
         for: 15m

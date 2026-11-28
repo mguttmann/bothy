@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"math"
 	"slices"
 	"time"
 
@@ -176,19 +177,15 @@ func (w *WebhookService) dueHead(ctx context.Context, subscriptionID ids.ID) (Su
 // disabled with cause gap, every pending row below the smallest retained seq becomes dead with
 // event_expired, and the audit entry names the first and last lost seq.
 func (w *WebhookService) gap(ctx context.Context, sub *SubscriptionRecord) error {
-	minSeq, err := w.d.Log.MinRetainedSeq(ctx)
+	below, err := w.retainedFrom(ctx)
 	if err != nil {
 		return err
-	}
-	below := minSeq
-	if minSeq == 0 {
-		// An empty log retains nothing: every pending row is lost.
-		below = 1<<63 - 1
 	}
 	seqs, err := w.d.Store.ExpirePending(ctx, sub.ID, below)
 	if err != nil {
 		return err
 	}
+	w.countDeliveries(ctx, outcomeDead, len(seqs))
 	var first, last int64
 	if len(seqs) > 0 {
 		first, last = slices.Min(seqs), slices.Max(seqs)
@@ -199,6 +196,64 @@ func (w *WebhookService) gap(ctx context.Context, sub *SubscriptionRecord) error
 	return w.d.Store.UpdateSubscription(ctx, *sub)
 }
 
+// ExpireLost is the sweep of the retention job (#893, 11 section 7): for up to limit
+// subscriptions with a pending row whose event left the event log, in one unit of work, it applies
+// the gap rule that otherwise waits for the head (D-M2-26-5): an active or paused subscription
+// becomes disabled with cause gap, every pending row below the smallest retained seq becomes dead
+// with event_expired, and the audit entry names the lost range; a disabled subscription only gets
+// its expired rows ended. A paused subscription keeps its retained rows (the quota catch-up of
+// D-M2-26-2). It returns the number of subscriptions handled; limit of them means there may be
+// more.
+func (w *WebhookService) ExpireLost(ctx context.Context, limit int) (int, error) {
+	n := 0
+	err := w.d.UoW.Do(ctx, func(ctx context.Context) error {
+		below, err := w.retainedFrom(ctx)
+		if err != nil {
+			return err
+		}
+		subs, err := w.d.Store.SubscriptionsPendingBelow(ctx, below, limit)
+		if err != nil {
+			return err
+		}
+		n = len(subs)
+		for _, id := range subs {
+			if err := w.expireLostOf(ctx, id, below); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return n, err
+}
+
+// retainedFrom returns the smallest retained seq of the log, the bound below which a pending row
+// is lost; an empty log retains nothing, so every row is lost.
+func (w *WebhookService) retainedFrom(ctx context.Context) (int64, error) {
+	minSeq, err := w.d.Log.MinRetainedSeq(ctx)
+	if err != nil || minSeq != 0 {
+		return minSeq, err
+	}
+	return math.MaxInt64, nil
+}
+
+// expireLostOf locks the subscription id and applies the sweep of ExpireLost to it: the gap rule
+// to an active or paused one, the end of its rows below below to a disabled one.
+func (w *WebhookService) expireLostOf(ctx context.Context, id ids.ID, below int64) error {
+	sub, found, err := w.d.Store.LockSubscription(ctx, id)
+	if err != nil || !found {
+		return err
+	}
+	if sub.State != domain.SubscriptionDisabled {
+		return w.gap(ctx, &sub)
+	}
+	seqs, err := w.d.Store.ExpirePending(ctx, id, below)
+	if err != nil {
+		return err
+	}
+	w.countDeliveries(ctx, outcomeDead, len(seqs))
+	return nil
+}
+
 // finishWithout ends the head as dead with code without a request: no attempt, no failure
 // counted; the next head gets a job (design note 4 c and d, AZ-M49).
 func (w *WebhookService) finishWithout(ctx context.Context, subscription ids.ID, head DeliveryRecord, code string) error {
@@ -206,6 +261,7 @@ func (w *WebhookService) finishWithout(ctx context.Context, subscription ids.ID,
 	if err := w.d.Store.UpdateDelivery(ctx, head); err != nil {
 		return err
 	}
+	w.countDeliveries(ctx, outcomeDead, 1)
 	return w.d.Scheduler.Schedule(ctx, subscription, w.now())
 }
 
@@ -325,6 +381,7 @@ func (w *WebhookService) record(ctx context.Context, c claim, res SendResult, se
 	if err := w.d.Store.UpdateSubscription(ctx, sub); err != nil {
 		return err
 	}
+	w.countDeliveries(ctx, outcomeOf(d.Status), 1)
 	if sub.State != domain.SubscriptionActive {
 		return nil
 	}

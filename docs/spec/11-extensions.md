@@ -59,7 +59,7 @@ ignored.
 | `min_api_version` | yes | lowest API version that the app needs ([06-api.md](06-api.md)) |
 | `scopes.required`, `scopes.optional` | yes | scopes from 05 section 2.6 |
 | `events` | no | event types from 05 section 6 for which the matching scope is required |
-| `delivery.mode` | if `events` is set | `gateway` or `webhook` |
+| `delivery.mode` | if `events` is set | `gateway` or `webhook`; `gateway` only while nothing reaches the app over the gateway (rule 6 of 3.2, section 9) |
 | `delivery.events_url` | with `webhook` | HTTPS address for outgoing webhooks |
 | `delivery.interactions_url` | if commands or components without a gateway | HTTPS address for synchronous requests; if set, commands, interactions and autocomplete requests of the app go there instead of the gateway (section 9) |
 | `commands` | no | commands according to [09-agents.md](09-agents.md) section 10, without reserved names |
@@ -97,6 +97,14 @@ with its hash (`apps.manifest_sha256`).
    `400 validation_failed` and a pointer below `/manifest/commands/<index>`. Reason: a manifest is
    independent of the instance and names no target (4.1); narrower scopes come through
    `registerCommand` with `commands:write`.
+6. `delivery.mode` `gateway` is refused while anything would reach the app over the gateway:
+   `events`, or `commands` or `components` without `delivery.interactions_url`. `installApp` and
+   `upgradeAppManifest` answer `400 validation_failed` with `invalid` on
+   `/manifest/delivery/mode`, and `validateManifest` reports the same error on `/delivery/mode`.
+   Reason: the gateway closes every app at `ready` with `4018` (section 9), so such a manifest
+   would install and never deliver there. A stored manifest is only parsed, never checked again, so
+   an installation made before keeps working on its other ways (`listEvents`, webhook
+   subscriptions). The rule is lifted when 05 gives `sync.snapshot.read` an app scope.
 
 ### 3.3 Example
 
@@ -214,7 +222,7 @@ see the change at their next `listChannelCommands`, and an invocation answers `4
 | Step | `app.suspend` | `app.uninstall` |
 |---|---|---|
 | Tokens | blocked, not revoked | revoked |
-| Deliveries | paused, position kept | subscriptions `disabled` |
+| Deliveries | paused, position kept | subscriptions `disabled`, their `pending` deliveries `dead` with `last_error = event_expired` |
 | Commands | hidden (the check of section 9 finds no `active` installation; rows unchanged) | removed (`removed_at`, `command.changed`) |
 | Components of the app | `disabled` (the active components of its cards, one `message.updated` per card) | `disabled` (likewise) |
 | Grants, incoming webhooks | remain | revoked |
@@ -281,7 +289,14 @@ longer in the log (`sync.event_retention`), and in the round of the worker consu
 when retention removed events before the consumer read them (the lost range of the round). In both
 cases the subscription becomes `disabled` with cause `gap` instead of skipping events silently, its
 expired pending deliveries become `dead` with `last_error = event_expired`, and the audit entry of
-`webhook_out.transition` names the lost range.
+`webhook_out.transition` names the lost range. The job `retention.transient` applies the same rule
+to every subscription with a pending delivery whose event left the log, also a `paused` one and
+one whose installation is `suspended`, so no row waits for an event that is gone; a `disabled`
+subscription only gets those rows ended. The rows of retained events stay `pending`, so the
+catch-up of a paused subscription is unchanged (D-M2-26-2). The counters `bothy.webhook.delivery`
+and `bothy.webhook.transition` ([signals.md](../observability/signals.md) 4.2) and the alert
+`BothyWebhookSubscriptionStopped` ([alerting.md](../observability/alerting.md) 3.2) report the
+outcomes and every stop by the system to the operator.
 
 ## 7. Outgoing webhooks
 
@@ -476,7 +491,10 @@ event `id`. On the gateway way the app needs `events:subscribe` to connect at al
 close code `4018`). Open gap: `sync.snapshot.read` has no app scope in the catalogue of 05, so the
 server refuses the snapshot of `ready` for every app and closes it with `4018` (decisions M1-64/11
 and D-M2-25-24); until 05 gives the snapshot an app scope, an app on the gateway way receives its
-events through `listEvents` or a webhook subscription. Wire format: [../api/webhooks.md](../api/webhooks.md), section 10.
+events through `listEvents` or a webhook subscription. Until then `validateManifest`, `installApp`
+and `upgradeAppManifest` refuse the gateway mode for a manifest with `events`, or with commands or
+components without `delivery.interactions_url` (rule 6 of 3.2); an installation made before keeps
+its manifest and its other ways. Wire format: [../api/webhooks.md](../api/webhooks.md), section 10.
 
 **Receive check.** For a personal event to an app, the receive action `agent.events.consume` is
 decided in filter mode by a rule for apps: the app must be the audience of the event (otherwise

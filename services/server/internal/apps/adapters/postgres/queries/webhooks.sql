@@ -116,6 +116,15 @@ UPDATE webhook_deliveries SET status = 'dead', last_error = 'event_expired', nex
 WHERE subscription_id = @subscription_id AND status = 'pending' AND event_seq < @below_seq
 RETURNING event_seq;
 
+-- name: SubscriptionsPendingBelow :many
+-- The sweep of the retention job (#893): the subscriptions with a pending row whose event_seq lies
+-- below a seq, at most row_limit, in id order; each lookup uses webhook_deliveries_pending_seq_idx.
+SELECT s.id FROM webhook_subscriptions s
+WHERE EXISTS (SELECT 1 FROM webhook_deliveries d
+              WHERE d.subscription_id = s.id AND d.status = 'pending' AND d.event_seq < @below_seq)
+ORDER BY s.id
+LIMIT @row_limit;
+
 -- name: ListDeliveries :many
 -- One page newest first; the keyset is (event_seq, id) descending; an empty status lists all.
 SELECT * FROM webhook_deliveries

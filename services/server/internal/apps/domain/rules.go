@@ -69,6 +69,7 @@ const (
 	ruleGrants   = "R-EX-03, 11 section 3.2 rule 4"
 	ruleCommands = "11 section 3.2 rule 5, 09 section 10"
 	ruleText     = "SEC-IN-4"
+	ruleGateway  = "11 section 9"
 )
 
 // minAPIPattern is min_api_version: major.minor (06 section 13).
@@ -257,7 +258,10 @@ func (c *checker) delivery(m Manifest) {
 }
 
 // deliveryMembers checks which members of the delivery block d the manifest needs (11 3.1 column
-// "Pflicht").
+// "Pflicht"). The gateway mode is refused while anything would reach the app over the gateway
+// (events, or commands and components without interactions_url): sync.snapshot.read has no app
+// scope, so the gateway closes every app at ready with 4018 (11 section 9, D-M2-25-24). Stored
+// manifests are only parsed, never checked again, so an installation made before stays readable.
 func (c *checker) deliveryMembers(m Manifest, d *Delivery) {
 	switch {
 	case d.Mode == DeliveryWebhook && d.EventsURL == "":
@@ -265,7 +269,12 @@ func (c *checker) deliveryMembers(m Manifest, d *Delivery) {
 	case d.Mode != DeliveryWebhook && d.EventsURL != "":
 		c.add("/delivery/events_url", CodeInvalid, "Only the webhook mode takes events_url ("+ruleFormat+").")
 	}
-	if (len(m.Commands) > 0 || len(m.Components) > 0) && d.Mode != DeliveryGateway && d.InteractionsURL == "" {
+	interactive := len(m.Commands) > 0 || len(m.Components) > 0
+	if d.Mode == DeliveryGateway && (len(m.Events) > 0 || interactive && d.InteractionsURL == "") {
+		c.add("/delivery/mode", CodeInvalid, "Apps cannot receive events, commands or components over the gateway yet, "+
+			"because the snapshot of ready has no app scope; use webhook with events_url and interactions_url ("+ruleGateway+").")
+	}
+	if interactive && d.Mode != DeliveryGateway && d.InteractionsURL == "" {
 		c.add("/delivery/interactions_url", CodeRequired, "Commands and components without the gateway need interactions_url ("+ruleFormat+").")
 	}
 	if (len(m.Events) > 0 || d.InteractionsURL != "") && m.DataEgress == "" {

@@ -165,7 +165,7 @@ func TestInstallApp_GrantedScopesRules(t *testing.T) {
 	o := w.RobinPhone.StepUp()
 	m := manifest("tracker", "1.0.0", []string{"messages:write"}, []string{"messages:read", "events:subscribe"}, func(m map[string]any) {
 		m["events"] = []any{"message.created"}
-		m["delivery"] = map[string]any{"mode": "gateway"}
+		m["delivery"] = map[string]any{"mode": "webhook", "events_url": "https://" + allowedHost + "/events"}
 		m["data_egress"] = "Messages of the granted channels go to the help desk."
 	})
 	w.WantField(o.Call(http.MethodPost, "/api/v1/apps", installBody(m, []string{"messages:read"}, nil), idem()...),

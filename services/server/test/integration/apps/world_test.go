@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -242,9 +243,30 @@ func (w *world) installApp(manifest map[string]any, scopes, events []string) str
 }
 
 // installLinker installs Linker with every scope, write on Support/Allgemein and an API token.
+// Linker stands for an installation made before installApp refused the gateway mode for apps with
+// events (11 section 9): it is installed in webhook mode, then its stored manifest becomes
+// linkerManifest (gateway, no interaction address) and the subscription of the install is
+// deleted. Every read of a stored manifest only parses it, so the tests below also prove that
+// such an installation keeps working.
 func (w *world) installLinker() {
-	w.linker = w.installApp(w.linkerManifest("1.0.0"), []string{"commands:write", "components:write", "events:subscribe", "messages:write"},
+	installable := w.linkerManifest("1.0.0")
+	installable["delivery"] = map[string]any{"mode": "webhook", "events_url": w.fake.URLFor(hooksHost, "/linker/events"),
+		"interactions_url": w.fake.URLFor(hooksHost, "/linker/interactions")}
+	w.linker = w.installApp(installable, []string{"commands:write", "components:write", "events:subscribe", "messages:write"},
 		[]string{"command.invoked"})
+	legacy, err := json.Marshal(w.linkerManifest("1.0.0"))
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	sum := sha256.Sum256(legacy)
+	if _, err := w.s.AdminDB().Exec(w.t.Context(), `UPDATE apps SET manifest = $1::jsonb, manifest_sha256 = $2 WHERE principal_id = $3`,
+		string(legacy), sum[:], w.linker); err != nil {
+		w.t.Fatal(err)
+	}
+	if _, err := w.s.AdminDB().Exec(w.t.Context(),
+		`DELETE FROM webhook_subscriptions WHERE app_installation_id IN (SELECT id FROM app_installations WHERE app_id = $1)`, w.linker); err != nil {
+		w.t.Fatal(err)
+	}
 	w.grant(w.linker, "Support/Allgemein")
 	w.linkerC = w.s.NewTokenClient(w.t, &harness.Client{PrincipalID: w.linker})
 	w.link = w.commandID(w.linker, "link")
