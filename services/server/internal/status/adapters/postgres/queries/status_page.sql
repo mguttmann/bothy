@@ -38,6 +38,18 @@ WHERE c.id = k.id;
 -- name: SetComponentState :exec
 UPDATE status_components SET state = sqlc.arg(state), updated_at = sqlc.arg(updated_at) WHERE id = sqlc.arg(id);
 
+-- name: ProbeTracks :many
+-- The memory of status.probe (AUD srv-stats-status-11); the job reads it after LockComponents.
+SELECT component_id, state, entered_at, out_since, failing_since, last_round
+FROM status_component_probe;
+
+-- name: UpsertProbeTrack :exec
+INSERT INTO status_component_probe (component_id, state, entered_at, out_since, failing_since, last_round)
+VALUES (sqlc.arg(component_id), sqlc.arg(state), sqlc.arg(entered_at), sqlc.narg(out_since), sqlc.narg(failing_since), sqlc.arg(last_round))
+ON CONFLICT (component_id) DO UPDATE
+SET state = EXCLUDED.state, entered_at = EXCLUDED.entered_at, out_since = EXCLUDED.out_since,
+    failing_since = EXCLUDED.failing_since, last_round = EXCLUDED.last_round;
+
 -- name: DeleteComponent :execrows
 DELETE FROM status_components WHERE id = sqlc.arg(id);
 

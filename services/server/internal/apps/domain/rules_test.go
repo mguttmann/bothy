@@ -104,6 +104,21 @@ func TestValidateManifest_Example(t *testing.T) {
 	}
 }
 
+// TestValidateManifest_GatewayWithoutGatewayDelivery: a manifest in gateway mode passes when
+// nothing reaches the app over the gateway (no events, commands and components at
+// interactions_url), so only the delivery modes that cannot work are refused (11 section 9).
+func TestValidateManifest_GatewayWithoutGatewayDelivery(t *testing.T) {
+	t.Parallel()
+	m := exampleManifest()
+	m["min_api_version"] = "1.4"
+	delete(m, "events")
+	m["delivery"] = map[string]any{"mode": "gateway", "interactions_url": "https://bridge.example.com/hooks/interactions"}
+	raw, parsed := encode(t, m)
+	if fe := domain.ValidateManifest(parsed, raw, testEnv()); len(fe) != 0 {
+		t.Fatalf("errors %+v", fe)
+	}
+}
+
 // at returns the object at the path of keys and indexes inside m.
 func at(m map[string]any, path ...any) map[string]any {
 	var cur any = m
@@ -158,6 +173,15 @@ func TestValidateManifest_Rules(t *testing.T) {
 			mutate: func(m map[string]any) { delete(at(m, "delivery"), "events_url") }},
 		{name: "gateway mode with events_url", pointer: "/delivery/events_url", code: "invalid",
 			mutate: func(m map[string]any) { at(m, "delivery")["mode"] = "gateway" }},
+		{name: "gateway mode with events", pointer: "/delivery/mode", code: "invalid",
+			mutate: func(m map[string]any) {
+				m["delivery"] = map[string]any{"mode": "gateway", "interactions_url": "https://bridge.example.com/i"}
+			}},
+		{name: "gateway mode for commands without interactions_url", pointer: "/delivery/mode", code: "invalid",
+			mutate: func(m map[string]any) {
+				delete(m, "events")
+				m["delivery"] = map[string]any{"mode": "gateway"}
+			}},
 		{name: "commands without interactions_url in webhook mode", pointer: "/delivery/interactions_url", code: "required",
 			mutate: func(m map[string]any) { delete(at(m, "delivery"), "interactions_url") }},
 		{name: "events without data_egress", pointer: "/data_egress", code: "required",

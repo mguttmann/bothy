@@ -752,7 +752,9 @@ amount per run, and run the same use case in one transaction:
   the run ID is reported in `unmatched_run_ids`: no entry in the period (also an unknown run),
   mode `personal` (amounts are information, never invoice), another provider, another or mixed
   currencies (no conversion). Entries outside the period stay as they are, so a run with turns on
-  two days is reconciled per day.
+  two days is reconciled per day. After the commit the server logs one line `cost reconciliation
+  entry unmatched` (info) per unmatched run with `bothy.run.id` and the first rule that failed as
+  `bothy.reason` (`no_entries`, `personal`, `provider`, `currency`), never an amount.
 - Split: the amount of a run is split over its valid entries in the period in proportion to their
   amounts (rounded down, the remainder on the largest entry, ties to the smallest ID; with all
   amounts `0` everything on the smallest ID), so every one of them gets exactly one `reconciled`

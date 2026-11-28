@@ -104,7 +104,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `audit_ip_keys` | no | keys of the IP pseudonyms in the audit log, stored encrypted (4.5) | `audit` | the key is destroyed after `privacy.audit_ip_key_retention`; the row stays as a record |
 | `gdpr_requests` | direct | data subject, kind, reason, state | `privacy_job` | `retention.privacy_job` |
 | `deletion_journal_state` | no | numbering of the deletion journal (4.6) | `config` | none |
-| `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | no | operational status, backup runs | `ops` | `retention.ops` |
+| `status_components`, `status_component_probe`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | no | operational status, backup runs | `ops` | `retention.ops` |
 | `local_credentials` (03, 08) | indirect | password hash, encrypted TOTP secret | `security` | immediately on account deletion |
 | `enrollment_codes` (03, 08) | indirect | hash, times | `security` | `retention.security_after_end` |
 | `auth_login_flows` (03, 08) | direct | login flow; between callback and completion the verified identity from the provider (`external_identity`: subject, display name, email hint), empty afterwards | `transient` | `auth.login_flow_ttl` |

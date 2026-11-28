@@ -147,6 +147,9 @@ type scheduleTarget interface {
 // ticker starts the due kinds; *wire.BackupScheduler implements it.
 type ticker interface {
 	Tick(ctx context.Context, now time.Time) []string
+	// RetryFailed plans the retry of a run of an earlier process that failed or was canceled at
+	// the latest due time of its kind.
+	RetryFailed(ctx context.Context, now time.Time) error
 	Wait()
 }
 
@@ -158,7 +161,8 @@ func (d daemonTarget) NewScheduler(start time.Time) ticker { return d.BackupDaem
 
 // schedule runs the scheduler of d until ctx ends: at the start of every minute of clk it starts
 // the kinds that became due since the previous tick (none before the start of the process, so
-// missed times are not caught up) and samples the WAL archive and the volumes. wait sleeps until
+// missed times are not caught up) and the retries of failed runs, and samples the WAL archive and
+// the volumes. wait sleeps until
 // an instant of clk or until ctx ends and reports whether the instant was reached. On return
 // every started run has finished; a run canceled by the stop is recorded as failed with the code
 // canceled.
@@ -168,7 +172,10 @@ func (d daemonTarget) NewScheduler(start time.Time) ticker { return d.BackupDaem
 // the backup_runs rows that were running before this process started are closed as failed with
 // the code interrupted. The default command is the first process of its container, so nothing
 // else uses either at that moment; the short commands never do this step, because they run next
-// to the daemon.
+// to the daemon. Once the rows are closed, the scheduler plans the retry of a run of the latest due
+// time that failed, was canceled by the stop of the earlier process or was just closed
+// (RetryFailed, AUD srv-stats-status-8); like the closing it is tried again before every tick
+// until it succeeded once.
 func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(ctx context.Context, clk clock.Clock, at time.Time) bool) {
 	started := clk.Now()
 	// Both log their own error. A dump directory that cannot be emptied does not stop the
@@ -182,6 +189,7 @@ func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(
 	primed := d.Prime(ctx) == nil
 	sched := d.NewScheduler(clk.Now())
 	defer sched.Wait()
+	resumed := closed && sched.RetryFailed(ctx, clk.Now()) == nil
 	d.Sample(ctx)
 	for {
 		next := clk.Now().Truncate(time.Minute).Add(time.Minute)
@@ -191,6 +199,9 @@ func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(
 		if !closed {
 			// Still with the start of the process: a run a tick started since then is alive.
 			closed = d.CloseInterrupted(ctx, started) == nil
+		}
+		if closed && !resumed {
+			resumed = sched.RetryFailed(ctx, clk.Now()) == nil
 		}
 		if !primed {
 			primed = d.Prime(ctx) == nil

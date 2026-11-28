@@ -11,10 +11,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/app"
-	"github.com/OWNER/bothy/services/server/internal/files/domain"
 )
 
 // tmpDir holds the temporary files of writes. It starts with a dot, which no key may contain, so
@@ -122,23 +120,6 @@ func serverDir(fi iofs.FileInfo) bool {
 
 // Close releases the directory handle of the root. Operations after Close fail.
 func (s *Store) Close() error { return s.root.Close() }
-
-// PresignUploadPart refuses with app.ErrNotSupported after the key check and the argument
-// checks of the port (app.ErrInvalidPart for n < 1, app.ErrSizeMismatch for size < 1) and
-// without any file system call: presigned uploads exist only with the S3 driver (12 "4.1",
-// "3.3").
-func (s *Store) PresignUploadPart(_ context.Context, key, _ string, n int, size int64, _ time.Duration) (app.PresignedPart, error) {
-	if err := domain.ValidateKey(key); err != nil {
-		return app.PresignedPart{}, opErr("presign upload part", "", err)
-	}
-	if n < 1 {
-		return app.PresignedPart{}, opErr("presign upload part", key, app.ErrInvalidPart)
-	}
-	if size < 1 {
-		return app.PresignedPart{}, opErr("presign upload part", key, app.ErrSizeMismatch)
-	}
-	return app.PresignedPart{}, opErr("presign upload part", key, app.ErrNotSupported)
-}
 
 // event reports one step of a write to the test seam.
 func (s *Store) event(e, name string) {

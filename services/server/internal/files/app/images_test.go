@@ -431,6 +431,56 @@ func TestProcessImageContainerValues(t *testing.T) {
 	}
 }
 
+// TestProcessImageSlotsBusy (srv-files-core-13): with every slot of file.image.max_concurrent
+// taken, a further run returns ErrImageSlotsBusy at once, without waiting under the job timeout
+// and without reading the file; once a slot is free the run works.
+func TestProcessImageSlotsBusy(t *testing.T) {
+	t.Parallel()
+	e := newImageEnv(t, nil)
+	var mu sync.Mutex
+	ran := map[ids.ID]bool{}
+	entered := make(chan struct{}, imageCfg.MaxConcurrent)
+	release := make(chan struct{})
+	holders := map[ids.ID]bool{}
+	e.hooks.BeforeRun = func(_ context.Context, id ids.ID) error {
+		mu.Lock()
+		ran[id] = true
+		hold := holders[id]
+		mu.Unlock()
+		if hold {
+			entered <- struct{}{}
+			<-release
+		}
+		return nil
+	}
+	var wg sync.WaitGroup
+	for range imageCfg.MaxConcurrent {
+		f := e.seed(t, "application/pdf", "complete", []byte("%PDF"))
+		mu.Lock()
+		holders[f.ID] = true
+		mu.Unlock()
+		wg.Go(func() { _ = e.proc.ProcessImage(context.Background(), f.ID) })
+	}
+	for range imageCfg.MaxConcurrent {
+		testkit.Receive(t, "a run took a slot", entered)
+	}
+	extra := e.seed(t, "application/pdf", "complete", []byte("%PDF"))
+	if err := e.proc.ProcessImage(context.Background(), extra.ID); !errors.Is(err, app.ErrImageSlotsBusy) {
+		t.Fatalf("ProcessImage with every slot taken = %v, want ErrImageSlotsBusy", err)
+	}
+	mu.Lock()
+	ranExtra := ran[extra.ID]
+	mu.Unlock()
+	if ranExtra {
+		t.Error("the run without a slot started")
+	}
+	close(release)
+	wg.Wait()
+	if err := e.proc.ProcessImage(context.Background(), extra.ID); err != nil {
+		t.Fatalf("ProcessImage with a free slot = %v", err)
+	}
+}
+
 // TestProcessImageConcurrencyLimit: never more runs at once than file.image.max_concurrent. The
 // runs that hold a slot wait until the test saw max_concurrent of them enter, so the peak reaches
 // the limit on any machine; a limiter that let a further run through would raise it.

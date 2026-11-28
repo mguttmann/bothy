@@ -148,16 +148,24 @@ func NewImageProcessor(cfg ImageConfig, d ImageDeps) (*ImageProcessor, error) {
 	return &ImageProcessor{cfg: cfg, d: d, slots: make(chan struct{}, cfg.MaxConcurrent)}, nil
 }
 
+// ErrImageSlotsBusy reports that every slot of file.image.max_concurrent in this process is taken;
+// ProcessImage did nothing, and the handler of files.thumbnail runs the job again later without
+// using up an attempt.
+var ErrImageSlotsBusy = errors.New("files: every image slot of the process is taken")
+
 // ProcessImage runs files.thumbnail for fileID (design note 3). It returns nil when the file is
 // gone, deleted, failed, not clean or skipped, or when nothing is left to do, so every run can
 // repeat without double effect (02 12.4 "Rules for jobs" item 1). A transient error of the store or
 // the database, a changed original and a cancelled ctx return the error, and River retries.
-// Permanent image errors (pixel limit, undecodable image) end a phase without retry.
+// Permanent image errors (pixel limit, undecodable image) end a phase without retry. With every
+// slot taken it returns ErrImageSlotsBusy at once.
 func (p *ImageProcessor) ProcessImage(ctx context.Context, fileID ids.ID) error {
 	select {
 	case p.slots <- struct{}{}:
-	case <-ctx.Done():
-		return ctx.Err()
+	default:
+		// The run does not wait for a slot under the job timeout: the handler holds the job and
+		// frees the worker of the queue files for the scans.
+		return ErrImageSlotsBusy
 	}
 	defer func() { <-p.slots }()
 	if h := p.d.Hooks.AfterRun; h != nil {

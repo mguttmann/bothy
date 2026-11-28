@@ -72,7 +72,7 @@ func TestStripPNGRemovesMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			b := img.Bounds()
-			if info.Width != b.Dx() || info.Height != b.Dy() || !bytes.Equal(info.ICCP, wantICCP) || info.Animated {
+			if info.Width != b.Dx() || info.Height != b.Dy() || !bytes.Equal(info.ICCP, wantICCP) {
 				t.Fatalf("info = %+v", info)
 			}
 			checkSamePNGPixels(t, in, out)
@@ -118,13 +118,14 @@ func checkSamePNGPixels(t *testing.T, a, b []byte) {
 	samePixels(t, ia, ib)
 }
 
+// TestStripPNGAnimated: the acTL chunk of an APNG passes the filter unchanged.
 func TestStripPNGAnimated(t *testing.T) {
 	in := buildPNG(t, palettedTestImage(), pngExtras{})
 	ihdrEnd := len(pngSignature) + 12 + 13
 	actl := pngChunk("acTL", []byte{0, 0, 0, 1, 0, 0, 0, 0})
 	in = append(append(append([]byte{}, in[:ihdrEnd]...), actl...), in[ihdrEnd:]...)
 	info, out := stripTestPNG(t, in)
-	if !info.Animated || info.ColourType != 3 || info.ICCP != nil {
+	if info.ICCP != nil {
 		t.Fatalf("info = %+v", info)
 	}
 	if !bytes.Contains(out, actl) {

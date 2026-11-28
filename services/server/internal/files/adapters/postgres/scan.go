@@ -4,10 +4,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/postgres/sqlcgen"
@@ -21,8 +19,8 @@ var _ app.ScanRepository = (*Repository)(nil)
 
 // ScanTarget implements app.ScanRepository.
 func (r *Repository) ScanTarget(ctx context.Context, fileID ids.ID) (app.SessionRecord, bool, error) {
-	row, err := r.read(ctx).GetScanTarget(ctx, uuid(fileID))
-	return scanTarget(row, err)
+	row, err := r.read(ctx).GetSessionByID(ctx, uuid(fileID))
+	return readSession(row, err)
 }
 
 // LockScanTarget implements app.ScanRepository: the session row and then the files row FOR UPDATE.
@@ -32,7 +30,7 @@ func (r *Repository) LockScanTarget(ctx context.Context, fileID ids.ID) (app.Ses
 		return app.SessionRecord{}, false, err
 	}
 	row, err := q.LockScanTarget(ctx, uuid(fileID))
-	return scanTarget(sqlcgen.GetScanTargetRow(row), err)
+	return readSession(sqlcgen.GetSessionByIDRow(row), err)
 }
 
 // FinishScan implements app.ScanRepository: the file, guarded by its pending state, then the
@@ -62,31 +60,6 @@ func (r *Repository) FinishScan(ctx context.Context, fileID ids.ID, res app.Scan
 func (r *Repository) CountAwaitingScan(ctx context.Context) (int64, error) {
 	n, err := r.read(ctx).CountAwaitingScan(ctx)
 	return n, mapError(err, "counting the files awaiting the scan")
-}
-
-// scanTarget converts a scan target row; no row is found = false.
-func scanTarget(row sqlcgen.GetScanTargetRow, err error) (app.SessionRecord, bool, error) {
-	if errors.Is(err, pgx.ErrNoRows) {
-		return app.SessionRecord{}, false, nil
-	}
-	if err != nil {
-		return app.SessionRecord{}, false, mapError(err, "reading a scan target")
-	}
-	s, _, err := oneSession(sqlcgen.GetSessionRow{
-		FileID: row.FileID, Mode: row.Mode, State: row.State, DeclaredSizeBytes: row.DeclaredSizeBytes,
-		DeclaredSha256: row.DeclaredSha256, PartSizeBytes: row.PartSizeBytes, PartCount: row.PartCount,
-		StorageUploadID: row.StorageUploadID, CreatedAt: row.CreatedAt, CompletedAt: row.CompletedAt, ExpiresAt: row.ExpiresAt,
-		ObjectKey: row.ObjectKey, Sha256: row.Sha256, SizeBytes: row.SizeBytes, MimeType: row.MimeType,
-		DeclaredMimeType: row.DeclaredMimeType, OriginalName: row.OriginalName, UploadedBy: row.UploadedBy, Purpose: row.Purpose,
-		ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
-		Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus,
-		TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, FileCreatedAt: row.FileCreatedAt,
-	}, nil)
-	if err != nil {
-		return app.SessionRecord{}, false, err
-	}
-	s.File.Deleted = row.Deleted
-	return s, true, nil
 }
 
 // optionalTS converts an optional time: the zero time becomes NULL.

@@ -40,6 +40,15 @@ WHERE state = 'succeeded' AND kind = ANY (sqlc.arg(kinds)::text[])
 ORDER BY started_at DESC, id DESC
 LIMIT 1;
 
+-- name: LatestBackupRunOfKind :one
+-- The newest run of one kind in any state: bothy-backupd retries it at start when it failed
+-- (AUD srv-stats-status-8). The index (kind, started_at DESC) serves this.
+SELECT id, kind, state, started_at, COALESCE(error, '')::text AS error
+FROM backup_runs
+WHERE kind = sqlc.arg(kind)
+ORDER BY started_at DESC, id DESC
+LIMIT 1;
+
 -- name: SucceededBackupRuns :many
 -- The succeeded backups with the position of the deletion journal of their manifest, 0 for a
 -- manifest before M7-07: the journal retention keeps every object a kept backup needs (M7-07).

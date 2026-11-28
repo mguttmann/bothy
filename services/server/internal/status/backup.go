@@ -66,9 +66,18 @@ type BackupRuns interface {
 	//
 	//	run, ok, err := runs.LatestSucceeded(ctx, status.BackupPGFull, status.BackupPGDiff)
 	LatestSucceeded(ctx context.Context, kinds ...BackupKind) (BackupRun, bool, error)
+	// LatestRun returns the newest run of kind by started_at in any state, with State and
+	// Error and without its manifest, and true, or false when there is none: bothy-backupd reads
+	// it at start to retry a run that the stop of the previous process canceled or that failed
+	// shortly before (AUD srv-stats-status-8).
+	//
+	// Example:
+	//
+	//	run, ok, err := runs.LatestRun(ctx, status.BackupLogical)
+	LatestRun(ctx context.Context, kind BackupKind) (BackupRun, bool, error)
 }
 
-// BackupRun is a recorded run as LatestSucceeded returns it.
+// BackupRun is a recorded run as LatestSucceeded and LatestRun return it.
 type BackupRun struct {
 	// ID is backup_runs.id.
 	ID ids.ID
@@ -76,8 +85,13 @@ type BackupRun struct {
 	Kind BackupKind
 	// StartedAt is backup_runs.started_at.
 	StartedAt time.Time
-	// Manifest is backup_runs.manifest, the JSON of backup_manifest.v1.
+	// Manifest is backup_runs.manifest, the JSON of backup_manifest.v2 (or v1 of an earlier
+	// run); LatestRun leaves it empty.
 	Manifest []byte
+	// State is backup_runs.state: running, succeeded or failed.
+	State string
+	// Error is backup_runs.error, "" when it is NULL.
+	Error string
 }
 
 // FinishedRun is the outcome of one run as Finish records it.
@@ -88,7 +102,7 @@ type FinishedRun struct {
 	Succeeded bool
 	// SizeBytes is backup_runs.size_bytes; a negative value records NULL (unknown).
 	SizeBytes int64
-	// Manifest is the JSON of backup_manifest.v1; nil records the default '{}' (a failed run).
+	// Manifest is the JSON of backup_manifest.v2; nil records the default '{}' (a failed run).
 	Manifest []byte
 	// Checks is the JSON of restore_test_checks.v1 of a restore test; nil records the default
 	// '{}' (every backup kind).

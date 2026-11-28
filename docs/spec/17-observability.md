@@ -41,6 +41,7 @@ units and attributes. Summary:
 | Sync | `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, `bothy.event.fanout.lag`, `bothy.db.event_seq.lock_wait` |
 | Agents | `bothy.run.start.latency`, `bothy.run.duration`, `bothy.run.finished`, `bothy.run.steps`, `bothy.run.tokens` (not built yet, signals.md), `bothy.run.cost`, `bothy.agent.consumer.lag` |
 | Push | `bothy.push.sent`, `bothy.push.skipped`, `bothy.push.fetch` |
+| Webhooks | `bothy.webhook.delivery`, `bothy.webhook.transition` |
 | Database | Receiver `postgresql` in the collector, `db.client.operation.duration`, `bothy.db.pool.connections` |
 | Backup | `bothy.backup.last_success.timestamp`, `bothy.backup.restore_test.*`, `bothy.storage.volume.*` |
 

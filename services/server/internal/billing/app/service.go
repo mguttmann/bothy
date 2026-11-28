@@ -45,7 +45,7 @@ type Deps struct {
 	// further page with an internal error.
 	Cursors Cursors
 	// Logger reports a run or session the job leaves unchanged because its valid entries mix
-	// currencies; nil discards.
+	// currencies, and every unmatched entry of a reconciliation with its reason; nil discards.
 	Logger *slog.Logger
 }
 

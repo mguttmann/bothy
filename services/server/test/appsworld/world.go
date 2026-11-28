@@ -263,6 +263,7 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	w.web.Resolver.Set(HooksHost, "127.0.0.1")
 	w.web.Resolver.Set(AltHost, "127.0.0.1")
 	w.web.Metrics = &Metrics{n: map[egress.Reason]int{}}
+	w.web.Signals = &Signals{deliveries: map[string]int{}, transitions: map[string]int{}}
 	wcfg := WebhookConfig()
 	wcfg.AllowedHosts = append(append([]string{}, appsCfg.AllowedHosts...),
 		HooksHost+":"+w.web.Hooks.Port(), AltHost+":"+w.web.Alt.Port())
@@ -285,7 +286,8 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	w.web.Invocations = &Invocations{}
 	w.web.deps = appsapp.WebhookDeps{Store: repo, Repo: repo, UoW: w.uow, Authorizer: az, Audit: w.rec, Sender: sender, Master: master,
 		Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow), Log: syncRepo, Cursors: appshttp.Cursors{},
-		Agents: appsapp.IdentityPrincipals{Directory: w.id.Directory}, Invocations: w.web.Invocations, Clock: w.Clk, Logger: log}
+		Agents: appsapp.IdentityPrincipals{Directory: w.id.Directory}, Invocations: w.web.Invocations, Clock: w.Clk, Logger: log,
+		Metrics: w.web.Signals}
 	// Chat and messaging serve the incoming webhooks the module builds (M2-27); the tests of this
 	// world reach them only through uninstall, which revokes the webhooks of the app.
 	rights, ok := az.(authz.RightsQuery)
@@ -310,7 +312,7 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	Must(t, err)
 	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,
 		Clock: w.Clk, Webhooks: wire.WebhookDeps{Config: wcfg, Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow),
-			Log: syncRepo, Master: master, Sender: sender, Invocations: w.web.Invocations, Logger: log},
+			Log: syncRepo, Master: master, Sender: sender, Invocations: w.web.Invocations, Logger: log, Metrics: w.web.Signals},
 		Incoming: appsapp.IncomingConfig{MaxContentBytes: 4096, FormatsEnabled: []string{"native", "alertmanager"},
 			LastUsedGranularity: idCfg.LastActiveGranularity, PublicURL: httpservertest.PublicURL},
 		Chat: ch, Messages: msgs, Commands: cmds, Components: noComponents{}})

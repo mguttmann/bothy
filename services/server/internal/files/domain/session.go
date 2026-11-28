@@ -7,7 +7,9 @@ import (
 	"fmt"
 )
 
-// SessionState is file_upload_sessions.state (docs/spec/03-data-model.md 4.7).
+// SessionState is file_upload_sessions.state (docs/spec/03-data-model.md 4.7). The writes of
+// adapters/postgres hold the transitions in their WHERE clauses: completing, aborting and
+// expiring change only an open row, and the import reopens an aborted or expired one (M8-11).
 type SessionState string
 
 // The states of an upload session.
@@ -21,23 +23,6 @@ const (
 	// SessionExpired ran past expires_at while open (set by the cleanup of M3-08).
 	SessionExpired SessionState = "expired"
 )
-
-// ErrTransition reports a state change the session machine does not allow.
-var ErrTransition = errors.New("files: session transition not allowed")
-
-// CheckTransition reports whether an upload session may go from one state to another: only an
-// open session changes, to completed, aborted or expired (docs/spec/12-files.md "2"). Every
-// other pair, also a state to itself, gives an error wrapping ErrTransition.
-//
-// Example:
-//
-//	err := domain.CheckTransition(domain.SessionCompleted, domain.SessionAborted) // ErrTransition
-func CheckTransition(from, to SessionState) error {
-	if from == SessionOpen && (to == SessionCompleted || to == SessionAborted || to == SessionExpired) {
-		return nil
-	}
-	return fmt.Errorf("%w: %s to %s", ErrTransition, from, to)
-}
 
 // The values of UploadState.upload_state of getUpload (openapi UploadState, its own enum).
 const (

@@ -127,7 +127,8 @@ type Observed struct {
 	UpdatedAt time.Time
 }
 
-// Track is the memory of the job status.probe about one component in one process (D-M7-09-3):
+// Track is the memory of the job status.probe about one component (D-M7-09-3), stored in
+// status_component_probe so that every worker reads the same (AUD srv-stats-status-11):
 // the state it saw after its last round, since when, since when the component is out of
 // operational, when the current run of failing rounds began, and when it saw the last round. The
 // timers of the state machine and of the incidents read only this memory, never a column that
@@ -147,7 +148,7 @@ type Track struct {
 	LastRound time.Time
 }
 
-// seed returns the memory of a component that this process has no valid memory of.
+// seed returns the memory of a component that has no valid memory.
 func seed(c Observed) Track {
 	tr := Track{State: c.State, EnteredAt: c.UpdatedAt}
 	if c.State != StateOperational {
@@ -159,7 +160,7 @@ func seed(c Observed) Track {
 // Step applies the outcome o of the round at now to the component c (16 12 "Automatic state"): a
 // pass gives operational at once; failing rounds give degraded (Fail) or major_outage (Outage,
 // NoAnswer) once they have lasted status.degrade_after; no evidence changes nothing; maintenance
-// is the owner's and stays. The memory tr is valid only while this process saw every round of the
+// is the owner's and stays. The memory tr is valid only while the job ran every round of the
 // component (at least every gapRounds intervals) and the stored state is the one it left;
 // otherwise it starts again from c, so a broken memory delays, never hastens, a change.
 func Step(c Observed, tr Track, o Outcome, now time.Time, cfg ProbeConfig) (ComponentState, Track) {

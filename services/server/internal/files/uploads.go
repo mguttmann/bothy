@@ -108,9 +108,8 @@ type PutPart struct {
 	// ContentDigest is the Content-Digest header (RFC 9530) as received; the use case parses it
 	// after the session checks (docs/DECISIONS.md D-M3-03-10).
 	ContentDigest string
-	// ContentLength is the Content-Length of the request; -1 when unknown.
-	ContentLength int64
-	// Body streams the part.
+	// Body streams the part. Its length is checked while it is read: the strict handler does not
+	// see Content-Length (docs/decisions.d/M3-03.md D-M3-03-22).
 	Body io.Reader
 }
 

@@ -106,10 +106,15 @@ func (r *Repository) InsertUpload(ctx context.Context, u app.NewUpload) error {
 	}), "inserting an upload session")
 }
 
-// Session implements app.Repository.
+// Session implements app.Repository: the session of a file of principal that is not deleted; a
+// foreign or deleted one is not found, like an unknown id.
 func (r *Repository) Session(ctx context.Context, fileID, principal ids.ID) (app.SessionRecord, bool, error) {
-	row, err := r.read(ctx).GetSession(ctx, sqlcgen.GetSessionParams{FileID: uuid(fileID), UploadedBy: uuid(principal)})
-	return oneSession(row, err)
+	row, err := r.read(ctx).GetSessionByID(ctx, uuid(fileID))
+	s, found, err := readSession(row, err)
+	if !found || s.File.UploadedBy != principal || s.File.Deleted {
+		return app.SessionRecord{}, false, err
+	}
+	return s, true, nil
 }
 
 // LockSession implements app.Repository.
@@ -120,10 +125,10 @@ func (r *Repository) LockSession(ctx context.Context, fileID, principal ids.ID, 
 	}
 	if update {
 		row, err := q.LockSessionForUpdate(ctx, sqlcgen.LockSessionForUpdateParams{FileID: uuid(fileID), UploadedBy: uuid(principal)})
-		return oneSession(sqlcgen.GetSessionRow(row), err)
+		return readSession(sqlcgen.GetSessionByIDRow(row), err)
 	}
 	row, err := q.LockSessionForShare(ctx, sqlcgen.LockSessionForShareParams{FileID: uuid(fileID), UploadedBy: uuid(principal)})
-	return oneSession(sqlcgen.GetSessionRow(row), err)
+	return readSession(sqlcgen.GetSessionByIDRow(row), err)
 }
 
 // SetStorageUploadID implements app.Repository.
@@ -144,7 +149,11 @@ func (r *Repository) Parts(ctx context.Context, fileID ids.ID) ([]app.PartRecord
 	}
 	out := make([]app.PartRecord, 0, len(rows))
 	for _, p := range rows {
-		out = append(out, partOf(p))
+		rec, err := partOf(p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
 	}
 	return out, nil
 }
@@ -158,7 +167,8 @@ func (r *Repository) Part(ctx context.Context, fileID ids.ID, n int) (app.PartRe
 	if err != nil {
 		return app.PartRecord{}, false, mapError(err, "reading a part")
 	}
-	return partOf(row), true, nil
+	rec, err := partOf(row)
+	return rec, err == nil, err
 }
 
 // InsertPart implements app.Repository.
@@ -207,63 +217,100 @@ func (r *Repository) AbortSession(ctx context.Context, fileID ids.ID) error {
 	return mapError(q.DeleteParts(ctx, uuid(fileID)), "deleting parts")
 }
 
-// File implements app.Repository: the file with its thumbnails (M3-06).
+// File implements app.Repository: the file with its thumbnails (M3-06); a deleted file is not
+// found.
 func (r *Repository) File(ctx context.Context, fileID ids.ID) (app.FileRecord, bool, error) {
 	q := r.read(ctx)
-	row, err := q.GetFile(ctx, uuid(fileID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return app.FileRecord{}, false, nil
+	row, err := q.GetFileByID(ctx, uuid(fileID))
+	f, found, err := readFile(row, err)
+	if !found || f.Deleted {
+		return app.FileRecord{}, false, err
 	}
-	if err != nil {
-		return app.FileRecord{}, false, mapError(err, "reading a file")
-	}
-	f := fileRecord(row)
 	if f.Thumbnails, err = thumbnails(ctx, q, row.ID); err != nil {
 		return app.FileRecord{}, false, err
 	}
 	return f, true, nil
 }
 
-// fileRecord converts a files row.
-func fileRecord(row sqlcgen.GetFileRow) app.FileRecord {
+// readFile converts the result of a file read (GetFileByID, LockFileByID); no row is found =
+// false.
+func readFile(row sqlcgen.GetFileByIDRow, err error) (app.FileRecord, bool, error) {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.FileRecord{}, false, nil
+	}
+	if err != nil {
+		return app.FileRecord{}, false, mapError(err, "reading a file")
+	}
+	f, err := fileOf(row)
+	return f, err == nil, err
+}
+
+// fileOf is the one mapping of the file row shape (GetFileByID, LockFileByID). Thumbnails stay
+// empty; the callers that need them read them.
+func fileOf(row sqlcgen.GetFileByIDRow) (app.FileRecord, error) {
+	sum, err := digest(row.Sha256)
+	if err != nil {
+		return app.FileRecord{}, err
+	}
 	return app.FileRecord{
-		ID: idOf(row.ID), ObjectKey: row.ObjectKey, SHA256: digest(row.Sha256), SizeBytes: row.SizeBytes, MIMEType: row.MimeType,
+		ID: idOf(row.ID), ObjectKey: row.ObjectKey, SHA256: sum, SizeBytes: row.SizeBytes, MIMEType: row.MimeType,
 		DeclaredMIMEType: row.DeclaredMimeType.String, OriginalName: row.OriginalName, UploadedBy: idOf(row.UploadedBy),
 		Purpose: row.Purpose, ScopeChannelID: idOf(row.ScopeChannelID), UploadState: row.UploadState, ScanStatus: row.ScanStatus,
 		Width: int(row.Width.Int32), Height: int(row.Height.Int32), DurationMS: row.DurationMs.Int64,
 		TranscriptStatus: row.TranscriptStatus, TranscriptLanguage: row.TranscriptLanguage.String,
 		TranscriptSource: row.TranscriptSource.String, TranscriptText: row.TranscriptText.String, CreatedAt: timeOf(row.CreatedAt),
-	}
+		Deleted: row.Deleted,
+	}, nil
 }
 
-// oneSession converts the result of a session read; no row is found = false.
-func oneSession(row sqlcgen.GetSessionRow, err error) (app.SessionRecord, bool, error) {
+// readSession converts the result of a session read (GetSessionByID and the three locks); no row
+// is found = false.
+func readSession(row sqlcgen.GetSessionByIDRow, err error) (app.SessionRecord, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return app.SessionRecord{}, false, nil
 	}
 	if err != nil {
 		return app.SessionRecord{}, false, mapError(err, "reading a session")
 	}
+	s, err := sessionOf(row)
+	return s, err == nil, err
+}
+
+// sessionOf is the one mapping of the session row shape. The file part goes through fileOf, so
+// both shapes map the file columns the same way (TestSessionRowCarriesTheFileRow holds the
+// columns equal).
+func sessionOf(row sqlcgen.GetSessionByIDRow) (app.SessionRecord, error) {
+	declared, err := digest(row.DeclaredSha256)
+	if err != nil {
+		return app.SessionRecord{}, err
+	}
+	f, err := fileOf(sqlcgen.GetFileByIDRow{
+		ID: row.FileID, ObjectKey: row.ObjectKey, Sha256: row.Sha256, SizeBytes: row.SizeBytes, MimeType: row.MimeType,
+		DeclaredMimeType: row.DeclaredMimeType, OriginalName: row.OriginalName, UploadedBy: row.UploadedBy, Purpose: row.Purpose,
+		ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
+		Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus, TranscriptText: row.TranscriptText,
+		TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, CreatedAt: row.FileCreatedAt,
+		Deleted: row.Deleted,
+	})
+	if err != nil {
+		return app.SessionRecord{}, err
+	}
 	return app.SessionRecord{
 		FileID: idOf(row.FileID), Mode: row.Mode, State: domain.SessionState(row.State), DeclaredSizeBytes: row.DeclaredSizeBytes,
-		DeclaredSHA256: digest(row.DeclaredSha256), PartSizeBytes: row.PartSizeBytes, PartCount: int(row.PartCount),
+		DeclaredSHA256: declared, PartSizeBytes: row.PartSizeBytes, PartCount: int(row.PartCount),
 		StorageUploadID: row.StorageUploadID.String, CreatedAt: timeOf(row.CreatedAt), CompletedAt: timeOf(row.CompletedAt),
-		ExpiresAt: timeOf(row.ExpiresAt),
-		File: app.FileRecord{
-			ID: idOf(row.FileID), ObjectKey: row.ObjectKey, SHA256: digest(row.Sha256), SizeBytes: row.SizeBytes, MIMEType: row.MimeType,
-			DeclaredMIMEType: row.DeclaredMimeType.String, OriginalName: row.OriginalName, UploadedBy: idOf(row.UploadedBy),
-			Purpose: row.Purpose, ScopeChannelID: idOf(row.ScopeChannelID), UploadState: row.UploadState, ScanStatus: row.ScanStatus,
-			Width: int(row.Width.Int32), Height: int(row.Height.Int32), DurationMS: row.DurationMs.Int64,
-			TranscriptStatus: row.TranscriptStatus, TranscriptLanguage: row.TranscriptLanguage.String,
-			TranscriptSource: row.TranscriptSource.String, CreatedAt: timeOf(row.FileCreatedAt),
-		},
-	}, true, nil
+		ExpiresAt: timeOf(row.ExpiresAt), File: f,
+	}, nil
 }
 
 // partOf converts a part row.
-func partOf(p sqlcgen.FileUploadPart) app.PartRecord {
-	return app.PartRecord{FileID: idOf(p.FileID), PartNumber: int(p.PartNumber), SizeBytes: p.SizeBytes, SHA256: digest(p.Sha256),
-		ETag: p.Etag.String, ReceivedAt: timeOf(p.ReceivedAt)}
+func partOf(p sqlcgen.FileUploadPart) (app.PartRecord, error) {
+	sum, err := digest(p.Sha256)
+	if err != nil {
+		return app.PartRecord{}, err
+	}
+	return app.PartRecord{FileID: idOf(p.FileID), PartNumber: int(p.PartNumber), SizeBytes: p.SizeBytes, SHA256: sum,
+		ETag: p.Etag.String, ReceivedAt: timeOf(p.ReceivedAt)}, nil
 }
 
 // mapError wraps a database error; nil and errs errors stay.
@@ -277,13 +324,18 @@ func mapError(err error, what string) error {
 	return errs.Wrap(errs.CodeInternalError, err, "files: "+what+" failed")
 }
 
-// digest converts a bytea column of 32 bytes; another length gives the zero digest.
-func digest(b []byte) [32]byte {
+// errDigestLength reports a SHA-256 column that does not hold 32 bytes; the module writes only 32,
+// so such a row is corrupt and is never read as the zero digest (srv-files-adapters-18).
+var errDigestLength = errors.New("files: a sha256 column does not hold 32 bytes")
+
+// digest converts a bytea column of 32 bytes; another length is an internal error.
+func digest(b []byte) ([32]byte, error) {
 	var out [32]byte
-	if len(b) == len(out) {
-		copy(out[:], b)
+	if len(b) != len(out) {
+		return out, errs.Wrap(errs.CodeInternalError, errDigestLength, "files: reading a digest failed")
 	}
-	return out
+	copy(out[:], b)
+	return out, nil
 }
 
 // uuid converts an id for a parameter.

@@ -431,7 +431,7 @@ func (s *Service) objects(ctx context.Context) (outcome, string, error) {
 	return outcome{size: res.SizeBytes, snapshot: res.SnapshotID}, "", nil
 }
 
-// manifest reads the facts and returns the validated JSON of backup_manifest.v1 for the run.
+// manifest reads the facts and returns the validated JSON of backup_manifest.v2 for the run.
 func (s *Service) manifest(ctx context.Context, kind domain.Kind, id ids.ID, started time.Time, out outcome) ([]byte, error) {
 	facts, err := s.deps.Source.Snapshot(ctx)
 	if err != nil {
@@ -440,6 +440,10 @@ func (s *Service) manifest(ctx context.Context, kind domain.Kind, id ids.ID, sta
 	counts := facts.RowCounts
 	if counts == nil {
 		counts = map[string]int64{}
+	}
+	tables := facts.Tables
+	if tables == nil {
+		tables = []string{}
 	}
 	m := domain.Manifest{
 		Schema:        domain.ManifestSchema,
@@ -454,6 +458,7 @@ func (s *Service) manifest(ctx context.Context, kind domain.Kind, id ids.ID, sta
 		EventLog:      domain.EventLogBounds{HeadSeq: facts.HeadSeq, MinRetainedSeq: facts.MinRetainedSeq},
 		Audit:         domain.AuditHead{LastSeq: facts.AuditLastSeq, LastHash: hex.EncodeToString(facts.AuditLastHash)},
 		RowCounts:     counts,
+		Tables:        tables,
 		Files:         domain.FileTotals{Count: facts.FileCount, TotalBytes: facts.FileBytes},
 		// The position of the deletion journal: a restore of this backup applies it from here
 		// (M7-07, docs/operations/backup-restore.md 3).
@@ -504,13 +509,21 @@ func (s *Service) Prime(ctx context.Context) error {
 	return nil
 }
 
+// sampleTimeout bounds one Sample: the scheduler loop of cmd/bothy-backupd calls it every minute
+// and reads pg_stat_archiver through the manifest pool, whose two connections a manifest snapshot
+// may hold, so a slow read must not hold the loop (AUD srv-stats-status-19).
+const sampleTimeout = 15 * time.Second
+
 // Sample records the time of the last archived WAL segment and the free and total bytes of each
-// volume in Config.Volumes. A value that cannot be read is logged and skipped; Sample never
-// fails, because a missing sample must not stop the backups. Without Metrics it does nothing.
+// volume in Config.Volumes, within sampleTimeout. A value that cannot be read is logged and
+// skipped; Sample never fails, because a missing sample must not stop the backups. Without
+// Metrics it does nothing.
 func (s *Service) Sample(ctx context.Context) {
 	if s.deps.Metrics == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
 	at, ok, err := s.deps.Source.LastArchived(ctx)
 	switch {
 	case err != nil:

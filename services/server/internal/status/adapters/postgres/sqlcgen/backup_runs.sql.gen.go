@@ -143,6 +143,37 @@ func (q *Queries) LatestBackupRun(ctx context.Context, kinds []string) (LatestBa
 	return i, err
 }
 
+const latestBackupRunOfKind = `-- name: LatestBackupRunOfKind :one
+SELECT id, kind, state, started_at, COALESCE(error, '')::text AS error
+FROM backup_runs
+WHERE kind = $1
+ORDER BY started_at DESC, id DESC
+LIMIT 1
+`
+
+type LatestBackupRunOfKindRow struct {
+	ID        pgtype.UUID
+	Kind      string
+	State     string
+	StartedAt pgtype.Timestamptz
+	Error     string
+}
+
+// The newest run of one kind in any state: bothy-backupd retries it at start when it failed
+// (AUD srv-stats-status-8). The index (kind, started_at DESC) serves this.
+func (q *Queries) LatestBackupRunOfKind(ctx context.Context, kind string) (LatestBackupRunOfKindRow, error) {
+	row := q.db.QueryRow(ctx, latestBackupRunOfKind, kind)
+	var i LatestBackupRunOfKindRow
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.State,
+		&i.StartedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
 const succeededBackupRuns = `-- name: SucceededBackupRuns :many
 SELECT kind, started_at, finished_at,
        COALESCE((manifest -> 'deletion_journal' ->> 'next_number')::bigint, 0)::bigint AS journal_next

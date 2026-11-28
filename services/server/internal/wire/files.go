@@ -227,8 +227,10 @@ type Files struct {
 	// Transcription is the use case of files.transcribe (M3-09), built by EnableTranscription in
 	// the roles worker and all; nil in the role api.
 	Transcription *filesapp.Transcription
-	// store is the object store; Close releases it.
-	store filesapp.ObjectStore
+	// store is the object store; Close releases it. multipart is its multipart port with the
+	// driver s3, nil with fs.
+	store     filesapp.ObjectStore
+	multipart filesapp.MultipartStore
 	// parts is the part strategy of the driver; purges inserts files.purge_objects; redactor
 	// blanks the file.updated payloads of a deleted file (M3-08).
 	parts    filesapp.PartStore
@@ -278,6 +280,7 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	channels := fileschannels.Locator{Structure: structure}
 	var parts filesapp.PartStore
 	var free filesapp.FreeSpace
+	var multipart filesapp.MultipartStore
 	switch driver {
 	case driverFS:
 		parts = filesapp.NewFSPartStore(store)
@@ -285,7 +288,11 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 			free = fs
 		}
 	case driverS3:
-		parts = filesapp.NewS3PartStore(store, repo, uow)
+		mp, ok := store.(filesapp.MultipartStore)
+		if !ok {
+			return nil, errors.New("wire: the object store of file.storage.driver s3 has no multipart port")
+		}
+		multipart, parts = mp, filesapp.NewS3PartStore(mp, repo, uow)
 	default:
 		return nil, errors.New("config: file.storage.driver: unknown driver")
 	}
@@ -297,7 +304,7 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	if err != nil {
 		return nil, err
 	}
-	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc, svc), Queue: queue, ExtractQueue: &filesjobs.ExtractQueue{}, store: store,
+	return &Files{Service: svc, Handlers: fileshttp.New(svc, svc, svc), Queue: queue, ExtractQueue: &filesjobs.ExtractQueue{}, store: store, multipart: multipart,
 		repo: repo, uow: uow, events: w.Events, channels: channels, scanMetrics: scanMetrics, parts: parts, purges: purges,
 		redactor: w.Redactor}, nil
 }
@@ -390,7 +397,7 @@ func (f *Files) EnableScan(cfg filesapp.ScanConfig, cc filesclamd.Config, audit 
 		scanner = c
 	}
 	pass, err := filesapp.NewScanPass(cfg, filesapp.ScanDeps{
-		Repo: f.repo, Scans: f.repo, Store: f.store, UoW: f.uow, Events: f.events, Audit: audit, Channels: f.channels,
+		Repo: f.repo, Scans: f.repo, Store: f.store, Multipart: f.multipart, UoW: f.uow, Events: f.events, Audit: audit, Channels: f.channels,
 		Scanner: scanner, Types: filesmimetype.NewDetector(cfg.SniffBytes), Queue: f.Queue, Purge: f.purges, Extracts: f.trigger(), Metrics: f.scanMetrics,
 		Clock: clk, Log: log,
 	})

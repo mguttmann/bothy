@@ -24,13 +24,12 @@ const (
 	opPart     = "upload part"
 	opComplete = "complete multipart"
 	opAbort    = "abort multipart"
-	opPresign  = "presign upload part"
 )
 
 // opError is every error of the driver (docs/DECISIONS.md M3-02/5). Its text is
 // "files/s3: <operation> <key>: <detail>", where detail is a port sentinel, the S3 error code,
 // the HTTP status, a fixed text for a known cause or "transport"; it never contains a request
-// URL, a query, a presigned URL, the endpoint or credentials. net/http errors carry the full
+// URL, a query, the endpoint or credentials. net/http errors carry the full
 // request URL, and callers that wrap a port error into kernel/errs put its text into the log
 // (SEC-LOG-3, SEC-SEC-3). Unwrap keeps errors.Is working for the port sentinel and the cause
 // (egress.ErrBlocked, egress.ErrResponseTooLarge, context errors, secret provider errors).

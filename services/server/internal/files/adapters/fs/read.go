@@ -13,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // objectReader streams one object or one range of it through ReadAt; Close closes the file.
@@ -129,8 +130,7 @@ func (s *Store) Head(ctx context.Context, key string) (app.ObjectInfo, error) {
 // Delete removes the regular file at key, syncs its directory and then removes the directory
 // f/<aa>/<bb>/<file_id> or uploads/<file_id> if it is empty now; the fan-out levels stay
 // (docs/DECISIONS.md M3-01/11). For an original key it also removes uploads/<file_id> with any
-// parts a completion could not remove, so deleting a file removes all its bytes (12 "12",
-// M3-01/18). A missing object, a directory at the key and a directory that is not empty or
+// parts left there, so deleting a file removes all its bytes (12 "12", M3-01/18). A missing object, a directory at the key and a directory that is not empty or
 // already gone are no error (12 "12": a missing object counts as deleted).
 //
 // Errors: app.ErrInvalidKey before any file system call; a symbolic link anywhere in the path,
@@ -155,6 +155,33 @@ func (s *Store) Delete(ctx context.Context, key string) error {
 		if err := s.dropUpload(id); err != nil {
 			return opErr("delete", key, err)
 		}
+	}
+	return nil
+}
+
+// uploadsDir is the parent of the part directories uploads/<file_id> (12 "4.4"), where the part
+// strategy of this driver writes part n with Put (D-M3-03-2).
+const uploadsDir = "uploads"
+
+// uploadDir returns uploads/<file_id>, the directory of the parts of one upload.
+func uploadDir(id ids.ID) string { return uploadsDir + "/" + id.String() }
+
+// dropUpload removes uploads/<file_id>/ with its parts and syncs uploads/; a missing directory,
+// or another entry than a directory there, is nothing to remove.
+func (s *Store) dropUpload(id ids.ID) error {
+	dir := uploadDir(id)
+	fi, err := s.inspect(dir)
+	if err != nil {
+		return err
+	}
+	if fi == nil || !fi.IsDir() {
+		return nil
+	}
+	if err := s.root.RemoveAll(osPath(dir)); err != nil {
+		return err
+	}
+	if err := s.syncDir(uploadsDir); err != nil && !errors.Is(err, iofs.ErrNotExist) {
+		return err
 	}
 	return nil
 }

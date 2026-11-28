@@ -77,7 +77,7 @@ func (h *Files) CreateUpload(ctx context.Context, req rest.CreateUploadRequestOb
 // handler, so the length is checked while reading (docs/DECISIONS.md D-M3-03-22).
 func (h *Files) UploadPart(ctx context.Context, req rest.UploadPartRequestObject) (rest.UploadPartResponseObject, error) {
 	ref, err := h.uploads.PutPart(ctx, files.PutPart{FileID: ids.ID(req.FileId), PartNumber: req.PartNumber,
-		ContentDigest: req.Params.ContentDigest, ContentLength: -1, Body: req.Body})
+		ContentDigest: req.Params.ContentDigest, Body: req.Body})
 	if err != nil {
 		return nil, err
 	}

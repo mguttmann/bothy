@@ -90,6 +90,8 @@ type fakeTarget struct {
 	clearErr  error
 	closes    []time.Time
 	closeErrs []error
+	// retryErrs are the answers of RetryFailed in order (nil once they are used up).
+	retryErrs []error
 	order     []string
 }
 
@@ -146,6 +148,18 @@ func (c *countTicker) Tick(context.Context, time.Time) []string {
 	return nil
 }
 
+func (c *countTicker) RetryFailed(context.Context, time.Time) error {
+	c.target.mu.Lock()
+	defer c.target.mu.Unlock()
+	c.target.order = append(c.target.order, "retry")
+	if len(c.target.retryErrs) == 0 {
+		return nil
+	}
+	err := c.target.retryErrs[0]
+	c.target.retryErrs = c.target.retryErrs[1:]
+	return err
+}
+
 func (c *countTicker) Wait() {}
 
 // TestScheduleWaitsForMinuteBoundaries: the loop primes the gauges, creates the scheduler with
@@ -189,7 +203,7 @@ func TestScheduleWaitsForMinuteBoundaries(t *testing.T) {
 		t.Errorf("primed %d, samples %d, ticks %d; want 1, 3 (start and two ticks), 2", target.primed, target.samples, target.ticks)
 	}
 	// What an earlier process left behind is handled once, before the scheduler exists.
-	if want := []string{"clear", "close", "scheduler", "tick", "tick"}; !slices.Equal(target.order, want) {
+	if want := []string{"clear", "close", "scheduler", "retry", "tick", "tick"}; !slices.Equal(target.order, want) {
 		t.Errorf("calls %v, want %v", target.order, want)
 	}
 	if len(target.closes) != 1 || !target.closes[0].Equal(start) {
@@ -201,13 +215,15 @@ func TestScheduleWaitsForMinuteBoundaries(t *testing.T) {
 // directory once and closes the rows an earlier process left running. The database may not
 // answer yet, so the closing is tried again before every tick until it succeeded once, always
 // with the start of this process, so a run this process started in between is never closed. A
-// dump directory that cannot be emptied does not stop the daemon.
+// dump directory that cannot be emptied does not stop the daemon. The retry of the failed runs of
+// the earlier process (AUD srv-stats-status-8) follows only a successful closing, and is tried
+// again before every tick until it succeeded once.
 func TestScheduleClosesInterruptedRunsUntilItSucceeds(t *testing.T) {
 	t.Parallel()
 	start := time.Date(2026, 10, 18, 1, 59, 30, 0, time.UTC)
 	clk := clock.NewFake(start)
 	down := errors.New("connection refused")
-	target := &fakeTarget{closeErrs: []error{down, down, nil}, clearErr: errors.New("permission denied")}
+	target := &fakeTarget{closeErrs: []error{down, down, nil}, retryErrs: []error{down}, clearErr: errors.New("permission denied")}
 	waits := 0
 	wait := func(_ context.Context, _ clock.Clock, at time.Time) bool {
 		waits++
@@ -218,7 +234,7 @@ func TestScheduleClosesInterruptedRunsUntilItSucceeds(t *testing.T) {
 		return true
 	}
 	schedule(context.Background(), target, clk, wait)
-	want := []string{"clear", "close", "scheduler", "close", "tick", "close", "tick", "tick", "tick"}
+	want := []string{"clear", "close", "scheduler", "close", "tick", "close", "retry", "tick", "retry", "tick", "tick"}
 	if !slices.Equal(target.order, want) {
 		t.Errorf("calls %v, want %v", target.order, want)
 	}

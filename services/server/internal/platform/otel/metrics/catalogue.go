@@ -284,6 +284,22 @@ var (
 		},
 		Buckets: BucketsSeconds,
 	}
+	// WebhookDelivery is bothy.webhook.delivery (4.2, #925): one per attempt of the job
+	// apps.webhook_deliver and per pending row ended without a request, by the status the row has
+	// afterwards (retrying: still pending for another attempt), recorded after the commit.
+	WebhookDelivery = Spec{
+		Name: "bothy.webhook.delivery", Kind: KindCounter, Unit: "{delivery}",
+		Description: "Outgoing webhook deliveries by the status after an attempt or an end without a request.",
+		Attrs:       []Attr{{Key: keyOutcome, Values: []string{"succeeded", "retrying", valueFailed, "dead"}}},
+	}
+	// WebhookTransition is bothy.webhook.transition (4.2, #925): one per change of a subscription
+	// by the system (webhook_out.transition), by its cause, recorded after the commit.
+	WebhookTransition = Spec{
+		Name: "bothy.webhook.transition", Kind: KindCounter, Unit: "{transition}",
+		Description: "Outgoing webhook subscriptions paused or disabled by the system, by cause.",
+		Attrs: []Attr{{Key: keyReason, Values: []string{
+			"gone", "max_consecutive_failures", "retry_max_age", "gap", "max_pending"}}},
+	}
 	// FileUploadSize is bothy.file.upload.size (4.4): the declared size of every completed
 	// upload, recorded after the commit of completeUpload; no attributes (M3-03).
 	FileUploadSize = Spec{
@@ -703,7 +719,7 @@ func All() []Spec {
 		GatewayConnectionsActive, GatewayConnectDuration, GatewayCatchupDuration, GatewayResync,
 		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
-		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
+		EventConsumerPendingAge, DeliveryDuration, WebhookDelivery, WebhookTransition, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, JobDiscarded, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog, RetentionDeleted,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,

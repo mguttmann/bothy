@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,8 +66,8 @@ const (
 // heads: every row of them carries the number of its log, so equal heads mean equal counts in an
 // undamaged copy. Other tables change without an event or audit row (sessions, tokens, cleanup
 // jobs, backup_runs itself) while a backup runs, so their counts are not compared
-// (docs/decisions.d/M7-03.md D-M7-03-3).
-var countedTables = []string{"audit_events", "event_log"}
+// (docs/decisions.d/M7-03.md D-M7-03-3), and backup_manifest.v2 does not count them at all.
+var countedTables = domain.ExactCountTables
 
 // errRestoreNotConfigured reports a service built without Scratch.
 var errRestoreNotConfigured = errors.New("status: the restore test needs a scratch area and the audit verifier")
@@ -328,7 +329,7 @@ func (t *restoreRun) restore() (ScratchDB, domain.Manifest, domain.CheckResult) 
 }
 
 // checkManifest is check 2: the copy against the manifest of its backup. Schema version,
-// instance and sync epoch must be equal and the copy holds exactly the tables of row_counts. The
+// instance and sync epoch must be equal and the copy holds exactly the tables of the manifest. The
 // manifest was read after the backup step (docs/decisions.d/M7-02.md D-M7-02-6), so the copy may lag it
 // but never lead it: its event_log head and audit head are not above those of the manifest, and
 // at the same audit head the hash is the same. When both heads are equal no write reached the
@@ -339,7 +340,7 @@ func (t *restoreRun) checkManifest(db ScratchDB, m domain.Manifest) domain.Check
 	if err != nil {
 		return failed(reasonQuery)
 	}
-	items := int64(len(f.RowCounts))
+	items := int64(len(f.Tables))
 	switch {
 	case f.SchemaVersion != m.SchemaVersion:
 		return failed(reasonSchemaVersion)
@@ -350,22 +351,23 @@ func (t *restoreRun) checkManifest(db ScratchDB, m domain.Manifest) domain.Check
 	case f.AuditLastSeq == m.Audit.LastSeq && fmt.Sprintf("%x", f.AuditLastHash) != m.Audit.LastHash:
 		return failed(reasonAuditHead)
 	}
-	if reason := compareTables(f.RowCounts, m.RowCounts, f.HeadSeq == m.EventLog.HeadSeq && f.AuditLastSeq == m.Audit.LastSeq); reason != "" {
+	equalHeads := f.HeadSeq == m.EventLog.HeadSeq && f.AuditLastSeq == m.Audit.LastSeq
+	if reason := compareTables(f.Tables, m.TableNames(), f.RowCounts, m.RowCounts, equalHeads); reason != "" {
 		return failed(reason)
 	}
 	return passed(items)
 }
 
-// compareTables returns the reason when the tables of the copy and of the manifest differ, or,
-// with counts, when the row count of one of countedTables differs; "" when they agree.
-func compareTables(copyCounts, manifestCounts map[string]int64, counts bool) string {
-	for table := range manifestCounts {
-		if _, ok := copyCounts[table]; !ok {
+// compareTables returns the reason when the table names of the copy and of the manifest differ,
+// or, with counts, when the row count of one of countedTables differs; "" when they agree.
+func compareTables(copyTables, manifestTables []string, copyCounts, manifestCounts map[string]int64, counts bool) string {
+	for _, table := range manifestTables {
+		if !slices.Contains(copyTables, table) {
 			return reasonTableMissing
 		}
 	}
-	for table := range copyCounts {
-		if _, ok := manifestCounts[table]; !ok {
+	for _, table := range copyTables {
+		if !slices.Contains(manifestTables, table) {
 			return reasonTableUnexpected
 		}
 	}

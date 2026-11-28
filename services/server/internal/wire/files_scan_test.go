@@ -78,7 +78,7 @@ func TestScanConfigsBind(t *testing.T) {
 		pass.RetryBackoffCap != 5*time.Minute || pass.SniffBytes != 1048576 {
 		t.Errorf("pass %+v", pass)
 	}
-	if client.Address != "unix:///run/clamav/clamd.sock" || client.ChunkBytes != 65536 || client.MaxConcurrent != 4 || client.Timeout != 120*time.Second {
+	if client.Address != "unix:///run/clamav/clamd.sock" || client.ChunkBytes != 65536 || client.MaxConcurrent != 2 || client.Timeout != 120*time.Second {
 		t.Errorf("client %+v", client)
 	}
 }

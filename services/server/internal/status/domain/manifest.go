@@ -2,12 +2,29 @@
 
 package domain
 
-import "time"
+import (
+	"maps"
+	"slices"
+	"time"
+)
 
-// ManifestSchema is the schema name of the manifest (03 4.12, backup_runs.manifest).
-const ManifestSchema = "backup_manifest.v1"
+// ManifestSchema is the schema name of the manifest bothy-backupd writes (03 4.12,
+// backup_runs.manifest): backup_manifest.v2 names every table in tables and counts exactly only
+// ExactCountTables in row_counts (AUD srv-stats-status-19).
+const ManifestSchema = "backup_manifest.v2"
 
-// Manifest is backup_manifest.v1: the fields of docs/spec/03-data-model.md 4.12 and the
+// ManifestSchemaV1 is the schema name of the manifests written before backup_manifest.v2: its
+// row_counts holds an exact count of every table and it has no tables. ParseManifest still reads
+// it, so the backups of earlier runs stay restorable and checkable.
+const ManifestSchemaV1 = "backup_manifest.v1"
+
+// ExactCountTables are the tables whose exact row count the manifest holds: the restore test
+// compares only these at equal heads, because every row of them carries the number of its log
+// (docs/decisions.d/M7-03.md D-M7-03-3). Counting the other tables exactly held a snapshot over
+// every table of a large instance after each run for numbers nobody read.
+var ExactCountTables = []string{"audit_events", "event_log"}
+
+// Manifest is backup_manifest.v2 (and the older backup_manifest.v1): the fields of docs/spec/03-data-model.md 4.12 and the
 // references of docs/operations/backup-restore.md 3. It describes a backup, never its content:
 // every string has a closed form (ids, versions, labels, hashes, table names), so a field with
 // message text fails Validate.
@@ -32,8 +49,13 @@ type Manifest struct {
 	EventLog EventLogBounds `json:"event_log"`
 	// Audit is the head of the audit chain.
 	Audit AuditHead `json:"audit"`
-	// RowCounts is count(*) per table of the domain schema, keyed by table name.
+	// RowCounts is count(*) per table, keyed by table name: in backup_manifest.v2 exactly the
+	// tables of ExactCountTables, in backup_manifest.v1 every table of the domain schema.
 	RowCounts map[string]int64 `json:"row_counts"`
+	// Tables are the names of every table of the domain schema, sorted (backup_manifest.v2),
+	// always written, also when empty; absent or null in backup_manifest.v1, whose row_counts
+	// names them.
+	Tables []string `json:"tables"`
 	// Files are the objects the table files names.
 	Files FileTotals `json:"files"`
 	// PgBackRest refers to the pgBackRest backup; set exactly for pg_full and pg_diff.
@@ -82,4 +104,13 @@ type PgBackRestRef struct {
 // ResticRef names the restic snapshot by its full id (64 lowercase hex characters).
 type ResticRef struct {
 	SnapshotID string `json:"snapshot_id"`
+}
+
+// TableNames returns the names of every table of the domain schema the manifest describes,
+// sorted: Tables for backup_manifest.v2, the keys of RowCounts for backup_manifest.v1.
+func (m Manifest) TableNames() []string {
+	if m.Schema == ManifestSchemaV1 {
+		return slices.Sorted(maps.Keys(m.RowCounts))
+	}
+	return m.Tables
 }

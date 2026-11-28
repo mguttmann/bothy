@@ -56,10 +56,12 @@ no batch delete, no versioning, no bucket policies. Details:
 ### Confirmation
 
 - A conformance test suite runs against the file system driver and against SeaweedFS in a
-  test container (Put, Get with range, Head, Delete of missing objects, Multipart with abort).
-  The suite is `filestest.RunObjectStoreConformance` in
+  test container (Put, Get with range, Head, Delete of missing objects, the part layout of the
+  file system driver). The suite is `filestest.RunObjectStoreConformance` in
   `services/server/internal/files/adapters/filestest`; the file system driver runs it in
-  `TestFSConformance` (M3-01), the S3 driver follows with M3-02.
+  `TestFSConformance` (M3-01), the S3 driver in `TestS3Conformance` (M3-02) together with
+  `filestest.RunMultipartConformance` (Multipart with abort), because only the S3 driver offers
+  the multipart port (audit finding srv-files-adapters-5).
 - The S3 driver depends only on a Go interface with exactly the core S3 operations; an
   architecture rule allows the import of the S3 SDK only in `internal/files/adapters/s3`.
   Since M7-22 the rule allows exactly one more package, the object store sink of the audit

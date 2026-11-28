@@ -147,7 +147,21 @@ func (r *Runs) LatestSucceeded(ctx context.Context, kinds ...status.BackupKind) 
 	if err != nil {
 		return status.BackupRun{}, false, fmt.Errorf("status: reading the latest successful backup: %w", err)
 	}
-	return status.BackupRun{ID: ids.ID(row.ID.Bytes), Kind: status.BackupKind(row.Kind), StartedAt: row.StartedAt.Time.UTC(), Manifest: row.Manifest}, true, nil
+	return status.BackupRun{ID: ids.ID(row.ID.Bytes), Kind: status.BackupKind(row.Kind), StartedAt: row.StartedAt.Time.UTC(), Manifest: row.Manifest,
+		State: "succeeded"}, true, nil
+}
+
+// LatestRun implements status.BackupRuns.
+func (r *Runs) LatestRun(ctx context.Context, kind status.BackupKind) (status.BackupRun, bool, error) {
+	row, err := r.q.LatestBackupRunOfKind(ctx, string(kind))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return status.BackupRun{}, false, nil
+	}
+	if err != nil {
+		return status.BackupRun{}, false, fmt.Errorf("status: reading the latest %s run: %w", kind, err)
+	}
+	return status.BackupRun{ID: ids.ID(row.ID.Bytes), Kind: status.BackupKind(row.Kind), StartedAt: row.StartedAt.Time.UTC(),
+		State: row.State, Error: row.Error}, true, nil
 }
 
 // uuid converts an id to its column value.

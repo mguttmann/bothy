@@ -178,7 +178,7 @@ func TestGIFScanAndReencode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("scanGIF: %v", err)
 	}
-	want := gifInfo{Width: 6, Height: 4, Frames: 3, LoopCount: 3, HasLoop: true}
+	want := gifInfo{Width: 6, Height: 4, Frames: 3}
 	if info != want {
 		t.Fatalf("scanGIF = %+v, want %+v", info, want)
 	}
@@ -335,7 +335,7 @@ func FuzzGIFScan(f *testing.F) {
 		if err != nil {
 			return
 		}
-		if info.Width < 0 || info.Height < 0 || info.Frames < 0 || info.LoopCount < 0 {
+		if info.Width < 0 || info.Height < 0 || info.Frames < 0 {
 			t.Fatalf("negative values in %+v", info)
 		}
 		// The pixel guard relies on the scan counting the frames DecodeAll decodes. Only small

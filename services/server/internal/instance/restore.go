@@ -39,7 +39,7 @@ type IdentityCheck struct {
 }
 
 // RelocationManifest are the facts of the manifest of the final backup that bothy restore
-// finalize --relocation compares with the restored database (backup_manifest.v1:
+// finalize --relocation compares with the restored database (backup_manifest.v2 or v1:
 // event_log.head_seq, audit.last_seq, audit.last_hash, sync_epoch).
 type RelocationManifest struct {
 	HeadSeq int64

@@ -128,18 +128,24 @@ Every run writes a manifest (JSON, encrypted next to the backup). Fields:
 | `instance_id`, `sync_epoch` | identity and timeline (03, `instance`) |
 | `event_log.head_seq`, `event_log.min_retained_seq` | bounds of the event log |
 | `audit.last_seq`, `audit.last_hash` | head of the audit chain |
-| `row_counts` | rows per table |
+| `row_counts` | rows of `event_log` and `audit_events` |
+| `tables` | names of every table |
 | `files.count`, `files.total_bytes` | objects according to the table `files` |
 | `pgbackrest.label`, `restic.snapshot_id` | reference to the backups |
 | `deletion_journal.next_number` | position of the deletion journal: the number after the newest journal object (M7-07) |
 
 The manifest contains no contents and no secrets.
 
-As built (M7-02): the JSON has the schema name `schema: backup_manifest.v1` and the fields above,
-nested as their names say (`event_log.head_seq`, `audit.last_hash` as lowercase hex,
-`files.total_bytes`); `row_counts` holds an exact `count(*)` of every table of the schema
-`public` (partitions through their parent), read as `migrate.bootstrap_user` in one `READ ONLY`
-transaction with `REPEATABLE READ`. `pgbackrest.label` is the label in repo1 and is set for
+As built (M7-02, AUD srv-stats-status-19): the JSON has the schema name
+`schema: backup_manifest.v2` and the fields above, nested as their names say
+(`event_log.head_seq`, `audit.last_hash` as lowercase hex, `files.total_bytes`); `tables` names
+every table of the schema `public` (partitions through their parent), sorted, and `row_counts`
+holds an exact `count(*)` of `event_log` and `audit_events` only, the two tables the restore test
+compares (section 4); all is read as `migrate.bootstrap_user` in one `READ ONLY` transaction with
+`REPEATABLE READ`. Manifests of earlier runs have the schema name `backup_manifest.v1`, no
+`tables`, and an exact `count(*)` of every table in `row_counts`; the restore test and
+`bothy restore finalize --relocation` still read them, taking the table names from the keys of
+`row_counts`. `pgbackrest.label` is the label in repo1 and is set for
 `pg_full` and `pg_diff`; `restic.snapshot_id` is set for `logical` and for `objects` with the
 driver `fs`. The manifest is stored in `backup_runs.manifest` and as a restic snapshot with the
 tags `manifest`, `<kind>` and `<run id>` in the restic repository (off-site, or local without a
@@ -470,6 +476,12 @@ versions after the Object Lock period:
    bucket's version listing shows when the rule has run.
 4. Remove the temporary copy of the key afterwards.
 
-The object mirror of the driver `s3` (below `<prefix>/objects/`) keeps objects deleted from the
+The object mirror of the driver `s3` (below `<prefix>/objects/`) tries each list, head, get and
+put again when it fails with a network error, `408`, `429` or a `5xx`, a bounded number of times
+with a doubling pause (the values `attempts` and `firstBackoff` in
+`services/server/internal/status/adapters/s3mirror/mirror.go`). An object that still cannot be copied is skipped and the pass goes on
+with the next key; the run then ends `failed` with the code `s3_mirror_objects_failed_<n>` (`n`
+objects not copied), and the next run tries them again. A list page that still fails ends the run
+with `s3_mirror_failed`. The mirror keeps objects deleted from the
 file bucket as current versions; the owner deletes them by hand with the same key, and the rule of
 section 2 removes the old versions `NoncurrentDays` later.

@@ -228,15 +228,3 @@ func TestCoreAPIMethodSet(t *testing.T) {
 		t.Error("*s3.Client does not implement coreAPI")
 	}
 }
-
-// TestPresignAPIMethodSet: the presign interface has exactly PresignUploadPart; no presigned GET,
-// HEAD, DELETE or whole-object PUT (R-FI-03, ADR 0048).
-func TestPresignAPIMethodSet(t *testing.T) {
-	t.Parallel()
-	if got := methodNames(s3.PresignAPI()); !slices.Equal(got, []string{"PresignUploadPart"}) {
-		t.Errorf("presignAPI methods = %v", got)
-	}
-	if !reflect.TypeFor[*awss3.PresignClient]().Implements(s3.PresignAPI()) {
-		t.Error("*s3.PresignClient does not implement presignAPI")
-	}
-}

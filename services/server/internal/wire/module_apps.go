@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	appsmetrics "github.com/OWNER/bothy/services/server/internal/apps/adapters/otelmetrics"
 	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -37,7 +38,7 @@ func appsWiring() moduleWiring {
 				return errors.New("wire: the jobs step needs the apps step")
 			}
 			m.Deliveries, m.DeliveriesTimeout = ap.Webhooks, ap.Webhooks.Lease()
-			return m.registerRetention(appspg.NewRetention(s.currentPool()), m.RetentionConfig.WebhookDeliveries)
+			return m.registerRetention(appspg.NewRetention(s.currentPool(), ap.Webhooks), m.RetentionConfig.WebhookDeliveries)
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
 			s.mu.Lock()
@@ -73,6 +74,10 @@ func (s *server) startApps(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	counters, err := appsmetrics.New(nil)
+	if err != nil {
+		return err
+	}
 	master := NewHMACMasterKey(s.sp, masterRef)
 	if err := master.Check(ctx); err != nil {
 		return err
@@ -93,6 +98,7 @@ func (s *server) startApps(ctx context.Context) error {
 	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id,
 		Grants: admin.Admin, Clock: s.deps.Clock, Webhooks: WebhookDeps{
 			Config: wcfg, State: state, Log: sy.LogReader(), Master: master, Sender: sender, Invocations: rn.Service, Logger: s.logger(),
+			Metrics: counters,
 		}, Incoming: icfg, Chat: ch, Messages: msg, Commands: ag.Commands, Components: rn.Service})
 	if err != nil {
 		return err

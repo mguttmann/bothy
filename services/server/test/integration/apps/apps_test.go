@@ -531,17 +531,19 @@ func TestApps(t *testing.T) {
 
 	t.Run("TestUpgradeAppliesCommandDiff", func(t *testing.T) {
 		w.t = t
-		own := w.mustRegister(w.linkerC, "own")
+		// Tracker, not Linker: an upgrade checks the new manifest, and the gateway mode of Linker
+		// is refused for apps with events (11 section 9).
+		own := w.mustRegister(w.trackerC, "own")
 		archive := map[string]any{"name": "archive", "description": "Archive an issue"}
-		next := w.linkerManifest("1.1.0", archive)
-		next["commands"].([]any)[0].(map[string]any)["description"] = "Link an issue of the tracker"
-		version := w.count(`SELECT version FROM commands WHERE id = $1`, w.link)
-		w.upgrade(w.linker, next)
-		archiveID := w.commandID(w.linker, "archive")
-		if w.count(`SELECT version FROM commands WHERE id = $1`, w.link) != version+1 {
-			t.Fatal("the changed link kept its version")
+		next := w.trackerManifest("1.1.0", archive)
+		next["commands"].([]any)[0].(map[string]any)["description"] = "Open a ticket in the tracker"
+		version := w.count(`SELECT version FROM commands WHERE id = $1`, w.ticket)
+		w.upgrade(w.tracker, next)
+		archiveID := w.commandID(w.tracker, "archive")
+		if w.count(`SELECT version FROM commands WHERE id = $1`, w.ticket) != version+1 {
+			t.Fatal("the changed ticket kept its version")
 		}
-		w.upgrade(w.linker, w.linkerManifest("1.2.0"))
+		w.upgrade(w.tracker, w.trackerManifest("1.2.0"))
 		if w.count(`SELECT count(*) FROM commands WHERE id = $1 AND removed_at IS NOT NULL`, archiveID) != 1 {
 			t.Fatal("archive was not removed")
 		}
@@ -695,11 +697,11 @@ func (w *world) setScopes(app string, scopes []string) {
 	harness.MustDo(w.t, w.s.Owner, harness.Request{Method: http.MethodPut, Path: "/apps/" + app + "/scopes", Body: body}, http.StatusOK)
 }
 
-// upgrade replaces the manifest of app.
+// upgrade replaces the manifest of app with the scopes of Tracker and no event subscription.
 func (w *world) upgrade(app string, manifest map[string]any) {
 	w.t.Helper()
 	body := map[string]any{"manifest": manifest, "reason": "test",
-		"granted_scopes": []string{"commands:write", "components:write", "events:subscribe", "messages:write"}, "event_subscriptions": []string{"command.invoked"}}
+		"granted_scopes": []string{"commands:write", "components:write", "messages:write"}}
 	harness.MustDo(w.t, w.s.Owner, harness.Request{Method: http.MethodPut, Path: "/apps/" + app + "/manifest", Body: body}, http.StatusOK)
 }
 

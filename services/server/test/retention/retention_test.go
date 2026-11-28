@@ -298,7 +298,7 @@ func TestRetention_ContentPeriodUsesDeletionPath(t *testing.T) {
 	}
 	file := ids.New()
 	w.exec(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, upload_state, scan_status, scope_channel_id)
-		VALUES ($1::uuid, 'objects/'||$1::text, '\x00', 4, 'text/plain', 'notes.txt', $2, 'attachment', 'complete', 'clean', $3)`, file, w.s.Owner.PrincipalID, channel)
+		VALUES ($1::uuid, 'objects/'||$1::text, decode(repeat('00', 32), 'hex'), 4, 'text/plain', 'notes.txt', $2, 'attachment', 'complete', 'clean', $3)`, file, w.s.Owner.PrincipalID, channel)
 	w.exec(`INSERT INTO message_attachments (message_id, file_id, position, thread_id, channel_id) VALUES ($1, $2, 0, $3, $4)`, msg, file, thread, channel)
 	w.exec(`UPDATE messages SET has_attachments = true, created_at = created_at - interval '31 days' WHERE id = $1`, msg)
 

@@ -105,9 +105,14 @@ func TestEventCommitThroughput(t *testing.T) {
 	})
 	t.Run("with_idle_river_worker", func(t *testing.T) {
 		jobstest.Migrate(t, db, "jobs")
+		// Every queue of jobs.Queues() needs workers (jobs.Config.validate).
+		mw := map[string]int{}
+		for _, q := range jobs.Queues() {
+			mw[q] = 1
+		}
 		rt, err := jobs.New(pool, jobs.Config{
 			Schema:          "jobs",
-			MaxWorkers:      map[string]int{jobs.QueueDefault: 1, jobs.QueueFiles: 1, jobs.QueueDelivery: 1, jobs.QueueMaintenance: 1, jobs.QueuePrivacy: 1},
+			MaxWorkers:      mw,
 			SoftStopTimeout: 5 * time.Second,
 		}, jobs.RoleWorker, jobs.NewRegistry(), nil)
 		if err != nil {

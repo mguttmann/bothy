@@ -174,7 +174,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `apps` | apps and manifests, installations, scopes, outgoing webhooks with consumer and delivery, incoming webhooks | `apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks` | 11 |
 | `importer` | import sources, batches with origin key (`import.apply`), ownership list and read-only state of mirrored channels; the dry run lives in the tool | `import_sources`, `import_items` | 22 |
 | `privacy` | privacy requests, export and deletion through the participants of all modules, deletion journal | `gdpr_requests`, `deletion_journal_state` | 20 |
-| `status` | status page, components, incidents, automatic checks, backup runs | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
+| `status` | status page, components, incidents, automatic checks, backup runs | `status_components`, `status_component_probe`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
 | `terminal` | hosts and pairing, declaration of the LLM login (I6), session users per person (T12), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams; computer sessions with their attach tokens and the enablement mirror (stage CU) | `hosts`, `host_session_users`, `terminal_sessions`, `computer_sessions` | 24, 27 |
 
 Technical tables outside the modules ([03-data-model.md](03-data-model.md), section
@@ -1144,14 +1144,16 @@ take neither a counter nor `NOTIFY`. The target `perf.event_commit_min_per_s` ho
 | Queue | Content | Concurrency |
 |---|---|---|
 | `default` | short domain jobs | `jobs.queue.default.max_workers` |
-| `files` | scan, thumbnails, transcription (CPU, memory) | `jobs.queue.files.max_workers` |
+| `files` | scan, thumbnails (CPU, memory) | `jobs.queue.files.max_workers` |
+| `files_text` | transcription, text extraction (long runs) | `jobs.queue.files_text.max_workers` |
 | `delivery` | push, webhooks (network) | `jobs.queue.delivery.max_workers` |
 | `maintenance` | cleanup, partitions, checks | `jobs.queue.maintenance.max_workers` |
 | `privacy` | export and erasure | `jobs.queue.privacy.max_workers` |
 
 Reason for separate queues: many thumbnails or a large GDPR export must not delay push
-and webhooks. Imports do not run as a job in the server, but in the tool
-`bothy import` through the API ([22-import-migration.md](22-import-migration.md), section 2).
+and webhooks, and slow transcriptions and text extractions must not hold the workers that scan
+new uploads (`files_text`, audit finding srv-files-adapters-12). Imports do not run as a job in
+the server, but in the tool `bothy import` through the API ([22-import-migration.md](22-import-migration.md), section 2).
 The scan and processing jobs of imported files stand on the queue `files` with the lowest River
 job priority, while every other job keeps the default (highest) priority: a worker fetches the
 available jobs of a queue by priority first, so live uploads are never queued behind an import,
@@ -1178,9 +1180,9 @@ maintenance` (`pg.UnitConfig.ReadOnly`).
 |---|---|---|---|---|
 | `files.scan` | `files` | `InsertTx` when an upload completes | `files` | 12 |
 | `files.thumbnail` | `files` | after `clean` or `skipped`: image originals (12 7.1), thumbnails (12 7.3), dimensions and duration of MP4 and QuickTime | `files` | 12 |
-| `files.extract_text` | `files` | after `clean` or `skipped`, purpose `attachment`, supported type (in the transaction that makes the file deliverable; M3-15) | `files` | 14 |
+| `files.extract_text` | `files` | after `clean` or `skipped`, purpose `attachment`, supported type (in the transaction that makes the file deliverable; M3-15) | `files_text` | 14 |
 | `files.extract_text_refresh` | `files` | periodic every `search.extract.refresh_interval` and once at the start: re-extracts rows of older extractor versions in batches (M3-15) | `maintenance` | 14 |
-| `files.transcribe` | `files` | `file.transcribe` with server transcription | `files` | 09, 12 |
+| `files.transcribe` | `files` | `file.transcribe` with server transcription | `files_text` | 09, 12 |
 | `files.cleanup_pending` | `files` | periodic every `file.gc_interval` and at worker start: expiry of open sessions, never attached files, failed and blocked rows, catch-up of purges, temporary files of the file system driver, deletion backlog (M3-08) | `maintenance` | 12 |
 | `files.purge_objects` | `files` | `InsertTx` when a file is deleted or becomes failed or blocked; caught up by `files.cleanup_pending` (M3-08) | `maintenance` | 12, 20 |
 | `messaging.purge_deleted` | `messaging` | periodic every `chat.delete_purge_interval` and at worker start (addendum of 2026-11-01): for every space, channel and thread deleted before now minus `chat.delete_undo_window` and not purged, oldest first, deletes its messages through the deletion path of 20 4.2 without an actor, each in its own transaction, in batches of `retention.batch_size`, then clears its thread titles and channel topics and sets `purged_at` through `chat.Purges`; idempotent, a stopped run is resumed by the next. Every run first releases the project bindings of purged forums and of the forums of purged spaces that no folder move waits for, also those purged before the release existed, and the purge of a channel or space releases them in its own transaction (addendum of 2026-11-02, FIX-delete-releases-binding) | `maintenance` | 03, 20 |
@@ -1239,6 +1241,10 @@ effective mode `service` ([12-files.md](12-files.md) 8.2), and it runs at most
    `database.statement_timeout` and `database.lock_timeout`. A job splits long work into batches
    (rule 1). Migrations set only `migrate.lock_timeout` per step
    ([upgrade.md](../operations/upgrade.md), rule M6).
+7. A job that cannot start yet because a limit of its process is reached (for example
+   `file.image.max_concurrent`) does not wait under its deadline: the handler returns
+   `jobs.Snooze`, River runs the job again after the pause, and the snooze uses up no attempt
+   (audit finding srv-files-core-13).
 
 ## 13. Configuration loading
 
@@ -1766,6 +1772,7 @@ the limits of outbound calls (`egress.*`) are listed in [19-security.md](19-secu
 | `jobs.schema` | Server | `jobs` | PostgreSQL schema of the River tables |
 | `jobs.queue.default.max_workers` | Server | `8` | parallelism `default` |
 | `jobs.queue.files.max_workers` | Server | `2` | parallelism `files` |
+| `jobs.queue.files_text.max_workers` | Server | `2` | parallelism `files_text` |
 | `jobs.queue.delivery.max_workers` | Server | `16` | parallelism `delivery` |
 | `jobs.queue.maintenance.max_workers` | Server | `2` | parallelism `maintenance` |
 | `jobs.queue.privacy.max_workers` | Server | `1` | parallelism `privacy` |

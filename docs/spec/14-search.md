@@ -408,7 +408,7 @@ built on the search of this chapter; a model only chooses among the hits and add
    and an extractor supports its detected type, the transaction that makes it deliverable (the
    result of the scan pass, or the stored original of the job `files.thumbnail`) creates its row
    `file_text_extracts` (`state = 'pending'`, `search_language` the language of the instance, 3.1)
-   and enqueues the job `files.extract_text` in the queue `files` with only the file id
+   and enqueues the job `files.extract_text` in the queue `files_text` with only the file id
    ([02-architecture.md](02-architecture.md), section 12.3). An unsupported type gets no row;
    avatars, logos and data exports never get one, because only attachments are searchable (2).
 2. The job reads the stored object once, outside every transaction, and calls the port

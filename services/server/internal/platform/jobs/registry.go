@@ -71,7 +71,7 @@ var errSealed = errors.New("jobs: the registry is in use by a runtime; register 
 //   - A passes ValidateArgsType (only IDs and int64),
 //   - the kind matches "<module>.<name>" and <module> is the module of A's package,
 //   - the kind is not registered yet,
-//   - o.Queue is empty or one of the five queues, o.MaxAttempts is not negative.
+//   - o.Queue is empty or one of the queues of Queues, o.MaxAttempts is not negative.
 //
 // The error names the kind or the type; it also reports a nil registry or handler and a
 // registry that New already took.

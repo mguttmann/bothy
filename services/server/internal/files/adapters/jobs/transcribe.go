@@ -51,13 +51,13 @@ func (h TranscribeHandler) Work(ctx context.Context, job jobs.Job[TranscribeArgs
 	return h.Transcription.Run(ctx, job.Args.FileID, job.Attempt)
 }
 
-// RegisterTranscribe adds files.transcribe on the queue files to reg (every role builds the same
+// RegisterTranscribe adds files.transcribe on the queue files_text to reg (every role builds the same
 // registry) with maxAttempts (voice.transcription_max_attempts) and River's default backoff. It
 // has no River job timeout: every attempt is bounded by voice.transcription_timeout of the
 // egress client, and River's default could cut the result unit of work that follows.
 func RegisterTranscribe(reg *jobs.Registry, t TranscribeRunner, maxAttempts int) error {
 	return jobs.Register[TranscribeArgs](reg, TranscribeHandler{Transcription: t},
-		jobs.HandlerOptions{Queue: jobs.QueueFiles, MaxAttempts: maxAttempts, Timeout: -1})
+		jobs.HandlerOptions{Queue: jobs.QueueFilesText, MaxAttempts: maxAttempts, Timeout: -1})
 }
 
 // TranscribeQueue implements app.TranscribeQueue over jobs.Inserter.InsertTx; internal/wire binds

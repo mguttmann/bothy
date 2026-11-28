@@ -36,6 +36,7 @@ type jobsKeys struct {
 	Schema          string        `config:"jobs.schema"`
 	Default         int           `config:"jobs.queue.default.max_workers"`
 	Files           int           `config:"jobs.queue.files.max_workers"`
+	FilesText       int           `config:"jobs.queue.files_text.max_workers"`
 	Delivery        int           `config:"jobs.queue.delivery.max_workers"`
 	Maintenance     int           `config:"jobs.queue.maintenance.max_workers"`
 	Privacy         int           `config:"jobs.queue.privacy.max_workers"`
@@ -45,7 +46,7 @@ type jobsKeys struct {
 }
 
 // JobsConfig binds the configuration of the job runtime from v: jobs.schema, the parallelism of
-// the five queues (jobs.queue.<queue>.max_workers), shutdown.jobs_soft_timeout and
+// the queues (jobs.queue.<queue>.max_workers), shutdown.jobs_soft_timeout and
 // database.statement_timeout (the bound of the count query of bothy.job.queue). The logger and
 // the meter provider (nil: the global one) are left to the caller. The error names the key whose binding failed, never a value.
 func JobsConfig(v *config.Values) (jobs.Config, error) {
@@ -56,7 +57,7 @@ func JobsConfig(v *config.Values) (jobs.Config, error) {
 	return jobs.Config{
 		Schema: k.Schema,
 		MaxWorkers: map[string]int{
-			jobs.QueueDefault: k.Default, jobs.QueueFiles: k.Files, jobs.QueueDelivery: k.Delivery,
+			jobs.QueueDefault: k.Default, jobs.QueueFiles: k.Files, jobs.QueueFilesText: k.FilesText, jobs.QueueDelivery: k.Delivery,
 			jobs.QueueMaintenance: k.Maintenance, jobs.QueuePrivacy: k.Privacy,
 		},
 		SoftStopTimeout:  k.SoftStopTimeout,
@@ -219,7 +220,7 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // on the queue default, never periodic (M2-28), files.scan
 // on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
 // the timeout file.image.processing_timeout (M3-06), files.purge_objects and the periodic
-// files.cleanup_pending on the queue maintenance (M3-08), files.extract_text on the queue files
+// files.cleanup_pending on the queue maintenance (M3-08), files.extract_text on the queue files_text
 // without a River job timeout and the periodic files.extract_text_refresh on the queue maintenance
 // (M3-15), runs.queued_expiry on the queue default
 // (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),

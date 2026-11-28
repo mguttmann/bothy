@@ -45,7 +45,7 @@ const (
 // billing.show_personal_estimates (10 section 12.2), as in getCostStats. No member names a runtime,
 // an adapter kind, a version, evidence, a subscription or a credential (I5).
 func (v *Views) Backends(ctx context.Context, q stats.BackendQuery) ([]stats.BackendAgent, error) {
-	st := v.d.Statistics
+	st := v.base
 	a, err := st.authorize(ctx, authorize.ActionStatsRead, q.SpaceID)
 	if err != nil {
 		return nil, err

@@ -80,15 +80,17 @@ type ProbeDeps struct {
 
 // Probe is the job status.probe (brief M7-09, 16 12): every status.check_interval it keeps the
 // standard components and one component per active agent, runs the checks, sets the automatic
-// states and opens and resolves the automatic incidents. Its memory of failing runs lives in the
-// process (domain.Track, D-M7-09-3). It is safe for concurrent use; rounds run one at a time.
+// states and opens and resolves the automatic incidents. Its memory of failing runs
+// (domain.Track, D-M7-09-3) lives in status_component_probe and is read and written in the
+// transaction of each round after every component is locked, so several workers share one memory
+// (AUD srv-stats-status-11). It is safe for concurrent use; rounds of one process run one at a
+// time.
 type Probe struct {
 	cfg domain.ProbeConfig
 	src Sources
 	d   ProbeDeps
 
-	mu     sync.Mutex
-	tracks map[ids.ID]domain.Track
+	mu sync.Mutex
 }
 
 // NewProbe returns the job over d with the periods of cfg and the sources src. Errors: a missing
@@ -106,7 +108,7 @@ func NewProbe(cfg domain.ProbeConfig, src Sources, d ProbeDeps) (*Probe, error) 
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
-	return &Probe{cfg: cfg, src: src, d: d, tracks: map[ids.ID]domain.Track{}}, nil
+	return &Probe{cfg: cfg, src: src, d: d}, nil
 }
 
 // Interval is status.check_interval, the period of the job.
@@ -132,9 +134,12 @@ func (p *Probe) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	tracks := map[ids.ID]domain.Track{}
 	err = p.d.UoW.Do(ctx, func(ctx context.Context) error {
 		comps, err := p.d.Store.LockComponents(ctx)
+		if err != nil {
+			return err
+		}
+		tracks, err := p.d.Store.ProbeTracks(ctx)
 		if err != nil {
 			return err
 		}
@@ -154,11 +159,7 @@ func (p *Probe) Run(ctx context.Context) error {
 		}
 		return appendUpdated(ctx, p.d.Events, overall(latest), r.components, r.incidents)
 	})
-	if err != nil {
-		return err
-	}
-	p.tracks = tracks
-	return nil
+	return err
 }
 
 // check runs every source once, all at the same time and each bounded by status.check_interval,
@@ -309,11 +310,19 @@ func (p *Probe) apply(ctx context.Context, comps []domain.Component, outcomes ma
 	return nil
 }
 
-// step applies the outcome o of the round to component c: its state, then its incidents.
+// step applies the outcome o of the round to component c: its state, its stored memory, then its
+// incidents. A round whose time is before the stored last round (another worker committed a later
+// round while this one waited for the lock) changes nothing of c.
 func (p *Probe) step(ctx context.Context, c domain.Component, o domain.Outcome, open []ids.ID, last *domain.LatestIncident,
 	now time.Time, tracks map[ids.ID]domain.Track, r *round) error {
-	next, tr := domain.Step(domain.Observed{State: c.State, UpdatedAt: c.UpdatedAt}, p.tracks[c.ID], o, now, p.cfg)
-	tracks[c.ID] = tr
+	stored := tracks[c.ID]
+	if now.Before(stored.LastRound) {
+		return nil
+	}
+	next, tr := domain.Step(domain.Observed{State: c.State, UpdatedAt: c.UpdatedAt}, stored, o, now, p.cfg)
+	if err := p.d.Store.SetProbeTrack(ctx, c.ID, tr); err != nil {
+		return err
+	}
 	if next != c.State {
 		if err := p.d.Store.SetComponentState(ctx, c.ID, next, now); err != nil {
 			return err

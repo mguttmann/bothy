@@ -22,6 +22,12 @@ erDiagram
     text state
     uuid agent_id FK
   }
+  status_component_probe {
+    uuid component_id PK, FK
+    text state "after the last round of status.probe"
+    timestamptz failing_since
+    timestamptz last_round
+  }
   status_incidents {
     uuid id PK
     text state
@@ -60,3 +66,4 @@ erDiagram
   status_incidents ||--o{ status_incident_updates : "history"
   status_incidents ||--o{ status_incident_components : "affects"
   status_components ||--o{ status_incident_components : "affected"
+  status_components ||--o| status_component_probe : "probe memory"

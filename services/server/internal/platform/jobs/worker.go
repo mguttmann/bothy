@@ -20,12 +20,12 @@ import (
 )
 
 // The values of bothy.outcome on the span "job <bothy.job.kind>" and on bothy.job.duration
-// (docs/observability/signals.md "Spans", 4.4). The catalogue also lists snoozed; it stays unused
-// until the River-free interface offers a snooze (README.md "Spans").
+// (docs/observability/signals.md "Spans", 4.4). snoozed is a handler that returned Snooze.
 const (
 	outcomeCompleted = "completed"
 	outcomeFailed    = "failed"
 	outcomeCancelled = "cancelled"
+	outcomeSnoozed   = "snoozed"
 )
 
 // Log messages of the handler wrapper; constant text (signals.md "Logs").
@@ -71,8 +71,9 @@ func newWorker[A Args](h Handler[A], o HandlerOptions, kind string, d workerDeps
 // the cancellation would otherwise mark an unfinished job as done, and a rerun is safe because
 // jobs are idempotent (docs/DECISIONS.md M1-14). In maintenance mode (Config.Maintenance) a kind
 // that does not run is held with River's snooze for Maintenance.Pause, and a kind that runs gets
-// txn.WithWriteInMaintenance, so its units of work may write (ADR 0065 item 4).
-func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
+// txn.WithWriteInMaintenance, so its units of work may write (ADR 0065 item 4). A handler that
+// returns Snooze gets River's snooze: the attempt is snoozed, uses up no attempt and logs nothing.
+func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) error {
 	if m := w.d.maintenance; m != nil {
 		if !m.runs(w.kind) {
 			// Maintenance mode holds the job without running it and without an attempt.
@@ -84,6 +85,8 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 	ctx, span := w.d.tracer.Start(ctx, "job "+w.kind,
 		trace.WithSpanKind(trace.SpanKindConsumer),
 		trace.WithAttributes(attribute.String(attr.JobKind, w.kind)))
+	// err is the result of the handler; the deferred records read it, not River's snooze error.
+	var err error
 	defer func() {
 		outcome := outcomeOf(ctx, err)
 		if w.d.metrics != nil {
@@ -98,7 +101,17 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 		}
 		span.End()
 	}()
-	err = w.run(ctx, j)
+	err = w.attempt(ctx, j)
+	if pause, ok := SnoozePause(err); ok {
+		return river.JobSnooze(pause)
+	}
+	return err
+}
+
+// attempt runs the handler once: a nil result while ctx has ended becomes ctx.Err(), and a failed
+// attempt is logged.
+func (w *worker[A]) attempt(ctx context.Context, j *river.Job[A]) error {
+	err := w.run(ctx, j)
 	if err == nil && ctx.Err() != nil {
 		err = ctx.Err()
 	}
@@ -123,6 +136,12 @@ func (w *worker[A]) logFailed(ctx context.Context, j *river.Job[A], err error) {
 // lastAttempt reports whether j runs its last attempt, after which River discards a failed job.
 func lastAttempt[A Args](j *river.Job[A]) bool {
 	return j.JobRow != nil && j.Attempt >= j.MaxAttempts
+}
+
+// isSnooze reports whether err is or wraps the result of Snooze.
+func isSnooze(err error) bool {
+	_, ok := SnoozePause(err)
+	return ok
 }
 
 // errPanicked marks the error of an attempt whose handler panicked.
@@ -183,6 +202,8 @@ func outcomeOf(ctx context.Context, err error) string {
 	switch {
 	case err == nil:
 		return outcomeCompleted
+	case isSnooze(err):
+		return outcomeSnoozed
 	case errors.Is(ctx.Err(), context.Canceled) && errors.Is(err, context.Canceled):
 		return outcomeCancelled
 	default:

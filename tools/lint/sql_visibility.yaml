@@ -156,9 +156,9 @@ exceptions:
   - query: chat.ListThreadsByCreated
     category: after_authorize
     reason: "the threads of the one channel channel.read allowed (listChannelThreads); a thread is visible exactly when its channel is (07 section 7.2, limit)"
-  - query: files.GetFile
+  - query: files.GetFileByID
     category: authorize_resolution
-    reason: "resolves one file by its id (scope channel, uploader, purpose) for authorize; getFile returns it only after file.read allowed it (M3-03)"
+    reason: "resolves one file by its id (scope channel, uploader, purpose, states) for authorize; getFile, downloads, tickets and transcripts serve it only after file.read allowed it, a deleted file like an unknown id (M3-03, M3-05); the jobs files.thumbnail and files.transcribe read the one file they were inserted for by the same id, without a principal, and serve nothing to a reader (M3-06, M3-09; one row shape, srv-files-adapters-18)"
   - query: files.GetAttachmentByFile
     category: authorize_resolution
     reason: "resolves where one file is attached (message, thread and channel copies) by its id for the file.read descriptor; getFile, downloads, tickets and transcripts serve the file only after file.read allowed it on that path; MessageOf and recordFileChange reuse it (M3-07)"
@@ -186,9 +186,6 @@ exceptions:
   - query: files.ListRelaysOfFile
     category: authorize_resolution
     reason: "resolves the team copies one file is relayed to by its id, for the file.read descriptors of their places when the original row denied; the file is served only after file.read allowed it on one of them (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-2)"
-  - query: files.GetFileForDelivery
-    category: authorize_resolution
-    reason: "resolves one file by its id (scope channel, uploader, purpose, states) for authorize; downloads, tickets and transcripts serve it only after file.read allowed it (M3-05)"
   - query: files.GetThumbnail
     category: after_authorize
     reason: "one thumbnail of the one file file.read allowed, by file id and variant (M3-05)"
@@ -198,9 +195,9 @@ exceptions:
   - query: files.CountOpenSessions
     category: after_authorize
     reason: "the number and earliest expiry of the caller's own open upload sessions for file.upload_max_open_sessions after file.upload was allowed; keyed by the uploader (M3-03)"
-  - query: files.GetSession
+  - query: files.GetSessionByID
     category: authorize_resolution
-    reason: "resolves the caller's own upload session by file id and uploader for authorize on its scope channel; an unknown and a foreign id answer the same 404 (M3-03)"
+    reason: "resolves an upload session with its file by file id; the upload operations keep it only for the caller as uploader and a file that is not deleted, so an unknown and a foreign id answer the same 404 (M3-03); the job files.scan reads the one session it was inserted for, without a principal, and serves nothing to a reader (M3-04; one row shape, srv-files-adapters-18)"
   - query: files.LockSessionForUpdate
     category: after_authorize
     reason: "locks the caller's own upload session by file id and uploader for abort and completion (03 section 6.3, M3-03)"
@@ -276,30 +273,15 @@ exceptions:
   - query: runs.PersonalDataInteractions
     category: system_job
     reason: "the job privacy.export reads the interactions of the person, without a principal; only the values the person submitted leave, into the export package of that person (M7-06)"
-  - query: files.GetScanTarget
-    category: system_job
-    reason: "the job files.scan reads the one file and session it was inserted for by id, without a principal; it serves nothing to a reader (M3-04)"
   - query: files.LockScanTarget
     category: system_job
     reason: "the job files.scan locks the one file and session it scans by id, without a principal (03 section 6.3, M3-04)"
   - query: files.CountAwaitingScan
     category: system_job
     reason: "the health monitor of the worker counts the files awaiting the scan for bothy.file.scan.queue; only a number, no content (M3-04)"
-  - query: files.GetImageFile
+  - query: files.LockFileByID
     category: system_job
-    reason: "the job files.thumbnail reads the one file it was inserted for by id, without a principal; it serves nothing to a reader (M3-06)"
-  - query: files.LockImageFile
-    category: system_job
-    reason: "the job files.thumbnail locks the one file it processes by id, without a principal (03 section 6.3, M3-06)"
-  - query: files.GetTranscriptFile
-    category: system_job
-    reason: "the job files.transcribe reads the one file it was inserted for by id, without a principal; the transcript goes back to the same row only (M3-09)"
-  - query: files.LockTranscriptFile
-    category: system_job
-    reason: "the job files.transcribe locks the one file whose transcript it writes, by id, without a principal (03 section 6.3, M3-09)"
-  - query: files.LockVoiceFile
-    category: after_authorize
-    reason: "requestTranscription and submitTranscript lock the file after file.transcribe or file.transcript.submit allowed it (M3-09)"
+    reason: "the jobs files.thumbnail and files.transcribe lock the one file they process by id, without a principal (03 section 6.3, M3-06, M3-09); requestTranscription and submitTranscript lock it after file.transcribe or file.transcript.submit allowed it (M3-09; one row shape, srv-files-adapters-18)"
   - query: files.GetExtractTarget
     category: system_job
     reason: "the job files.extract_text reads the one extract row and file facts it was inserted for by id, without a principal; the text is never selected and nothing is served to a reader (M3-15)"

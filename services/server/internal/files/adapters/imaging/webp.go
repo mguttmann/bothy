@@ -7,8 +7,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"golang.org/x/image/webp"
-
 	"github.com/OWNER/bothy/services/server/internal/files/app"
 )
 
@@ -220,15 +218,4 @@ func webpVP8LSize(p []byte) (int, int, error) {
 	w := bits&mask + 1
 	h := bits>>webpVP8LSizeBits&mask + 1
 	return w, h, nil
-}
-
-// webpConfig returns the size of a still WebP through golang.org/x/image/webp DecodeConfig,
-// which reads the headers only. An error wraps app.ErrImageMalformed because the header cannot
-// be read.
-func webpConfig(data []byte) (width, height int, err error) {
-	cfg, err := webp.DecodeConfig(bytes.NewReader(data))
-	if err != nil {
-		return 0, 0, fmt.Errorf("%w: %w", app.ErrImageMalformed, err)
-	}
-	return cfg.Width, cfg.Height, nil
 }

@@ -982,6 +982,12 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
 1. `bothy-backupd` evaluates the five-field cron expressions of `backup.pg.full_schedule`,
    `backup.pg.diff_schedule`, `backup.logical.schedule` and `backup.objects.schedule` in UTC once
    a minute. Missed times while the process was down are not caught up; the next due time runs.
+   The one exception is the retry of a failed run (AUD srv-stats-status-8): a run that fails,
+   also one that could not write its row, starts again 15 minutes after it ended, at most twice
+   for one due time, and the next due time replaces a pending retry. At its start `bothy-backupd`
+   plans the same retry for the newest run of each kind when it failed, was canceled by the stop
+   of the previous process or was closed as `interrupted`, and no later due time of its kind has
+   passed since it started; an older run stays as it is.
    At most one run per slot runs at a time: `pg_full` and `pg_diff` share one slot (one
    pgBackRest lock per stanza), and a full and a differential due together run only the full.
    `bothy-backupd backup <kind>` runs one kind at once and exits with `0` or `1`.
@@ -998,7 +1004,10 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
    `logical`: `pg_dump -Fc` as `migrate.bootstrap_user` into the volume
    `backup-scratch`, stored as a restic snapshot and removed. `objects`: driver `fs` restic over
    the read-only volume `files`; driver `s3` a mirror into the off-site bucket that copies new
-   objects and never deletes or overwrites.
+   objects and never deletes or overwrites; it retries a failed call a bounded number of times,
+   skips an object that still fails and ends the run `failed` with
+   `s3_mirror_objects_failed_<n>` after the other objects
+   ([backup-restore.md](../operations/backup-restore.md) 9).
 3. The off-site target `backup.offsite.target` is an S3-compatible bucket with versioning and
    Object Lock, written `s3:https://<host>[:<port>]/<bucket>[/<prefix>]`; repo2 lies below
    `<prefix>/pgbackrest`, the restic repository below `<prefix>/restic`, the object mirror below
@@ -1053,7 +1062,8 @@ On the schedule `backup.restore_test.schedule`, `bothy-backupd` restores the las
 `backup-scratch`, starts a database there only on a Unix socket and checks:
 
 1. `pgbackrest verify` and the checksums during the restore.
-2. Schema version and row counts against the manifest.
+2. Schema version, tables and the row counts of `event_log` and `audit_events` against the
+   manifest.
 3. Event log without gaps: per partition `count(*) = max(seq) - min(seq) + 1`, and
    `sequence_counters` is at least as large as every assigned number.
 4. Audit chain: the same check as `audit.verify` from the anchor to the end.
@@ -1158,7 +1168,7 @@ counts per kind, never an ID.
 
 Relocation. A relocation without data loss (section 11) also starts on a new timeline or a new
 cluster, so the start lock holds it as well. `bothy restore finalize --relocation <manifest>` takes
-the manifest of the final backup (`backup_manifest.v1`) and compares `event_log.head_seq`,
+the manifest of the final backup (`backup_manifest.v2`, or `v1` of an earlier run) and compares `event_log.head_seq`,
 `audit.last_seq`, `audit.last_hash` and `sync_epoch` with the restored database; only when all are
 equal does it store the new identity, keeping the epoch and every cursor (audit action
 `instance.restore.finalize_relocation`). Any difference exits `1`, names the field and changes
@@ -1514,11 +1524,14 @@ As built (M7-09, [status README](../../services/server/internal/status/README.md
    time, each bounded by `status.check_interval`.
 4. State machine: a passing check sets `operational` at once. A run of failing rounds sets
    `degraded`, or `major_outage` for no answer or an error ratio above `status.error_ratio_outage`,
-   once it has lasted `status.degrade_after`. The run and the times of the timers live in the
-   memory of the worker process and count only while that process ran the rounds without a gap of
-   more than three `status.check_interval` and the stored state is the one it left; otherwise they
-   start again from `updated_at`. A restart, an owner's change of the state or several workers
-   therefore delay a change or an incident, never hasten them. `maintenance` and the states of
+   once it has lasted `status.degrade_after`. The run and the times of the timers are the memory of
+   the job, stored per component in `status_component_probe` and read and written in the
+   transaction of each round after every component is locked, so several workers share one memory
+   and a passing round on one worker ends the run of failing rounds for all (AUD
+   srv-stats-status-11). They count only while the job ran the rounds without a gap of more than
+   three `status.check_interval` and the stored state is the one it left; otherwise they start
+   again from `updated_at`. A stop of every worker or an owner's change of the state therefore
+   delays a change or an incident, never hastens it. `maintenance` and the states of
    manual components belong to the owner.
 5. Incidents: one automatic incident (`created_by` NULL, impact `major`) per outage. An outage
    begins when the component leaves `operational` and ends after `status.resolve_after` of

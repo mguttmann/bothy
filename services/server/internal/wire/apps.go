@@ -128,6 +128,9 @@ type WebhookDeps struct {
 	Rand func(n int64) int64
 	// Logger receives the delivery and state lines; nil discards them.
 	Logger *slog.Logger
+	// Metrics counts the delivery outcomes and system transitions (adapters/otelmetrics, #925);
+	// nil counts nothing.
+	Metrics appsapp.WebhookMetrics
 }
 
 // Apps is the module apps of the process (M2-24, M2-26): the use cases and the REST handlers of
@@ -248,7 +251,7 @@ func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
 		Store: repo, Repo: repo, UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Scheduler: sched, Sender: d.Webhooks.Sender,
 		Master: d.Webhooks.Master, Keys: keys, State: d.Webhooks.State, Log: d.Webhooks.Log, Cursors: appshttp.Cursors{},
 		Agents: appsapp.IdentityPrincipals{Directory: d.Identity.Directory}, Invocations: d.Webhooks.Invocations,
-		Clock: d.Clock, Rand: d.Webhooks.Rand, Logger: d.Webhooks.Logger,
+		Clock: d.Clock, Rand: d.Webhooks.Rand, Logger: d.Webhooks.Logger, Metrics: d.Webhooks.Metrics,
 	})
 	if err != nil {
 		return nil, err

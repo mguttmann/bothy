@@ -13,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/status/domain"
 )
 
 // mustExec runs stmt as superuser or fails the test.
@@ -62,10 +63,12 @@ func seed(t *testing.T, conn *pgx.Conn) {
 	}
 }
 
-// TestManifestCounts holds brief M7-02 design note 3: after seeding messages, files and audit
-// rows, the snapshot of the manifest equals direct queries: count(*) per ordinary and partitioned
-// table of schema public (partitions counted through their parent), the bounds of event_log, the
-// last audit row, the instance row and the totals of the files that are not deleted.
+// TestManifestCounts holds brief M7-02 design note 3 with backup_manifest.v2 (AUD
+// srv-stats-status-19): after seeding messages, files and audit rows, the snapshot of the manifest
+// equals direct queries: the name of every ordinary and partitioned table of schema public
+// (partitions through their parent), count(*) of exactly domain.ExactCountTables and of no other
+// table, the bounds of event_log, the last audit row, the instance row and the totals of the files
+// that are not deleted.
 func TestManifestCounts(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -80,7 +83,7 @@ func TestManifestCounts(t *testing.T) {
 	}
 
 	rows, err := super.Query(ctx, `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-		WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition ORDER BY 1`)
+		WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition ORDER BY c.relname COLLATE "C"`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,13 +91,16 @@ func TestManifestCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := slices.Sorted(maps.Keys(facts.RowCounts)); !slices.Equal(got, tables) {
-		t.Errorf("tables of the manifest:\n got %q\nwant %q", got, tables)
+	if !slices.Equal(facts.Tables, tables) {
+		t.Errorf("tables of the manifest:\n got %q\nwant %q", facts.Tables, tables)
+	}
+	if got := slices.Sorted(maps.Keys(facts.RowCounts)); !slices.Equal(got, domain.ExactCountTables) {
+		t.Errorf("counted tables %q, want only %q", got, domain.ExactCountTables)
 	}
 	if slices.ContainsFunc(tables, func(s string) bool { return len(s) > 15 && s[:15] == "event_log_from_" }) {
 		t.Error("a partition of event_log is counted on its own")
 	}
-	for _, table := range tables {
+	for _, table := range domain.ExactCountTables {
 		var n int64
 		if err := super.QueryRow(ctx, "SELECT count(*) FROM "+pgx.Identifier{table}.Sanitize()).Scan(&n); err != nil {
 			t.Fatal(err)
@@ -103,7 +109,7 @@ func TestManifestCounts(t *testing.T) {
 			t.Errorf("row_counts[%s] = %d, want %d", table, facts.RowCounts[table], n)
 		}
 	}
-	for table, want := range map[string]int64{"messages": 3, "files": 3, "audit_events": 3, "event_log": 5, "instance": 1} {
+	for table, want := range map[string]int64{"audit_events": 3, "event_log": 5} {
 		if facts.RowCounts[table] != want {
 			t.Errorf("row_counts[%s] = %d, want %d seeded", table, facts.RowCounts[table], want)
 		}
@@ -143,7 +149,8 @@ func TestManifestEmptyLogs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if facts.HeadSeq != 0 || facts.MinRetainedSeq != 0 || facts.AuditLastSeq != 0 || facts.AuditLastHash != nil ||
-		facts.FileCount != 0 || facts.FileBytes != 0 || facts.RowCounts["instance"] != 1 {
+		facts.FileCount != 0 || facts.FileBytes != 0 || !slices.Contains(facts.Tables, "instance") ||
+		len(facts.RowCounts) != 2 || facts.RowCounts["event_log"] != 0 {
 		t.Errorf("facts %+v", facts)
 	}
 }

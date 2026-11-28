@@ -11,14 +11,31 @@ VALUES (sqlc.arg(id), sqlc.arg(object_key), sqlc.arg(sha256), sqlc.arg(size_byte
         sqlc.narg(scope_channel_id), sqlc.arg(upload_state), sqlc.arg(scan_status), sqlc.arg(transcript_status),
         sqlc.arg(created_at));
 
--- name: GetFile :one
--- One file that is not deleted, for authorize and getFile; transcript_text only for the derived
--- transcript ETag of getFile (R-DM-48, M3-09), never for the representation.
+-- The row shape of one file (srv-files-adapters-18): GetFileByID and LockFileByID select the same
+-- columns, so their generated rows convert into each other and one mapping (fileOf) reads both; a
+-- column missing in one of them does not compile. The session reads of upload_sessions.sql carry
+-- the same file columns.
+
+-- name: GetFileByID :one
+-- One file by id, deleted or not; the caller decides what a deleted file means. getFile and the
+-- downloads resolve it for authorize (a deleted file answers like an unknown id), the jobs
+-- files.thumbnail and files.transcribe read the file they were inserted for. transcript_text is
+-- read for the derived transcript ETag and the transcript of a delivery (R-DM-48, M3-05, M3-09).
 SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
-       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status,
-       transcript_language, transcript_source, created_at, transcript_text
+       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status, transcript_text,
+       transcript_language, transcript_source, created_at, (deleted_at IS NOT NULL)::boolean AS deleted
 FROM files
-WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+WHERE id = sqlc.arg(id);
+
+-- name: LockFileByID :one
+-- GetFileByID with the files row locked FOR UPDATE: the result writes of files.thumbnail and
+-- files.transcribe, and requestTranscription and submitTranscript after authorize (03 6.3).
+SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
+       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status, transcript_text,
+       transcript_language, transcript_source, created_at, (deleted_at IS NOT NULL)::boolean AS deleted
+FROM files
+WHERE id = sqlc.arg(id)
+FOR UPDATE;
 
 -- name: QuotaUsedBytes :one
 -- The quota of the uploader: the files that are neither deleted nor failed (D-M3-03-6). Export

@@ -199,6 +199,7 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | string | `jobs` | PostgreSQL schema of the River tables | active |
 | `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server | int | `8` | parallelism `default` | active |
 | `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server | int | `2` | parallelism `files` | active |
+| `jobs.queue.files_text.max_workers` | `BOTHY_JOBS__QUEUE__FILES_TEXT__MAX_WORKERS` | Server | int | `2` | parallelism `files_text` | active |
 | `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server | int | `16` | parallelism `delivery` | active |
 | `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server | int | `2` | parallelism `maintenance` | active |
 | `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server | int | `1` | parallelism `privacy` | active |
@@ -643,7 +644,7 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.scan.clamd_address` | `BOTHY_FILE__SCAN__CLAMD_ADDRESS` | Server | string | `unix:///run/clamav/clamd.sock` | Unix socket of clamd, `unix://` plus an absolute path; no other transport (19 SEC-TLS-5) | active |
 | `file.scan.chunk_bytes` | `BOTHY_FILE__SCAN__CHUNK_BYTES` | Server | int | `65536` | chunk size for `INSTREAM` | active |
 | `file.scan.timeout` | `BOTHY_FILE__SCAN__TIMEOUT` | Server | duration | `120s` | time limit per scan | active |
-| `file.scan.max_concurrent` | `BOTHY_FILE__SCAN__MAX_CONCURRENT` | Server | int | `4` | scans per worker process | active |
+| `file.scan.max_concurrent` | `BOTHY_FILE__SCAN__MAX_CONCURRENT` | Server | int | `2` | scans per worker process; the workers of the queue `files` bound it too | active |
 | `file.scan.retry_backoff_cap` | `BOTHY_FILE__SCAN__RETRY_BACKOFF_CAP` | Server | duration | `5m` | largest interval between scan attempts | active |
 | `file.scan.health_interval` | `BOTHY_FILE__SCAN__HEALTH_INTERVAL` | Server | duration | `30s` | `PING` interval | active |
 | `file.scan.pending_alert_after` | `BOTHY_FILE__SCAN__PENDING_ALERT_AFTER` | Server |  | `10m` | age of the oldest `pending` file before the alert (not built: V3-31) | planned (V3) |

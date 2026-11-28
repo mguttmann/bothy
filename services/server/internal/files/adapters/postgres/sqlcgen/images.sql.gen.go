@@ -54,71 +54,6 @@ func (q *Queries) FailImageFile(ctx context.Context, id pgtype.UUID) (int64, err
 	return result.RowsAffected(), nil
 }
 
-const getImageFile = `-- name: GetImageFile :one
-
-SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
-       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status,
-       transcript_language, transcript_source, created_at, (deleted_at IS NOT NULL)::boolean AS deleted
-FROM files
-WHERE id = $1
-`
-
-type GetImageFileRow struct {
-	ID                 pgtype.UUID
-	ObjectKey          string
-	Sha256             []byte
-	SizeBytes          int64
-	MimeType           string
-	DeclaredMimeType   pgtype.Text
-	OriginalName       string
-	UploadedBy         pgtype.UUID
-	Purpose            string
-	ScopeChannelID     pgtype.UUID
-	UploadState        string
-	ScanStatus         string
-	Width              pgtype.Int4
-	Height             pgtype.Int4
-	DurationMs         pgtype.Int8
-	TranscriptStatus   string
-	TranscriptLanguage pgtype.Text
-	TranscriptSource   pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	Deleted            bool
-}
-
-// SPDX-License-Identifier: Apache-2.0
-// The job files.thumbnail of M3-06 (docs/spec/12-files.md 7, brief M3-06 design note 10). The
-// job has no principal, so its reads are keyed by the file id only (the exceptions of AZ-P12 in
-// tools/lint/sql_visibility.yaml); only the files row is locked (03 6.3).
-// One file by id, deleted or not (design note 3b).
-func (q *Queries) GetImageFile(ctx context.Context, id pgtype.UUID) (GetImageFileRow, error) {
-	row := q.db.QueryRow(ctx, getImageFile, id)
-	var i GetImageFileRow
-	err := row.Scan(
-		&i.ID,
-		&i.ObjectKey,
-		&i.Sha256,
-		&i.SizeBytes,
-		&i.MimeType,
-		&i.DeclaredMimeType,
-		&i.OriginalName,
-		&i.UploadedBy,
-		&i.Purpose,
-		&i.ScopeChannelID,
-		&i.UploadState,
-		&i.ScanStatus,
-		&i.Width,
-		&i.Height,
-		&i.DurationMs,
-		&i.TranscriptStatus,
-		&i.TranscriptLanguage,
-		&i.TranscriptSource,
-		&i.CreatedAt,
-		&i.Deleted,
-	)
-	return i, err
-}
-
 const insertFileThumbnail = `-- name: InsertFileThumbnail :execrows
 INSERT INTO file_thumbnails (file_id, variant, object_key, mime_type, width, height, size_bytes)
 VALUES ($1, $2, $3, $4, $5,
@@ -188,67 +123,6 @@ func (q *Queries) ListFileThumbnails(ctx context.Context, fileID pgtype.UUID) ([
 	return items, nil
 }
 
-const lockImageFile = `-- name: LockImageFile :one
-SELECT id, object_key, sha256, size_bytes, mime_type, declared_mime_type, original_name, uploaded_by, purpose,
-       scope_channel_id, upload_state, scan_status, width, height, duration_ms, transcript_status,
-       transcript_language, transcript_source, created_at, (deleted_at IS NOT NULL)::boolean AS deleted
-FROM files
-WHERE id = $1
-FOR UPDATE
-`
-
-type LockImageFileRow struct {
-	ID                 pgtype.UUID
-	ObjectKey          string
-	Sha256             []byte
-	SizeBytes          int64
-	MimeType           string
-	DeclaredMimeType   pgtype.Text
-	OriginalName       string
-	UploadedBy         pgtype.UUID
-	Purpose            string
-	ScopeChannelID     pgtype.UUID
-	UploadState        string
-	ScanStatus         string
-	Width              pgtype.Int4
-	Height             pgtype.Int4
-	DurationMs         pgtype.Int8
-	TranscriptStatus   string
-	TranscriptLanguage pgtype.Text
-	TranscriptSource   pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	Deleted            bool
-}
-
-// GetImageFile with the files row locked FOR UPDATE (design note 10).
-func (q *Queries) LockImageFile(ctx context.Context, id pgtype.UUID) (LockImageFileRow, error) {
-	row := q.db.QueryRow(ctx, lockImageFile, id)
-	var i LockImageFileRow
-	err := row.Scan(
-		&i.ID,
-		&i.ObjectKey,
-		&i.Sha256,
-		&i.SizeBytes,
-		&i.MimeType,
-		&i.DeclaredMimeType,
-		&i.OriginalName,
-		&i.UploadedBy,
-		&i.Purpose,
-		&i.ScopeChannelID,
-		&i.UploadState,
-		&i.ScanStatus,
-		&i.Width,
-		&i.Height,
-		&i.DurationMs,
-		&i.TranscriptStatus,
-		&i.TranscriptLanguage,
-		&i.TranscriptSource,
-		&i.CreatedAt,
-		&i.Deleted,
-	)
-	return i, err
-}
-
 const setFileMediaInfo = `-- name: SetFileMediaInfo :execrows
 UPDATE files
 SET width = coalesce($1, width), height = coalesce($2, height),
@@ -278,6 +152,7 @@ func (q *Queries) SetFileMediaInfo(ctx context.Context, arg SetFileMediaInfoPara
 }
 
 const storeImageOriginal = `-- name: StoreImageOriginal :execrows
+
 UPDATE files
 SET object_key = $1, sha256 = $2, size_bytes = $3,
     mime_type = $4, width = $5, height = $6, upload_state = 'complete'
@@ -294,6 +169,11 @@ type StoreImageOriginalParams struct {
 	ID        pgtype.UUID
 }
 
+// SPDX-License-Identifier: Apache-2.0
+// The job files.thumbnail of M3-06 (docs/spec/12-files.md 7, brief M3-06 design note 10). The
+// job has no principal; it reads and locks its file with GetFileByID and LockFileByID (files.sql,
+// the exceptions of AZ-P12 in tools/lint/sql_visibility.yaml); only the files row is locked
+// (03 6.3).
 // T1 (design note 10a): the cleaned original becomes the stored object and the file deliverable.
 func (q *Queries) StoreImageOriginal(ctx context.Context, arg StoreImageOriginalParams) (int64, error) {
 	result, err := q.db.Exec(ctx, storeImageOriginal,

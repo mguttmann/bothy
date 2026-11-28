@@ -127,7 +127,7 @@ func NewRestoreService(pool *pg.Pool, a *Audit, cursors []instanceapp.CursorMove
 }
 
 // ParseRelocationManifest reads the facts bothy restore finalize --relocation compares from the
-// manifest of the final backup (backup_manifest.v1, docs/operations/backup-restore.md 3). The
+// manifest of the final backup (backup_manifest.v2 or v1, docs/operations/backup-restore.md 3). The
 // manifest is checked as bothy-backupd writes it; an invalid one is an error that names the
 // field, never a value.
 func ParseRelocationManifest(b []byte) (instance.RelocationManifest, error) {

@@ -27,7 +27,7 @@ func (sc *Scenario) apps() {
 			"version": version, "min_api_version": "0.1",
 			"scopes":   map[string]any{"required": []string{"messages:read", "events:subscribe"}, "optional": []string{}},
 			"events":   []string{"message.created"},
-			"delivery": map[string]any{"mode": "gateway"}, "data_egress": sc.Reg.New(ClassContent, "", "app data egress "+version),
+			"delivery": map[string]any{"mode": "webhook", "events_url": "https://hooks.example.com/manifest-events"}, "data_egress": sc.Reg.New(ClassContent, "", "app data egress "+version),
 		}
 	}
 	sc.post(o, "/app-manifests/validate", manifest("0.9.0"), ok...)

@@ -31,7 +31,7 @@ import (
 //
 // The result is not cached: the range is minute-precise, so equal requests are rare.
 func (v *Views) Timeline(ctx context.Context, q stats.TimelineQuery) (stats.Timeline, error) {
-	st := v.d.Statistics
+	st := v.base
 	a, err := st.authorize(ctx, authorize.ActionStatsRead, q.SpaceID)
 	if err != nil {
 		return stats.Timeline{}, err
@@ -112,7 +112,7 @@ func (v *Views) nameTimelineRuns(ctx context.Context, a actor.Actor, out []stats
 	if len(out) == 0 {
 		return nil
 	}
-	named, err := namedChannels(ctx, v.d.Statistics.d.Authorizer, a)
+	named, err := namedChannels(ctx, v.base.authorizer(), a)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (v *Views) nameTimelineRuns(ctx context.Context, a actor.Actor, out []stats
 	if len(threads) == 0 {
 		return nil
 	}
-	chats, err := v.d.Statistics.d.Chat.StatsRunChats(ctx, channels, threads)
+	chats, err := v.base.chatSource().StatsRunChats(ctx, channels, threads)
 	if err != nil {
 		return err
 	}

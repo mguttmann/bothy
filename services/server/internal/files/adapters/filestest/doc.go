@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package filestest is the test helper of the files module: the conformance suite
-// RunObjectStoreConformance that every driver of the ObjectStore port runs
+// RunObjectStoreConformance that every driver of the ObjectStore port runs, and
+// RunMultipartConformance for a driver that also offers the MultipartStore port (the S3 driver)
 // (docs/spec/12-files.md "15. Tests", ADR 0010). Only _test.go files import it
 // (02 "6. Code-Layout"); TestFilestestNotInBinary in internal/wire holds it out of the binary.
 //

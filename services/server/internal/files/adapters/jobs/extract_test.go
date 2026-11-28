@@ -25,7 +25,7 @@ func (r *idRunner) Run(_ context.Context, id ids.ID) error {
 }
 
 // TestExtractArgsAndRegistration: both kinds carry only ids and pass the argument and kind checks;
-// files.extract_text runs on the queue files, files.extract_text_refresh periodically on the queue
+// files.extract_text runs on the queue files_text, files.extract_text_refresh periodically on the queue
 // maintenance with the interval and once at the start; the handlers pass ids and errors through.
 func TestExtractArgsAndRegistration(t *testing.T) {
 	t.Parallel()
@@ -44,7 +44,7 @@ func TestExtractArgsAndRegistration(t *testing.T) {
 	if err := filesjobs.RegisterExtract(reg, &idRunner{}, &idRunner{}, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
-	if q, ok := reg.Queue("files.extract_text"); !ok || q != jobs.QueueFiles {
+	if q, ok := reg.Queue("files.extract_text"); !ok || q != jobs.QueueFilesText {
 		t.Fatalf("extract queue %q %v", q, ok)
 	}
 	if q, ok := reg.Queue("files.extract_text_refresh"); !ok || q != jobs.QueueMaintenance {

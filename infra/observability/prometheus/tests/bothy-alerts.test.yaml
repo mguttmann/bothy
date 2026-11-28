@@ -511,6 +511,28 @@ tests:
 
   # The series start at 0 with the worker (signals.md 4.4), so the first discarded job is an
   # increase. Only the three kinds of the rule count: a discarded job of another kind is quiet.
+  # The series start at 0 with the server (signals.md 4.2), so the first stop is an increase.
+  - name: BothyWebhookSubscriptionStopped fires at once per cause
+    interval: 1m
+    input_series:
+      - series: 'bothy_webhook_transition_total{job="bothy/bothy-server", bothy_reason="max_pending"}'
+        values: '0 1 1'
+      - series: 'bothy_webhook_transition_total{job="bothy/bothy-server", bothy_reason="gap"}'
+        values: '0 0 0'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: BothyWebhookSubscriptionStopped
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: BothyWebhookSubscriptionStopped
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_reason: max_pending
+            exp_annotations:
+              summary: "The system paused or disabled an outgoing webhook subscription with cause max_pending in the last 24 hours."
+              runbook_url: "docs/observability/alerting.md#bothywebhooksubscriptionstopped"
+
   - name: BothyJobFinallyFailed fires at once for the kind that failed for good
     interval: 1m
     input_series:

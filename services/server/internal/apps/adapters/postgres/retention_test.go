@@ -4,6 +4,8 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -51,9 +53,20 @@ func TestPurgeOnlyExpired(t *testing.T) {
 		delivery("dead", cutoff, nil):           true,
 		delivery("pending", old, nil):           true,
 	}
-	n, more, err := postgres.NewRetention(db.Pool(t, pg.RoleApp)).Purge(ctx, cutoff, 10)
-	if err != nil || n != 2 || more {
-		t.Fatalf("Purge = %d, %v, %v; want 2, false, nil", n, more, err)
+	sweep := &sweeper{}
+	p := postgres.NewRetention(db.Pool(t, pg.RoleApp), sweep)
+	n, more, err := p.Purge(ctx, cutoff, 10)
+	if err != nil || n != 2 || more || !slices.Equal(sweep.limits, []int{10}) {
+		t.Fatalf("Purge = %d, %v, %v, sweeps %v; want 2, false, nil, [10]", n, more, err, sweep.limits)
+	}
+	// A sweep that handled a whole batch asks for another call; a failed sweep deletes nothing.
+	sweep.handled = 10
+	if _, more, err := p.Purge(ctx, cutoff, 10); err != nil || !more {
+		t.Fatalf("Purge after a full sweep: more %v, %v", more, err)
+	}
+	sweep.err = errors.New("sweep failed")
+	if _, _, err := p.Purge(ctx, cutoff, 10); !errors.Is(err, sweep.err) {
+		t.Fatalf("Purge with a failed sweep: %v", err)
 	}
 	for id, want := range cases {
 		var ok bool
@@ -64,4 +77,16 @@ func TestPurgeOnlyExpired(t *testing.T) {
 			t.Errorf("delivery present = %v, want %v", ok, want)
 		}
 	}
+}
+
+// sweeper records the limits of ExpireLost and answers handled and err.
+type sweeper struct {
+	limits  []int
+	handled int
+	err     error
+}
+
+func (s *sweeper) ExpireLost(_ context.Context, limit int) (int, error) {
+	s.limits = append(s.limits, limit)
+	return s.handled, s.err
 }

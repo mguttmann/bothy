@@ -40,7 +40,7 @@ Output on stdout:
   permission version <n>
 
 --relocation FILE  after a relocation without data loss: FILE is the manifest of the final
-                   backup (backup_manifest.v1). Only when event_log.head_seq, audit.last_seq,
+                   backup (backup_manifest.v2 or v1). Only when event_log.head_seq, audit.last_seq,
                    audit.last_hash and sync_epoch of the restored database equal the manifest,
                    it stores the new identity and keeps the epoch and every cursor
                    ("sync epoch <e> kept, cursors unchanged at head_seq <n>"). Any difference

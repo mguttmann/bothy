@@ -221,10 +221,12 @@ The mode stays off until two things are proven:
 - The presigned URL binds the part length, so that a client cannot store more bytes than
   declared. Integration test against every supported S3 service. Result of M3-02
   (`TestPresignedPartBindsLength`, docs/DECISIONS.md M3-02/9): proven for SeaweedFS at the version
-  the Compose stack pins (`BOTHY_SEAWEEDFS_VERSION`). The S3 driver signs `content-length` into
-  every part URL; SeaweedFS accepts a plain `PUT` of exactly the signed length and refuses one
-  byte more, one byte less, chunked transfer encoding and a request after the validity, each
-  without storing a part. Other S3 services are not proven.
+  the Compose stack pinned then. The S3 driver signed `content-length` into every part URL;
+  SeaweedFS accepted a plain `PUT` of exactly the signed length and refused one byte more, one
+  byte less, chunked transfer encoding and a request after the validity, each without storing a
+  part. Other S3 services are not proven. Until the mode is built, neither the port nor the S3
+  driver has a presign operation (audit findings srv-files-adapters-5, srv-files-core-12); plan
+  row V3-32 brings the operation back together with the proof test against the pinned version.
 - The clients reach the S3 endpoint. For instances in private networks this is often not so
   (open, not checked).
 
@@ -447,8 +449,13 @@ these operations:
 | `Get(key, range)` | read, optionally a byte range |
 | `Head(key)` | size and existence |
 | `Delete(key)` | delete one object; a missing object is not an error |
-| `CreateMultipart(key)`, `UploadPart(key, uploadID, n, reader, size)`, `CompleteMultipart(key, uploadID, parts)`, `AbortMultipart(key, uploadID)` | multipart uploads |
-| `PresignUploadPart(key, uploadID, n, size, ttl)` | S3 only, only for mode `presigned`; the signature binds the part length `size` |
+
+The multipart upload of the S3 part strategy (3.2) is the separate port `MultipartStore`, which
+only the S3 driver implements; the file system driver keeps parts as objects written with `Put`:
+
+| Operation | Purpose |
+|---|---|
+| `CreateMultipart(key)`, `UploadPart(key, uploadID, n, reader, size)`, `CompleteMultipart(key, uploadID, parts)`, `AbortMultipart(key, uploadID)` | multipart uploads of the S3 driver |
 
 Not in the port: listing, copying, batch deletion, versioning, bucket policies, lifecycle
 and encryption headers. The server knows every key from the database and needs no
@@ -478,18 +485,13 @@ and treats an object with more bytes as a read error; a use case that streams ne
   `ErrUploadNotFound` (an upload that was never created, was aborted or was completed),
   `ErrInvalidPart` (part number below 1; in `CompleteMultipart` an empty list, numbers that are
   not strictly ascending, a number without an uploaded part or an ETag that does not match; the
-  upload stays open), `ErrNotSupported` (an operation the driver does not offer). `Delete` of a
+  upload stays open). `Delete` of a
   missing object and `AbortMultipart` of an unknown, aborted or completed upload return no error
   (section 12). Every other error is a storage failure that callers answer with `503 unavailable`
   ([02-architecture.md](02-architecture.md) 14.4); errors name the operation and the key and never
   contain object bytes. The port never panics on a failing storage.
 - `Put` on an existing key replaces it atomically. The drivers do not enforce "Objects are never
   overwritten"; the module does, through the key schema and the unique `files.object_key`.
-- `PresignUploadPart` takes the size of the part before the validity (M3-02,
-  docs/DECISIONS.md M3-02/9), because no driver can bind a length it does not know. `n < 1` gives
-  `ErrInvalidPart`, `size < 1` gives `ErrSizeMismatch`, both on every driver; the file system
-  driver then answers `ErrNotSupported`. The URL is a credential for its validity: callers hand
-  it to the client only and never log it.
 
 ### 4.2 File system driver (default)
 
@@ -526,17 +528,12 @@ File system rules (M3-01, `internal/files/adapters/fs`, docs/DECISIONS.md M3-01/
   (`f/<aa>/<bb>/<file_id>` or `uploads/<file_id>`) if it is empty now; the levels `f/<aa>` and
   `f/<aa>/<bb>` stay. A writer whose directory a concurrent `Delete` removed creates it again and
   renames again.
-- Multipart: `CreateMultipart` accepts only original keys, creates `uploads/<file_id>/`, is
-  idempotent and returns the upload ID `""`. `UploadPart` writes `uploads/<file_id>/<n>` like an
-  object and returns the ETag `"<sha256 hex>"` of the part bytes (the form of 9.3); a part with the
-  same number is replaced atomically. While the upload is open, parts are regular objects under
-  their keys. `CompleteMultipart` writes the listed parts in order into one temporary file, reads
-  each part exactly once and checks it against its ETag, renames to the key and removes
-  `uploads/<file_id>/` with all parts; a failure of that removal does not fail the completion; `Delete`
-  of an original key also removes `uploads/<file_id>/`, so parts left behind go with the file. The list shape is checked before any file
-  system call. `AbortMultipart` removes that directory. Deleting the last
-  part of an open upload with `Delete` removes `uploads/<file_id>/` and so ends the upload.
-- `PresignUploadPart` gives `ErrInvalidPart` for a part number below 1 and otherwise `ErrNotSupported`. Several processes may share one root (roles `api`
+- Parts: the driver has no multipart operations. The part strategy of 3.2 writes part `n` with
+  `Put` to `uploads/<file_id>/<n>`, the scan pass (3.4) reads the parts in order and writes the
+  joined bytes with `Put` to the original key, and the parts go with `Delete`; deleting the last
+  part removes `uploads/<file_id>/`. `Delete` of an original key also removes
+  `uploads/<file_id>/`, so parts left behind go with the file.
+- Several processes may share one root (roles `api`
   and `worker` on one volume), because every change is a rename or an unlink; the driver takes no
   lock. Every write ends with a rename or the removal of its temporary file, and no write outlives
   an upload session, so a temporary file older than `file.upload_session_ttl` belongs to a crashed
@@ -563,9 +560,8 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
 
 - Core S3 only: the driver holds a Go interface with exactly `PutObject`, `GetObject`,
   `HeadObject`, `DeleteObject`, `CreateMultipartUpload`, `UploadPart`,
-  `CompleteMultipartUpload`, `AbortMultipartUpload` and a presign interface with only
-  `PresignUploadPart`. Only this package and the audit checkpoint sink
-  `internal/audit/adapters/s3sink` (M7-22) and the object mirror of the backup service
+  `CompleteMultipartUpload` and `AbortMultipartUpload`, and no presign client (3.3). Only this
+  package and the audit checkpoint sink `internal/audit/adapters/s3sink` (M7-22) and the object mirror of the backup service
   `internal/status/adapters/s3mirror` (M7-02) import the AWS SDK (depguard in `make lint`,
   `TestS3SDKOnlyInAdapter`); forbidigo forbids `DeleteObjects` and `PresignGetObject`. No request
   of the files driver sets server-side encryption, ACL, tagging, object lock, storage class or
@@ -607,7 +603,7 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
 - The object name is `<file.s3.prefix>/<key>` with a prefix, else the key; key and prefix follow
   the key grammar of 4.1, checked before any request.
 - Errors keep the contract of 4.1 and read `files/s3: <operation> <key>: <detail>`; they never
-  contain a request URL, a query, a presigned URL, the endpoint or credentials. A `HEAD` answer
+  contain a request URL, a query, the endpoint or credentials. A `HEAD` answer
   has no body, so `Head` on a missing bucket reads as `ErrNotFound`; `Get` reports `NoSuchBucket`
   as a storage failure. An error document above `egress.max_response_bytes` was not read, so it
   is a storage failure whatever its status.
@@ -659,7 +655,8 @@ Decision and alternatives: ADR 0033. ClamAV runs as a separate service; the serv
 4. Read the response until clamd closes the connection: `stream: OK`, `stream: <signature> FOUND`
    or a line with `ERROR` [Q7, verified].
 5. Time limit per file `file.scan.timeout`. At most `file.scan.max_concurrent` scans per
-   worker process.
+   worker process; the workers of the queue `files` bound the scans too, so the default equals
+   `jobs.queue.files.max_workers` (02 12.2).
 
 A small client of our own is enough; the protocol is small, and the well-known Go library
 `go-clamd` has had no release since 2017 [Q8, verified].
@@ -848,7 +845,9 @@ Before decoding, the server reads only the header and dimensions (`image.DecodeC
 times height (for GIF times the frame count) is greater than `file.image.max_pixels`, it does not
 decode: no preview, shown as a download card. Every processing step has the time limit
 `file.image.processing_timeout`; at most `file.image.max_concurrent` image jobs run per
-worker at the same time. JPEG and PNG above the limit are still cleaned, because the filter never
+worker at the same time. A job that finds every slot taken does not wait under its time limit: it
+is snoozed for a few seconds without using up an attempt and frees its worker of the queue
+`files` for the scans (audit finding srv-files-core-13). JPEG and PNG above the limit are still cleaned, because the filter never
 decodes pixels; a GIF or WebP above it stays unchanged (D-M3-06-5).
 
 The pixel count alone does not bound the memory of a decode, so two more rules belong to the
@@ -1389,7 +1388,7 @@ signature names only in the audit log.
 
 | Test | Holds |
 |---|---|
-| Driver conformance: the same test suite against the file system and against SeaweedFS (testcontainers) | port contract, ranges, multipart, deletion of missing objects |
+| Driver conformance: the same test suite against the file system and against SeaweedFS (testcontainers) | port contract, ranges, the part layout `uploads/<file_id>/<n>` of 3.2 through `Put`, deletion of missing objects; multipart against SeaweedFS (`RunMultipartConformance`) |
 | The S3 driver depends only on a Go interface with the port operations; architecture rule: only `internal/files/adapters/s3` imports the S3 SDK (and, since M7-22, the audit checkpoint sink `internal/audit/adapters/s3sink`; since M7-02, the backup mirror `internal/status/adapters/s3mirror`) | "core S3 only", no `DeleteObjects` |
 | EICAR test file against a real clamd container | `infected`, never servable, objects deleted, audit entry |
 | clamd stopped | file stays `pending`, `409 file_not_ready`; after the start `clean` |
@@ -1478,7 +1477,7 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.scan.clamd_address` | `unix:///run/clamav/clamd.sock` | Unix socket of clamd, `unix://` plus an absolute path; no other transport (19 SEC-TLS-5) |
 | `file.scan.chunk_bytes` | `65536` | chunk size for `INSTREAM` |
 | `file.scan.timeout` | `120s` | time limit per scan |
-| `file.scan.max_concurrent` | `4` | scans per worker process |
+| `file.scan.max_concurrent` | `2` | scans per worker process; the workers of the queue `files` bound it too |
 | `file.scan.retry_backoff_cap` | `5m` | largest interval between scan attempts |
 | `file.scan.health_interval` | `30s` | `PING` interval |
 | `file.scan.pending_alert_after` | `10m` | age of the oldest `pending` file before the alert (not built: V3-31) |

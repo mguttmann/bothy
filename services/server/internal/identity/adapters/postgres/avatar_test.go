@@ -20,7 +20,7 @@ func TestSetAvatarQuery(t *testing.T) {
 	alex := e.mustAddUser(t, "alex", "alex@example.com").Principal.ID
 	file := ids.New()
 	e.exec(t, `INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose)
-		VALUES ($1, $3, '\x00', 1, 'image/png', 'avatar', $2, 'avatar')`, file.String(), alex.String(), "avatars/"+file.String())
+		VALUES ($1, $3, decode(repeat('00', 32), 'hex'), 1, 'image/png', 'avatar', $2, 'avatar')`, file.String(), alex.String(), "avatars/"+file.String())
 
 	if err := e.repo.SetAvatar(ctx, alex, file); err == nil {
 		t.Fatal("SetAvatar outside a unit of work")

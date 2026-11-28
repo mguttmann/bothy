@@ -13,46 +13,32 @@ import (
 )
 
 // TestObjectStoreHasExactlyThePortOperations holds docs/spec/12-files.md "4.1 Port": exactly
-// nine operations, none for listing, copying, batch deletion or versioning.
+// four operations, none for listing, copying, batch deletion or versioning, and the multipart
+// operations of the S3 part strategy as the separate port MultipartStore; no presigned URL
+// before the mode presigned is built (12 "3.3").
 func TestObjectStoreHasExactlyThePortOperations(t *testing.T) {
 	t.Parallel()
-	typ := reflect.TypeFor[app.ObjectStore]()
-	var got []string
-	for i := range typ.NumMethod() {
-		got = append(got, typ.Method(i).Name)
-	}
-	want := []string{
-		"AbortMultipart", "CompleteMultipart", "CreateMultipart", "Delete", "Get", "Head",
-		"PresignUploadPart", "Put", "UploadPart",
-	}
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Fatalf("ObjectStore methods = %v, want %v", got, want)
-	}
-	for _, m := range got {
-		ft, _ := typ.MethodByName(m)
-		if ft.Type.NumIn() == 0 || ft.Type.In(0).String() != "context.Context" {
-			t.Errorf("%s does not take a context first", m)
+	for _, port := range []struct {
+		typ  reflect.Type
+		want []string
+	}{
+		{reflect.TypeFor[app.ObjectStore](), []string{"Delete", "Get", "Head", "Put"}},
+		{reflect.TypeFor[app.MultipartStore](), []string{"AbortMultipart", "CompleteMultipart", "CreateMultipart", "UploadPart"}},
+	} {
+		var got []string
+		for i := range port.typ.NumMethod() {
+			got = append(got, port.typ.Method(i).Name)
 		}
-	}
-}
-
-// TestPresignUploadPartTakesThePartSize holds docs/DECISIONS.md M3-02/9: PresignUploadPart takes
-// the part size before the validity, so the S3 driver can bind the length into the signature
-// (12 "3.3", R-FI-02).
-func TestPresignUploadPartTakesThePartSize(t *testing.T) {
-	t.Parallel()
-	m, ok := reflect.TypeFor[app.ObjectStore]().MethodByName("PresignUploadPart")
-	if !ok {
-		t.Fatal("no PresignUploadPart")
-	}
-	var got []string
-	for i := range m.Type.NumIn() {
-		got = append(got, m.Type.In(i).String())
-	}
-	want := []string{"context.Context", "string", "string", "int", "int64", "time.Duration"}
-	if !slices.Equal(got, want) {
-		t.Errorf("PresignUploadPart parameters = %v, want %v", got, want)
+		slices.Sort(got)
+		if !slices.Equal(got, port.want) {
+			t.Fatalf("%s methods = %v, want %v", port.typ.Name(), got, port.want)
+		}
+		for _, m := range got {
+			ft, _ := port.typ.MethodByName(m)
+			if ft.Type.NumIn() == 0 || ft.Type.In(0).String() != "context.Context" {
+				t.Errorf("%s.%s does not take a context first", port.typ.Name(), m)
+			}
+		}
 	}
 }
 
@@ -63,7 +49,7 @@ func TestErrInvalidKeyIsTheDomainError(t *testing.T) {
 		t.Fatal("app.ErrInvalidKey is not domain.ErrInvalidKey")
 	}
 	distinct := []error{app.ErrInvalidKey, app.ErrNotFound, app.ErrInvalidRange, app.ErrSizeMismatch,
-		app.ErrUploadNotFound, app.ErrInvalidPart, app.ErrNotSupported}
+		app.ErrUploadNotFound, app.ErrInvalidPart}
 	for i, a := range distinct {
 		for j, b := range distinct {
 			if i != j && errors.Is(a, b) {

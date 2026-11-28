@@ -246,27 +246,6 @@ func FuzzParseContentDigest(f *testing.F) {
 	})
 }
 
-func TestSessionTransitions(t *testing.T) {
-	for _, c := range []struct {
-		from, to domain.SessionState
-		ok       bool
-	}{
-		{domain.SessionOpen, domain.SessionCompleted, true},
-		{domain.SessionOpen, domain.SessionAborted, true},
-		{domain.SessionOpen, domain.SessionExpired, true},
-		{domain.SessionCompleted, domain.SessionAborted, false},
-		{domain.SessionAborted, domain.SessionCompleted, false},
-		{domain.SessionExpired, domain.SessionOpen, false},
-		{domain.SessionCompleted, domain.SessionCompleted, false},
-		{domain.SessionState("unknown"), domain.SessionAborted, false},
-	} {
-		err := domain.CheckTransition(c.from, c.to)
-		if (err == nil) != c.ok {
-			t.Errorf("CheckTransition(%s, %s) = %v, want ok %v", c.from, c.to, err, c.ok)
-		}
-	}
-}
-
 func TestUploadStateView(t *testing.T) {
 	for _, c := range []struct {
 		state     domain.SessionState

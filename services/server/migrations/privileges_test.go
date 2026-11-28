@@ -207,6 +207,8 @@ var appPrivileges = map[string][]string{
 	"status_incidents":           {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"status_incident_updates":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"status_incident_components": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 status_component_probe (AUD srv-stats-status-11): the memory of the job status.probe.
+	"status_component_probe": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 runs and run_steps (M2-05): a run ends with an end state, never with a delete; steps
 	// are deleted when the server folds older finished steps into one (run.max_steps_persisted,
 	// M2-10).

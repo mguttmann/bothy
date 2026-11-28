@@ -18,22 +18,30 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Options tunes RunObjectStoreConformance to a driver.
+// Options tunes RunObjectStoreConformance and RunMultipartConformance to a driver.
 type Options struct {
-	// PartSize is the size of every part but the last in the multipart cases. It must be at
-	// least the smallest part the driver accepts: the file system driver accepts any size, the
-	// S3 driver needs the S3 minimum that docs/spec/12-files.md "3.1" cites.
+	// PartSize is the size of every part but the last in the part cases. It must be at least the
+	// smallest part the driver accepts: the file system driver accepts any size, the S3 driver
+	// needs the S3 minimum that docs/spec/12-files.md "3.1" cites.
 	PartSize int64
+}
+
+// MultipartDriver is a driver that also offers the multipart port: the S3 driver.
+type MultipartDriver interface {
+	app.ObjectStore
+	app.MultipartStore
 }
 
 // RunObjectStoreConformance runs the conformance suite of the ObjectStore port against one
 // driver (docs/spec/12-files.md "15. Tests" row "Driver conformance", ADR 0010
 // "Confirmation"). Every driver must pass it. Each case is a subtest with a fresh, empty store
 // from newStore; file IDs come from ids.New, keys only from the domain builders, and content from
-// a generator whose seed the subtest logs.
+// a generator whose seed the subtest logs. The case PartLayout runs the part strategy of the file
+// system driver (app.NewFSPartStore) and the join of the scan pass over the store, the layout
+// uploads/<file_id>/<n> that production writes with Put (D-M3-03-2).
 //
-// The suite asserts nothing a driver may do differently: the form of the upload ID, whether
-// parts are readable as objects, and what Put on an existing key does.
+// The suite asserts nothing a driver may do differently, such as what Put on an existing key
+// does.
 //
 // Example (in a _test.go file of a driver):
 //
@@ -44,13 +52,7 @@ type Options struct {
 //	}
 func RunObjectStoreConformance(t *testing.T, newStore func(t *testing.T) app.ObjectStore, opts Options) {
 	t.Helper()
-	if opts.PartSize < 1 {
-		t.Fatalf("filestest: Options.PartSize must be at least 1, got %d", opts.PartSize)
-	}
-	cases := []struct {
-		name string
-		run  func(t *testing.T, s app.ObjectStore, c *caseEnv)
-	}{
+	runCases(t, newStore, opts, []namedCase[app.ObjectStore]{
 		{"PutGetHead", casePutGetHead},
 		{"GetRange", caseGetRange},
 		{"InvalidRange", caseInvalidRange},
@@ -59,12 +61,38 @@ func RunObjectStoreConformance(t *testing.T, newStore func(t *testing.T) app.Obj
 		{"PutSizeMismatch", casePutSizeMismatch},
 		{"PutCancelled", casePutCancelled},
 		{"InvalidKeys", caseInvalidKeys},
+		{"PartLayout", casePartLayout},
+		{"KeysIndependent", caseKeysIndependent},
+		{"ConcurrentPuts", caseConcurrentPuts},
+	})
+}
+
+// RunMultipartConformance runs the conformance suite of the MultipartStore port (12 "4.1")
+// against a driver that offers it, as RunObjectStoreConformance does for ObjectStore. The suite
+// asserts nothing a driver may do differently: the form of the upload ID and whether parts are
+// readable as objects.
+func RunMultipartConformance(t *testing.T, newStore func(t *testing.T) MultipartDriver, opts Options) {
+	t.Helper()
+	runCases(t, newStore, opts, []namedCase[MultipartDriver]{
+		{"MultipartInvalidKeys", caseMultipartInvalidKeys},
 		{"MultipartComplete", caseMultipartComplete},
 		{"MultipartAbort", caseMultipartAbort},
 		{"MultipartInvalidParts", caseMultipartInvalidParts},
 		{"MultipartUnknownUpload", caseMultipartUnknownUpload},
-		{"KeysIndependent", caseKeysIndependent},
-		{"ConcurrentPuts", caseConcurrentPuts},
+	})
+}
+
+// namedCase is one subtest of a suite.
+type namedCase[S any] struct {
+	name string
+	run  func(t *testing.T, s S, c *caseEnv)
+}
+
+// runCases runs each case as a subtest with a fresh store and a logged content seed.
+func runCases[S any](t *testing.T, newStore func(t *testing.T) S, opts Options, cases []namedCase[S]) {
+	t.Helper()
+	if opts.PartSize < 1 {
+		t.Fatalf("filestest: Options.PartSize must be at least 1, got %d", opts.PartSize)
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -263,19 +291,78 @@ func caseInvalidKeys(t *testing.T, s app.ObjectStore, _ *caseEnv) {
 			_ = rc.Close()
 		}
 		_, headErr := s.Head(ctx, k)
+		errs := map[string]error{
+			"Put":    s.Put(ctx, k, bytes.NewReader([]byte("x")), 1),
+			"Get":    getErr,
+			"Head":   headErr,
+			"Delete": s.Delete(ctx, k),
+		}
+		for op, err := range errs {
+			if !errors.Is(err, app.ErrInvalidKey) {
+				t.Errorf("%s(%q) err = %v, want ErrInvalidKey", op, k, err)
+			}
+		}
+	}
+}
+
+// casePartLayout stores the parts of an upload as production does on the file system driver:
+// app.NewFSPartStore writes part n with Put to uploads/<file_id>/<n> (12 "3.2", D-M3-03-2), the
+// scan pass reads them in order and writes the joined bytes with Put to the original key (12
+// "3.4"), and Discard removes every part.
+func casePartLayout(t *testing.T, s app.ObjectStore, c *caseEnv) {
+	ctx := t.Context()
+	id := ids.New()
+	data := [][]byte{c.content(c.partSize), c.content(c.partSize), c.content(c.partSize/2 + 1)}
+	session := app.SessionRecord{FileID: id, PartCount: len(data)}
+	parts := app.NewFSPartStore(s)
+	for _, n := range []int{3, 1, 2} {
+		etag, err := parts.Put(ctx, session, n, bytes.NewReader(data[n-1]), int64(len(data[n-1])))
+		if err != nil || etag != "" {
+			t.Fatalf("PartStore.Put(%d) = %q, %v; want the ETag from the digest", n, etag, err)
+		}
+	}
+	var joined []byte
+	for n := 1; n <= len(data); n++ {
+		key, err := domain.UploadPartKey(id, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantHead(t, s, key, int64(len(data[n-1])))
+		joined = append(joined, read(t, s, key, nil)...)
+	}
+	whole := bytes.Join(data, nil)
+	sameBytes(t, "joined parts", joined, whole)
+	orig := originalKey(t, id)
+	put(t, s, orig, joined)
+	if err := parts.Discard(ctx, session); err != nil {
+		t.Fatalf("PartStore.Discard: %v", err)
+	}
+	for n := 1; n <= len(data); n++ {
+		key, _ := domain.UploadPartKey(id, n)
+		wantMissing(t, s, key)
+	}
+	sameBytes(t, "original after Discard", read(t, s, orig, nil), whole)
+	// A part stored for a session that ended meanwhile goes alone.
+	if _, err := parts.Put(ctx, session, 1, bytes.NewReader(data[0]), int64(len(data[0]))); err != nil {
+		t.Fatalf("PartStore.Put again: %v", err)
+	}
+	if err := parts.DiscardUnconfirmed(ctx, session, 1); err != nil {
+		t.Fatalf("PartStore.DiscardUnconfirmed: %v", err)
+	}
+	first, _ := domain.UploadPartKey(id, 1)
+	wantMissing(t, s, first)
+}
+
+func caseMultipartInvalidKeys(t *testing.T, s MultipartDriver, _ *caseEnv) {
+	ctx := t.Context()
+	for _, k := range invalidKeys {
 		_, createErr := s.CreateMultipart(ctx, k)
 		_, partErr := s.UploadPart(ctx, k, "", 1, bytes.NewReader([]byte("x")), 1)
-		_, presignErr := s.PresignUploadPart(ctx, k, "", 1, 1, time.Minute)
 		errs := map[string]error{
-			"Put":               s.Put(ctx, k, bytes.NewReader([]byte("x")), 1),
-			"Get":               getErr,
-			"Head":              headErr,
-			"Delete":            s.Delete(ctx, k),
 			"CreateMultipart":   createErr,
 			"UploadPart":        partErr,
 			"CompleteMultipart": s.CompleteMultipart(ctx, k, "", []app.Part{{Number: 1, ETag: `"x"`}}),
 			"AbortMultipart":    s.AbortMultipart(ctx, k, ""),
-			"PresignUploadPart": presignErr,
 		}
 		for op, err := range errs {
 			if !errors.Is(err, app.ErrInvalidKey) {
@@ -286,7 +373,7 @@ func caseInvalidKeys(t *testing.T, s app.ObjectStore, _ *caseEnv) {
 }
 
 // startUpload opens a multipart upload on a fresh original key.
-func startUpload(t *testing.T, s app.ObjectStore) (key, uploadID string) {
+func startUpload(t *testing.T, s MultipartDriver) (key, uploadID string) {
 	t.Helper()
 	key = originalKey(t, ids.New())
 	uploadID, err := s.CreateMultipart(t.Context(), key)
@@ -296,7 +383,7 @@ func startUpload(t *testing.T, s app.ObjectStore) (key, uploadID string) {
 	return key, uploadID
 }
 
-func uploadPart(t *testing.T, s app.ObjectStore, key, uploadID string, n int, data []byte) app.Part {
+func uploadPart(t *testing.T, s MultipartDriver, key, uploadID string, n int, data []byte) app.Part {
 	t.Helper()
 	p, err := s.UploadPart(t.Context(), key, uploadID, n, bytes.NewReader(data), int64(len(data)))
 	if err != nil {
@@ -308,7 +395,7 @@ func uploadPart(t *testing.T, s app.ObjectStore, key, uploadID string, n int, da
 	return p
 }
 
-func caseMultipartComplete(t *testing.T, s app.ObjectStore, c *caseEnv) {
+func caseMultipartComplete(t *testing.T, s MultipartDriver, c *caseEnv) {
 	key, uploadID := startUpload(t, s)
 	data := [][]byte{c.content(c.partSize), c.content(c.partSize), c.content(c.partSize/2 + 1)}
 	parts := make([]app.Part, 3)
@@ -340,7 +427,7 @@ func caseMultipartComplete(t *testing.T, s app.ObjectStore, c *caseEnv) {
 	wantHead(t, s, key, int64(len(whole)))
 }
 
-func caseMultipartAbort(t *testing.T, s app.ObjectStore, c *caseEnv) {
+func caseMultipartAbort(t *testing.T, s MultipartDriver, c *caseEnv) {
 	key, uploadID := startUpload(t, s)
 	p1 := uploadPart(t, s, key, uploadID, 1, c.content(c.partSize))
 	p2 := uploadPart(t, s, key, uploadID, 2, c.content(10))
@@ -360,7 +447,7 @@ func caseMultipartAbort(t *testing.T, s app.ObjectStore, c *caseEnv) {
 	wantMissing(t, s, key)
 }
 
-func caseMultipartInvalidParts(t *testing.T, s app.ObjectStore, c *caseEnv) {
+func caseMultipartInvalidParts(t *testing.T, s MultipartDriver, c *caseEnv) {
 	key, uploadID := startUpload(t, s)
 	d1, d2 := c.content(c.partSize), c.content(5)
 	p1 := uploadPart(t, s, key, uploadID, 1, d1)
@@ -393,7 +480,7 @@ func caseMultipartInvalidParts(t *testing.T, s app.ObjectStore, c *caseEnv) {
 	sameBytes(t, "completed object", read(t, s, key, nil), append(append([]byte{}, d1...), d2...))
 }
 
-func caseMultipartUnknownUpload(t *testing.T, s app.ObjectStore, _ *caseEnv) {
+func caseMultipartUnknownUpload(t *testing.T, s MultipartDriver, _ *caseEnv) {
 	key := originalKey(t, ids.New())
 	// The list shape is checked before any storage call, so an empty list is ErrInvalidPart even
 	// without an open upload.

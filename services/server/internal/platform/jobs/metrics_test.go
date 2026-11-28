@@ -76,3 +76,20 @@ func TestJobsMetrics_DiscardedOnLastFailedAttempt(t *testing.T) {
 		t.Fatalf("discarded after two failed last attempts = %v, want 2", n)
 	}
 }
+
+// TestJobsMetrics_SnoozeIsSnoozed: a snoozed last attempt records bothy.job.duration with the
+// outcome snoozed and counts nothing in bothy.job.discarded, because River keeps the job.
+func TestJobsMetrics_SnoozeIsSnoozed(t *testing.T) {
+	metricstest.Strict(t)
+	mp, reader := metricstest.Provider(t)
+	if err := jobs.WorkFailingWithMetricsForTest(mp, jobs.Snooze(time.Second), 3, 3); err == nil {
+		t.Fatal("Work = nil, want River's snooze")
+	}
+	got := metricstest.Collect(t, reader)
+	if n := metricstest.Sum(got["bothy.job.duration"], map[string]string{"bothy.job.kind": "jobs.timeout", "bothy.outcome": "snoozed"}); n != 1 {
+		t.Errorf("snoozed durations = %v, want 1", n)
+	}
+	if n := metricstest.Sum(got["bothy.job.discarded"], map[string]string{"bothy.job.kind": "jobs.timeout"}); n != 0 {
+		t.Errorf("discarded after a snooze = %v, want 0", n)
+	}
+}

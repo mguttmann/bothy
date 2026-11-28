@@ -8,6 +8,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/OWNER/bothy/services/server/internal/apps"
 	"github.com/OWNER/bothy/services/server/internal/apps/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -162,6 +163,7 @@ func (c *Consumer) HandleLost(ctx context.Context, from, to int64) error {
 		if err != nil {
 			return err
 		}
+		c.w.countDeliveries(ctx, outcomeDead, len(seqs))
 		first := from
 		if len(seqs) > 0 {
 			first = slices.Min(seqs)
@@ -231,5 +233,42 @@ func (w *WebhookService) applyTransition(ctx context.Context, rec *SubscriptionR
 	}
 	w.d.Logger.LogAttrs(ctx, slog.LevelWarn, msgStateChanged, slog.String(keySubscriptionID, rec.ID.String()),
 		slog.String(keyReason, ev.Cause()), slog.String(keyServerAddress, hostOf(rec.URL)))
+	cause := ev.Cause()
+	afterCommit(ctx, func(ctx context.Context) { w.d.Metrics.Transition(ctx, cause) })
 	return nil
+}
+
+// The outcomes of bothy.webhook.delivery: the status of the row after an attempt, retrying for a
+// row that stays pending for another attempt.
+const (
+	outcomeSucceeded = apps.DeliverySucceeded
+	outcomeRetrying  = "retrying"
+	outcomeFailed    = apps.DeliveryFailed
+	outcomeDead      = apps.DeliveryDead
+)
+
+// outcomeOf is the outcome of a row with status after an attempt: its status, retrying for a row
+// that stays pending.
+func outcomeOf(status string) string {
+	if status == apps.DeliveryPending {
+		return outcomeRetrying
+	}
+	return status
+}
+
+// countDeliveries adds n deliveries with outcome after the commit of the unit of ctx.
+func (w *WebhookService) countDeliveries(ctx context.Context, outcome string, n int) {
+	if n <= 0 {
+		return
+	}
+	afterCommit(ctx, func(ctx context.Context) { w.d.Metrics.Deliveries(ctx, outcome, n) })
+}
+
+// afterCommit runs fn after the commit of the unit of ctx, or at once outside a unit, with a
+// context that outlives the request and carries no unit.
+func afterCommit(ctx context.Context, fn func(context.Context)) {
+	detached := txn.Detach(context.WithoutCancel(ctx))
+	if !txn.AfterCommit(ctx, func() { fn(detached) }) {
+		fn(detached)
+	}
 }

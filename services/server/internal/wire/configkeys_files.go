@@ -242,8 +242,8 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "file.scan.max_concurrent", Kind: config.KindInt, Default: "4", Min: "1",
-			Doc:     "Scans that one worker process runs at the same time.",
+			Name: "file.scan.max_concurrent", Kind: config.KindInt, Default: "2", Min: "1",
+			Doc:     "Scans that one worker process runs at the same time; the workers of the queue files bound it too.",
 			Chapter: chapter12,
 		},
 		{

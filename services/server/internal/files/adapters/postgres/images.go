@@ -4,9 +4,7 @@ package postgres
 
 import (
 	"context"
-	"errors"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/postgres/sqlcgen"
@@ -19,7 +17,7 @@ import (
 // ImageFile implements app.Repository (M3-06): the file by id with its thumbnails, deleted or not.
 func (r *Repository) ImageFile(ctx context.Context, fileID ids.ID) (app.FileRecord, bool, error) {
 	q := r.read(ctx)
-	row, err := q.GetImageFile(ctx, uuid(fileID))
+	row, err := q.GetFileByID(ctx, uuid(fileID))
 	return r.withThumbnails(ctx, q, row, err)
 }
 
@@ -29,26 +27,16 @@ func (r *Repository) LockImageFile(ctx context.Context, fileID ids.ID) (app.File
 	if err != nil {
 		return app.FileRecord{}, false, err
 	}
-	row, err := q.LockImageFile(ctx, uuid(fileID))
-	return r.withThumbnails(ctx, q, sqlcgen.GetImageFileRow(row), err)
+	row, err := q.LockFileByID(ctx, uuid(fileID))
+	return r.withThumbnails(ctx, q, sqlcgen.GetFileByIDRow(row), err)
 }
 
 // withThumbnails converts an image file row and reads its thumbnails; no row is found = false.
-func (r *Repository) withThumbnails(ctx context.Context, q *sqlcgen.Queries, row sqlcgen.GetImageFileRow, err error) (app.FileRecord, bool, error) {
-	if errors.Is(err, pgx.ErrNoRows) {
-		return app.FileRecord{}, false, nil
+func (r *Repository) withThumbnails(ctx context.Context, q *sqlcgen.Queries, row sqlcgen.GetFileByIDRow, err error) (app.FileRecord, bool, error) {
+	f, found, err := readFile(row, err)
+	if !found {
+		return app.FileRecord{}, false, err
 	}
-	if err != nil {
-		return app.FileRecord{}, false, mapError(err, "reading an image file")
-	}
-	f := fileRecord(sqlcgen.GetFileRow{
-		ID: row.ID, ObjectKey: row.ObjectKey, Sha256: row.Sha256, SizeBytes: row.SizeBytes, MimeType: row.MimeType,
-		DeclaredMimeType: row.DeclaredMimeType, OriginalName: row.OriginalName, UploadedBy: row.UploadedBy, Purpose: row.Purpose,
-		ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
-		Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus,
-		TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, CreatedAt: row.CreatedAt,
-	})
-	f.Deleted = row.Deleted
 	if f.Thumbnails, err = thumbnails(ctx, q, row.ID); err != nil {
 		return app.FileRecord{}, false, err
 	}

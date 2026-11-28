@@ -55,6 +55,7 @@ var handledElsewhere = map[string]string{
 // withParent are the tables whose rows go with a parent row by the deletion path of 20 section 2
 // (03 section 6.5 for a message, 4.3 for its files): the parent must be covered itself.
 var withParent = map[string]string{
+	"status_component_probe":    "status_components",
 	"message_revisions":         "messages",
 	"mentions":                  "messages",
 	"reactions":                 "messages",
@@ -100,7 +101,7 @@ func retentionParticipants(t *testing.T) []retention.Participant {
 	}
 	return []retention.Participant{
 		identitypg.NewRetention(nil), instancepg.NewRepository(nil).Retention(), notifypg.NewRegistrations(nil),
-		terminalpg.NewRetention(nil), appspg.NewRetention(nil), billingpg.NewRetention(nil),
+		terminalpg.NewRetention(nil), appspg.NewRetention(nil, nil), billingpg.NewRetention(nil),
 		new(messagingapp.Service).Retention(), trim, auditapp.NewIPKeys(auditpg.NewRepository(nil), nil),
 		statuspg.NewRetention(nil), privacypg.NewRetention(nil), importerpg.NewRetention(nil),
 		runspg.NewRetention(nil), new(chatapp.Service).TitleRetention(),

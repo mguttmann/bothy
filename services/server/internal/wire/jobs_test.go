@@ -39,7 +39,7 @@ func TestJobsConfigBindsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]int{"default": 8, "files": 5, "delivery": 16, "maintenance": 2, "privacy": 1}
+	want := map[string]int{"default": 8, "files": 5, "files_text": 2, "delivery": 16, "maintenance": 2, "privacy": 1}
 	if cfg.Schema != "jobs" || cfg.SoftStopTimeout != 20*time.Second || cfg.StatementTimeout <= 0 || len(cfg.MaxWorkers) != len(want) {
 		t.Fatalf("JobsConfig = %+v", cfg)
 	}
@@ -258,7 +258,7 @@ func TestExtractJobsRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q, ok := reg.Queue("files.extract_text"); !ok || q != jobs.QueueFiles {
+	if q, ok := reg.Queue("files.extract_text"); !ok || q != jobs.QueueFilesText {
 		t.Fatalf("files.extract_text queue %q %v", q, ok)
 	}
 	if q, ok := reg.Queue("files.extract_text_refresh"); !ok || q != jobs.QueueMaintenance {

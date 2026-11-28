@@ -153,11 +153,11 @@ func (w *world) file(uploader, channel ids.ID, purpose, session, upload, scan st
 		scope = channel.String()
 	}
 	w.exec(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, scope_channel_id,
-		upload_state, scan_status) VALUES ($1, $2, '\x01', 10, 'text/plain', 'notes.txt', $3, $4, $5, $6, $7)`,
+		upload_state, scan_status) VALUES ($1, $2, decode(repeat('00', 32), 'hex'), 10, 'text/plain', 'notes.txt', $3, $4, $5, $6, $7)`,
 		id, "f/"+id.String(), uploader, purpose, scope, upload, scan)
 	if session != "" {
 		w.exec(`INSERT INTO file_upload_sessions (file_id, state, declared_size_bytes, declared_sha256, part_size_bytes, part_count, expires_at)
-			VALUES ($1, $2, 10, '\x01', 4, 3, now() + interval '1 hour')`, id, session)
+			VALUES ($1, $2, 10, decode(repeat('00', 32), 'hex'), 4, 3, now() + interval '1 hour')`, id, session)
 	}
 	return id
 }

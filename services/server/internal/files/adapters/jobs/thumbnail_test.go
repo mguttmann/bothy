@@ -5,11 +5,13 @@ package jobs_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
+	"github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 )
@@ -47,6 +49,12 @@ func TestThumbnailArgsAndRegistration(t *testing.T) {
 	if err := h.Work(context.Background(), jobs.Job[filesjobs.ThumbnailArgs]{Args: filesjobs.ThumbnailArgs{FileID: id}}); !errors.Is(err, r.err) ||
 		len(r.got) != 1 || r.got[0] != id {
 		t.Fatalf("Work = %v, %v", err, r.got)
+	}
+	// Every image slot taken: the job snoozes instead of failing an attempt (srv-files-core-13).
+	busy := filesjobs.ThumbnailHandler{Images: &imageRunner{err: fmt.Errorf("run: %w", app.ErrImageSlotsBusy)}}
+	err := busy.Work(context.Background(), jobs.Job[filesjobs.ThumbnailArgs]{Args: filesjobs.ThumbnailArgs{FileID: id}})
+	if pause, ok := jobs.SnoozePause(err); !ok || pause <= 0 {
+		t.Fatalf("Work with every slot taken = %v, want a snooze with a pause", err)
 	}
 	if err := (filesjobs.ThumbnailHandler{}).Work(context.Background(), jobs.Job[filesjobs.ThumbnailArgs]{}); err == nil {
 		t.Fatal("a handler without use case succeeded")

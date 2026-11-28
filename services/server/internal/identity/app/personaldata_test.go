@@ -81,7 +81,7 @@ func (w *personalWorld) rows(id ids.ID, handle string, held bool) personRows {
 	w.t.Helper()
 	r := personRows{id: id, avatar: ids.New(), identity: ids.New(), passkey: ids.New(), code: ids.New()}
 	w.sql(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose)
-		VALUES ($1, $3, '\x00', 1, 'image/png', 'avatar', $2, 'avatar')`, r.avatar.String(), id.String(), "avatars/"+r.avatar.String())
+		VALUES ($1, $3, decode(repeat('00', 32), 'hex'), 1, 'image/png', 'avatar', $2, 'avatar')`, r.avatar.String(), id.String(), "avatars/"+r.avatar.String())
 	w.sql(`UPDATE principals SET avatar_file_id = $2 WHERE id = $1`, id.String(), r.avatar.String())
 	w.sql(`UPDATE users SET locale = 'en', time_zone = 'Europe/Berlin', last_active_at = $2 WHERE principal_id = $1`, id.String(), peopleStart)
 	r.revokedOwner, r.ownerRow = ids.New(), ids.New()

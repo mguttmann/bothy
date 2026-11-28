@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"time"
@@ -97,6 +98,9 @@ type WebhookDeps struct {
 	Rand func(n int64) int64
 	// Logger receives the delivery and state lines; nil discards them.
 	Logger *slog.Logger
+	// Metrics counts the delivery outcomes and the system transitions after the commit; nil
+	// counts nothing.
+	Metrics WebhookMetrics
 }
 
 // WebhookService implements apps.Webhooks, the consumer webhooks (Consumer), the attempt of the
@@ -139,6 +143,9 @@ func NewWebhooks(cfg WebhookConfig, d WebhookDeps) (*WebhookService, error) {
 	}
 	if d.Logger == nil {
 		d.Logger = slog.New(slog.DiscardHandler)
+	}
+	if d.Metrics == nil {
+		d.Metrics = noMetrics{}
 	}
 	return &WebhookService{cfg: cfg, d: d, hosts: hosts, retry: domain.RetryConfig{
 		BackoffBase: cfg.RetryBackoffBase, BackoffCap: cfg.RetryBackoffCap, MaxAge: cfg.RetryMaxAge,
@@ -792,8 +799,10 @@ func (w *WebhookService) ResumeInstallation(ctx context.Context, installationID 
 	return nil
 }
 
-// disableInstallation sets every subscription of the installation disabled in the caller's unit
-// of work (app.uninstall, 11 section 4.3; covered by the entry of app.uninstall).
+// disableInstallation sets every subscription of the installation disabled and ends its pending
+// rows as dead with event_expired in the caller's unit of work (app.uninstall, 11 section 4.3;
+// covered by the entry of app.uninstall): an uninstalled app never gets them, and a reinstall
+// creates new subscriptions.
 func (w *WebhookService) disableInstallation(ctx context.Context, installationID ids.ID) error {
 	subs, err := w.d.Store.LockInstallationSubscriptions(ctx, installationID)
 	if err != nil {
@@ -801,6 +810,11 @@ func (w *WebhookService) disableInstallation(ctx context.Context, installationID
 	}
 	now := w.now()
 	for _, s := range subs {
+		seqs, err := w.d.Store.ExpirePending(ctx, s.ID, math.MaxInt64)
+		if err != nil {
+			return err
+		}
+		w.countDeliveries(ctx, outcomeDead, len(seqs))
 		if s.State == domain.SubscriptionDisabled {
 			continue
 		}

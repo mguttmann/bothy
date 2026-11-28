@@ -145,9 +145,12 @@ type ManifestFacts struct {
 	AuditLastSeq   int64
 	// AuditLastHash is audit_events.hash of the last row; nil when the log is empty.
 	AuditLastHash []byte
-	RowCounts     map[string]int64
-	FileCount     int64
-	FileBytes     int64
+	// RowCounts is the exact count(*) of each table of domain.ExactCountTables that exists.
+	RowCounts map[string]int64
+	// Tables are the names of every table of the domain schema, sorted.
+	Tables    []string
+	FileCount int64
+	FileBytes int64
 	// JournalNextNumber is deletion_journal_state.next_number (M7-07).
 	JournalNextNumber int64
 }

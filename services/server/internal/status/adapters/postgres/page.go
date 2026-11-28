@@ -270,6 +270,34 @@ func (p *Page) OpenAutomaticIncidents(ctx context.Context) (map[ids.ID][]ids.ID,
 	return out, nil
 }
 
+// ProbeTracks implements app.PageStore.
+func (p *Page) ProbeTracks(ctx context.Context) (map[ids.ID]domain.Track, error) {
+	rows, err := p.q(ctx).ProbeTracks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[ids.ID]domain.Track, len(rows))
+	for _, r := range rows {
+		tr := domain.Track{State: domain.ComponentState(r.State), EnteredAt: r.EnteredAt.Time, LastRound: r.LastRound.Time}
+		if r.OutSince.Valid {
+			tr.OutSince = r.OutSince.Time
+		}
+		if r.FailingSince.Valid {
+			tr.FailingSince = r.FailingSince.Time
+		}
+		out[r.ComponentID.Bytes] = tr
+	}
+	return out, nil
+}
+
+// SetProbeTrack implements app.PageStore.
+func (p *Page) SetProbeTrack(ctx context.Context, id ids.ID, tr domain.Track) error {
+	return p.q(ctx).UpsertProbeTrack(ctx, sqlcgen.UpsertProbeTrackParams{
+		ComponentID: uuid(id), State: string(tr.State), EnteredAt: ts(tr.EnteredAt), OutSince: optTS(tr.OutSince),
+		FailingSince: optTS(tr.FailingSince), LastRound: ts(tr.LastRound),
+	})
+}
+
 // LatestAutomaticIncidents implements app.PageStore.
 func (p *Page) LatestAutomaticIncidents(ctx context.Context) (map[ids.ID]domain.LatestIncident, error) {
 	rows, err := p.q(ctx).LatestAutomaticIncidents(ctx)

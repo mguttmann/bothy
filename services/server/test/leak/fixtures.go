@@ -168,7 +168,7 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 			"schema_version": 1, "slug": "leak-probe", "name": "Leak probe", "description": "An app the requesters may not read.",
 			"publisher": "Example Org", "version": "1.0.0", "min_api_version": "0.1",
 			"scopes": map[string]any{"required": []string{"messages:read", "events:subscribe"}, "optional": []string{}},
-			"events": []string{"message.created"}, "delivery": map[string]any{"mode": "gateway"}, "data_egress": "None, a test app.",
+			"events": []string{"message.created"}, "delivery": map[string]any{"mode": "webhook", "events_url": "https://" + extrasWebhookHost + "/manifest"}, "data_egress": "None, a test app.",
 		},
 		"granted_scopes": []string{"messages:read", "events:subscribe"}, "event_subscriptions": []string{"message.created"}, "reason": "leak test",
 	}}, http.StatusCreated))

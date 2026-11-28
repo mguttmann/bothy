@@ -40,14 +40,17 @@ func (r *Repository) LockAttachTargets(ctx context.Context, fileIDs []ids.ID) ([
 	out := make([]app.AttachTarget, 0, len(rows))
 	found := make([]ids.ID, 0, len(rows))
 	for _, row := range rows {
-		f := fileRecord(sqlcgen.GetFileRow{
+		f, err := fileOf(sqlcgen.GetFileByIDRow{
 			ID: row.ID, ObjectKey: row.ObjectKey, Sha256: row.Sha256, SizeBytes: row.SizeBytes, MimeType: row.MimeType,
 			DeclaredMimeType: row.DeclaredMimeType, OriginalName: row.OriginalName, UploadedBy: row.UploadedBy, Purpose: row.Purpose,
 			ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
 			Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus,
 			TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, CreatedAt: row.CreatedAt,
+			Deleted: row.Deleted,
 		})
-		f.Deleted = row.Deleted
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, app.AttachTarget{File: f, SessionState: domain.SessionState(row.SessionState.String)})
 		found = append(found, f.ID)
 	}
@@ -111,15 +114,17 @@ func (r *Repository) MessageAttachments(ctx context.Context, messageIDs []ids.ID
 	out := make([]app.AttachedFile, 0, len(rows))
 	fileIDs := make([]ids.ID, 0, len(rows))
 	for _, row := range rows {
-		f := fileRecord(sqlcgen.GetFileRow{
+		f, err := fileOf(sqlcgen.GetFileByIDRow{
 			ID: row.ID, ObjectKey: row.ObjectKey, Sha256: row.Sha256, SizeBytes: row.SizeBytes, MimeType: row.MimeType,
 			DeclaredMimeType: row.DeclaredMimeType, OriginalName: row.OriginalName, UploadedBy: row.UploadedBy, Purpose: row.Purpose,
 			ScopeChannelID: row.ScopeChannelID, UploadState: row.UploadState, ScanStatus: row.ScanStatus, Width: row.Width,
 			Height: row.Height, DurationMs: row.DurationMs, TranscriptStatus: row.TranscriptStatus,
 			TranscriptLanguage: row.TranscriptLanguage, TranscriptSource: row.TranscriptSource, CreatedAt: row.CreatedAt,
-			TranscriptText: row.TranscriptText,
+			TranscriptText: row.TranscriptText, Deleted: row.Deleted,
 		})
-		f.Deleted = row.Deleted
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, app.AttachedFile{File: f, Row: app.AttachmentRecord{MessageID: idOf(row.MessageID), FileID: f.ID,
 			ThreadID: idOf(row.ThreadID), ChannelID: idOf(row.ChannelID), Position: int(row.Position)}})
 		fileIDs = append(fileIDs, f.ID)

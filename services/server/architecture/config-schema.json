@@ -2405,13 +2405,13 @@
       "name": "file.scan.max_concurrent",
       "env": "BOTHY_FILE__SCAN__MAX_CONCURRENT",
       "kind": "int",
-      "default": "4",
+      "default": "2",
       "required": false,
       "enum": [],
       "min": "1",
       "max": "",
       "chapter": "12-files.md",
-      "doc": "Scans that one worker process runs at the same time."
+      "doc": "Scans that one worker process runs at the same time; the workers of the queue files bound it too."
     },
     {
       "name": "file.scan.mode",
@@ -2841,7 +2841,19 @@
       "min": "1",
       "max": "10000",
       "chapter": "02-architecture.md",
-      "doc": "Parallel workers of the queue files for scans, thumbnails and transcription."
+      "doc": "Parallel workers of the queue files for scans and thumbnails."
+    },
+    {
+      "name": "jobs.queue.files_text.max_workers",
+      "env": "BOTHY_JOBS__QUEUE__FILES_TEXT__MAX_WORKERS",
+      "kind": "int",
+      "default": "2",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "02-architecture.md",
+      "doc": "Parallel workers of the queue files_text for transcription and text extraction."
     },
     {
       "name": "jobs.queue.maintenance.max_workers",

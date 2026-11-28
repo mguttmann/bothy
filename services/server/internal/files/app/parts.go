@@ -65,9 +65,6 @@ func (s *Service) storePart(ctx context.Context, a actor.Actor, rec SessionRecor
 		return samePart(p, digest)
 	}
 	size := domain.PartLength(cmd.PartNumber, rec.PartCount, rec.DeclaredSizeBytes, rec.PartSizeBytes)
-	if cmd.ContentLength >= 0 && cmd.ContentLength != size {
-		return files.PartRef{}, lengthMismatch()
-	}
 	body := &verifyingReader{r: cmd.Body, want: size, digest: digest, h: sha256.New()}
 	etag, err := s.d.Parts.Put(ctx, rec, cmd.PartNumber, body, size)
 	if err != nil {

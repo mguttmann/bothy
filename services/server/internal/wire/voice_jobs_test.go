@@ -11,7 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
-// TestTranscribeJobRegistration: every role registers files.transcribe on the queue files with an
+// TestTranscribeJobRegistration: every role registers files.transcribe on the queue files_text with an
 // argument type of IDs only (M3-09).
 func TestTranscribeJobRegistration(t *testing.T) {
 	t.Parallel()
@@ -21,7 +21,7 @@ func TestTranscribeJobRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q, ok := reg.Queue(filesjobs.KindTranscribe); !ok || q != jobs.QueueFiles {
+	if q, ok := reg.Queue(filesjobs.KindTranscribe); !ok || q != jobs.QueueFilesText {
 		t.Fatalf("queue = %q, %v", q, ok)
 	}
 	if typ := reg.ArgTypes()[filesjobs.KindTranscribe]; typ != reflect.TypeFor[filesjobs.TranscribeArgs]() {

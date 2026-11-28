@@ -11,7 +11,9 @@ import "time"
 // note 1).
 //
 // The window is how missed times are skipped: the scheduler passes the start of the process as
-// the first from, so a time that passed while the process was down is never caught up.
+// the first from, so a time that passed while the process was down is never caught up. The only
+// exception is the retry of a failed run of the latest due time in app.Scheduler
+// (AUD srv-stats-status-8).
 //
 // Example:
 //

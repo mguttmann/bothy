@@ -5,7 +5,6 @@ package app_test
 import (
 	"context"
 	"errors"
-	"maps"
 	"strings"
 	"testing"
 
@@ -32,9 +31,7 @@ func TestRestoreCheckFailureReasons(t *testing.T) {
 	}{
 		{"facts unreadable", func(r *restoreEnv) { r.scratch.db.err["Facts"] = errFake }, domain.CheckManifest, "scratch_query_failed"},
 		{"unexpected table", func(r *restoreEnv) {
-			counts := maps.Clone(r.scratch.db.facts.RowCounts)
-			counts["intruder"] = 1
-			r.scratch.db.facts.RowCounts = counts
+			r.scratch.db.facts.Tables = []string{"event_log", "intruder", "messages"}
 		}, domain.CheckManifest, "table_unexpected"},
 		{"audit head hash", func(r *restoreEnv) { r.scratch.db.facts.AuditLastHash = []byte{0x01} }, domain.CheckManifest, "audit_head_mismatch"},
 		{"event log unreadable", func(r *restoreEnv) { r.scratch.db.err["EventLog"] = errFake }, domain.CheckEventLog, "scratch_query_failed"},

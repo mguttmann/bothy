@@ -510,5 +510,11 @@ func (s *BackupScheduler) Tick(ctx context.Context, now time.Time) []string {
 	return out
 }
 
+// RetryFailed plans the retry of each kind whose newest run, of an earlier process, failed at the
+// latest due time; see statusapp.Scheduler.RetryFailed.
+func (s *BackupScheduler) RetryFailed(ctx context.Context, now time.Time) error {
+	return s.s.RetryFailed(ctx, now)
+}
+
 // Wait waits for every run Tick started.
 func (s *BackupScheduler) Wait() { s.s.Wait() }

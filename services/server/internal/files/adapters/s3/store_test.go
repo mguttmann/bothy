@@ -62,7 +62,7 @@ func newFakeEnv(t *testing.T, answer func(http.ResponseWriter, *http.Request) bo
 // isSentinel reports whether err is one of the port sentinels.
 func isSentinel(err error) bool {
 	for _, s := range []error{app.ErrInvalidKey, app.ErrNotFound, app.ErrInvalidRange, app.ErrSizeMismatch,
-		app.ErrUploadNotFound, app.ErrInvalidPart, app.ErrNotSupported} {
+		app.ErrUploadNotFound, app.ErrInvalidPart} {
 		if errors.Is(err, s) {
 			return true
 		}
@@ -95,8 +95,6 @@ func TestChecksBeforeAnyRequest(t *testing.T) {
 		{"Get negative offset", get(&app.ByteRange{Offset: -1, Length: 5}), app.ErrInvalidRange},
 		{"Get length 0", get(&app.ByteRange{Offset: 0, Length: 0}), app.ErrInvalidRange},
 		{"UploadPart n 0", func() error { _, err := s.UploadPart(ctx, key, "upload-1", 0, body(), 1); return err }(), app.ErrInvalidPart},
-		{"PresignUploadPart n 0", func() error { _, err := s.PresignUploadPart(ctx, key, "upload-1", 0, 1, time.Minute); return err }(), app.ErrInvalidPart},
-		{"PresignUploadPart size 0", func() error { _, err := s.PresignUploadPart(ctx, key, "upload-1", 1, 0, time.Minute); return err }(), app.ErrSizeMismatch},
 		{"CompleteMultipart empty", s.CompleteMultipart(ctx, key, "upload-1", nil), app.ErrInvalidPart},
 		{"CompleteMultipart descending", s.CompleteMultipart(ctx, key, "upload-1", []app.Part{{Number: 2, ETag: `"b"`}, {Number: 1, ETag: `"a"`}}), app.ErrInvalidPart},
 		{"CreateMultipart variant key", func() error { _, err := s.CreateMultipart(ctx, variant); return err }(), app.ErrInvalidKey},
@@ -342,7 +340,6 @@ func TestOnlyGivenHTTPClient(t *testing.T) {
 			return s.CompleteMultipart(ctx, key, "upload-1", []app.Part{{Number: 1, ETag: `"part-1"`}})
 		},
 		func() error { return s.AbortMultipart(ctx, key, "upload-1") },
-		func() error { _, err := s.PresignUploadPart(ctx, key, "upload-1", 1, 3, time.Minute); return err },
 	}
 	for i, step := range steps {
 		if err := step(); err != nil {
@@ -359,7 +356,7 @@ func TestOnlyGivenHTTPClient(t *testing.T) {
 		}
 	}
 	if n := len(e.fake.Requests()); n != 8 {
-		t.Errorf("the fake saw %d requests, want 8 (presigning sends nothing)", n)
+		t.Errorf("the fake saw %d requests, want 8", n)
 	}
 }
 
@@ -463,13 +460,6 @@ func TestErrorsCarryNoURLOrSecret(t *testing.T) {
 			_ = rc.Close()
 		}
 		checkClean(t, "object without a length", err, "get", key, forbiddenInErrors(e))
-	})
-	t.Run("failed presign", func(t *testing.T) {
-		t.Parallel()
-		e := newFakeEnv(t, nil, nil)
-		key := newKey(t)
-		_, err := e.store.PresignUploadPart(t.Context(), key, "upload-1", 1, 5, 0)
-		checkClean(t, "presign with ttl 0", err, "presign upload part", key, forbiddenInErrors(e))
 	})
 }
 
@@ -669,62 +659,6 @@ func TestOversizedErrorDocumentIsNoSentinel(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestPresignUploadPartSignsLength holds docs/DECISIONS.md M3-02/9: the signature binds the part
-// length and the validity, and the URL carries no secret.
-func TestPresignUploadPartSignsLength(t *testing.T) {
-	t.Parallel()
-	e := newFakeEnv(t, nil, nil)
-	key := newKey(t)
-	before := time.Now()
-	p, err := e.store.PresignUploadPart(t.Context(), key, "upload-1", 2, 5<<20, 15*time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
-	u, err := url.Parse(p.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	q := u.Query()
-	signed := strings.Split(q.Get("X-Amz-SignedHeaders"), ";")
-	if !containsAll(signed, "content-length", "host") {
-		t.Errorf("X-Amz-SignedHeaders = %v, want content-length and host", signed)
-	}
-	if got := q.Get("X-Amz-Expires"); got != strconv.Itoa(15*60) {
-		t.Errorf("X-Amz-Expires = %q, want %d", got, 15*60)
-	}
-	if q.Get("partNumber") != "2" || q.Get("uploadId") != "upload-1" {
-		t.Errorf("query %v does not address part 2 of upload-1", q)
-	}
-	if strings.Contains(p.URL, e.secret) {
-		t.Error("the URL carries the secret key")
-	}
-	if p.ExpiresAt.Before(before.Add(15*time.Minute)) || p.ExpiresAt.After(time.Now().Add(15*time.Minute)) {
-		t.Errorf("ExpiresAt %v is not the signing time plus ttl", p.ExpiresAt)
-	}
-	if _, err := e.store.PresignUploadPart(t.Context(), key, "upload-1", 1, 5, 0); err == nil {
-		t.Error("ttl 0 was signed")
-	}
-	if _, err := e.store.PresignUploadPart(t.Context(), key, "upload-1", 1, 5, -time.Second); err == nil {
-		t.Error("a negative ttl was signed")
-	}
-	if n := len(e.fake.Requests()); n != 0 {
-		t.Errorf("presigning sent %d requests", n)
-	}
-}
-
-func containsAll(have []string, want ...string) bool {
-	for _, w := range want {
-		found := false
-		for _, h := range have {
-			found = found || h == w
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 // TestS3SDKOnlyInAdapter holds 12 "15" and ADR 0048 "Confirmation": no package of the module but

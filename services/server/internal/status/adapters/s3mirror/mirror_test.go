@@ -146,8 +146,9 @@ func TestMirror_CopiesNewNeverOverwritesNeverDeletes(t *testing.T) {
 	}
 }
 
-// TestMirror_ErrorIsCode: refused credentials of the destination are s3_mirror_failed, an error
-// code without the keys or the endpoint.
+// TestMirror_ErrorIsCode: refused credentials of the destination fail every object, so the pass
+// ends with s3_mirror_objects_failed_<n> (AUD srv-stats-status-7), an error code without the keys
+// or the endpoint.
 func TestMirror_ErrorIsCode(t *testing.T) {
 	s := sharedSeaweed(t)
 	src, dst := s.newBucket(t), s.newBucket(t)
@@ -160,8 +161,8 @@ func TestMirror_ErrorIsCode(t *testing.T) {
 	}
 	_, err = m.S3Mirror(context.Background())
 	var ee *app.ExecError
-	if !errors.As(err, &ee) || ee.Code != "s3_mirror_failed" || err.Error() != "status: s3_mirror_failed" {
-		t.Fatalf("error %v, want ExecError s3_mirror_failed", err)
+	if !errors.As(err, &ee) || ee.Code != "s3_mirror_objects_failed_1" || err.Error() != "status: s3_mirror_objects_failed_1" {
+		t.Fatalf("error %v, want ExecError s3_mirror_objects_failed_1", err)
 	}
 }
 

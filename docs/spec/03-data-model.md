@@ -2644,6 +2644,26 @@ Purpose: components of the status page. Module: `status`.
 PK: `id`. FK: `agent_id` -> `agents(principal_id)` ON DELETE SET NULL. Unique: `lower(name)`.
 Indexes: `(sort_key)`. Retention: `ops`.
 
+#### `status_component_probe`
+
+Purpose: the memory of the job `status.probe` about one automatic component
+([16-operations.md](16-operations.md) section 12 item 4): the state it left, the timers of the
+state machine and the time of its last round. The job reads and writes it in the transaction of
+its round after it has locked every component, so the rounds of several workers share one memory
+(AUD srv-stats-status-11). No operation of the API reads it. Module: `status`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `component_id` | `uuid` | no | | |
+| `state` | `text` | no | | the state after the last round; the states of `status_components.state` |
+| `entered_at` | `timestamptz` | no | | when `state` began |
+| `out_since` | `timestamptz` | yes | | when the component last left `operational`; NULL while operational |
+| `failing_since` | `timestamptz` | yes | | first failing round of the current run; NULL when the last round with evidence passed |
+| `last_round` | `timestamptz` | no | | time of the last round |
+
+PK: `component_id`. FK: `component_id` -> `status_components(id)` ON DELETE CASCADE.
+Retention: `ops` (goes with its component).
+
 #### `status_incidents`
 
 Purpose: incidents and maintenance windows. Module: `status`.
@@ -2710,7 +2730,7 @@ table.
 | `started_at` | `timestamptz` | no | `now()` | |
 | `finished_at` | `timestamptz` | yes | | |
 | `size_bytes` | `bigint` | yes | | |
-| `manifest` | `jsonb` | no | `'{}'` | schema `backup_manifest.v1`: row count per table, `head_seq`, last audit `seq` and `hash`, schema and server version, `sync_epoch`, count and sum of the file sizes; never content |
+| `manifest` | `jsonb` | no | `'{}'` | schema `backup_manifest.v2`: the names of every table, the row counts of `event_log` and `audit_events` (`backup_manifest.v1` of earlier runs: row count per table), `head_seq`, last audit `seq` and `hash`, schema and server version, `sync_epoch`, count and sum of the file sizes; never content |
 | `checks` | `jsonb` | no | `'{}'` | schema `restore_test_checks.v1`: result and duration per check (only for `restore_test`) |
 | `error` | `text` | yes | | code without content or secrets |
 

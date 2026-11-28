@@ -22,6 +22,7 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
 - `adapters/jobs/` (M2-26): the job `apps.webhook_deliver` (`WebhookDeliver`, `Register`) and `Scheduler`, the `DeliveryScheduler` over `jobs.Inserter.InsertTx`.
 - `adapters/webhookhttp/` (M2-26): `Sender`, the `WebhookSender` over one egress client with the span `webhook.deliver`.
 - `adapters/hmackey/` (M2-26): `Master`, the `HMACMasterKey` over `webhook.hmac_master_key_ref`.
+- `adapters/otelmetrics/` (#925): `Metrics`, the `WebhookMetrics` over the counters `bothy.webhook.delivery` and `bothy.webhook.transition`.
 - `adapters/httpapi/` (M2-26): `Webhooks`, the strict-server handlers of the six webhook operations.
 - `internal/apps` (`incoming.go`, M2-27): the port `IncomingWebhooks` with `ListIncoming`, `CreateIncoming`, `RevokeIncoming`, `AuthenticateIncoming`, `PostIncoming` and the DTOs `IncomingWebhook`, `CreateIncomingCmd`, `IncomingCreated`, `PostIncomingCmd`, `IncomingPosted`.
 - `domain/incoming/` (M2-27): the pure rules of 11 section 8: `Classify` and `CheckEnabled` (`format.go`), `CheckNative` (`native.go`), `ParseAlertmanager` and `RenderAlertmanager` (`alertmanager.go`, goldens in `testdata/alertmanager`), `ChooseTarget` (`target.go`), `HashContext` (`hashctx.go`).
@@ -46,7 +47,12 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
 
 `adapters/postgres.Retention` is the participant of apps in the job `retention.transient`:
 finished webhook deliveries (every status but `pending`) whose `delivered_at`, or `created_at`
-of a failed or dead delivery, lies before now minus `retention.webhook_deliveries`.
+of a failed or dead delivery, lies before now minus `retention.webhook_deliveries`. Before each
+batch it calls `WebhookService.ExpireLost` (the sweep of #893): every subscription with a pending
+row whose event left the event log gets the gap rule (an `active` or `paused` one becomes
+`disabled` with cause `gap`, the expired rows `dead` with `event_expired`, one entry of
+`webhook_out.transition`); a `disabled` one only gets those rows ended. The rows of retained events
+stay `pending` (D-M2-26-2).
 
 ## Port (root package `internal/apps`)
 
@@ -108,7 +114,10 @@ Normative: [11-extensions.md](../../../../docs/spec/11-extensions.md) sections 3
   (`app.manifest_max_bytes`), slug as handle (`principal.handle_max_chars`), name as display name,
   texts through `kernel/textcheck`, SemVer, `min_api_version` not above `routes.SpecVersion`,
   scopes of the catalogue, only subscribable events with the scope of their receive action and
-  `events:subscribe` (`authz.AppScopes.EventScope`), the conditional delivery members, `https`
+  `events:subscribe` (`authz.AppScopes.EventScope`), the conditional delivery members, the gateway
+  mode only while nothing would reach the app over the gateway (no `events`, commands and
+  components at `interactions_url`; 11 3.2 rule 6, because the gateway closes every app with
+  `4018`; a stored manifest is only parsed, so an installation made before stays readable), `https`
   addresses on hosts of `webhook.allowed_hosts`, `requested_grants` at most `write` and `upload`
   and never on a host, commands without reserved names, without `scope_id` and with `scope_kind` absent or `instance`
   (a manifest names no target, 11 section 4.1), descriptions within
@@ -153,8 +162,8 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   `webhook.allowed_hosts` (`domain.ValidateTarget`, the same rule for manifest addresses and the
   egress policy). `event_types` are subscribable by apps and granted to the installation. A
   manifest with `delivery.mode = webhook` gets its subscription in the install transaction;
-  uninstall disables every subscription; suspend keeps them and sends nothing; resume makes the
-  heads due.
+  uninstall disables every subscription and ends its pending rows as `dead` with
+  `event_expired`; suspend keeps them and sends nothing; resume makes the heads due.
 - **States**: `active`, `paused`, `disabled`. The owner pauses, resumes and re-enables (failures
   reset, the head due now). The system disables after `410` (cause `gone`), after
   `webhook.max_consecutive_failures` counted failures (`max_consecutive_failures`; the head stays
@@ -175,6 +184,12 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   without access), sign, take a lease of twice `webhook.delivery_timeout` (also the River timeout of the job, so a hanging receiver ends as a failed attempt before the lease wake-up claims the head again) with a wake-up job, send
   through the egress client outside any transaction, record the outcome and chain the next job.
   Strictly in `seq` order; at least once with the same `webhook-id`.
+- **Metrics** (#925, `adapters/otelmetrics`, the port `WebhookMetrics`): after the commit,
+  `bothy.webhook.delivery` counts each attempt by the status of the row afterwards (`succeeded`,
+  `retrying`, `failed`, `dead`) and each row ended without a request (`dead`), and
+  `bothy.webhook.transition` each change by the system by its cause; the series start at 0, so
+  the alert `BothyWebhookSubscriptionStopped` sees the first stop (signals.md 4.2, alerting.md
+  3.2).
 - **Signatures**: `v1a` with every signer of the purpose `webhook_out` (`instance.Keys.Signers`);
   `v1` per subscription with the key `HMAC-SHA256(master, "webhook-v1:" + id + ":" + generation)`,
   never stored, shown once as `whsec_`; inside `webhook.secret_rotation_overlap` the previous
@@ -300,7 +315,8 @@ check and the receive rule live in `authz`.
   `events:subscribe`) and gets `command.invoked`, `interaction.created` and
   `command.autocomplete_requested` live. The gateway way stays closed for now: `ready` needs
   `sync.snapshot.read`, which has no app scope in the core contract, so the app is closed with
-  `4018` and gets nothing live (D-M2-25-24, spec gap reported); catch-up: `listEvents` with `events:subscribe`; webhook
+  `4018` and gets nothing live (D-M2-25-24, spec gap reported), so the manifest rules refuse the
+  gateway mode for anything that would arrive there (11 3.2 rule 6); catch-up: `listEvents` with `events:subscribe`; webhook
   subscription: `command.invoked` and `interaction.created` in the `event_types` of a subscription
   of the app; `delivery.interactions_url`: the adapter below. The receive check of the first three
   is `agent.events.consume` in filter mode, which `authz` admits for the audience app with an

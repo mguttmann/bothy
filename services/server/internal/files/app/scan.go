@@ -99,6 +99,9 @@ type ScanDeps struct {
 	Scans ScanRepository
 	// Store reads the bytes and writes the assembled object.
 	Store ObjectStore
+	// Multipart completes an open S3 multipart upload; nil with the file system driver, where a
+	// session never has a storage upload id (D-M3-03-2).
+	Multipart MultipartStore
 	// UoW runs the result and the retry units.
 	UoW txn.UnitOfWork
 	// Events appends file.updated; Audit records the malware entry.
@@ -342,7 +345,10 @@ func (p *ScanPass) completeMultipart(ctx context.Context, t SessionRecord) error
 	for _, r := range rows {
 		parts = append(parts, Part{Number: r.PartNumber, ETag: r.ETag})
 	}
-	return p.d.Store.CompleteMultipart(ctx, t.File.ObjectKey, t.StorageUploadID, parts)
+	if p.d.Multipart == nil {
+		return errors.New("files: a multipart upload is open, but the driver has no multipart port")
+	}
+	return p.d.Multipart.CompleteMultipart(ctx, t.File.ObjectKey, t.StorageUploadID, parts)
 }
 
 // assembly writes object_key from a pipe in its own goroutine (the driver writes a temporary

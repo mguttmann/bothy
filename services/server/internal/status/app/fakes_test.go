@@ -4,11 +4,13 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"slices"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -167,13 +169,15 @@ type fakeSource struct {
 	archivedOK  bool
 	archivedErr error
 	snapshots   int
+	// archiveDeadline is the deadline of the context of the last LastArchived call.
+	archiveDeadline time.Time
 }
 
 func newFakeSource() *fakeSource {
 	return &fakeSource{facts: app.ManifestFacts{
 		SchemaVersion: 49, InstanceID: "0192f4a0-7b1c-7000-8a00-0000000000a1", SyncEpoch: "0192f4a0-7b1c-7000-8a00-0000000000a2",
 		HeadSeq: 120, MinRetainedSeq: 1, AuditLastSeq: 42, AuditLastHash: []byte{0xab, 0xcd, 0x01},
-		RowCounts: map[string]int64{"messages": 100, "event_log": 120}, FileCount: 3, FileBytes: 4096, JournalNextNumber: 1,
+		RowCounts: map[string]int64{"event_log": 120}, Tables: []string{"event_log", "messages"}, FileCount: 3, FileBytes: 4096, JournalNextNumber: 1,
 	}}
 }
 
@@ -184,7 +188,10 @@ func (s *fakeSource) Snapshot(context.Context) (app.ManifestFacts, error) {
 	return s.facts, s.err
 }
 
-func (s *fakeSource) LastArchived(context.Context) (time.Time, bool, error) {
+func (s *fakeSource) LastArchived(ctx context.Context) (time.Time, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.archiveDeadline, _ = ctx.Deadline()
 	return s.archived, s.archivedOK, s.archivedErr
 }
 
@@ -390,4 +397,53 @@ func (m *fakeMetrics) failedRuns() []domain.Kind {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return slices.Clone(m.runFailed)
+}
+
+// setManifest rewrites the stored manifest of row id with mutate, bypassing Validate of the
+// current version, so a test can store a manifest of an earlier schema version.
+func (r *fakeRuns) setManifest(t *testing.T, id ids.ID, mutate func(m *domain.Manifest)) {
+	t.Helper()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, row := range r.rows {
+		if row.id != id {
+			continue
+		}
+		m, err := domain.ParseManifest(row.manifest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mutate(&m)
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		row.manifest = b
+		return
+	}
+	t.Fatalf("no row %s", id)
+}
+
+// LatestRun returns the newest row of kind, as the adapter does; lastErr fails it.
+func (r *fakeRuns) LatestRun(_ context.Context, kind status.BackupKind) (status.BackupRun, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.lastErr != nil {
+		return status.BackupRun{}, false, r.lastErr
+	}
+	var out status.BackupRun
+	found := false
+	for _, row := range r.rows {
+		if row.kind == kind && (!found || !row.started.Before(out.StartedAt)) {
+			out, found = status.BackupRun{ID: row.id, Kind: row.kind, StartedAt: row.started, State: row.state, Error: row.code}, true
+		}
+	}
+	return out, found, nil
+}
+
+// add stores a finished row of an earlier process.
+func (r *fakeRuns) add(kind status.BackupKind, state, code string, started time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rows = append(r.rows, &fakeRow{id: ids.New(), kind: kind, state: state, code: code, started: started, finished: started.Add(time.Minute), size: -1})
 }
