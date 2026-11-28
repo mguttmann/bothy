@@ -21,6 +21,5 @@ it yourself": each row takes the recommended option). Each finding was read agai
 
 ## Open minors
 
-- Semgrep runs through `uvx --from semgrep==$(SEMGREP_VERSION)`: only the package is pinned, its
-  dependencies resolve anew without hashes. A locked environment of its own (a `pyproject.toml`
-  with `uv.lock`) is more than a line and waits for the next change of the security gates (#734).
+- Done in AUD-Q04/1 (`docs/decisions.d/AUD-PKG-Q04-ci-workflows-pins.md`): Semgrep runs from
+  its own locked project `tools/semgrep` (#755).

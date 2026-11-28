@@ -54,12 +54,45 @@ class Response:
 
 Http = Callable[[str, str, Mapping[str, str], bytes | None], Response]
 
+# A store answers 429 when it refused the request for its rate, and 5xx or nothing at all when it
+# had a passing fault. A refused request (429) is sent again whatever its method; a 5xx or a
+# lost connection only for a read, because a write may have taken effect (a second upload or
+# commit of a Play edit would be refused anyway, but not for the right reason). The waits grow,
+# in seconds; after the last one the answer counts (#1478).
+RETRY_DELAYS = (5.0, 20.0, 60.0)
+_TRANSIENT = frozenset({500, 502, 503, 504})
+
+
+class NetworkError(StepError):
+    """The request did not reach the service, or its answer was lost."""
+
+
+def retrying(http: Http, sleep: Callable[[float], None] = time.sleep) -> Http:
+    """Wrap `http` so that a refusal for the rate and a passing fault of a read are retried."""
+
+    def call(method: str, url: str, headers: Mapping[str, str], body: bytes | None) -> Response:
+        for delay in (*RETRY_DELAYS, None):
+            try:
+                response = http(method, url, headers, body)
+            except NetworkError:
+                if delay is None or method != "GET":
+                    raise
+            else:
+                transient = method == "GET" and response.status in _TRANSIENT
+                if (response.status != 429 and not transient) or delay is None:
+                    return response
+            sleep(delay)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    return call
+
 
 def urllib_http(method: str, url: str, headers: Mapping[str, str], body: bytes | None) -> Response:
     """`Http` over urllib with a bound of COMMAND_PATIENCE_SECONDS per request.
 
     Raises:
-        StepError: the address is no https address of a store service, or the network fails.
+        StepError: the address is no https address of a store service.
+        NetworkError: the network fails.
     """
     if not url.startswith(
         (
@@ -76,7 +109,7 @@ def urllib_http(method: str, url: str, headers: Mapping[str, str], body: bytes |
     except urllib.error.HTTPError as err:
         return Response(err.code, err.read())
     except OSError as err:
-        raise StepError(f"{method} {url}: {err}") from err
+        raise NetworkError(f"{method} {url}: {err}") from err
 
 
 def _b64url(data: bytes) -> str:
@@ -143,8 +176,9 @@ class PlayPublisher:
         service_account: the JSON key of the service account (`client_email`, `private_key`,
             `token_uri`), which the publisher grants release rights in the Play Console.
         package_name: the application ID (`android.package_name`).
-        http: the network seam.
+        http: the network seam, wrapped by `retrying`.
         clock: seconds since the epoch, for the token's lifetime.
+        sleep: the wait between two tries of a request.
     """
 
     def __init__(
@@ -153,6 +187,7 @@ class PlayPublisher:
         package_name: str,
         http: Http = urllib_http,
         clock: Callable[[], float] = time.time,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         """Create the client and read the service account key.
 
@@ -170,7 +205,7 @@ class PlayPublisher:
             raise StepError("PLAY_SERVICE_ACCOUNT_JSON holds no RSA key")
         self._key = key
         self._package = package_name
-        self._http = http
+        self._http = retrying(http, sleep)
         self._clock = clock
         self._token: str | None = None
 
@@ -279,9 +314,10 @@ class AppStoreConnect:
         key: the private key (`.p8`, PEM) of the API key.
         key_id: its key ID.
         issuer: the issuer ID of the team.
-        http: the network seam.
+        http: the network seam, wrapped by `retrying`.
         clock: seconds since the epoch, for the token's lifetime (at most 20 minutes).
-        sleep: waits between the polls of a processing build.
+        sleep: waits between the polls of a processing build and between two tries of a
+            request.
     """
 
     def __init__(
@@ -308,7 +344,7 @@ class AppStoreConnect:
         self._key = loaded
         self._key_id = key_id
         self._issuer = issuer
-        self._http = http
+        self._http = retrying(http, sleep)
         self._clock = clock
         self._monotonic = monotonic
         self._sleep = sleep

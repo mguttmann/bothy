@@ -271,19 +271,29 @@ def branded_tree(run: Runner, branding: Path, release_branding: Path) -> Iterato
     `tool/branding_defines.dart` writes the checked-in native files (Branding.xcconfig,
     branding.h, ...) and build/branding/dart_defines.json; the release build needs them for the
     publisher's identity, and the tree goes back to the given branding afterwards, also after a
-    failure.
+    failure. When the restore fails after a failure of the build, the build's error is raised
+    with the restore's error as a note, so neither hides the other (#1601).
     """
+
+    def restore() -> None:
+        run(
+            ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(branding)],
+            cwd=CLIENT,
+        )
+
     run(
         ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(release_branding)],
         cwd=CLIENT,
     )
     try:
         yield
-    finally:
-        run(
-            ["dart", "run", "tool/branding_defines.dart", "--input", _client_input(branding)],
-            cwd=CLIENT,
-        )
+    except BaseException as err:
+        try:
+            restore()
+        except Exception as again:
+            err.add_note(f"restoring the native branding files failed too: {again}")
+        raise
+    restore()
 
 
 def _client_input(path: Path) -> str:

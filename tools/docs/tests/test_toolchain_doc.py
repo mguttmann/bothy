@@ -9,6 +9,7 @@ The generator row of docs/spec/06-api.md 14 names the same versions.
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import tomllib
@@ -169,6 +170,11 @@ def pinned_tools() -> dict[str, str]:
     lock = tomllib.loads((REPO / "tools" / "uv.lock").read_text())
     for pkg in lock["package"]:
         pins[pkg["name"].lower()] = pkg["version"]
+    # Semgrep has a locked project of its own (Python 3.12, #755); only its own pin is listed.
+    semgrep = tomllib.loads((REPO / "tools" / "semgrep" / "uv.lock").read_text())
+    pins.update(
+        {pkg["name"]: pkg["version"] for pkg in semgrep["package"] if pkg["name"] == "semgrep"}
+    )
     npm = json.loads((REPO / "tools" / "node" / "package-lock.json").read_text())
     for path, meta in npm["packages"].items():
         if path.startswith("node_modules/") and path.count("node_modules/") == 1:
@@ -178,7 +184,6 @@ def pinned_tools() -> dict[str, str]:
         pins[name] = tool["version"]
     makefile = (REPO / "Makefile").read_text()
     for var, name in [
-        ("SEMGREP_VERSION", "semgrep"),
         ("GOVULNCHECK_VERSION", "govulncheck"),
         ("GO_LICENSES_VERSION", "go-licenses"),
     ]:
@@ -202,6 +207,15 @@ def pinned_tools() -> dict[str, str]:
     m = re.search(r"^ARG SCANCODE_VERSION=(\S+)$", scancode, re.MULTILINE)
     assert m, "ScanCode version"
     pins["scancode-toolkit"] = m.group(1)
+    # Release downloads of the app and host builds, pinned with their SHA-256 (#1599).
+    for path, var, name in [
+        ("apple.py", "SPARKLE_VERSION", "sparkle"),
+        ("android.py", "BUNDLETOOL_VERSION", "bundletool"),
+    ]:
+        source = (REPO / "tools" / "distribution" / path).read_text()
+        m = re.search(rf'^{var} = "([^"]+)"$', source, re.MULTILINE)
+        assert m, var
+        pins[name] = m.group(1)
     pins["uv"] = ci_uv_version()
     pins.update({k: v for k, v in sdk_pins().items() if k in SDK_GENERATORS})
     return pins
@@ -241,3 +255,23 @@ def test_every_pinned_gate_tool_is_documented() -> None:
 
 def test_actions_table_matches_workflows() -> None:
     assert doc_versions("GitHub Actions") == pinned_actions()
+
+
+_REVIEW = re.compile(r"Next review:\s+`(\d{4}-\d{2}-\d{2})`")
+
+
+def test_every_review_date_of_the_page_lies_ahead() -> None:
+    """The pin review and the Trivy and WiX holds have a date that has not passed (#757).
+
+    The test fails on the day after a review date, like an expired OSV exception: the review
+    raises the pins or confirms the hold and sets the next date.
+    """
+    text = DOC.read_text(encoding="utf-8")
+    sections = {
+        section: _REVIEW.findall(text.split(f"## {section}", 1)[1].split("\n## ", 1)[0])
+        for section in ("Updates", "Trivy: keep the version", "WiX: keep the version")
+    }
+    assert all(len(dates) == 1 for dates in sections.values()), sections
+    today = datetime.date.today()
+    passed = {s: d[0] for s, d in sections.items() if datetime.date.fromisoformat(d[0]) < today}
+    assert passed == {}, f"review dates passed in docs/quality/toolchain.md: {passed}"

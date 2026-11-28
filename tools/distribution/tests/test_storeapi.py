@@ -380,3 +380,72 @@ def test_asc_refuses_a_key_that_is_no_ec_key(rsa_key: rsa.RSAPrivateKey) -> None
     ).decode()
     with pytest.raises(common.StepError, match="no EC key"):
         storeapi.AppStoreConnect(pem, "K", "I")
+
+
+# ---- retries (#1478) ------------------------------------------------------------------------
+
+
+def _flaky(*answers: storeapi.Response | Exception) -> Callable[[bytes | None], storeapi.Response]:
+    queue = list(answers)
+
+    def route(_: bytes | None) -> storeapi.Response:
+        item = queue.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    return route
+
+
+def test_a_read_is_retried_after_a_passing_fault_and_a_refusal_for_the_rate(p8: str) -> None:
+    app = {"id": "6400", "attributes": {"bundleId": "org.acme.chat"}}
+    ok = storeapi.Response(200, json.dumps({"data": [app]}).encode())
+    http = FakeHttp(
+        {
+            f"GET {API}/apps": _flaky(
+                storeapi.Response(503, b"busy"),
+                storeapi.NetworkError("GET apps: connection reset"),
+                storeapi.Response(429, b"slow down"),
+                ok,
+            )
+        }
+    )
+    clock = Clock()
+    assert asc(p8, http, clock).app_id("org.acme.chat") == "6400"
+    assert len(http.calls) == 4
+    assert clock.sleeps == list(storeapi.RETRY_DELAYS)
+
+
+def test_a_read_fails_after_the_last_try(p8: str) -> None:
+    http = FakeHttp({f"GET {API}/apps": answer({"error": "down"}, status=502)})
+    clock = Clock()
+    with pytest.raises(common.StepError, match="the app lookup refused with 502"):
+        asc(p8, http, clock).app_id("org.acme.chat")
+    assert len(http.calls) == len(storeapi.RETRY_DELAYS) + 1
+    http = FakeHttp({f"GET {API}/apps": _flaky(*[storeapi.NetworkError("lost")] * 4)})
+    with pytest.raises(storeapi.NetworkError, match="lost"):
+        asc(p8, http, Clock()).app_id("org.acme.chat")
+
+
+def test_a_write_is_retried_only_after_a_refusal_for_the_rate(account: str) -> None:
+    routes = play_routes()
+    routes[f"POST {EDITS}"] = _flaky(
+        storeapi.Response(429, b"slow down"), storeapi.Response(200, b'{"id": "e1"}')
+    )
+    sleeps: list[float] = []
+    http = FakeHttp(routes)
+    play = storeapi.PlayPublisher(account, PKG, http=http, clock=lambda: NOW, sleep=sleeps.append)
+    assert play._edit() == "e1"
+    assert sleeps == [storeapi.RETRY_DELAYS[0]]
+    # A 5xx of a write may have taken effect: no second try.
+    routes[f"POST {EDITS}"] = answer({"error": "oops"}, status=500)
+    http = FakeHttp(routes)
+    play = storeapi.PlayPublisher(account, PKG, http=http, clock=lambda: NOW, sleep=sleeps.append)
+    with pytest.raises(common.StepError, match="a Play edit refused with 500"):
+        play._edit()
+    assert [c[1] for c in http.calls].count(EDITS) == 1
+    routes[f"POST {EDITS}"] = _flaky(storeapi.NetworkError("POST edits: reset"))
+    http = FakeHttp(routes)
+    play = storeapi.PlayPublisher(account, PKG, http=http, clock=lambda: NOW, sleep=sleeps.append)
+    with pytest.raises(storeapi.NetworkError):
+        play._edit()

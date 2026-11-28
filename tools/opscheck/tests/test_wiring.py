@@ -202,3 +202,20 @@ def test_renovate_description_names_the_tag_based_compose_images() -> None:
     description = renovate()["description"]
     assert "Compose-Images" in description
     assert "version tags" in description
+
+
+def test_release_downloads_of_the_distribution_steps_have_a_manager() -> None:
+    """Sparkle, bundletool and WiX are found by one manager with their pinned versions (#1599)."""
+    pins = {
+        "tools/distribution/apple.py": ("github-releases", "sparkle-project/Sparkle", "SPARKLE"),
+        "tools/distribution/android.py": ("github-releases", "google/bundletool", "BUNDLETOOL"),
+        "tools/distribution/hostdist.py": ("nuget", "wix", "WIX"),
+    }
+    for path, (datasource, dep, prefix) in pins.items():
+        text = (REPO / path).read_text(encoding="utf-8")
+        version = re.search(rf'^{prefix}_VERSION = "([^"]+)"$', text, re.MULTILINE)
+        assert version, path
+        assert extract(manager_for(path), text) == {(datasource, dep, version.group(1))}
+        assert re.search(rf'^{prefix}_SHA256 = "[0-9a-f]{{64}}"$', text, re.MULTILINE), path
+    [hold] = [r for r in renovate()["packageRules"] if r.get("matchPackageNames") == ["wix"]]
+    assert hold["allowedVersions"] == "<6"

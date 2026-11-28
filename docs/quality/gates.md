@@ -290,7 +290,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `denylist` | `tools/denylist/denylist_scan.py` | white label in contents, names, commits (message, identities and the files each commit of the range adds or changes), refs, and the pull request title and body (`PR_TITLE`, `PR_BODY`, `PR_BODY_FILE`) | | yes, needs the private list |
 | `sonar` | SonarScanner (npm) against the local server or SonarQube Cloud | gate "Bothy way" | `quality.sonar.*` | from the first product code |
 
-In addition, the release workflow runs: `trivy-image` (vulnerabilities in the built image), SBOM
+In addition, the release workflow runs: `trivy-image` (vulnerabilities in the built image; daily on `main` also in `images.yml`, section "Advisories"), SBOM
 (Syft via `anchore/sbom-action`), build provenance and SBOM attestation (public),
 `portability` (whole stack on a fresh machine, `make portability` with `PORTABILITY_TAG`, M7-14).
 
@@ -496,8 +496,8 @@ What tells a maintainer about a red run:
   notifications for GitHub Actions switched on.
 
 The scheduled workflows are `advisories.yml`, `codeql.yml`, `docs.yml`, `e2e-desktop.yml`,
-`e2e-mobile.yml`, `flakes.yml`, `hermes-pin.yml`, `host-platform.yml`, `red-runs.yml` and
-`scorecard.yml`
+`e2e-mobile.yml`, `flakes.yml`, `hermes-pin.yml`, `host-platform.yml`, `images.yml`,
+`red-runs.yml` and `scorecard.yml`
 (`tools/docs/tests/test_red_runs_doc.py` holds this list to the workflows with a `schedule`
 trigger). Without the alert below, a red run of one of them, or of `ci.yml` on `main`, would
 reach at most that one person until a maintainer looks at the Actions page.
@@ -568,6 +568,15 @@ request fails only for vulnerable dependencies the pull request itself adds or c
 * A push to `main` (`ci.yml`) and the daily workflow `advisories.yml` run the full scan without
   `OSV_BASE`; local runs scan in full too. When either fails on a new advisory, a maintainer
   opens the update pull request at once (section "Red runs" says how a red run reaches one).
+* The daily workflow `images.yml` scans the operating system packages and binaries of the
+  images an instance runs, which no lock file names: it builds bothy-server and bothy-postgres
+  from `main` for the runner's platform and runs `make trivy-image` (HIGH and CRITICAL with a
+  fix) over them and over the third-party images of `infra/compose/compose.yaml` and
+  `compose.multi-node.yaml` at their default versions (`tools/ci/compose_images.py`, tests
+  `tools/ci/tests/test_compose_images.py`). Every image is scanned before the job fails. A
+  finding is fixed by a new base image digest or a raised default version; one in a third-party
+  image can stay red until upstream publishes a fixed release, which is why the scan is not part
+  of `advisories.yml` (#908).
 * For a `go.mod`, OSV-Scanner runs its own call analysis whenever `go` is on `PATH` (as in CI
   and in local runs) and then neither reports nor fails for a vulnerability that the module's
   code does not call; only `--all-vulns` lists such findings, under "Uncalled vulnerabilities",

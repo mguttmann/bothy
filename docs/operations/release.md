@@ -229,6 +229,15 @@ Not built yet: `apps/client` has no `VERSION` and no `CHANGELOG.md`, so a tag `c
 does not resolve and the jobs above are not reached by a tag (docs/decisions.d/M7-12.md,
 D-M7-12-0); the trials of the pull requests run them with a test publisher.
 
+A release that stopped half way is corrected forward, never by a rerun of the job: a rerun
+would upload the same build number again, which the stores refuse. The store requests retry a
+refusal for the rate (429) and, for reads, a passing fault (5xx, a lost connection) three times
+with growing waits (`tools/distribution/storeapi.py`, `RETRY_DELAYS`). If the iOS build reached
+App Store Connect but the job ended before it joined the group beta, the publisher adds it with
+`tools/distribution/ios.py promote --build <n> --group beta` (a build already in the group stays
+as it is); an Android build on the internal track stays there and moves on with `android.py
+promote` as above (#1478).
+
 Before the switch to stable: check the crash rate of the beta build (if a target for
 crash reports is configured) and no open bugs of severity critical.
 

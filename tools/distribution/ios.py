@@ -32,7 +32,7 @@ need an Apple Developer Program account (OQ-08). It writes `<out>/trial-ios.json
 
 Usage:
   ios.py release --version X.Y.Z --out DIR [--distribution FILE] [--branding FILE]
-  ios.py promote --build N [--distribution FILE]
+  ios.py promote --build N [--group beta|stable] [--distribution FILE]
   ios.py trial --out DIR [--branding FILE]
 Exit codes: 0 done, 1 a step failed or this is no macOS host (named on stderr), 2 usage error.
 """
@@ -510,9 +510,15 @@ def promote(
     distribution: Path,
     build: int,
     environ: Mapping[str, str],
+    group: str = STABLE_GROUP,
     http: storeapi.Http = storeapi.urllib_http,
 ) -> None:
-    """Add the processed build `build` to the TestFlight group `stable` (18 5 rule 1).
+    """Add the processed build `build` to the TestFlight group `group` (18 5 rule 1).
+
+    `stable` is the promotion. `beta` catches up a release whose upload reached App Store
+    Connect but whose job ended before the build joined the group (docs/operations/release.md,
+    "A release that stopped half way"); adding a build that is already in the group changes
+    nothing.
 
     Raises:
         StepError: the API key is missing, or App Store Connect refuses.
@@ -529,7 +535,7 @@ def promote(
         http=http,
     )
     app_id = store.app_id(cfg["bundle_id"])
-    store.add_to_group(app_id, store.processed_build(app_id, build), STABLE_GROUP)
+    store.add_to_group(app_id, store.processed_build(app_id, build), group)
 
 
 def trial(run: Runner, *, out: Path, branding: Path) -> list[str]:
@@ -575,8 +581,9 @@ def main(argv: list[str] | None = None, run: Runner | None = None) -> int:
     r.add_argument("--out", type=Path, required=True)
     r.add_argument("--distribution", type=Path, default=appdist.TEMPLATE)
     r.add_argument("--branding", type=Path, default=DEFAULT_BRANDING)
-    p = sub.add_parser("promote", help="add a processed build to the TestFlight group stable")
+    p = sub.add_parser("promote", help="add a processed build to a TestFlight group (stable)")
     p.add_argument("--build", type=int, required=True)
+    p.add_argument("--group", choices=(BETA_GROUP, STABLE_GROUP), default=STABLE_GROUP)
     p.add_argument("--distribution", type=Path, default=appdist.TEMPLATE)
     t = sub.add_parser("trial", help="the unsigned archive and its checks with a test publisher")
     t.add_argument("--out", type=Path, required=True)
@@ -595,8 +602,13 @@ def main(argv: list[str] | None = None, run: Runner | None = None) -> int:
             )
             print(f"release-ios: {ipa.name} in TestFlight, group {BETA_GROUP}")
         elif args.command == "promote":
-            promote(distribution=args.distribution, build=args.build, environ=os.environ)
-            print(f"release-ios: build {args.build} in TestFlight, group {STABLE_GROUP}")
+            promote(
+                distribution=args.distribution,
+                build=args.build,
+                environ=os.environ,
+                group=args.group,
+            )
+            print(f"release-ios: build {args.build} in TestFlight, group {args.group}")
         else:
             checks = trial(runner, out=args.out, branding=args.branding)
             print(f"trial-ios: {len(checks)} checks passed")

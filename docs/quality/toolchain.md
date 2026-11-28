@@ -34,7 +34,7 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `mkdocs-material` | `9.7.7` | theme of the docs site | MIT | ADR 0045 |
 | `mkdocstrings` | `1.0.8` | API reference of the Python SDK from its docstrings (`docs/sdk/python.md`) | ISC | the MkDocs plugin for references from source code (23 "Documentation in code", M2-29) |
 | `mkdocstrings-python` | `2.0.10` | Python handler of mkdocstrings: reads the SDK with griffe without importing it, google docstrings | ISC | the official Python handler of mkdocstrings |
-| `semgrep` | `1.180.0` | project rules (`.semgrep/`) | LGPL-2.1 | pattern rules for project invariants without an own parser (R-QA-05) |
+| `semgrep` | `1.180.0` | project rules (`.semgrep/`); a locked project of its own, `tools/semgrep` (Python 3.12, its dependencies with their hashes in `tools/semgrep/uv.lock`) | LGPL-2.1 | pattern rules for project invariants without an own parser (R-QA-05) |
 | `@mermaid-js/mermaid-cli` | `11.17.0` | rendering diagrams | MIT | reference renderer of Mermaid; major 11 as at planning time |
 | `puppeteer` | `25.13.0` | browser control for mermaid-cli | Apache-2.0 | dependency of mermaid-cli; determines the browser version |
 | `katex` | `0.18.10` | math typesetting inside Mermaid diagrams | MIT | dependency of mermaid-cli and mermaid, which still ask for 0.16; pinned through `overrides` in `tools/node/package.json` to a release with the fix for GHSA-238p-pmpm-9mq7 (https://github.com/advisories/GHSA-238p-pmpm-9mq7, ranges in https://registry.npmjs.org/@mermaid-js/mermaid-cli/11.17.0 and https://registry.npmjs.org/mermaid/11.17.2, retrieved 2026-10-11; D-DEPS-1) |
@@ -64,6 +64,8 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `syft` | `1.54.1` | SPDX and CycloneDX SBOMs of every release image per platform and every binary | Apache-2.0 | the SBOM generator behind `anchore/sbom-action`, as a binary so that the trial release and `release.yml` run the same version (18, section 6) |
 | `nfpm` | `2.48.0` | builds the `.deb` and `.rpm` packages of the host service from `infra/host/linux/nfpm.yaml` (`make -C services/host release-build`, brief M7-23) | MIT | one static binary for both formats with owners and modes per file, no `dpkg-deb` or `rpmbuild` on the build host |
 | `wix` (WiX Toolset) | `5.0.2` | builds the MSI of the host service from `infra/host/windows/bothy-host.wxs` (`tools/distribution/hostdist.py`, nupkg checked against its SHA-256 there; only on Windows) | MS-RL | the MSI compiler of the Windows Installer documentation, runs on the preinstalled .NET; version 5 is the last one without the maintenance fee agreement of later versions (no cost, D-W-125); a build tool, not part of the MSI |
+| `sparkle` | `2.10.1` | the update framework embedded in the macOS app and `sign_update` for the appcast (`tools/distribution/apple.py`, archive checked against its SHA-256 there; only on macOS) | MIT | the update framework of macOS apps outside the App Store, with EdDSA-signed feeds (brief M7-12); OSV lists its advisories (ecosystem SwiftURL), but no gate reads this pin, so the pin review of section "Updates" checks them |
+| `bundletool` | `1.18.3` | checks the Android App Bundle of a release and builds the device APKs of the trial (`tools/distribution/android.py`, jar checked against its SHA-256 there) | Apache-2.0 | Google's tool for App Bundles; a build tool, not part of the app |
 | `ubuntu`, `fedora`, `almalinux` (container images) | `24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac`, `43@sha256:a651ddf48ea28a06ed4e1e6519f51c9f47e7a5a138722ade87369b8fbb7e5b42`, `10-minimal@sha256:7127d3a958a0ba8bb673d7b4cd378c11052404ce1897940c32f1dd944448f7ab` (digests of the multi-architecture indexes) | throwaway containers in which `make release-trial COMPONENT=host` installs and removes the `.deb` and `.rpm` of the host service, next to the `debian` image above (`PACKAGE_TEST_IMAGES` in `tools/ci/release_trial.py`) | Ubuntu, Fedora and AlmaLinux image terms (free distributions) | one more distribution per package format than the build host's own; never installed on the build host |
 | `git-cliff` | `2.14.2` | selects and parses the commits of one component for `make release-prep` | MIT OR Apache-2.0 | ADR 0060: path filter and tag pattern per component, offline |
 | `registry` | `3.1.2` | local registry of `make release-trial` on `127.0.0.1` (image pinned by digest in `tools/ci/release_trial.py`) | Apache-2.0 | the reference implementation of the OCI distribution API (CNCF Distribution); no account, removed after the run |
@@ -150,6 +152,11 @@ tags, the commit SHA behind the tag).
   no update has come from it so far. Until then nobody proposes updates: a maintainer raises a
   version by hand, and the advisory gates (`osv`, `trivy`) are what notice a vulnerable one.
   Where another page says that Renovate updates or proposes something, it means this state.
+* Until Renovate is active, a maintainer compares the pins of this page with their upstream
+  releases on a fixed date and raises the patch versions of Go, Flutter and the release binaries
+  in one change; that change also sets the next date, at most three months later. Next review:
+  `2026-12-31`. `tools/docs/tests/test_toolchain_doc.py` fails once a review date of this page
+  has passed (#757).
 * An update is only done when this page names the new version; the test enforces this.
 * Release binaries: after the Renovate proposal, `make tools-lock TOOL=<name>
   VERSION=<version>`; the command takes over the sha256 values that GitHub reports for the
@@ -184,6 +191,17 @@ newer version needs:
 
 Trivy is never included via `trivy-action` or `setup-trivy`, but as a pinned
 binary via `tools/bin/fetch_tools.py`.
+
+The hold is checked again on a fixed date: whether a newer release meets the four conditions
+above. Next review: `2027-02-28`.
+
+## WiX: keep the version
+
+WiX stays on `5.0.2` (row `wix` above): version 5 is the last one without the maintenance fee
+agreement of the later versions, and this project takes on no costs (D-W-125). The pin lives in
+`tools/distribution/hostdist.py` with its SHA-256. The hold is checked again on a fixed date:
+whether the terms of a newer version changed or version 5 lost its security fixes. Next review:
+`2027-02-28`.
 
 ## Known limitations
 

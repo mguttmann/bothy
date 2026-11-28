@@ -72,6 +72,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `observability/` | SLI bounds from the Sloth files (`sli_bounds.py`, read by `opscheck/`) and the runner of the alert path test (`alert_e2e.py`) ([README](observability/README.md)) | `alert-e2e`, `ops-check` | `observability/tests/` |
 | `portability/` | runner of the portability test (`portability_run.py`) and its local trial (`portability_trial.py`) | `portability`, `portability-trial` | `portability/tests/` |
 | `scancode/` | the pinned ScanCode Toolkit image of the text-level license scan | `scancode` | |
+| `semgrep/` | Semgrep in a locked project of its own (Python 3.12, `uv.lock` with hashes) and its accepted advisories (`osv-scanner.toml`) | `semgrep` | |
 | `bin/tofu_providers.py` | offline provider mirror of the OpenTofu gates | `install-options`, `tofu-check` | `bin/tests/` |
 | `ci/android_sdk.py` | install the emulator packages of an Android CI job with retries | CI jobs `apps-android-*`, workflow `e2e-mobile.yml` | `ci/tests/` |
 | `ci/apps_platform.py` | platform tests of the apps and packages | `apps-platform` | `ci/tests/` |
@@ -87,6 +88,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `ci/plugin_release.py` | release ZIP of the Grafana panel plugin | `make -C plugins/grafana-bothy-live` | `ci/tests/` |
 | `ci/pr_mode.py` | whether a `ci.yml` run gets the checks that need repository secrets | CI job of `ci.yml` | `ci/tests/` |
 | `ci/release_chain.py` | supply-chain steps of a component release: join, SBOM, sign, verify, tag | workflow `release.yml` | `ci/tests/` |
+| `ci/compose_images.py` | the third-party images of the Compose files at their default versions, for the daily image scan | workflow `images.yml` | `ci/tests/test_compose_images.py` |
 | `ci/release_prep.py` | release preparation of one component | `release-prep` | `ci/tests/` |
 | `ci/release_trial.py` | trial release on the build host | `release-trial` | `ci/tests/` |
 | `ci/scancode_policy.py` | license gate over a ScanCode report | `scancode` | `ci/tests/` |

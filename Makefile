@@ -75,8 +75,6 @@ SONAR_STARTUP_TIMEOUT_S ?= 300
 GO_LICENSES_VERSION := v2.0.1
 # renovate: datasource=go depName=golang.org/x/vuln
 GOVULNCHECK_VERSION := v1.8.0
-# renovate: datasource=pypi depName=semgrep
-SEMGREP_VERSION := 1.180.0
 # The CodeRabbit schema that `make lint` checks .coderabbit.yaml against: the vendor's copy at a
 # fixed commit, checked by its SHA-256 (#734); raise both together.
 CODERABBIT_SCHEMA_URL := https://raw.githubusercontent.com/coderabbitai/awesome-coderabbit/41993ea4a799a0bc35e2da1ead3b7f7a08d7de47/schema.v2.json
@@ -103,7 +101,8 @@ GO_SHARDS := $(UVRUN) python tools/ci/go_shards.py
 FLAKES := $(UV) run --project $(CURDIR)/tools --locked --quiet python $(CURDIR)/tools/ci/flakes.py
 CODEGEN_CHECK := $(UVRUN) python tools/ci/codegen_check.py
 MIGRATIONS_LINT := $(UVRUN) python tools/ci/migrations_lint.py
-SEMGREP := $(UV)x --quiet --python 3.12 --from semgrep==$(SEMGREP_VERSION) semgrep
+# Semgrep from its own locked project (Python 3.12, every dependency with its hash; #755).
+SEMGREP := $(UV) run --project tools/semgrep --locked --quiet semgrep
 # Path of a pinned release binary, resolved (and fetched on first use) inside a recipe.
 tool = "$$($(FETCH) path $(1))"
 # `go test` with the flags $(1) for the packages $(2); with CI=true through flakes.py (reruns and

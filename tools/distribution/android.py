@@ -76,6 +76,7 @@ from common import (
 )
 
 # The pinned bundletool release: version, file and its SHA-256 (brief M7-13 rule 9 of M7-12).
+# renovate: datasource=github-releases depName=google/bundletool
 BUNDLETOOL_VERSION = "1.18.3"
 BUNDLETOOL_URL = (
     "https://github.com/google/bundletool/releases/download/"
