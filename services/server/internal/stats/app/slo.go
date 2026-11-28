@@ -25,10 +25,10 @@ var keySLO = cacheKey("slo", nil, "instance")
 // the state of domain.EvaluateSLO. The report is cached for stats.cache_ttl because it scans the
 // whole period; the cache of M6-05 holds it.
 func (v *Views) SLO(ctx context.Context) (stats.SLOReport, error) {
-	if _, err := v.d.Statistics.authorize(ctx, authorize.ActionStatsRead, ids.ID{}); err != nil {
+	if _, err := v.base.authorize(ctx, authorize.ActionStatsRead, ids.ID{}); err != nil {
 		return stats.SLOReport{}, err
 	}
-	cache := v.d.Statistics.cache
+	cache := v.base.resultCache()
 	if c, ok := cache.Get(keySLO); ok {
 		return c.(stats.SLOReport), nil
 	}

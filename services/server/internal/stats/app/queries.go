@@ -169,6 +169,15 @@ func (s *Statistics) authorize(ctx context.Context, action authorize.Action, spa
 	return a, d.Err()
 }
 
+// resultCache returns the cache of the statistics (viewBase).
+func (s *Statistics) resultCache() *Cache { return s.cache }
+
+// authorizer returns the Authorizer of the statistics (viewBase).
+func (s *Statistics) authorizer() authorize.Authorizer { return s.d.Authorizer }
+
+// chatSource returns the chat statistics source of the statistics (viewBase).
+func (s *Statistics) chatSource() chat.StatsSource { return s.d.Chat }
+
 // visible builds the channel set of a (design note 1, reused by the views of M6-14):
 // Scope(message.read), kept to the channels with a space and, with a space, to the channels of
 // that space, sorted; instance is set only without a space for a caller whose Scope is instance

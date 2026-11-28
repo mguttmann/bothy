@@ -169,8 +169,9 @@ receiver who may read them (25 section 4 rule 6 and the agent tree in section 5)
 `getStatsBackends` ([25-visualization.md](../../../../docs/spec/25-visualization.md) 6.2, 6.4,
 6.5; rulings `D-M6-14-1` to `D-M6-14-7` in
 [docs/decisions.d/M6-14.md](../../../../docs/decisions.d/M6-14.md)); `app.Views` implements it over
-the authorization, the channel set and the cache of `app.Statistics`, and
-`adapters/httpapi/views.go` serves it.
+the authorization, the channel set and the cache of `app.Statistics`, which it reads only through
+the narrow interface `viewBase` (`authorize`, `visible`, `resultCache`, `authorizer`,
+`chatSource`), never through private fields, and `adapters/httpapi/views.go` serves it.
 
 - `domain/slo.go`: `EvaluateSLO` (ratio, remaining budget `1 - (1 - ratio) / (1 - objective/100)`,
   the state by `stats.slo_warn_budget_ratio` and `stats.slo_min_events`), `ValidateTimeline` and

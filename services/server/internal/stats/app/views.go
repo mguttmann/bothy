@@ -105,7 +105,29 @@ type ViewsDeps struct {
 type Views struct {
 	cfg ViewsConfig
 	d   ViewsDeps
+	// base is d.Statistics behind the narrow interface the views use.
+	base viewBase
 }
+
+// viewBase is what the views reuse from Statistics (M6-14 design note 1): the authorization of
+// the caller, the channel set of M6-05, the result cache, and the Authorizer and the chat
+// statistics source for the cost decision and the thread lookups. The views read nothing else of
+// Statistics (AUD srv-stats-status-17).
+type viewBase interface {
+	// authorize decides action for the caller of ctx on the instance (zero space) or the space.
+	authorize(ctx context.Context, action authorize.Action, space ids.ID) (actor.Actor, error)
+	// visible builds the channel set of a, with the cache scope key.
+	visible(ctx context.Context, a actor.Actor, space ids.ID) (target, error)
+	// resultCache is the cache of stats.cache_ttl shared with the statistics.
+	resultCache() *Cache
+	// authorizer is the Authorizer of the statistics.
+	authorizer() authorize.Authorizer
+	// chatSource is the chat statistics source of the statistics.
+	chatSource() chat.StatsSource
+}
+
+// Compile-time check: Statistics gives the views what they reuse.
+var _ viewBase = (*Statistics)(nil)
 
 // Compile-time check: Views is the port of the three view queries.
 var _ stats.Views = (*Views)(nil)
@@ -122,7 +144,7 @@ func NewViews(cfg ViewsConfig, d ViewsDeps) (*Views, error) {
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
-	return &Views{cfg: cfg, d: d}, nil
+	return &Views{cfg: cfg, d: d, base: d.Statistics}, nil
 }
 
 // costsAllowed decides cost.read.aggregate for a on the instance (zero space) or the space in
@@ -133,7 +155,7 @@ func (v *Views) costsAllowed(ctx context.Context, a actor.Actor, space ids.ID) (
 	if !space.IsZero() {
 		res = authorize.Resource{Kind: authorize.ResourceSpace, ID: space}
 	}
-	d, err := v.d.Statistics.d.Authorizer.Authorize(ctx, a, authorize.ActionCostReadAggregate, res)
+	d, err := v.base.authorizer().Authorize(ctx, a, authorize.ActionCostReadAggregate, res)
 	if err != nil {
 		return false, err
 	}
@@ -143,7 +165,7 @@ func (v *Views) costsAllowed(ctx context.Context, a actor.Actor, space ids.ID) (
 // threadsOf resolves channels to their threads created before to, with the channel of each
 // thread, because runs has no channel_id (D-M2-05-9).
 func (v *Views) threadsOf(ctx context.Context, channels []ids.ID, to time.Time) ([]ids.ID, map[ids.ID]ids.ID, error) {
-	ts, err := v.d.Statistics.d.Chat.StatsThreads(ctx, channels, to)
+	ts, err := v.base.chatSource().StatsThreads(ctx, channels, to)
 	if err != nil {
 		return nil, nil, err
 	}
