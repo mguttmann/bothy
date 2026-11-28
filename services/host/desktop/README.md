@@ -9,11 +9,13 @@ channel of 27 9.4; the helper itself never talks to the server.
 
 | Folder | Content |
 |---|---|
-| [`macos/`](macos/README.md) | Swift package: `HelperCore` (logic behind interfaces), `HelperMac` (ScreenCaptureKit, `CGEvent`, event tap, indicator), the app bundle `bothy-computer-helper.app` |
-| [`windows/`](windows/README.md) | CMake project (C++20): `helper_core` (portable logic), the Win32 layer (DXGI, `SendInput`, keyboard hook, indicator, tray) and `bothy-computer-helper.exe` with `uiAccess` |
+| [`macos/`](macos/README.md) | Swift package: `HelperCore` (logic behind interfaces), `HelperMac` (ScreenCaptureKit, `CGEvent`, event tap, indicator, settings window), the app bundle `bothy-computer-helper.app` |
+| [`windows/`](windows/README.md) | CMake project (C++20): `helper_core` (portable logic), the Win32 layer (DXGI, `SendInput`, keyboard hook, indicator, tray during a session, settings window) and `bothy-computer-helper.exe` with `uiAccess` |
 
 Both share the logic of 27: the enablement switch with its generation (a click at the machine is
-the only way on), `show` and `hide` with the indicator, the Esc tap and the display assertion, a
+the only way on) in a settings window, `show` and `hide` with the indicator (border, stop button,
+pointer mark, menu bar item or tray icon; nothing of it outside a session,
+[FIX-CU-HELPER-NO-ICON](../../../docs/decisions.d/FIX-CU-HELPER-NO-ICON.md)), the Esc tap and the display assertion, a
 release of every key and button on every end and at start, `screen_locked` and `secure_desktop`,
 capture scaled into `max_edge`, and the key names of D-CU-02-7. No app, key or setting is refused.
 
@@ -25,8 +27,9 @@ cmake -S services/host/desktop/windows -B <temporary folder> -DHELPER_CORE_ONLY=
 cmake --build <temporary folder> && ctest --test-dir <temporary folder>
 ```
 
-The native behaviour (capture, input, the indicator outside the image, an injected Esc that stops
-nothing) runs only in CI: the jobs `helper-macos` and `helper-windows` of
+The native behaviour (capture, input, the indicator outside the image, a click through the pointer
+ring, an injected Esc that stops nothing, no window outside a session, the settings window after a
+second start) runs only in CI: the jobs `helper-macos` and `helper-windows` of
 `.github/workflows/host-platform.yml` probe the hosted runner with `tools/ci/computer_probe.py`
 and a fixture window, and the native jobs test it where the probe passed (27 section 16). Never
 run the helpers against a real desktop of a maintainer for a test.
@@ -54,9 +57,10 @@ session: when the build runs over ssh, start `helper-sign-macos` as a one-shot j
 by unlocking the keychain. The step refuses a build whose designated requirement differs from the
 one in `REQUIREMENT_FILE`, because screen recording and accessibility grants follow that
 requirement. No notarization: a package built and installed on the same Mac carries no quarantine
-flag. In Installer, select "Computer helper"; then grant screen recording and accessibility to the
-helper in the system settings (its menu opens the panes) and switch "Allow computer control" on in
-its menu bar item.
+flag. In Installer, select "Computer helper"; the helper then opens its settings window: grant
+screen recording and accessibility to the helper in the system settings (its buttons open the
+panes) and switch "Allow computer control" on there. Later the window opens again when you open
+"Computer Helper" from Spotlight or Finder; outside a session the helper shows nothing.
 
 Windows, on the owner's Windows computer, elevated:
 
@@ -69,8 +73,9 @@ msiexec /i <folder>\bothy-host-computer_<version>_windows_amd64.msi ADDLOCAL=Com
 
 `helper-cert-windows` runs once: it creates a self-signed code signing certificate whose key cannot
 be exported and which only this machine trusts (`LocalMachine\Root` and `TrustedPublisher`).
-`uiAccess` needs that trust and the folder under `Program Files`. The helper starts at the next
-login; switch "Allow computer control" on in its tray menu.
+`uiAccess` needs that trust and the folder under `Program Files`. The helper starts right away
+and opens its settings window: switch "Allow computer control" on there. Later the Start menu entry
+"Computer Helper" opens the window again; outside a session the helper shows nothing.
 
 Selecting the helper component sets `host_service.computer_use: true` in the host service's
 configuration file (`infra/host/set-computer-use.sh`, `infra/host/windows/set-computer-use.ps1`);

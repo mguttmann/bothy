@@ -220,6 +220,8 @@ final class FakeIndicator: Indicator {
     var shownAgent: String?
     var onStop: (() -> Void)?
     var lastStatus: HelperStatus?
+    /// The points of `markClick(at:)`, in order.
+    var clicks: [Point] = []
     /// The controller's flag; like the platform indicator, a click raises it before the handler.
     var interrupt: ActionInterrupt?
     init(journal: Journal) { self.journal = journal }
@@ -237,6 +239,8 @@ final class FakeIndicator: Indicator {
     }
 
     func update(status: HelperStatus) { lastStatus = status }
+
+    func markClick(at point: Point) { clicks.append(point) }
 
     /// Simulates a click on the stop button.
     func clickStop() {

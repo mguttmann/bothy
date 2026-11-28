@@ -45,6 +45,10 @@ func (c ComputerSection) Format() string {
 	on := yesNo(c.Enabled)
 	if c.Enabled {
 		on += " (generation " + strconv.FormatInt(c.Generation, 10) + ")"
+	} else {
+		// The helper shows nothing outside a session (docs/decisions.d/FIX-CU-HELPER-NO-ICON.md),
+		// so the line says where its switch is; switching on stays local (27 4 item 1).
+		on += " (switch it on at this computer: open Computer Helper)"
 	}
 	line("switched on", on)
 	line("permission capture", c.Capture)

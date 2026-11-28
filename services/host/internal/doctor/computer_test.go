@@ -29,7 +29,10 @@ func TestComputerSection(t *testing.T) {
 	}
 	dev := ComputerSection{On: true, Helper: "refused", Capture: "unknown", Input: "unknown", TestPeer: true}.Format()
 	for _, line := range []string{"computer helper installed: no\n", "computer helper path trusted: no\n", "computer build: development\n",
-		"computer helper: refused\n", "computer switched on: no\n", "computer test peer: set (test setting)\n"} {
+		"computer helper: refused\n", "computer test peer: set (test setting)\n",
+		// The helper shows nothing outside a session, so the line says where the switch is
+		// (decisions.d/FIX-CU-HELPER-NO-ICON.md).
+		"computer switched on: no (switch it on at this computer: open Computer Helper)\n"} {
 		if !strings.Contains(dev, line) {
 			t.Errorf("development section lacks %q:\n%s", line, dev)
 		}

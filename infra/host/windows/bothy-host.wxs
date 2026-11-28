@@ -44,7 +44,7 @@
          -d HelperStartScript=<start-computer-helper.ps1> (hostdist.py helper-package-windows); the release MSI carries none of it (D-CU-01-29).
          The feature is off unless selected (ADDLOCAL=ComputerHelper): the helper goes to
          %ProgramFiles%\bothy-host next to bothy-host.exe (uiAccess needs a protected folder; D-CU-03-7), its start entry
-         to the Run key of the machine, set-computer-use.ps1 sets host_service.computer_use
+         to the Run key of the machine, its Start menu entry "Computer Helper", set-computer-use.ps1 sets host_service.computer_use
          in the configuration file as the system account, and start-computer-helper.ps1 starts the
          helper in the session of the person at the console. An uninstall removes helper and start
          entry; the key stays in the configuration like every other key. -->
@@ -65,12 +65,24 @@
                        Value="&quot;[INSTALLFOLDER]bothy-computer-helper.exe&quot;" KeyPath="yes" />
       </Component>
     </DirectoryRef>
+    <!-- The helper shows nothing outside a session (docs/decisions.d/FIX-CU-HELPER-NO-ICON.md), so the
+         person reaches its switch "Allow computer control" through this Start menu entry: it starts
+         the helper with its settings option, which makes the running helper open its settings window. The
+         key path in HKCU is what Windows Installer asks of a shortcut component (ICE38). -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="HelperShortcut" Bitness="always64">
+        <Shortcut Id="HelperStartMenu" Name="Computer Helper" Description="Allow or stop computer control by an agent"
+                  Target="[INSTALLFOLDER]bothy-computer-helper.exe" Arguments="--settings" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\bothy-host" Name="ComputerHelperShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
     <Feature Id="ComputerHelper" Title="Computer helper" Level="1000" AllowAbsent="yes"
              Description="Lets an agent of the owner control this desktop (sets host_service.computer_use).">
       <ComponentRef Id="HelperExe" />
       <ComponentRef Id="HelperConfigScript" />
       <ComponentRef Id="HelperStartScript" />
       <ComponentRef Id="HelperStartEntry" />
+      <ComponentRef Id="HelperShortcut" />
     </Feature>
     <CustomAction Id="SetComputerUse" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check"
                   ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]set-computer-use.ps1&quot; -Config &quot;[INSTALLFOLDER]config.yaml&quot;" />

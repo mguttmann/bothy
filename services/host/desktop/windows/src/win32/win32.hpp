@@ -33,6 +33,10 @@ enum : UINT {
   kMsgChannel = WM_APP + 2,  ///< the pipe channel has events in its queue (posted by its thread)
   kMsgTray = WM_APP + 3,     ///< the tray icon's callback message
   kMsgStop = WM_APP + 4,     ///< the stop button was clicked (posted by the indicator thread)
+  /// open the settings window; posted by a second start with `--settings` (Start menu shortcut)
+  kMsgOpenSettings = WM_APP + 5,
+  kMsgRing = WM_APP + 6,   ///< to the ring window: wParam 1 shows and follows the pointer, 0 hides
+  kMsgPulse = WM_APP + 7,  ///< to the pulse window: a click at wParam (x), lParam (y)
 };
 
 /// Converts UTF-8 to UTF-16 for Win32; invalid input yields an empty string.
@@ -186,21 +190,26 @@ class Win32EscTap final : public EscTap {
   std::uint64_t remove_pending_ = 0;   // hook thread only: end this generation once Esc is up
 };
 
-/// Indicator: a click-through, topmost, layered border window in the indicator color with a
-/// separate stop button window, both excluded from capture with WDA_EXCLUDEFROMCAPTURE; and the
-/// tray icon with its text and its menu ("Allow computer control", "Stop the agent").
-/// The border and the stop button live on their own thread with their own message loop, so a
-/// click on the stop button raises the interrupt while the UI thread is busy with an action
-/// (27 9.6 item 1); the tray stays on the UI thread, whose menu cannot open during an action.
+/// Indicator (decisions.d/FIX-CU-HELPER-NO-ICON.md): while a session is shown, a click-through,
+/// topmost, layered border window in the indicator color with a separate stop button window, the
+/// pointer ring that follows the pointer and the pulse window of a click, all excluded from capture
+/// with WDA_EXCLUDEFROMCAPTURE, and a tray icon with the session text and the menu item "Stop the
+/// agent". Outside a session nothing shows: no tray icon, no window. The settings window with the
+/// switch "Allow computer control" opens on a second start with `--settings` (the Start menu
+/// shortcut) and by itself at start while the switch was never switched on.
+/// The border, the stop button, the ring and the pulse live on their own thread with their own
+/// message loop, so a click on the stop button raises the interrupt while the UI thread is busy
+/// with an action (27 9.6 item 1); the tray and the settings window stay on the UI thread.
 class Win32Indicator final : public Indicator {
  public:
   /// @param instance the module instance.
   /// @param window the main window that receives the tray messages and kMsgStop.
   /// @param interrupt raised with Kind::StopButton by a click on the stop button.
   /// @param on_stop called on the UI thread when the person picks the tray's stop item.
-  /// @param on_switch called when the person clicks "Allow computer control".
+  /// @param on_switch called on the UI thread when the person clicks "Allow computer control".
+  /// @param about the version line of the settings window.
   Win32Indicator(HINSTANCE instance, HWND window, Interrupt* interrupt, std::function<void()> on_stop,
-                 std::function<void()> on_switch);
+                 std::function<void()> on_switch, std::wstring about);
   ~Win32Indicator() override;
   Win32Indicator(const Win32Indicator&) = delete;
   Win32Indicator& operator=(const Win32Indicator&) = delete;
@@ -208,6 +217,11 @@ class Win32Indicator final : public Indicator {
   void show(const std::string& agent_name) override;
   void hide() override;
   void set_enabled(bool enabled) override;
+  void mark_click(const Point& at) override;
+
+  /// Opens the settings window with the switch "Allow computer control" and brings it to the
+  /// front. UI thread only.
+  void open_settings();
 
   /// Lets the indicator see a message of the main window (tray callbacks, menu commands, the
   /// taskbar restart, display changes).
@@ -217,26 +231,38 @@ class Win32Indicator final : public Indicator {
  private:
   static LRESULT CALLBACK border_proc(HWND, UINT, WPARAM, LPARAM);
   static LRESULT CALLBACK button_proc(HWND, UINT, WPARAM, LPARAM);
+  static LRESULT CALLBACK ring_proc(HWND, UINT, WPARAM, LPARAM);
+  static LRESULT CALLBACK pulse_proc(HWND, UINT, WPARAM, LPARAM);
+  static LRESULT CALLBACK settings_proc(HWND, UINT, WPARAM, LPARAM);
   void run_windows();
   void add_tray();
-  void update_tray_text();
+  void remove_tray();
   void place();
   void show_menu();
+  HWND make_settings();
+  void follow_pointer();
 
   HINSTANCE instance_;
   HWND window_;
   Interrupt* interrupt_;
   std::function<void()> on_stop_;
   std::function<void()> on_switch_;
+  std::wstring about_;
   std::thread thread_;
   std::atomic<DWORD> thread_id_{0};
   std::atomic<bool> ready_{false};
   HWND border_ = nullptr;  // written by the indicator thread before ready_
   HWND button_ = nullptr;  // written by the indicator thread before ready_
+  HWND ring_ = nullptr;    // written by the indicator thread before ready_
+  HWND pulse_ = nullptr;   // written by the indicator thread before ready_
+  HWND settings_ = nullptr;  // UI thread
+  HFONT font_ = nullptr;     // UI thread, the settings window's font
   UINT taskbar_created_ = 0;
   std::atomic<bool> shown_{false};
+  bool tray_added_ = false;  // UI thread
   bool enabled_ = false;
   std::wstring agent_;
+  ULONGLONG pulse_start_ = 0;  // indicator thread
 };
 
 /// EnablementStore in `%LOCALAPPDATA%\bothy-computer-helper\state.json` (D-CU-02-4), written to a

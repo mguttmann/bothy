@@ -52,7 +52,7 @@ public final class HelperController {
     ///   - lockMonitor: lock state.
     ///   - waker: display assertion.
     ///   - escTap: the Esc tap.
-    ///   - indicator: border, stop button and menu bar item.
+    ///   - indicator: border, stop button, pointer mark, session menu bar item and settings window.
     ///   - store: the persisted enablement.
     ///   - info: version, signature state and account.
     ///   - frameMaxBytes: `host_service.computer_frame_max_bytes` (D-CU-02-8).
@@ -88,7 +88,7 @@ public final class HelperController {
         injected ? .pass : .swallow
     }
 
-    /// What the menu shows now.
+    /// What the settings window shows now.
     public var status: HelperStatus {
         HelperStatus(
             enabled: enablement.enabled, generation: enablement.generation,
@@ -182,7 +182,8 @@ public final class HelperController {
     }
 
     /// Reads permissions and lock state again and reports what changed. The app calls it when
-    /// the menu opens and when the system reports an accessibility change; there is no timer.
+    /// the settings window opens and when the system reports an accessibility change; there is
+    /// no timer.
     public func refreshStatus() {
         locked = lockMonitor.isLocked()
         interrupt.setLocked(locked)
@@ -190,8 +191,8 @@ public final class HelperController {
         indicator.update(status: status)
     }
 
-    /// The person clicked the menu item of a permission, which then opens its pane of the
-    /// system settings. A missing permission is registered with the system first: a preflight
+    /// The person clicked a permission button of the settings window, which then opens its pane
+    /// of the system settings. A missing permission is registered with the system first: a preflight
     /// alone never lists the helper in the Screen Recording pane, so the person could only add
     /// it by hand or switch on another app (live finding 26.11.). The person still decides.
     /// - Parameter kind: the permission of the clicked item.
@@ -464,6 +465,7 @@ public final class HelperController {
                     case .up(let key): try injector.keyUp(key)
                     case .mouseDown(let button, let point, let count):
                         try injector.mouseDown(button, at: point, clickCount: count)
+                        indicator.markClick(at: point)
                     case .mouseUp(let button, let point, let count):
                         try injector.mouseUp(button, at: point, clickCount: count)
                     case .scroll(let point, let direction, let lines):

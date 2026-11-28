@@ -166,7 +166,8 @@ struct FakeTap : EscTap {
 struct FakeIndicator : Indicator {
   bool shown = false;      ///< border and stop button
   std::string agent;       ///< the name given to show()
-  bool enabled = false;    ///< the menu check mark
+  bool enabled = false;    ///< the check mark of the settings window
+  std::vector<Point> clicks;  ///< the points of mark_click(), in order
   void show(const std::string& name) override {
     shown = true;
     agent = name;
@@ -176,6 +177,7 @@ struct FakeIndicator : Indicator {
     agent.clear();
   }
   void set_enabled(bool e) override { enabled = e; }
+  void mark_click(const Point& at) override { clicks.push_back(at); }
 };
 
 /// EnablementStore in memory.

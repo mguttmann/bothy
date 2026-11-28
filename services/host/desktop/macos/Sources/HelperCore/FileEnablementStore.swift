@@ -6,8 +6,8 @@ import Foundation
 /// `{"v": 1, "enabled": <bool>, "generation": <int>}`, file mode `0600`, folder mode `0700`.
 ///
 /// The file is read at start only and never watched: a change of the file is no order, so a
-/// process that rewrites it reaches nothing before the next start, and only the click in the
-/// menu switches on while the helper runs.
+/// process that rewrites it reaches nothing before the next start, and only the click on the
+/// switch of the settings window switches on while the helper runs.
 ///
 /// Example:
 /// ```swift

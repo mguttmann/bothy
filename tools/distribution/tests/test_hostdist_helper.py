@@ -623,6 +623,25 @@ def test_the_msi_has_the_helper_only_with_its_define() -> None:
     assert "&amp;ComputerHelper=3" in block
 
 
+def test_the_msi_puts_a_start_menu_entry_that_opens_the_settings() -> None:
+    """The helper shows nothing outside a session, so its switch is reached through the Start menu
+    entry "Computer Helper", which starts it with --settings (decisions.d/FIX-CU-HELPER-NO-ICON.md);
+    the entry belongs to the feature ComputerHelper and leaves with it."""
+    wxs = (hostdist.INFRA / "windows" / "bothy-host.wxs").read_text(encoding="utf-8")
+    start = wxs.index("<?ifdef HelperPath?>")
+    block = wxs[start : wxs.index("<?endif?>", start)]
+    shortcut = re.search(r"<Shortcut [^>]*/>", block)
+    assert shortcut
+    for attr in (
+        'Name="Computer Helper"',
+        'Target="[INSTALLFOLDER]bothy-computer-helper.exe"',
+        'Arguments="--settings"',
+    ):
+        assert attr in shortcut.group(0)
+    assert '<StandardDirectory Id="ProgramMenuFolder">' in block
+    assert 'ComponentRef Id="HelperShortcut"' in block
+
+
 def test_the_msi_starts_the_helper_after_install() -> None:
     """The helper runs right after the install in the console session, not only after a login:
     a deferred action as the system account (it needs SeTcbPrivilege for uiAccess), after the

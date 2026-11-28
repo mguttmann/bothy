@@ -149,19 +149,27 @@ public protocol EscTap: AnyObject {
     func stop()
 }
 
-/// The indicator and the menu bar item (brief item 16, 27 9.1).
+/// The indicator (brief item 16, 27 9.1, decisions.d/FIX-CU-HELPER-NO-ICON.md): while a session is
+/// shown, the border around the screen with its stop button, the pointer mark (a ring that follows
+/// the pointer and a pulse at every click the helper sends), all excluded from capture, and a menu
+/// bar item with the session text and a stop item. Nothing of it shows outside a session. The
+/// switch "Allow computer control" lives in the helper's settings window, which opens when the
+/// person opens the helper app.
 public protocol Indicator: AnyObject {
-    /// Shows the border around the screen with its stop button and the menu bar text
-    /// "Agent <name> controls this computer, Esc to stop".
+    /// Shows the border with its stop button, the pointer ring and the menu bar item with the
+    /// text "Agent <name> controls this computer, Esc to stop".
     /// - Parameters:
     ///   - agentName: the `agent_name` of `show`.
     ///   - onStop: runs in the controller's context when the person clicks the stop button or
     ///     the stop item of the menu.
     func show(agentName: String, onStop: @escaping () -> Void)
-    /// Hides the border and the session text; harmless when nothing is shown.
+    /// Hides all of it and removes the menu bar item; harmless when nothing is shown.
     func hide()
-    /// Updates the menu (switch, permissions, version) after a change.
+    /// Updates the settings window (switch, permissions, version) after a change.
     func update(status: HelperStatus)
+    /// Pulses at the point of a click the helper just sent for the agent; returns at once.
+    /// - Parameter point: the click's point in screen space.
+    func markClick(at point: Point)
 }
 
 /// The persisted enablement (D-CU-02-4).

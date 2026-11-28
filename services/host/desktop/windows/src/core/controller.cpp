@@ -490,6 +490,7 @@ bool Controller::handle_do(const Value& o) {
   // one press of a combination), and the Controller checks for an Esc and a lock between steps.
   std::vector<std::vector<InputEvent>> steps;
   std::vector<InputEvent> events;
+  std::optional<Point> click_at;
   bool valid = action != nullptr;
   std::string_view a = valid ? std::string_view(*action) : std::string_view();
 
@@ -503,6 +504,7 @@ bool Controller::handle_do(const Value& o) {
                            : a == "middle_click" ? MouseButton::Middle
                                                  : MouseButton::Left;
       int count = a == "double_click" ? 2 : a == "triple_click" ? 3 : 1;
+      click_at = at;
       // Modifiers go down before and up after the click (D-CU-02-7). One step per click; the
       // first carries the move and the modifiers, the last releases them.
       for (int i = 0; i < count; ++i) {
@@ -619,13 +621,14 @@ bool Controller::handle_do(const Value& o) {
     answer(*seq, kInvalid, AppIdentity{}, screen);
     return true;
   }
-  const char* code = run_steps(steps);
+  const char* code = run_steps(steps, click_at);
   if (code == kSilent) return true;
   answer(*seq, code, session_ ? p_.apps.frontmost() : AppIdentity{}, screen);
   return true;
 }
 
-const char* Controller::run_steps(const std::vector<std::vector<InputEvent>>& steps) {
+const char* Controller::run_steps(const std::vector<std::vector<InputEvent>>& steps,
+                                  std::optional<Point> click_at) {
   for (const std::vector<InputEvent>& step : steps) {
     // Before every step, the first included (27 9.6 item 1): an Esc, the stop button, a hide, a
     // disable or a broken channel raised on another thread ends the action here, and a lock or the
@@ -638,6 +641,10 @@ const char* Controller::run_steps(const std::vector<std::vector<InputEvent>>& st
       return now.locked ? kLocked : kSecure;
     }
     if (send_input(step) < step.size()) return kRefused;
+    if (click_at) {
+      for (const InputEvent& e : step)
+        if (e.type == InputEvent::Type::ButtonDown) p_.indicator.mark_click(*click_at);
+    }
   }
   return kOk;
 }

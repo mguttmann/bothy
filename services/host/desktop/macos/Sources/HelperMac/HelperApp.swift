@@ -44,9 +44,8 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         var controllerRef: HelperController?
         let indicator = MacIndicator(
             dispatch: dispatch, interrupt: interrupt, onToggle: { controllerRef?.toggleEnablementByClick() },
-            onMenuOpen: { controllerRef?.refreshStatus() },
+            onSettingsOpen: { controllerRef?.refreshStatus() },
             onPermissionLink: { controllerRef?.permissionLinkClicked($0) })
-        indicator.install()
         let logger = self.logger
         let controller = HelperController(
             capturer: MacCapturer(), injector: injector, appInspector: MacAppInspector(),
@@ -64,8 +63,16 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         axObserver = DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.accessibility.api"), object: nil, queue: nil
         ) { _ in dispatch { controller.refreshStatus() } }
-        // Asynchronous, because start() waits for the main thread to hide the indicator.
-        dispatch { controller.start() }
+        // Asynchronous, because start() waits for the main thread to hide the indicator. The
+        // settings window opens by itself only while the switch was never switched on, so the
+        // person finds it after installing; otherwise the helper shows nothing until a session.
+        dispatch {
+            controller.start()
+            let status = controller.status
+            if EnablementState(enabled: status.enabled, generation: status.generation).needsSetup {
+                DispatchQueue.main.async { indicator.openSettings() }
+            }
+        }
 
         let channel = UnixSocketChannel.forBuild(
             signature: signature, environment: ProcessInfo.processInfo.environment)
@@ -83,7 +90,15 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         thread.start()
     }
 
-    /// Runs the helper as an accessory app (no Dock icon, no main window) until it is ended.
+    /// The person opened the helper app while it runs (Finder, Spotlight, `open`): the system
+    /// sends the running helper a reopen event, which opens the settings window.
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        indicator?.openSettings()
+        return false
+    }
+
+    /// Runs the helper as an accessory app (no Dock icon, no menu bar item, no window outside a
+    /// session or its settings) until it is ended.
     public static func main() {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
