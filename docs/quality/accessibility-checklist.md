@@ -116,6 +116,7 @@ reachable. The column "Manual pass" is ticked in the release checklist of the se
 | Contrast (text 4.5:1, controls 3:1) and targets of `density.target-min` | the screen in light and dark | macOS, Windows | `apps/client/test/a11y/files_voice_semantics_test.dart`: "the file tiles: contrast, labelled targets and target size in light and dark" | by sight |
 | Text scaling to 200 percent | the screen at text scale 2 in German and English | macOS, Windows | `apps/client/test/a11y/files_voice_semantics_test.dart`: "the file tiles at text scale 2 in de and en: no overflow, every control reachable" | by sight |
 | Images | previews of images and voice messages | macOS, Windows | `apps/client/test/a11y/files_voice_semantics_test.dart`: "the image previews: roles, labels and states for screen readers"; "the voice messages: roles, labels and states for screen readers" | VoiceOver, Narrator |
+| Media that plays is operable (WCAG 1.4.2, 2.1.1) | the video dialog does not start by itself; Play and Pause, Mute and Sound on, the position as a slider the arrow keys move and the position in words | macOS, Windows | `apps/client/test/files/ticket_video_test.dart`: "the video waits for Play and has labelled controls" | VoiceOver, Narrator |
 
 ### Search
 
@@ -281,8 +282,8 @@ The same page on the desktop, the phones and in the console (`StatusScreen` of `
 
 This page has rows for the screens of M4-32, M4-36, M4-37 and M7-21 only, and no gate holds that
 every screen of the desktop app has a row (the phones have one, `routes_checklist_test.dart`).
-Without a row today, among others: the delete dialog, the new project assistant, the document and
-video views, export, the run graph and the live views on the desktop, the administration screens
+Without a row today, among others: the delete dialog, the new project assistant, the document
+view, the contrast and text scaling of the video view, export, the run graph and the live views on the desktop, the administration screens
 statistics, instance, apps, incoming webhooks, login providers and import, the built-in agent
 screens (their tests `new_agent_semantics_test.dart` and `builtin_agent_semantics_test.dart` of
 `admin_ui` exist) and the dialogs D-M4-32-7 names. The web console has no section: its own pages

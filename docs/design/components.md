@@ -374,7 +374,7 @@ States (`message_components.state`):
 | State | Rendering |
 |---|---|
 | `active`, permitted | operable |
-| `active`, not permitted | visible, disabled, note with `security.lock`: "Only <Triggering person> or an owner can approve this" or "You do not have the permission 'Approve actions' for this" |
+| `active`, not permitted | visible, disabled, note with `security.lock`: "Only <Triggering person> or an owner can approve this" or "You do not have the permission 'Approve actions' for this"; decided per component from its own `required_capability` and `restricted_to`, so on the approval card a run starter may press "Deny" while "Always allow" (owner) stays locked with the note |
 | sent, answer pending | the pressed button shows a loading icon; other buttons locked |
 | `used` | all buttons gone; line "<Name> chose '<Choice>', <Time>" with `trigger.done` |
 | `expired` | line "Expired" in `color.text.muted` |

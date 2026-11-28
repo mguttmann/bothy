@@ -1134,9 +1134,14 @@ As built (M5-06, docs/decisions.d/M5-06.md):
   `files/` and `manifest.json` (version, `client_msg_id`, instance, target, comment, title of a
   new post, creation time, per file name, type, size and the ID of an upload the extension
   completed already; never a token). The extension writes it in a hidden folder with the manifest
-  last and renames it, so the app never reads half an entry. Into the inbox go no network, a
+  last and renames it, so the app never reads half an entry. It writes the entry at Send, before
+  the first network call, and uploads the files from it, because iOS may end the extension during
+  an upload without any error path running; it deletes the entry after a confirmed send and on a
+  refusal. The entry stays, with the IDs of the uploads completed so far, on no network, a
   timeout, `5xx`, `429`, `409 request_in_progress` and a missing or revoked child session; every
-  other `4xx` is shown in the sheet and nothing is kept.
+  other `4xx` is shown in the sheet and nothing is kept. When the app reads the inbox it deletes
+  staging folders and half-written entries older than `ShareInbox.staleAfter` (what a sheet
+  left whose process ended), never a finished entry.
 - **Takeover.** At start and on every return to the foreground the app takes the entries of the
   signed-in instance into `share_inbox` and the outbox: files without a completed upload are
   copied into the outbox's own folder and become upload entries with IDs derived from the

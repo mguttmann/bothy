@@ -51,14 +51,15 @@ public protocol ShareSending {
 
 /// The send of the Share Extension (15 12; 04 13.2; brief M5-06 Design note 4).
 ///
-/// At Send it makes the `client_msg_id` (UUIDv7), uploads each item (`UploadClient`), then sends
-/// the message into the thread or the channel's main thread, or a new forum post with
-/// `first_message` (`MessageClient`). On success it records the target in the recent targets and
-/// deletes the staged copies. On a refusal (any `4xx` other than `401` and `429`, and not
-/// `409 request_in_progress`) it deletes the staged copies and keeps nothing: the reason is
-/// shown. On every other failure (no network, a timeout, `5xx`, `429`, a missing or revoked
-/// child session) it writes an inbox entry with the same `client_msg_id`, the files and the IDs
-/// of the uploads already completed, so the app sends it later exactly once.
+/// At Send it makes the `client_msg_id` (UUIDv7) and writes the inbox entry with that ID and
+/// the files first, so a share survives the end of the extension's process during an upload.
+/// Then it uploads each file of the entry (`UploadClient`) and sends the message into the thread
+/// or the channel's main thread, or a new forum post with `first_message` (`MessageClient`). On
+/// success it records the target in the recent targets and deletes the entry. On a refusal (any
+/// `4xx` other than `401` and `429`, and not `409 request_in_progress`) it deletes the entry and
+/// keeps nothing: the reason is shown. On every other failure (no network, a timeout, `5xx`,
+/// `429`, a missing or revoked child session) the entry stays with the IDs of the uploads
+/// already completed, so the app sends it later exactly once.
 ///
 /// Example:
 ///
@@ -101,12 +102,24 @@ public final class ShareSender: ShareSending {
     public func send(_ draft: ShareDraft) async -> ShareOutcome {
         let createdAt = now()
         let clientMsgID = UUIDv7.make(now: createdAt)
-        var completed = [String?](repeating: nil, count: draft.items.count)
+        // The inbox entry is written before the first network call: iOS may end the extension
+        // during an upload (the person switches away, the memory limit) without any `catch`
+        // running, and the app must still learn of the share. It goes only after a confirmed
+        // send or a refusal; a send of the app after a lost answer carries the same
+        // `client_msg_id` and creates nothing twice.
+        let items: [ShareItem]
+        do {
+            items = try queue(draft, clientMsgID: clientMsgID, createdAt: createdAt)
+        } catch {
+            inbox.removeStaged(draft.items)
+            return .refused(status: 0, code: "inbox_write_failed")
+        }
+        var completed = [String?](repeating: nil, count: items.count)
         do {
             guard let api else { throw ShareError.noSession }
             let clock = now
             let uploads = UploadClient(api: api, transport: transport, reader: reader, idempotencyKey: { UUIDv7.make(now: clock()) })
-            for (index, item) in draft.items.enumerated() {
+            for (index, item) in items.enumerated() {
                 completed[index] = try await uploads.upload(item, channelID: draft.target.channelID)
             }
             let messages = MessageClient(api: api)
@@ -122,27 +135,29 @@ public final class ShareSender: ShareSending {
                     content: draft.comment, fileIDs: fileIDs)
             }
         } catch let ShareError.refused(status, code) {
-            inbox.removeStaged(draft.items)
+            try? inbox.delete(clientMsgID: clientMsgID)
             return .refused(status: status, code: code)
         } catch {
-            return queue(draft, clientMsgID: clientMsgID, createdAt: createdAt, completed: completed)
+            // The uploads completed so far go into the entry, so the app does not send them again.
+            if completed.contains(where: { $0 != nil }) {
+                try? inbox.recordCompleted(clientMsgID: clientMsgID, fileIDs: completed)
+            }
+            return .queued
         }
         targets.recordUse(draft.target)
-        inbox.removeStaged(draft.items)
+        try? inbox.delete(clientMsgID: clientMsgID)
         return .sent
     }
 
-    /// Writes the inbox entry; the files move into it and the empty staging folder goes.
-    private func queue(_ draft: ShareDraft, clientMsgID: String, createdAt: Date, completed: [String?]) -> ShareOutcome {
-        defer { inbox.removeStaged(draft.items) }
-        do {
-            try inbox.write(
-                clientMsgID: clientMsgID, instanceID: instanceID, target: draft.target, comment: draft.comment,
-                title: draft.title, createdAt: createdAt,
-                files: zip(draft.items, completed).map { ShareInboxItem(item: $0, completedFileID: $1) })
-            return .queued
-        } catch {
-            return .refused(status: 0, code: "inbox_write_failed")
-        }
+    /// Writes the inbox entry without completed uploads; the files move into it and the empty
+    /// staging folder goes. Returns the files as they lie in the entry, which the uploads read.
+    private func queue(_ draft: ShareDraft, clientMsgID: String, createdAt: Date) throws -> [ShareItem] {
+        try inbox.write(
+            clientMsgID: clientMsgID, instanceID: instanceID, target: draft.target, comment: draft.comment,
+            title: draft.title, createdAt: createdAt,
+            files: draft.items.map { ShareInboxItem(item: $0, completedFileID: nil) })
+        inbox.removeStaged(draft.items)
+        guard let entry = inbox.entry(clientMsgID: clientMsgID) else { throw ShareInboxError.invalidID }
+        return entry.files.map { ShareItem(fileURL: $0.url, name: $0.name, mimeType: $0.mimeType, sizeBytes: $0.sizeBytes) }
     }
 }

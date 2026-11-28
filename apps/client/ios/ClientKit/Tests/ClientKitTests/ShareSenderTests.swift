@@ -265,3 +265,75 @@ private func millis(_ uuid: String) -> Int64? {
     #expect(!FileManager.default.fileExists(atPath: left.fileURL.path))
     try inbox.removeAll()
 }
+
+/// AUD-PKG-Q03 (#1156): the entry exists before the first network call, so a process end of
+/// the extension during an upload, where no `catch` runs, still leaves the share for the app.
+@Test func testEntryIsWrittenBeforeTheFirstUpload() async throws {
+    let world = ShareWorld()
+    let inbox = world.inbox
+    let lock = NSLock()
+    var seenAtFirstRequest: [ShareInboxEntry]?
+    world.chat.override = { _ in
+        lock.withLock {
+            if seenAtFirstRequest == nil { seenAtFirstRequest = inbox.entries() }
+        }
+        return nil
+    }
+    let staged = try world.stage("photo.jpg", bytes: pattern(700), mime: "image/jpeg")
+
+    let outcome = await world.sender().send(ShareDraft(target: threadTarget, comment: "c", title: nil, items: [staged]))
+
+    #expect(outcome == .sent)
+    let early = try #require(lock.withLock { seenAtFirstRequest })
+    #expect(early.count == 1)
+    #expect(early.first?.files.first?.name == "photo.jpg")
+    #expect(early.first?.files.first?.completedFileID == nil)
+    // A confirmed send leaves nothing behind.
+    #expect(inbox.entries().isEmpty)
+    #expect(world.stagedFiles.isEmpty)
+}
+
+/// AUD-PKG-Q03 (#1156): what a sheet left when iOS ended it goes after a day, a fresh staging
+/// folder and every finished entry stay.
+@Test func testRemoveStaleDeletesOnlyOldLeftovers() throws {
+    let world = ShareWorld()
+    let inbox = world.inbox
+    let files = FileManager.default
+    let old = try world.stage("old.jpg", bytes: Data("x".utf8), mime: "image/jpeg")
+    let fresh = try world.stage("fresh.jpg", bytes: Data("y".utf8), mime: "image/jpeg")
+    let half = world.root.appendingPathComponent("ShareInbox/.tmp-x")
+    try files.createDirectory(at: half, withIntermediateDirectories: true)
+    let kept = try world.stage("kept.jpg", bytes: Data("z".utf8), mime: "image/jpeg")
+    let id = UUIDv7.make(now: world.clock.now())
+    try inbox.write(clientMsgID: id, instanceID: instanceID, target: forumTarget, comment: "c", title: "T",
+                    createdAt: world.clock.now(), files: [ShareInboxItem(item: kept, completedFileID: nil)])
+    let longAgo = Date().addingTimeInterval(-3 * 86_400)
+    for url in [old.fileURL.deletingLastPathComponent(), half, world.root.appendingPathComponent("ShareInbox/\(id)")] {
+        try files.setAttributes([.modificationDate: longAgo], ofItemAtPath: url.path)
+    }
+
+    inbox.removeStale(before: Date().addingTimeInterval(-86_400))
+
+    #expect(!files.fileExists(atPath: old.fileURL.path))
+    #expect(!files.fileExists(atPath: half.path))
+    #expect(files.fileExists(atPath: fresh.fileURL.path))
+    #expect(inbox.entries().map(\.clientMsgID) == [id])
+}
+
+/// AUD-PKG-Q03 (#1156): completed uploads are recorded in the entry that was written first.
+@Test func testRecordCompletedUpdatesTheManifest() throws {
+    let world = ShareWorld()
+    let inbox = world.inbox
+    let a = try world.stage("a.txt", bytes: Data("a".utf8), mime: "text/plain")
+    let b = try world.stage("b.txt", bytes: Data("b".utf8), mime: "text/plain")
+    let id = UUIDv7.make(now: world.clock.now())
+    try inbox.write(clientMsgID: id, instanceID: instanceID, target: forumTarget, comment: "c", title: "T",
+                    createdAt: world.clock.now(),
+                    files: [ShareInboxItem(item: a, completedFileID: nil), ShareInboxItem(item: b, completedFileID: nil)])
+
+    try inbox.recordCompleted(clientMsgID: id, fileIDs: ["f1", nil])
+
+    let entry = try #require(inbox.entry(clientMsgID: id))
+    #expect(entry.files.map(\.completedFileID) == ["f1", nil])
+    #expect(inbox.entry(clientMsgID: "../x") == nil)
+}
