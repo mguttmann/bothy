@@ -51,3 +51,21 @@ final class IndicatorMarkTests: XCTestCase {
         XCTAssertFalse(EnablementState(enabled: false, generation: 2).needsSetup)
     }
 }
+
+/// R-CU-03: a click on the switch that the helper injected for the agent may switch off, never on.
+final class InjectedSwitchTests: XCTestCase {
+    func testAnInjectedClickOnTheSwitchNeverSwitchesOn() {
+        let rig = Rig()
+        rig.show()
+        let generation = rig.store.state.generation
+        rig.controller.toggleEnablementByClick(injected: true)
+        XCTAssertFalse(rig.store.state.enabled)
+        XCTAssertNil(rig.indicator.shownAgent)
+        rig.controller.toggleEnablementByClick(injected: true)
+        XCTAssertFalse(rig.store.state.enabled)
+        XCTAssertEqual(rig.store.state.generation, generation)
+        rig.controller.toggleEnablementByClick()
+        XCTAssertTrue(rig.store.state.enabled)
+        XCTAssertEqual(rig.store.state.generation, generation + 1)
+    }
+}

@@ -206,10 +206,11 @@ class Win32Indicator final : public Indicator {
   /// @param window the main window that receives the tray messages and kMsgStop.
   /// @param interrupt raised with Kind::StopButton by a click on the stop button.
   /// @param on_stop called on the UI thread when the person picks the tray's stop item.
-  /// @param on_switch called on the UI thread when the person clicks "Allow computer control".
+  /// @param on_switch called on the UI thread when "Allow computer control" is clicked, with true
+  ///        when the click came from input the helper injected (its marker in the input).
   /// @param about the version line of the settings window.
   Win32Indicator(HINSTANCE instance, HWND window, Interrupt* interrupt, std::function<void()> on_stop,
-                 std::function<void()> on_switch, std::wstring about);
+                 std::function<void(bool)> on_switch, std::wstring about);
   ~Win32Indicator() override;
   Win32Indicator(const Win32Indicator&) = delete;
   Win32Indicator& operator=(const Win32Indicator&) = delete;
@@ -222,6 +223,10 @@ class Win32Indicator final : public Indicator {
   /// Opens the settings window with the switch "Allow computer control" and brings it to the
   /// front. UI thread only.
   void open_settings();
+
+  /// Lets the settings window handle a message of the UI thread's loop first (Tab, Enter, Esc).
+  /// @return true when the window took it; the loop then skips it.
+  bool dialog_message(MSG* msg);
 
   /// Lets the indicator see a message of the main window (tray callbacks, menu commands, the
   /// taskbar restart, display changes).
@@ -246,7 +251,7 @@ class Win32Indicator final : public Indicator {
   HWND window_;
   Interrupt* interrupt_;
   std::function<void()> on_stop_;
-  std::function<void()> on_switch_;
+  std::function<void(bool)> on_switch_;
   std::wstring about_;
   std::thread thread_;
   std::atomic<DWORD> thread_id_{0};

@@ -675,9 +675,13 @@ def run_checks(helper: Path, result: Result, work: Path) -> None:
         s.send({"op": "hide", "session_id": session_id})
         time.sleep(SETTLE * 2)
         window_check(result, "hide_shows_nothing", windows, want_any=False)
-        subprocess.run(reopen_command(helper), check=False, timeout=EVENT_WAIT)
-        time.sleep(SETTLE * 4)
-        window_check(result, "reopen_opens_settings", windows, want_any=True)
+        try:
+            subprocess.run(reopen_command(helper), check=False, timeout=EVENT_WAIT)
+        except subprocess.TimeoutExpired:
+            result.check("reopen_opens_settings", False, "the second start did not return")
+        else:
+            time.sleep(SETTLE * 4)
+            window_check(result, "reopen_opens_settings", windows, want_any=True)
     except ProbeError as err:
         result.check("error", False, str(err))
     finally:

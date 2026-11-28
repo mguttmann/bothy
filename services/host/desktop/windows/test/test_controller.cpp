@@ -768,3 +768,21 @@ CHECK_TEST(settings_show_at_start_only_before_the_first_switch_on) {
   CHECK(!needs_setup(EnablementState{true, 1}));
   CHECK(!needs_setup(EnablementState{false, 2}));
 }
+
+// R-CU-03 (decisions.d/FIX-CU-HELPER-NO-ICON.md): a click on the switch that the helper itself
+// injected for the agent (its marker in the input) may switch off, never on; a double click of the
+// agent on the switch therefore ends switched off.
+CHECK_TEST(an_injected_click_on_the_switch_never_switches_on) {
+  Rig rig;
+  rig.show();
+  std::int64_t gen = rig.store.stored.generation;
+  rig.controller.on_switch_clicked(true);  // off: ends the session
+  CHECK(!rig.store.stored.enabled);
+  CHECK(!rig.indicator.shown);
+  rig.controller.on_switch_clicked(true);  // the second click of the double click
+  CHECK(!rig.store.stored.enabled);
+  CHECK_EQ(rig.store.stored.generation, gen);
+  rig.controller.on_switch_clicked(false);  // the person
+  CHECK(rig.store.stored.enabled);
+  CHECK_EQ(rig.store.stored.generation, gen + 1);
+}

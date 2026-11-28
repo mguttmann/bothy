@@ -154,9 +154,14 @@ public final class HelperController {
     ///
     /// Switching on raises the generation by one and takes effect only once persisted;
     /// switching off takes effect at once and ends a shown session.
-    public func toggleEnablementByClick() {
+    /// - Parameter injected: the click came from input the helper sent for the agent (its
+    ///   marker): it may switch off, never on (R-CU-03, decisions.d/FIX-CU-HELPER-NO-ICON.md).
+    public func toggleEnablementByClick(injected: Bool = false) {
         if enablement.enabled {
             switchOff()
+        } else if injected {
+            // The window shows the switch off again with the update below.
+            log("switch-on by injected input refused")
         } else {
             let next = EnablementState(enabled: true, generation: enablement.generation + 1)
             do {

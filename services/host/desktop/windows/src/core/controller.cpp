@@ -226,8 +226,9 @@ void Controller::on_stop_button() {
   send(Value::object({{"op", "stop"}, {"session_id", id}, {"detail", "indicator_stop"}}));
 }
 
-void Controller::on_switch_clicked() {
+void Controller::on_switch_clicked(bool injected) {
   if (!enablement_.enabled) {
+    if (injected) return;  // only the person switches on (R-CU-03)
     EnablementState next{true, enablement_.generation + 1};
     // Switching on without a persisted generation could reuse a generation after a restart and
     // undo a remote disable (D-CU-01-25), so a failed save keeps the switch off.

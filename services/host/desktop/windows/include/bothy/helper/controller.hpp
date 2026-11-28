@@ -161,7 +161,9 @@ class Controller {
   /// The person clicked "Allow computer control" (brief item 15): switches on with the generation
   /// raised by one, or off (ending a shown session first), persists the state and reports `state`.
   /// This is the only way to switch on; nothing the host sends can do it.
-  void on_switch_clicked();
+  /// @param injected the click came from input the helper sent for the agent (its marker): it may
+  ///        switch off, never on (R-CU-03, decisions.d/FIX-CU-HELPER-NO-ICON.md).
+  void on_switch_clicked(bool injected = false);
 
   /// The lock monitor learned of a change: asks it again and reports what changed.
   void on_lock_changed();

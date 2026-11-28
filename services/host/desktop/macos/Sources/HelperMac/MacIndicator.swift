@@ -46,7 +46,7 @@ public final class MacIndicator: NSObject, Indicator {
 
     private let dispatch: (@escaping () -> Void) -> Void
     private let interrupt: ActionInterrupt
-    private let onToggle: () -> Void
+    private let onToggle: (Bool) -> Void
     private let onSettingsOpen: () -> Void
     private let onPermissionLink: (PermissionKind) -> Void
     private var onStop: (() -> Void)?
@@ -55,6 +55,7 @@ public final class MacIndicator: NSObject, Indicator {
     private var stopPanel: NSPanel?
     private var ring: NSPanel?
     private var ringTimer: Timer?
+    private var pulses: [NSPanel] = []
     private var status: HelperStatus?
 
     private var settings: NSWindow?
@@ -68,14 +69,15 @@ public final class MacIndicator: NSObject, Indicator {
     /// - Parameters:
     ///   - dispatch: runs a closure asynchronously in the controller's context.
     ///   - interrupt: set at once by the stop button, so a running action stops between steps.
-    ///   - onToggle: the person clicked "Allow computer control"; runs in the controller's context.
+    ///   - onToggle: "Allow computer control" was clicked, with true when the click came from input
+    ///     the helper injected (its marker); runs in the controller's context.
     ///   - onSettingsOpen: the settings window opens; runs in the controller's context, to
     ///     refresh the permissions.
     ///   - onPermissionLink: a permission button was clicked; runs in the controller's context
     ///     before the pane opens, to register a missing permission with the system.
     public init(
         dispatch: @escaping (@escaping () -> Void) -> Void, interrupt: ActionInterrupt,
-        onToggle: @escaping () -> Void, onSettingsOpen: @escaping () -> Void,
+        onToggle: @escaping (Bool) -> Void, onSettingsOpen: @escaping () -> Void,
         onPermissionLink: @escaping (PermissionKind) -> Void
     ) {
         self.dispatch = dispatch
@@ -122,7 +124,12 @@ public final class MacIndicator: NSObject, Indicator {
         // Asynchronous: the action goes on while the pulse shows.
         DispatchQueue.main.async { [weak self] in
             guard let self, self.onStop != nil else { return }
-            Self.pulse(at: Self.appKitPoint(point))
+            let panel = Self.pulse(at: Self.appKitPoint(point))
+            self.pulses.append(panel)
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.pulseDuration) { [weak self] in
+                panel.orderOut(nil)
+                self?.pulses.removeAll { $0 === panel }
+            }
         }
     }
 
@@ -203,8 +210,12 @@ public final class MacIndicator: NSObject, Indicator {
 
     @objc private func switchClicked() {
         // The box shows the stored state again once the controller answered with update(status:).
+        // The helper's marker in the event that made the click means the agent clicked, which may
+        // switch off but never on (R-CU-03).
+        let injected =
+            NSApp.currentEvent?.cgEvent?.getIntegerValueField(.eventSourceUserData) == MacInjector.marker
         let toggle = onToggle
-        dispatch { toggle() }
+        dispatch { toggle(injected) }
     }
 
     @objc private func openScreenRecording() {
@@ -248,6 +259,8 @@ public final class MacIndicator: NSObject, Indicator {
         ringTimer = nil
         ring?.orderOut(nil)
         ring = nil
+        for pulse in pulses { pulse.orderOut(nil) }
+        pulses.removeAll()
         if let item = statusItem { NSStatusBar.system.removeStatusItem(item) }
         statusItem = nil
     }
@@ -318,7 +331,7 @@ public final class MacIndicator: NSObject, Indicator {
         return panel
     }
 
-    private static func pulse(at center: NSPoint) {
+    private static func pulse(at center: NSPoint) -> NSPanel {
         let size = NSSize(width: pulseSize, height: pulseSize)
         let panel = overlayPanel(
             frame: NSRect(
@@ -347,7 +360,7 @@ public final class MacIndicator: NSObject, Indicator {
         group.fillMode = .forwards
         group.isRemovedOnCompletion = false
         ring.add(group, forKey: "pulse")
-        DispatchQueue.main.asyncAfter(deadline: .now() + pulseDuration) { panel.orderOut(nil) }
+        return panel
     }
 
     private func makeStopPanel() -> NSPanel? {

@@ -109,7 +109,7 @@ T* self_of(HWND hwnd, UINT msg, LPARAM lp) {
 }  // namespace
 
 Win32Indicator::Win32Indicator(HINSTANCE instance, HWND window, Interrupt* interrupt,
-                               std::function<void()> on_stop, std::function<void()> on_switch,
+                               std::function<void()> on_stop, std::function<void(bool)> on_switch,
                                std::wstring about)
     : instance_(instance),
       window_(window),
@@ -296,7 +296,7 @@ HWND Win32Indicator::make_settings() {
   wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
   wc.lpszClassName = kSettingsClass;
   RegisterClassExW(&wc);  // a second registration fails harmlessly
-  HWND hwnd = CreateWindowExW(0, kSettingsClass, kSettingsTitle, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+  HWND hwnd = CreateWindowExW(WS_EX_CONTROLPARENT, kSettingsClass, kSettingsTitle, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
                               CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, nullptr, nullptr, instance_, this);
   if (hwnd == nullptr) return nullptr;
   UINT dpi = dpi_of(hwnd);
@@ -354,6 +354,11 @@ void Win32Indicator::open_settings() {
   set_enabled(enabled_);
   ShowWindow(settings_, SW_SHOWNORMAL);
   SetForegroundWindow(settings_);
+  if (HWND box = GetDlgItem(settings_, kSwitchId)) SetFocus(box);
+}
+
+bool Win32Indicator::dialog_message(MSG* msg) {
+  return settings_ != nullptr && IsWindowVisible(settings_) && IsDialogMessageW(settings_, msg) != FALSE;
 }
 
 bool Win32Indicator::handle(UINT msg, WPARAM wp, LPARAM lp, LRESULT& result) {
@@ -475,7 +480,10 @@ LRESULT CALLBACK Win32Indicator::settings_proc(HWND hwnd, UINT msg, WPARAM wp, L
   if (msg == WM_COMMAND && HIWORD(wp) == BN_CLICKED) {
     // On the UI thread, which owns the window: the switch reaches the Controller directly, and
     // set_enabled() then shows the stored state.
-    if (LOWORD(wp) == kSwitchId && self != nullptr) self->on_switch_();
+    // GetMessageExtraInfo() is the dwExtraInfo of the mouse or key message that made the click: the
+    // helper's marker means the agent clicked, which may switch off but never on (R-CU-03).
+    if (LOWORD(wp) == kSwitchId && self != nullptr)
+      self->on_switch_(static_cast<std::uintptr_t>(GetMessageExtraInfo()) == kInjectedMarker);
     if (LOWORD(wp) == kCloseId) ShowWindow(hwnd, SW_HIDE);
     return 0;
   }

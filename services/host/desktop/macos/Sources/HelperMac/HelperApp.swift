@@ -65,7 +65,7 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         let interrupt = ActionInterrupt()
         var controllerRef: HelperController?
         let indicator = MacIndicator(
-            dispatch: dispatch, interrupt: interrupt, onToggle: { controllerRef?.toggleEnablementByClick() },
+            dispatch: dispatch, interrupt: interrupt, onToggle: { controllerRef?.toggleEnablementByClick(injected: $0) },
             onSettingsOpen: { controllerRef?.refreshStatus() },
             onPermissionLink: { controllerRef?.permissionLinkClicked($0) })
         let logger = self.logger

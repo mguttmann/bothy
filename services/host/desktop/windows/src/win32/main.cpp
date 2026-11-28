@@ -31,7 +31,7 @@ struct App {
       : lock(window, [this] { controller.on_lock_changed(); }),
         esc_tap(window, &interrupt),
         indicator(instance, window, &interrupt, [this] { controller.on_stop_button(); },
-                  [this] { controller.on_switch_clicked(); }, about(info)),
+                  [this](bool injected) { controller.on_switch_clicked(injected); }, about(info)),
         channel(window, pipe, check_server, info.frame_max_bytes, &interrupt),
         controller(Platform{capturer, injector, apps, lock, waker, esc_tap, indicator, store, channel},
                    info, &interrupt) {}
@@ -163,7 +163,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
   if (single == nullptr || GetLastError() == ERROR_ALREADY_EXISTS) {
     // The person started the helper again from the Start menu: the running one opens its settings
     // window. A second start without --settings (installer, login) stays silent.
-    HWND running = settings ? FindWindowW(kWindowClass, nullptr) : nullptr;
+    // The running helper may still be starting (mutex taken, window not yet made): wait a little.
+    HWND running = nullptr;
+    for (int i = 0; settings && running == nullptr && i < 50; ++i) {
+      running = FindWindowW(kWindowClass, nullptr);
+      if (running == nullptr) Sleep(100);
+    }
     if (running != nullptr) {
       DWORD pid = 0;
       GetWindowThreadProcessId(running, &pid);
@@ -215,6 +220,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (app->indicator.dialog_message(&msg)) continue;
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
   }
