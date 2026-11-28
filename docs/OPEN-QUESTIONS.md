@@ -47,7 +47,6 @@ Sorted by deadline.
 | OQ-14 | Public commitments on deprecation and version overlap | default values from chapter 06 | before V1-05 |
 | OQ-15 | Commitments in SECURITY.md and GOVERNANCE.md | default values from chapter 23 | before V1-05 |
 | OQ-16 | Final name and trademark check | Bothy stays the working name | before V1-06 |
-| OQ-25 | Identity of new commits and the allow list of authors | the identity of the commits so far stays; `denylist-main` stays red on new commits until the ruling; recommendation: the hosting service's no-reply address | before V1-07 |
 | OQ-26 | Test from zero by a third person | the session's recorded run on a fresh host; a third person after A1-10 and V1-09 | before V1-10 |
 | OQ-17 | Package names and accounts for SDKs at PyPI and npm | reserve only after the choice of name | before the first SDK publication, at the latest V1-06 |
 | OQ-18 | Personal subscription in dev environments | no; V2-06 is not built | before V2-06 |
@@ -365,24 +364,6 @@ Sorted by deadline.
   network), a change of [chapter 24](spec/24-terminal.md) and a change of M2-43 and M2-44.
 - **Due by:** before M2-43.
 
-### OQ-25: Identity of new commits and the allow list of authors
-
-- **Question:** Which identity do author and sign-off of new commits on `main` carry, and which
-  identities does the allow list of authors of the deny list scan accept?
-- **Why only the owner:** A personal or company identity in a public history is a public effect,
-  and the allow list lives in the operations repository and a CI secret that only the owner
-  changes. The commits so far carry the identity of the decision of 2026-10-10 (section
-  "Decided"); `denylist-main` fails on the latest squash commits because author and sign-off use
-  different identities (design note of the built-in agents, section 10).
-- **Default:** The identity of the commits so far stays, and `denylist-main` stays red on new
-  commits until the ruling. Recommendation: from now on the hosting service's no-reply address for
-  author and sign-off, added to the allow list (operations repository and CI secret), with the
-  existing history left as it is; rewriting a public `main` is irreversible and breaks every
-  clone.
-- **What the plan does with it:** V1-07 changes the allow list and the landing step of the
-  operations repository in the same step as the ruling.
-- **Due by:** before V1-07.
-
 ### OQ-26: Test from zero by a third person
 
 - **Question:** Who runs the test from zero: a person who has never seen the project, a fresh
@@ -440,6 +421,7 @@ column "Question"; the ID is not reassigned.
 | Does the acceptance apply to the seven preview images generated again afterwards (D-W-46)? | yes, without a new acceptance: The acceptance applies to the images in `docs/design/previews`, and the seven are content corrections within the accepted design (run states as words, `amber.100` in the warning banner, no truncated message). | Owner decision "Design on `docs/design/previews` accepted", passed to the planning in this wording on 2026-10-11, after the seven images had been generated again on the same day (D-W-46, D-W-77) | The tickets build with these versions. |
 | OQ-23: Are the preview images terminal and statistics (`terminal-*`, `viz-*`) considered accepted? | yes, without an open owner question: They are in `docs/design/previews` and apply the accepted design system (same tokens, same rules). They were created after the acceptance of 2026-10-10: both pairs on the same day (D-W-13), `viz-*` generated again on 2026-10-11, last with D-W-55. | Owner decision as in the row above; ruling T14 of the lead, 2026-10-11 (D-W-77) | The tickets build with these versions; the earlier deadline before M4-03 no longer applies. |
 | Commit identity in the public repository | The commits carry the identity chosen by the owner; the product repository does not name it. | Owner, 2026-10-10 | No rewriting of the authors needed. What is published is a commit without parents; the planning history stays private (D-W-93, step 2 of the [Checklist: publishing](quality/public-switch.md)). |
+| OQ-25: Which identity do author and sign-off of new commits on `main` carry, and which identities does the allow list of authors accept? | The hosting service's no-reply address for author and sign-off, added to the allow list; the earlier commits stay as they are. | Owner, 2026-11-07 | The allow list of the operations repository holds both identities. `make commitlint` requires the sign-off of a pull request body with a no-reply address in one line, and `tools/hooks/land_pr.py` lands with exactly the maintainer's identity (FIX-LAND-SIGNOFF). |
 | Android, voice messages, sharing from other apps, login through OIDC | Part of the core | Owner, planning basis | [Chapter 01](spec/01-product.md), [chapter 08](spec/08-identity.md); tickets in M3 to M5. |
 | Revisions of edited messages and default values of the core contract (retention of the event log, session duration, sizes) | not an owner question | Planning | Revisions follow the class `content` in [chapter 20](spec/20-privacy.md); the values are named configuration values that every instance can change ([configuration reference](operations/configuration.md)). |
 | View with data about individual subscription seats or credentials | not in the product | Planning, ruling T8 | The product shows only the backend view ([chapter 25](spec/25-visualization.md) section 6.2) and knows no credentials (I5). |

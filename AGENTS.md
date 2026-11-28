@@ -51,8 +51,10 @@ is.
   never paste raw reviewer, bot or agent output (the review report stays in `.review/`;
   name only the reviewed commit, the verdict and the fixes), and no local paths, user or
   machine names, temporary folder names or notes about your tools. The body ends with a
-  `Signed-off-by:` line (DCO of the squash commit), which `make commitlint` requires. The deny-list job in
-  CI scans title and body on every edit and fails `ci-ok` on a finding; check the planned
+  `Signed-off-by:` line (DCO of the squash commit), in one line, the only sign-off of the body,
+  with a GitHub no-reply address, which `make commitlint` requires. A maintainer lands with
+  `tools/hooks/land_pr.py`, never with GitHub's default squash text (push-discipline.md,
+  step 8). The deny-list job in CI scans title and body on every edit and fails `ci-ok` on a finding; check the planned
   text before the push with `PR_TITLE=... PR_BODY_FILE=<file> make denylist`.
 - CodeRabbit reviews every pull request that is ready for review. Fix its findings and
   comments, or answer them with a reason in the thread, before the pull request is

@@ -34,8 +34,9 @@ commit per feature, signed and linear.
    CI checks it (`PR_TITLE` in `make commitlint`). The body becomes the message of that
    commit, so it ends with a `Signed-off-by: Name <e-mail>` line outside HTML comments, which
    `make commitlint` requires (`PR_BODY`; not for a pull request of `dependabot[bot]`,
-   `renovate[bot]` or `github-actions[bot]`, `PR_BODY_BOTS` in `tools/hooks/commit_msg.py`;
-   which identity signs is OQ-25), and title and body are written fresh, in your own words: what and why, how it
+   `renovate[bot]` or `github-actions[bot]`, `PR_BODY_BOTS` in `tools/hooks/commit_msg.py`).
+   That line is the only `Signed-off-by` line of the body, in one line, with a GitHub no-reply
+   address (OQ-25; `check_squash_body`), and title and body are written fresh, in your own words: what and why, how it
    was verified, which commit the independent review covered with which verdict and what
    was fixed. Never paste a raw review report, bot or agent output, local paths, user or
    machine names, temporary folder names or notes about tools. Section
@@ -44,8 +45,15 @@ commit per feature, signed and linear.
    the last job of the run: it needs every other job, runs with `always()` and combines their
    results (`tools/ci/ci_ok.py`), so it reports on every run; the job `plan` marks it pending
    for the head commit at the start of a pull request run.
-8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
-   pull request body (repository setting below). `main` stays linear. Once the repository has
+8. **Merge.** The maintainer lands with `python3 tools/hooks/land_pr.py <number> --delete-branch`
+   and `BOTHY_SIGNOFF_IDENTITY="Name <no-reply address>"`: it checks that the body ends with
+   exactly that sign-off, squash-merges with the pull request title plus ` (#<number>)` and the
+   body without the template's HTML comments as a file, that address as author and the checked head commit, and reads the
+   message of the commit on `main` back. Never the "Squash and merge" button and never
+   `gh pr merge --squash` without `--body-file`: both take GitHub's default squash text, which
+   wraps the body at 72 columns (the sign-off breaks over two lines and becomes plain text for
+   the deny list) and appends the trailers of the branch commits after a `---------` line, with
+   the identity those commits carry. GitHub signs the resulting commit. `main` stays linear. Once the repository has
    a merge queue, the pull request joins it instead and the queue runs the full suite before
    it squashes (gates.md, "How a pull request lands").
 
@@ -226,7 +234,9 @@ scans what actually reached `main`):
   (maintainers only);
 - a run that waits for a maintainer's approval (first contribution from a fork) has no
   `ci-ok` yet, so the older result stays the latest until the maintainer approves;
-- a message typed into the merge dialog instead of the pull request body.
+- a message typed into the merge dialog instead of the pull request body, or GitHub's default
+  squash text of the dialog or of a merge without a body (step 8); `land_pr.py` passes the
+  checked body and fails after the merge when the commit on `main` differs from it.
 
 ## Release notes
 

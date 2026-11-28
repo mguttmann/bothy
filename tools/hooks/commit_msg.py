@@ -23,7 +23,10 @@ Rules (docs/quality/push-discipline.md):
   * --pr-body: the body of the pull request becomes the message of the squash commit on
     `main`, so its last line outside HTML comments is `Signed-off-by: Name <e-mail>` (git
     reads a sign-off only in the trailer block at the end of a message), unless
-    the author is a bot of PR_BODY_BOTS (#872); which identity signs is OQ-25
+    the author is a bot of PR_BODY_BOTS (#872). That line is the only `Signed-off-by` line of
+    the body, in one line, with a GitHub no-reply address (owner decision of 2026-11-07,
+    OQ-25): a sign-off wrapped over two lines or a second identity fails. The landing step
+    (land_pr.py) also requires the exact identity of the maintainer who lands.
 """
 
 from __future__ import annotations
@@ -67,24 +70,50 @@ BOT_AUTHORS = {
 # Pull request authors whose body needs no sign-off: the dependency bots and the bot of the
 # repository's own workflows (hermes-pin.yml opens its pull requests as github-actions[bot]).
 PR_BODY_BOTS = frozenset({*BOT_AUTHORS, "github-actions[bot]"})
-_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+# GitHub's no-reply address of an account: `<id>+<login>@users.noreply.github.com`.
+NOREPLY = re.compile(r"^\d+\+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?@users\.noreply\.github\.com$")
+
+
+def check_squash_body(body: str, *, identity: str | None = None) -> list[str]:
+    """Return the errors of the text that becomes the squash commit message below its header.
+
+    It ends with exactly one `Signed-off-by: Name <address>` line, in one line, with a GitHub
+    no-reply address, and with `identity` ("Name <address>") when it is given. HTML comments of
+    the template never reach the commit and do not count. The errors never repeat a rejected
+    line: CI logs are public.
+    """
+    text = HTML_COMMENT.sub("", body.replace("\r\n", "\n"))
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    last = lines[-1] if lines else ""
+    match = _SIGNOFF.fullmatch(last)
+    errors: list[str] = []
+    if match is None:
+        errors.append(
+            "the body must end with a 'Signed-off-by: Name <e-mail>' line, in one line: it "
+            "becomes the squash commit on main (CONTRIBUTING.md, Pull requests)"
+        )
+    elif identity is not None and last != f"Signed-off-by: {identity}":
+        errors.append(f"the last line must be exactly 'Signed-off-by: {identity}'")
+    elif not NOREPLY.match(match.group("email")):
+        errors.append("the sign-off must use a GitHub no-reply address (OQ-25)")
+    if any(ln.lower().startswith("signed-off-by") for ln in lines[:-1]):
+        errors.append(
+            "the last line must be the only 'Signed-off-by' line: a second identity or a "
+            "sign-off wrapped over two lines reaches main"
+        )
+    return errors
 
 
 def check_pr_body(body: str, *, author: str) -> list[str]:
     """Return the errors of a pull request body; empty means it passes (#872).
 
     The body becomes the message of the squash commit on `main`, so it needs a DCO sign-off
-    of its own; HTML comments of the template never reach the commit and do not count.
+    of its own (check_squash_body); a body of a bot of PR_BODY_BOTS needs none.
     """
     if author in PR_BODY_BOTS:
         return []
-    lines = [ln for ln in _HTML_COMMENT.sub("", body).splitlines() if ln.strip()]
-    if lines and _SIGNOFF.fullmatch(lines[-1].strip()):
-        return []
-    return [
-        "the body must end with a 'Signed-off-by: Name <e-mail>' line: it becomes the squash "
-        "commit on main (CONTRIBUTING.md, Pull requests)"
-    ]
+    return check_squash_body(body)
 
 
 def _clean(message: str) -> str:
