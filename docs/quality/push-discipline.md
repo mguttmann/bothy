@@ -297,7 +297,11 @@ fork pull request, a merge straight after a reduced run has not seen the private
 SonarQube before the merge, and only `denylist-main.yml` checks afterwards. Anyone with write
 access can push a commit with a forged bot author address to a bot branch, and that commit
 then needs no sign-off; the push is a run of a person, so it gets every other check, and the
-squash commit on `main` carries the bot as author and no sign-off.
+squash commit on `main` carries the bot as author and no sign-off. A merge with the button or
+with `gh pr merge --squash` without a body takes GitHub's default text, which appends the
+trailers of the branch commits; a signed maintainer commit on a bot branch then puts the
+maintainer's sign-off on a commit authored by the bot, which `ci-ok` cannot see and only
+`denylist-main.yml` reports afterwards; `land_pr.py` passes the checked body instead.
 
 ## Deny-list hit on `main`
 
