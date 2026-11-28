@@ -38,6 +38,8 @@ mentions a member starts one run of that member; when that run has nothing to ad
 shows in the team channel without a mention and the chain ends there. A member that answers the
 notice (it reaches the member only as a context input in its next run) is not prevented.
 
-Open minor (delta review of 2026-11-25): the quiet rules still say "never mention a member to
-say ... that you are waiting, unless it asked you for something", which leaves an `@` open for a
-plain waiting notice to the requester; the next run in this area aligns it with D-TAL-1.
+Addendum of 2026-11-28 (open minor of the delta review of 2026-11-25, also found by the review
+of pull request 1798): the quiet rules no longer say "unless it asked you for something" after
+"never mention a member to say ... that you are waiting", so a plain waiting notice to the
+requester goes without `@` as D-TAL-1 says; a member that has to act on a blocker is still
+mentioned.

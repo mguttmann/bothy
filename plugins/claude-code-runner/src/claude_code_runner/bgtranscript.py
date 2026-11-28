@@ -817,13 +817,18 @@ class TranscriptMapper:
         """
         return [{"task_id": ref, "description": title} for ref, title in self._jobs.items()]
 
-    def close_jobs(self) -> None:
+    def close_jobs(self) -> bool:
         """The session is idle between turns: no background command of it runs any more.
 
         A command the CLI stopped without a notification is not listed again in a later
         busy phase.
+
+        Returns:
+            Whether a command was still open.
         """
+        cleared = bool(self._jobs)
         self._jobs.clear()
+        return cleared
 
     def _task_results(
         self, record: Mapping[str, Any], results: list[dict[str, Any]]
@@ -1446,11 +1451,12 @@ class TranscriptReader:
         return failure
 
     def _tasks(self, working: bool) -> list[dict[str, Any]]:
-        if not working:
-            self.mapper.close_jobs()
+        # A command still open when the session is idle gets the empty list even when none was
+        # reported before: it ends the command's step (D-FIX-RUNNER-BG-VISIBILITY-2).
+        cleared = not working and self.mapper.close_jobs()
         tasks = (self.mapper.open_jobs() or [{"task_id": BACKGROUND_TASK}]) if working else []
         ids = [str(t["task_id"]) for t in tasks]
-        if ids == self._reported:
+        if ids == self._reported and not cleared:
             return []
         self._reported = ids
         return [{"type": "system", "subtype": "background_tasks_changed", "tasks": tasks}]

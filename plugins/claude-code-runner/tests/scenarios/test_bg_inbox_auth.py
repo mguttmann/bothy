@@ -784,7 +784,7 @@ async def test_a_session_whose_login_is_gone_is_not_taken_for_one_on_another_acc
 async def test_an_answer_without_the_login_during_the_wait_is_withheld_and_the_wait_goes_on(
     bg_world: World, logs: LogLines
 ) -> None:
-    # The log of run 01a20d79 on 2026-11-25 05:07 UTC: a brief loss of the login failed the
+    # The runner log of a live run on 2026-11-25 05:07 UTC: a brief loss of the login failed the
     # notification turn (account_wait_started not_logged_in, background_tasks 1), the runner
     # wrote its retry line (account_retry 1), and the CLI answered it after a request record
     # without the login beta. The counter-check then stopped the session with its background

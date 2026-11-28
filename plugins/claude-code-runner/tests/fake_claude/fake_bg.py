@@ -559,7 +559,7 @@ class Player:
         ``credential`` the record lists no login beta, as the record of the pinned CLI for a
         request it never sends because its login is gone. ``bg_unlisted_after_login_loss``:
         after the error of a lost login the next so many requests list no login beta and are
-        answered all the same, as in the live run of 2026-11-25 (session 5f6e0695, the request
+        answered all the same, as in the live run of 2026-11-25 (the request
         of the runner's retry line, FIX-RUNNER-BG-VISIBILITY).
         """
         self.requests += 1

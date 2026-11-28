@@ -351,6 +351,7 @@ def test_acknowledgements_and_start_notices_mention_nobody() -> None:
     assert "mention nobody with @, also when they answer a request" in text
     assert "the mention comes with what the member has to act on" in text
     assert "a question that needs its answer" in text
+    assert "unless it asked you for something" not in text
     # Team follow-up of 2026-11-25: reviewagent answered hermesmember with @, hermesmember had
     # nothing left to do, and the notice came anyway; an answer the member does not have to
     # act on goes without @, a result it needs to go on keeps it.

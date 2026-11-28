@@ -2245,6 +2245,25 @@ async def test_busy_without_a_known_background_command_is_the_one_task(tmp_path:
     assert _tasks_reported(messages) == [[BACKGROUND_TASK], []]
 
 
+async def test_a_command_still_open_when_the_list_first_says_idle_gets_the_empty_list(
+    tmp_path: Path,
+) -> None:
+    # The list never said busy between turns, so no list was reported before; the command
+    # the idle session no longer runs still gets the empty list that ends its step.
+    sessions = Sessions(after_turn=["idle"])
+    pieces = [
+        piece(
+            PROMPT,
+            _job_call("toolu_j", "sleep 60"),
+            _job_launched("toolu_j", "bj1"),
+            ANSWER,
+            TURN_END,
+        )
+    ]
+    messages, _ = await read_through(tmp_path, pieces, sessions)
+    assert _tasks_reported(messages) == [[]]
+
+
 async def test_a_command_without_a_notification_ends_once_the_session_is_idle(
     tmp_path: Path,
 ) -> None:

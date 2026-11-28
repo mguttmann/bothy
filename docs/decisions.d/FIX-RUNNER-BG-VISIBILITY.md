@@ -3,10 +3,10 @@
 Owner's word (2026-11-25): everything that runs locally out of Bothy must be visible in Live. A
 read-only diagnosis of the same day found two gaps of the Claude Code runner in background mode.
 
-Gap C (the trigger). Reproduction: runner log of run `01a20d79` (channel `01a20368`) on
+Gap C (the trigger). Reproduction: runner log of a run (one channel of the live instance) on
 2026-11-25 05:07 UTC: `account_wait_started` (`not_logged_in`, `background_tasks` 1),
 `account_retry` 1, `counter_check_failed` `request_without_login`, `run_finished` `failed`
-`billing_mode_mismatch`. The transcript of session `5f6e0695` shows why: a request record with
+`billing_mode_mismatch`. The transcript of its session shows why: a request record with
 the login beta at 05:06:36 was refused by the CLI itself (`Not logged in`, synthetic,
 `authentication_failed`); the runner waited and wrote its retry line at 05:07:37; the request
 record of that turn (05:07:38) lists no `oauth-2025-04-20` and the model answered it with a
@@ -47,6 +47,11 @@ Open minors (for the next run in this area of the runner):
   `billing_mode_mismatch` again (fails closed; see "Not covered").
 - During a withheld phase the runner keeps writing retry lines up to the bound; each costs a
   model request if the CLI answers it on an unproven credential.
+- SonarQube Cloud on pull request 1798 (quality gate passed): cognitive complexity
+  (python:S3776) of `runturn.py` `_read` (the counter-check and the withheld branch added to
+  the one loop over mapped messages) and `processstate.py` `ProcessState.apply` (the
+  `proven` flag), and of `runturn.py` `_computer_finish` (CU code already on main). A split
+  of `runturn.py` is a ticket of its own, as for FIX-RUNNER-CLI-PIN-326.
 
 Deploy note: the runner only (no server, app or schema change). A turn that runs at the
 restart is adopted and mapped again from its launch offset, so its open background commands

@@ -60,7 +60,7 @@ QUIET_RULES = (
     "again', 'I report when it is done') and a status mention nobody with @, also when they "
     "answer a request: the mention comes with what the member has to act on. Never mention a "
     "member to say that a message was not for it, that you stay out, that you agree or that you "
-    "are waiting, unless it asked you for something. When an input mentions you with @ and asks "
+    "are waiting. When an input mentions you with @ and asks "
     f"you for something, never answer {SILENT_REPLY}: do what it asks, or say briefly what you "
     "need for it or what blocks it (for example that you wait for the owner's go), and mention "
     "the member who asked as @handle when it has to act on your answer (it waits for the result "
