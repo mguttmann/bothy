@@ -194,7 +194,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "8a17610f27343e4c2e3cdfdcc47a5e1acfa07592164be1f4d07ae2d5052e4d2d",
+  "inputs_sha256": "92e9400f03f7b644076d8be3cf83ec40c3a69f2a455b64e7e31db41a69e5b955",
   "model_requests": [
     {
       "credential": "none",
@@ -206,7 +206,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:b81e377b22bc4a9377e183191537c4201f0c8ac86c07713da07771421cfddd70:5007",
+        "sha256:585761909bbe05d5424617c6ef70948449e145a9d44e8a2f90b04814e3caad52:5010",
         "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
       ],
       "roles": [
@@ -327,7 +327,7 @@
     }
   ],
   "pin": {
-    "commit": "0f602c5f6f18615632535251d62a2db74ce93b69",
+    "commit": "b39dd91f689a1857d48dd8fda778f2d623b16226",
     "tag": null
   },
   "scenario": "access_policy_upstream"

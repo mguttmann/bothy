@@ -10,4 +10,5 @@ def load_hermes_dotenv(
     hermes_home: str | os.PathLike[str] | None = ...,
     project_env: str | os.PathLike[str] | None = ...,
     load_external_secrets: bool = ...,
+    home_elsewhere: bool | None = ...,
 ) -> list[Path]: ...
