@@ -33,6 +33,7 @@ add_library(helper_core STATIC
   src/core/codec.cpp
   src/core/keys.cpp
   src/core/geometry.cpp
+  src/core/duplication.cpp
   src/core/escape.cpp
   src/core/settings.cpp
   src/core/trust.cpp

@@ -12,7 +12,7 @@ watch for the person's Esc. Rulings: [decisions.d/CU-02.md](../../../../docs/dec
 | Path | Content |
 |---|---|
 | `include/bothy/helper/` | public headers of the portable core |
-| `src/core/` | `helper_core`: JSON, channel codec, key names, geometry, settings files, server rule, Esc decision, `Controller` |
+| `src/core/` | `helper_core`: JSON, channel codec, key names, geometry, the Desktop Duplication frame choice, settings files, server rule, Esc decision, `Controller` |
 | `src/win32/` | the Win32 implementations of the interfaces, `main.cpp`, the manifest and resource templates |
 | `test/` | the test runner `check.hpp` (D-CU-02-2), fakes of every interface, the core tests |
 
@@ -26,7 +26,7 @@ Every platform call sits behind one interface of `platform.hpp` (brief CU-02 ite
 
 | Interface | Win32 implementation |
 |---|---|
-| `Capturer` | DXGI Desktop Duplication of the monitor with the foreground window, GDI `BitBlt` as fallback, WIC encoding in memory (JPEG or PNG) |
+| `Capturer` | DXGI Desktop Duplication of the monitor with the foreground window (a pointer-only frame without desktop image is skipped, `duplication.hpp`), GDI `BitBlt` as fallback, WIC encoding in memory (JPEG or PNG) |
 | `Injector` | `SendInput` with absolute coordinates over the virtual desktop, `KEYEVENTF_UNICODE` for text, a marker in `dwExtraInfo` |
 | `AppInspector` | foreground window, process, executable name, version resource, Authenticode signer (embedded or catalog) |
 | `LockMonitor` | `WTSRegisterSessionNotification`, `GUID_CONSOLE_DISPLAY_STATE`, the screen saver, `OpenInputDesktop` for the secure desktop |
