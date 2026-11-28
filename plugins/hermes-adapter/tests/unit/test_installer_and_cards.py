@@ -86,6 +86,36 @@ def test_plan_install_keeps_the_platform_key() -> None:
         plan_install(planned, _request(platform_key="other"))
 
 
+def test_plan_install_keeps_a_parked_platform_off() -> None:
+    # An operator parks a profile with `enabled: false`; a later install (adapter update) must
+    # not put it back on the platform (reported from operation, 2026-11-28).
+    parked = plan_install({}, _request())
+    parked["gateway"]["platforms"]["bothy"]["enabled"] = False
+    again = plan_install(parked, _request())
+    assert again["gateway"]["platforms"]["bothy"]["enabled"] is False
+    assert (
+        plan_install(parked, _request(enable=True))["gateway"]["platforms"]["bothy"]["enabled"]
+        is True
+    )
+
+
+def test_plan_install_enables_a_new_platform_section() -> None:
+    fresh = plan_install({"gateway": {"platforms": {"bothy": {"extra": {}}}}}, _request())
+    assert fresh["gateway"]["platforms"]["bothy"]["enabled"] is True
+
+
+def test_install_says_a_parked_profile_stays_off(tmp_path: Path) -> None:
+    bridge = MemoryBridge(tmp_path)
+    install(bridge, _request(), lambda path, text: None, [], _no_copy)
+    bridge.config["gateway"]["platforms"]["bothy"]["enabled"] = False
+    lines = install(bridge, _request(), lambda path, text: None, [], _no_copy)
+    assert bridge.config["gateway"]["platforms"]["bothy"]["enabled"] is False
+    assert "platform enabled: no (kept off; install --enable switches it on)" in lines
+    lines = install(bridge, _request(enable=True), lambda path, text: None, [], _no_copy)
+    assert bridge.config["gateway"]["platforms"]["bothy"]["enabled"] is True
+    assert "platform enabled: yes" in lines
+
+
 def test_install_switch_and_check_without_values(tmp_path: Path) -> None:
     bridge = MemoryBridge(tmp_path, env={"ANTHROPIC_API_KEY": CANARY})
     placed: dict[Path, str] = {}
@@ -265,6 +295,10 @@ def test_plugin_entry_and_parser() -> None:
         "personal",
         INSTANCE,
     )
+    base = ["install", "--profile-home", "/srv/h", "--server-url", "https://example.com/api/v1"]
+    base += ["--instance-id", str(INSTANCE), "--token-file", "/t", "--busy-input-mode", "steer"]
+    assert build_parser().parse_args(base).enable is False
+    assert build_parser().parse_args([*base, "--enable"]).enable is True
 
 
 # ---- cards -----------------------------------------------------------------------------------

@@ -71,6 +71,11 @@ def build_parser() -> argparse.ArgumentParser:
     inst.add_argument("--consumer", default="default")
     inst.add_argument("--report-channel", type=UUID)
     inst.add_argument("--report-thread", type=UUID)
+    inst.add_argument(
+        "--enable",
+        action="store_true",
+        help="switch the platform on also when the profile has it parked (enabled: false)",
+    )
     switch = sub.add_parser("switch-mode", help="switch the billing mode of the profile")
     switch.add_argument("mode", choices=("organization", "personal"))
     switch.add_argument("--profile-home", type=Path, required=True)
@@ -188,6 +193,7 @@ def _install(bridge: _Bridge, args: argparse.Namespace) -> list[str]:
         dpop_key_file=args.dpop_key_file,
         report_channel=args.report_channel,
         report_thread=args.report_thread,
+        enable=args.enable,
     )
     packages = locate_packages(locate, Path(sys.prefix))
     return install(bridge, request, place_file, packages, copy_package)
