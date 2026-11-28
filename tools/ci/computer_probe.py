@@ -14,7 +14,13 @@ host service on its own channel endpoint and a fixture window (`computer_fixture
 4. `show`, `capture` (PNG): the image shows the fixture's color at its center and no pixel of the
    indicator color (D-CU-02-9); `do left_click` on the entry, `do type`, `do key Return` and an
    injected `do key Escape`, each seen by the fixture, the Escape without a `stop` of the helper
-   (CU-T14); `position`; `hide`.
+   (CU-T14); `position`; `hide`. The click lands where the pointer ring of the indicator is
+   about to follow, so a ring that caught clicks near the pointer would fail it;
+5. the visible windows of the helper process (decisions.d/FIX-CU-HELPER-NO-ICON.md): none before
+   `show` and after `hide` (no menu bar item, no window), some while the session shows, and the
+   settings window once the helper is opened again (macOS `open` of the running app, Windows a
+   second start with `--settings`). Windows tray icons cannot be listed, so there the check covers
+   the windows only.
 
 The channel codec follows docs/spec/27-computer-use.md 9.4 and reads the vectors of
 `services/host/testdata/computer/channel-vectors.json` (tests). Images stay in memory.
@@ -31,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import ctypes
 import importlib
 import json
 import os
@@ -415,6 +422,12 @@ class Result:
 
 CAPTURE_CHECKS = ("connect", "show", "capture", "fixture_in_image", "indicator_not_in_image")
 INPUT_CHECKS = ("click", "type", "key", "injected_escape_passes")
+WINDOW_CHECKS = (
+    "idle_shows_nothing",
+    "session_shows_indicator",
+    "hide_shows_nothing",
+    "reopen_opens_settings",
+)
 
 
 def state_file() -> Path:
@@ -531,6 +544,102 @@ def helper_command(helper: Path, channel: str) -> list[str]:
     return [str(helper)]
 
 
+def reopen_command(helper: Path) -> list[str]:
+    """Return the command with which a person opens the running helper again.
+
+    macOS `open` without `-n` (LaunchServices sends the running app a reopen event), Windows a
+    second start with `--settings` (the Start menu entry).
+    """
+    if helper.suffix == ".app":
+        return ["open", str(helper)]
+    return [str(helper), "--settings"]
+
+
+def helper_pid(helper: Path, proc: subprocess.Popen[bytes]) -> int:
+    """Return the process ID of the running helper; on macOS `open` started it, so look it up."""
+    if helper.suffix != ".app":
+        return proc.pid
+    out = subprocess.run(
+        ["pgrep", "-f", str(helper / "Contents" / "MacOS")],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.split()
+    return int(out[0]) if out else -1
+
+
+def _cf_number(cf: Any, ref: int) -> int:
+    value = ctypes.c_int64()
+    cf.CFNumberGetValue(ctypes.c_void_p(ref), 4, ctypes.byref(value))  # kCFNumberSInt64Type
+    return value.value
+
+
+def visible_windows_macos(pid: int) -> int:
+    """Count the on-screen windows (menu bar items included) of `pid` with CoreGraphics."""
+    cg = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+    cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+    cg.CGWindowListCopyWindowInfo.restype = ctypes.c_void_p
+    cg.CGWindowListCopyWindowInfo.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    cf.CFArrayGetCount.restype = ctypes.c_long
+    cf.CFArrayGetCount.argtypes = [ctypes.c_void_p]
+    cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
+    cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
+    cf.CFDictionaryGetValue.restype = ctypes.c_void_p
+    cf.CFDictionaryGetValue.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    cf.CFStringCreateWithCString.restype = ctypes.c_void_p
+    cf.CFStringCreateWithCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_uint32]
+    cf.CFNumberGetValue.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+    cf.CFRelease.argtypes = [ctypes.c_void_p]
+    key = cf.CFStringCreateWithCString(None, b"kCGWindowOwnerPID", 0x08000100)  # UTF-8
+    windows = cg.CGWindowListCopyWindowInfo(1, 0)  # kCGWindowListOptionOnScreenOnly
+    count = 0
+    try:
+        for i in range(cf.CFArrayGetCount(windows) if windows else 0):
+            owner = cf.CFDictionaryGetValue(cf.CFArrayGetValueAtIndex(windows, i), key)
+            if owner and _cf_number(cf, owner) == pid:
+                count += 1
+    finally:
+        if windows:
+            cf.CFRelease(windows)
+        cf.CFRelease(key)
+    return count
+
+
+def visible_windows_windows(pid: int) -> int:
+    """Count the visible top-level windows of `pid`."""
+    # Windows only; typed as Any because the stubs gate these names by platform.
+    wintypes: Any = importlib.import_module("ctypes.wintypes")
+    windll: Any = ctypes
+    user32 = windll.WinDLL("user32")
+    proc_type = windll.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    found = [0]
+
+    def visit(hwnd: Any, _: Any) -> bool:
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd):
+            found[0] += 1
+        return True
+
+    user32.EnumWindows(proc_type(visit), 0)
+    return found[0]
+
+
+def visible_windows(pid: int) -> int:
+    """Count the visible windows of the helper process `pid` on this platform."""
+    if pid < 0:
+        raise ProbeError("the helper process was not found")
+    if sys.platform == "win32":
+        return visible_windows_windows(pid)
+    return visible_windows_macos(pid)
+
+
+def window_check(result: Result, name: str, count: Callable[[], int], *, want_any: bool) -> None:
+    """Record whether the helper shows any window (`want_any`) or none."""
+    n = count()
+    result.check(name, (n > 0) == want_any, f"{n} visible windows of the helper")
+
+
 def helper_env(channel: str) -> dict[str, str]:
     """Return the environment of the helper: this one plus the endpoint (D-CU-02-5)."""
     return {**os.environ, "BOTHY_COMPUTER_HELPER_CHANNEL": channel}
@@ -552,13 +661,27 @@ def run_checks(helper: Path, result: Result, work: Path) -> None:
         hello = decode_object(*endpoint.frame())
         result.hello = {k: v for k, v in hello.items() if k != "os_account"}
         result.check("hello", hello.get("op") == "hello", json.dumps(result.hello))
+        pid = helper_pid(helper, proc)
+        windows = lambda: visible_windows(pid)  # noqa: E731
+        time.sleep(SETTLE * 2)
+        window_check(result, "idle_shows_nothing", windows, want_any=False)
         session_id = str(uuid.uuid4())
         s.send({"op": "show", "session_id": session_id, "agent_name": "Alex"})
         result.check("show", True)
         time.sleep(SETTLE * 2)
+        window_check(result, "session_shows_indicator", windows, want_any=True)
         capture_checks(s, fixture, result)
         input_checks(s, fixture, result)
         s.send({"op": "hide", "session_id": session_id})
+        time.sleep(SETTLE * 2)
+        window_check(result, "hide_shows_nothing", windows, want_any=False)
+        try:
+            subprocess.run(reopen_command(helper), check=False, timeout=EVENT_WAIT)
+        except subprocess.TimeoutExpired:
+            result.check("reopen_opens_settings", False, "the second start did not return")
+        else:
+            time.sleep(SETTLE * 4)
+            window_check(result, "reopen_opens_settings", windows, want_any=True)
     except ProbeError as err:
         result.check("error", False, str(err))
     finally:

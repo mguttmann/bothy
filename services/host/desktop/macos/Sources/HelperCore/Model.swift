@@ -131,7 +131,7 @@ public enum ResultCode: String, Sendable {
 public enum StopDetail: String, Sendable {
     /// Esc at the real keyboard.
     case localEscape = "local_escape"
-    /// The stop button of the indicator or the stop item of the menu bar.
+    /// The stop button of the indicator or the stop item of the session's menu bar item.
     case indicatorStop = "indicator_stop"
 }
 
@@ -203,9 +203,13 @@ public struct EnablementState: Equatable, Sendable {
 
     /// The state after installation and for a missing or unreadable file.
     public static let off = EnablementState(enabled: false, generation: 0)
+
+    /// Whether the switch was never switched on (generation 0): the helper then opens its
+    /// settings window by itself at start, so the person finds the switch after installing.
+    public var needsSetup: Bool { !enabled && generation == 0 }
 }
 
-/// What the menu bar shows; handed to the `Indicator` on every change.
+/// What the settings window shows; handed to the `Indicator` on every change.
 public struct HelperStatus: Equatable, Sendable {
     /// The switch "Allow computer control".
     public var enabled: Bool

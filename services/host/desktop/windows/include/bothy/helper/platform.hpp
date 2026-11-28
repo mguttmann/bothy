@@ -198,22 +198,28 @@ class EscTap {
   virtual void stop() = 0;
 };
 
-/// The indicator: the border around the screen with its stop button (excluded from capture) and
-/// the tray icon with its text and the menu "Allow computer control" (27 9.2, brief item 16).
-/// A click on the stop button reaches Controller::on_stop_button(), a click on the menu switch
-/// Controller::on_switch_clicked().
+/// The indicator (27 9.2, brief item 16, decisions.d/FIX-CU-HELPER-NO-ICON.md): while a session is
+/// shown, the border around the screen with its stop button, the pointer mark (a ring that follows
+/// the pointer and a pulse at every click the helper sends), all excluded from capture, and a tray
+/// icon with the session text and a stop item. Nothing of it shows outside a session. The switch
+/// "Allow computer control" lives in the helper's settings window, which opens when the person
+/// starts the helper again. A click on the stop button reaches Controller::on_stop_button(), a click
+/// on the switch Controller::on_switch_clicked().
 class Indicator {
  public:
   virtual ~Indicator() = default;
-  /// Shows the border and the stop button and sets the tray text
+  /// Shows the border, the stop button, the pointer ring and the tray icon with the text
   /// "Agent <name> controls this computer, Esc to stop".
   /// @param agent_name the agent's display name from `show`.
   virtual void show(const std::string& agent_name) = 0;
-  /// Hides the border and the stop button and resets the tray text; repeated calls are harmless.
+  /// Hides all of it and removes the tray icon; repeated calls are harmless.
   virtual void hide() = 0;
-  /// Sets the check mark of the menu item "Allow computer control".
+  /// Sets the check mark of the switch "Allow computer control" in the settings window.
   /// @param enabled the enablement.
   virtual void set_enabled(bool enabled) = 0;
+  /// Pulses at the point of a click the helper just sent for the agent; returns at once.
+  /// @param at the click's point in screen space.
+  virtual void mark_click(const Point& at) = 0;
 };
 
 /// The persisted enablement (D-CU-02-4).
@@ -225,6 +231,10 @@ struct EnablementState {
     return enabled == o.enabled && generation == o.generation;
   }
 };
+
+/// @return true while the switch was never switched on (generation 0): the helper then opens its
+///         settings window by itself at start, so the person finds the switch after installing.
+inline bool needs_setup(const EnablementState& state) { return !state.enabled && state.generation == 0; }
 
 /// Persists the enablement in the helper's own state file (D-CU-02-4). The helper reads it at
 /// start only and never treats a change of the file as an order.

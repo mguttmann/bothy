@@ -723,3 +723,66 @@ CHECK_TEST(a_new_connection_drops_a_stale_broken_channel) {
   CHECK(rig.host(do_frame(1, "key", {{"keys", "Return"}})));
   CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
 }
+
+// The pointer mark (27 9.2, decisions.d/FIX-CU-HELPER-NO-ICON.md): every click the helper sends for
+// the agent pulses at its point, other actions pulse nothing, a stopped click pulses nothing.
+CHECK_TEST(every_click_pulses_at_its_point) {
+  Rig rig;
+  rig.show();
+  CHECK(rig.host(do_frame(1, "left_click", {{"x", 10}, {"y", 20}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
+  REQUIRE(rig.indicator.clicks.size() == 1);
+  CHECK_EQ(rig.indicator.clicks[0].x, 10.0);
+  CHECK_EQ(rig.indicator.clicks[0].y, 20.0);
+  CHECK(rig.host(do_frame(2, "double_click", {{"x", 30}, {"y", 40}})));
+  REQUIRE(rig.indicator.clicks.size() == 3);
+  CHECK_EQ(rig.indicator.clicks[2].x, 30.0);
+  CHECK_EQ(rig.indicator.clicks[2].y, 40.0);
+}
+
+CHECK_TEST(other_actions_pulse_nothing) {
+  Rig rig;
+  rig.show();
+  CHECK(rig.host(do_frame(1, "mouse_move", {{"x", 10}, {"y", 20}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
+  CHECK(rig.host(do_frame(2, "type", {{"text", "hi"}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
+  CHECK(rig.host(do_frame(3, "key", {{"keys", "Return"}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
+  CHECK(rig.host(do_frame(4, "scroll", {{"x", 10}, {"y", 20}, {"direction", "down"}, {"amount", 2}})));
+  CHECK_EQ(code_of(rig.channel.last()), std::string("ok"));
+  CHECK(rig.indicator.clicks.empty());
+}
+
+CHECK_TEST(a_stopped_click_pulses_nothing) {
+  Rig rig;
+  rig.show();
+  rig.interrupt.raise(Interrupt::Kind::StopButton);
+  CHECK(rig.host(do_frame(1, "left_click", {{"x", 10}, {"y", 20}})));
+  CHECK(rig.indicator.clicks.empty());
+}
+
+// The settings window opens by itself at start only while the switch was never switched on.
+CHECK_TEST(settings_show_at_start_only_before_the_first_switch_on) {
+  CHECK(needs_setup(EnablementState{}));
+  CHECK(!needs_setup(EnablementState{true, 1}));
+  CHECK(!needs_setup(EnablementState{false, 2}));
+}
+
+// R-CU-03 (decisions.d/FIX-CU-HELPER-NO-ICON.md): a click on the switch that the helper itself
+// injected for the agent (its marker in the input) may switch off, never on; a double click of the
+// agent on the switch therefore ends switched off.
+CHECK_TEST(an_injected_click_on_the_switch_never_switches_on) {
+  Rig rig;
+  rig.show();
+  std::int64_t gen = rig.store.stored.generation;
+  rig.controller.on_switch_clicked(true);  // off: ends the session
+  CHECK(!rig.store.stored.enabled);
+  CHECK(!rig.indicator.shown);
+  rig.controller.on_switch_clicked(true);  // the second click of the double click
+  CHECK(!rig.store.stored.enabled);
+  CHECK_EQ(rig.store.stored.generation, gen);
+  rig.controller.on_switch_clicked(false);  // the person
+  CHECK(rig.store.stored.enabled);
+  CHECK_EQ(rig.store.stored.generation, gen + 1);
+}

@@ -161,7 +161,9 @@ class Controller {
   /// The person clicked "Allow computer control" (brief item 15): switches on with the generation
   /// raised by one, or off (ending a shown session first), persists the state and reports `state`.
   /// This is the only way to switch on; nothing the host sends can do it.
-  void on_switch_clicked();
+  /// @param injected the click came from input the helper sent for the agent (its marker): it may
+  ///        switch off, never on (R-CU-03, decisions.d/FIX-CU-HELPER-NO-ICON.md).
+  void on_switch_clicked(bool injected = false);
 
   /// The lock monitor learned of a change: asks it again and reports what changed.
   void on_lock_changed();
@@ -188,7 +190,10 @@ class Controller {
   void end_session();
   void release_pressed();
   std::size_t send_input(const std::vector<InputEvent>& events);
-  const char* run_steps(const std::vector<std::vector<InputEvent>>& steps);
+  // `click_at` is the point of a click action: every step that presses a button there pulses the
+  // indicator's pointer mark once it was sent.
+  const char* run_steps(const std::vector<std::vector<InputEvent>>& steps,
+                        std::optional<Point> click_at = std::nullopt);
   LockState refresh_lock();
   json::Value screen_json(const std::optional<ScreenInfo>& screen) const;
   void answer(std::int64_t seq, const char* code, const AppIdentity& app,

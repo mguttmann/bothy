@@ -65,7 +65,7 @@ Not in this stage (PLAN section 23 "Later"): dragging, holding a key or a button
 | C1 | `bothy-computer-mcp` | `services/host/cmd/bothy-computer-mcp/` (Go, without cgo, sharing `internal/noise` and `internal/frame`) | tools of section 7; Noise initiator with key pinning; reassembles image chunks; writes nothing to disk; talks to the server through the runner (section 10) |
 | C2 | Computer sessions in the module `terminal` | `services/server/internal/terminal/` (D-CU-01-15) | open with SR13, enablement mirror, attach token, relay pairing, binding to the run, revocation, audit; reads no content |
 | C3 | Session kind `computer` of the host service | `services/host/internal/computer/` with the session manager of `internal/session` | token check, enablement, one controller per host, state with pause, coordinate mapping, frames to and from C4; holds the Noise keys (R-TM-12 unchanged) |
-| C4 | Computer helper | `services/host/desktop/macos/` (Swift), `services/host/desktop/windows/` (C++, Win32) | capture, input, app identity, lock state, Esc tap, indicator with a stop button, keeping the display awake, the enablement switch |
+| C4 | Computer helper | `services/host/desktop/macos/` (Swift), `services/host/desktop/windows/` (C++, Win32) | capture, input, app identity, lock state, Esc tap, indicator with a stop button and a pointer mark, keeping the display awake, the enablement switch in its settings window |
 | C5 | Enablement | C4 (switch), C3 (report), C2 (mirror and remote disable) | section 4 |
 | C6 | Client views | `apps/client/lib/computer/`, tray in `apps/client/lib/desktop/tray.dart` | status chip in the thread, stop on every device, list of desktops with "Switch enablement off" (section 11) |
 | C7 | Runner integration | `plugins/claude-code-runner/src/claude_code_runner/` | per-turn MCP file, request folder, system prompt block, end of the Claude Code session after a computer run (section 10) |
@@ -92,6 +92,14 @@ flowchart LR
       the same switch; Windows has no permission dialog of its own for capture and input.
    The switch is off after installation. Every switch-on increases the enablement generation by
    one; the helper keeps switch and generation in its own state file in the user's account.
+   The switch sits in the helper's settings window, the only place that switches on. Outside a
+   session the helper shows nothing, no menu bar item, tray icon or window (owner ruling of
+   2026-11-28, [decisions.d/FIX-CU-HELPER-NO-ICON.md](../decisions.d/FIX-CU-HELPER-NO-ICON.md)).
+   The settings window opens when the person opens the helper app at the machine (macOS: the app
+   from Finder or Spotlight, which hands the running helper a reopen event; Windows: the Start menu
+   entry "Computer Helper", which starts the helper with `--settings`), and by itself at the
+   helper's start while the switch was never switched on (generation 0), so the person finds it
+   after installing.
 2. **Report.** The host service learns state, generation, the operating system account of the
    helper, the state of the operating system permissions, the helper version and the signature
    state from the helper's `hello` and every change (section 9.4), and sends them in its `report`
@@ -416,8 +424,14 @@ session on the same host is no conflict.
   signing step compares the designated requirement of the signed helper with the one of the
   previous signed build and fails on a change, because a changed requirement silently voids the
   grants.
-- Indicator: a border window around the screen with a stop button, a menu bar item "Agent <name>
-  controls this computer, Esc to stop", and the system's own recording indicator.
+- Indicator, only while a session is shown: a border window around the screen with a stop button,
+  the pointer mark (a glowing ring in the indicator color that follows the pointer and a short pulse
+  at the point of every click the helper sends; the real pointer itself is not recolored), a menu
+  bar item "Agent <name> controls this computer, Esc to stop" with a stop item, and the system's
+  own recording indicator. Border, ring and pulse let every click through and, like every window
+  of the helper, are excluded from the capture. Outside a session the helper has no menu bar item
+  and no window; its settings window (switch, permission links, version) opens as section 4 item 1
+  says (FIX-CU-HELPER-NO-ICON).
 
 ### 9.2 Windows
 
@@ -433,8 +447,11 @@ session on the same host is no conflict.
 - Lock: `WTSRegisterSessionNotification` and a failing `OpenInputDesktop` (the secure desktop);
   keeping awake: `SetThreadExecutionState` with `ES_DISPLAY_REQUIRED`.
 - Esc tap: a low-level keyboard hook that swallows a real Esc (`LLKHF_INJECTED` not set).
-- Indicator: a topmost border window with a stop button and a tray icon with the same text as on
-  macOS.
+- Indicator, only while a session is shown: a topmost border window with a stop button, the same
+  pointer mark as on macOS, and a tray icon with the same text and a stop item. Border, ring and
+  pulse are click-through and excluded with `WDA_EXCLUDEFROMCAPTURE`. Outside a session the helper
+  has no tray icon and no window; the Start menu entry "Computer Helper" opens its settings window
+  (section 4 item 1, FIX-CU-HELPER-NO-ICON).
 
 ### 9.3 Install, update, doctor
 
@@ -450,7 +467,9 @@ server refuses another): helper installed and trusted (9.4), connected, enabled,
 `/Library/Application Support/bothy-host/bin/` next to `bothy-host` with the LaunchAgent
 `/Library/LaunchAgents/com.example.bothy-computer-helper.plist`; Windows
 `%ProgramFiles%\bothy-host\bothy-computer-helper.exe` with the value `bothy-computer-helper` of the
-machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule). The installer starts the
+machine's `Run` key (D-CU-03-7 fixes these paths for the peer rule) and the Start menu entry
+"Computer Helper" with `--settings` (FIX-CU-HELPER-NO-ICON). While the switch is off, the doctor's
+line names where it is. The installer starts the
 helper at once in the session of the person at the console (macOS `launchctl bootstrap gui/<uid>`,
 after the old helper is gone and every other helper process of that user has ended, so exactly one runs, in the postinstall, Windows `start-computer-helper.ps1` as a deferred action of the system account
 with a uiAccess token of that session), so no new login is needed; the enablement's state file
@@ -909,6 +928,7 @@ there.
 | R-CU-10 | The helper is the only process with capture and input rights, reachable only by the host service over a local channel with the peer rule of 9.4. | Keys stay with the service user (R-TM-12); no other local process drives the screen through Bothy. |
 | R-CU-11 | The runner talks to the server for the MCP server; only the attach token reaches it; the Claude Code session of a computer run ends with the run and its transcript is removed. | Credentials stay out of the turn; screenshots leave the runner host's disk. |
 | R-CU-12 | No image in the thread, the server, the audit, the log, telemetry, the event log, search or push. | F3 and B11. |
+| R-CU-13 | The helper shows nothing outside a session; its indicator (border, stop button, pointer mark, menu bar item or tray icon) shows only while a session is shown, and its switch lives in a settings window that the person opens at the machine. | Owner ruling of 2026-11-28 (FIX-CU-HELPER-NO-ICON): the owner does not want to see the helper; the indicator is the protection of item 3 of section 1 and stays, and switching on stays local (R-CU-03). |
 
 ## 18. Configuration values of this chapter
 

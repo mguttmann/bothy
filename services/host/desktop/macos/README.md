@@ -2,26 +2,32 @@
 
 The Bothy Computer Helper is the only process with screen capture and input rights on a Mac
 that a Bothy agent may control (docs/spec/27-computer-use.md section 9.1). It runs in the
-desktop session of the person who owns the account, as an accessory app with a menu bar item,
+desktop session of the person who owns the account, as an accessory app that shows nothing
+outside a session (no Dock icon, no menu bar item, no window; decisions.d/FIX-CU-HELPER-NO-ICON.md),
 and talks only to the local host service `bothy-host` over the channel of 27 section 9.4. It is
 built and signed on the owner's own Mac and never published (D-CU-01-29).
 
 Names: the app bundle is `bothy-computer-helper.app` (bundle ID `com.example.bothy-computer-helper`,
 executable `bothy-computer-helper`), installed to
 `/Library/Application Support/bothy-host/bin/bothy-computer-helper.app`; its display name and
-menu bar title are "Computer Helper", because code and configuration carry the working name only
+the title of its settings window are "Computer Helper", because code and configuration carry the working name only
 in its prefix forms (docs/spec/02-architecture.md "6. Code layout").
 
 What it does:
 
-- **Enablement.** Off after installation. Only a click on "Allow computer control" in the menu
-  bar switches it on; every switch-on raises the generation by one. Switch and generation live
+- **Enablement.** Off after installation. Only a click on "Allow computer control" in the
+  settings window switches it on; every switch-on raises the generation by one. The window opens
+  when the person opens the app again (Finder or Spotlight, "Computer Helper" or
+  "bothy-computer-helper"; the running helper gets a reopen event) and by itself at start while
+  the switch was never switched on (generation 0). Switch and generation live
   in `~/Library/Application Support/bothy-computer-helper/state.json` (mode `0600`, folder
   `0700`, D-CU-02-4). The file is read at start only; changing it is no order. The host service
   can switch off (`disable`), never on.
 - **Session.** `show` draws a border in `#FF6A00` around every screen (D-CU-02-9) with a stop
-  button, sets the menu text "Agent <name> controls this computer, Esc to stop", starts the Esc
-  tap and keeps the display awake. `hide`, a broken channel, the helper's start, a real Esc, the
+  button and the pointer mark (a glowing ring in the same color that follows the pointer, and a
+  pulse at every click the helper sends), adds the menu bar item "Agent active" with the text
+  "Agent <name> controls this computer, Esc to stop" and a stop item, starts the Esc tap and keeps
+  the display awake. Border, ring and pulse let clicks through. `hide`, a broken channel, the helper's start, a real Esc, the
   stop button and a local switch-off release every key and button and undo all three before
   anything is reported (D-CU-02-6).
 - **Esc.** A real Esc ends the session with `local_escape` and is swallowed; an Esc the helper
@@ -52,7 +58,7 @@ What it does:
   injects nothing.
 - **Permissions.** Screen Recording and Accessibility are only checked
   (`CGPreflightScreenCaptureAccess`, `AXIsProcessTrusted`) and reported in `hello` and `state`;
-  a click on a permission item in the menu registers a missing permission with the system
+  a click on a permission button of the settings window registers a missing permission with the system
   (`CGRequestScreenCaptureAccess`, `AXIsProcessTrustedWithOptions` with the prompt), so the helper
   is listed in the pane, and then opens the matching pane of the system settings. The helper never
   grants itself a permission and asks only after that click.
@@ -83,7 +89,7 @@ controller runs against fakes in the unit tests:
 | `LockMonitor` | `MacLockMonitor` | `CGSessionCopyCurrentDictionary`, screen lock and screen saver notifications, `NSWorkspace` session and display sleep notifications |
 | `Waker` | `MacWaker` | `IOPMAssertionCreateWithName` with `kIOPMAssertionTypePreventUserIdleDisplaySleep` |
 | `EscTap` | `MacEscTap` | an active `CGEventTap` on the session; an Esc with the helper's marker or source state passes |
-| `Indicator` | `MacIndicator` | borderless click-through border windows, a stop button panel and an `NSStatusItem` menu |
+| `Indicator` | `MacIndicator` | during a session: borderless click-through border windows, a stop button panel, the pointer ring and click pulse panels and an `NSStatusItem` menu; the settings window with the switch |
 | `EnablementStore` | `FileEnablementStore` (in `HelperCore`) | the state file of D-CU-02-4 |
 | `HostChannel` | `UnixSocketChannel` | Unix socket client to `/Library/Application Support/bothy-host/computer/computer.sock` |
 

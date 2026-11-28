@@ -219,3 +219,30 @@ def test_the_pipe_mode_needs_no_byte_names_of_winapi() -> None:
         cp.pipe_mode(types.SimpleNamespace(PIPE_TYPE_BYTE=0, PIPE_READMODE_BYTE=0, PIPE_WAIT=0))
         == 0
     )
+
+
+def test_the_window_checks_expect_nothing_outside_a_session() -> None:
+    """No menu bar item, tray icon or window outside a session; the indicator while one shows.
+
+    The settings window once the helper is opened again (decisions.d/FIX-CU-HELPER-NO-ICON.md).
+    """
+    counts = iter([0, 3, 0, 1])
+    result = cp.Result(platform="test")
+    cp.window_check(result, "idle_shows_nothing", lambda: next(counts), want_any=False)
+    cp.window_check(result, "session_shows_indicator", lambda: next(counts), want_any=True)
+    cp.window_check(result, "hide_shows_nothing", lambda: next(counts), want_any=False)
+    cp.window_check(result, "reopen_opens_settings", lambda: next(counts), want_any=True)
+    assert result.passed(*cp.WINDOW_CHECKS)
+    assert result.checks["session_shows_indicator"]["detail"] == "3 visible windows of the helper"
+    bad = cp.Result(platform="test")
+    cp.window_check(bad, "idle_shows_nothing", lambda: 1, want_any=False)
+    cp.window_check(bad, "reopen_opens_settings", lambda: 0, want_any=True)
+    assert not bad.checks["idle_shows_nothing"]["ok"]
+    assert not bad.checks["reopen_opens_settings"]["ok"]
+
+
+def test_the_helper_opens_again_with_its_settings() -> None:
+    app = Path("/x/bothy-computer-helper.app")
+    # Without -n LaunchServices hands the running helper a reopen event.
+    assert cp.reopen_command(app) == ["open", str(app)]
+    assert cp.reopen_command(Path("h.exe")) == ["h.exe", "--settings"]

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // bothy-computer-helper.exe: wires the Win32 implementations to the Controller and runs the UI
-// thread's message loop. `--version` prints HELPER_VERSION and exits.
+// thread's message loop. `--version` prints HELPER_VERSION and exits. `--settings` (the Start menu
+// shortcut "Computer Helper") opens the settings window: in the running helper of this session when
+// there is one, else in this one once it runs. A start without it never shows a window, so the
+// login and the installer start the helper silently (decisions.d/FIX-CU-HELPER-NO-ICON.md).
 
 #include "win32.hpp"  // first: windows.h must precede the other Windows headers
 
@@ -28,7 +31,7 @@ struct App {
       : lock(window, [this] { controller.on_lock_changed(); }),
         esc_tap(window, &interrupt),
         indicator(instance, window, &interrupt, [this] { controller.on_stop_button(); },
-                  [this] { controller.on_switch_clicked(); }),
+                  [this](bool injected) { controller.on_switch_clicked(injected); }, about(info)),
         channel(window, pipe, check_server, info.frame_max_bytes, &interrupt),
         controller(Platform{capturer, injector, apps, lock, waker, esc_tap, indicator, store, channel},
                    info, &interrupt) {}
@@ -45,6 +48,12 @@ struct App {
   PipeChannel channel;
   Controller controller;
   std::uint64_t connection = 0;  // the connection whose frames the Controller takes
+
+  /// @return the version line of the settings window.
+  static std::wstring about(const HelperInfo& info) {
+    return L"Version " + to_wide(info.helper_version) +
+           (info.signature == "verified" ? L", signed" : L", development build");
+  }
 
   void drain_channel() {
     for (PipeChannel::Event& e : channel.drain()) {
@@ -142,15 +151,33 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     print_line(HELPER_VERSION);
     return 0;
   }
-  if (argc > 1) {
-    print_line("usage: bothy-computer-helper [--version]");
+  bool settings = argc == 2 && arg == L"--settings";
+  if (argc > 1 && !settings) {
+    print_line("usage: bothy-computer-helper [--version | --settings]");
     return 2;
   }
 
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);  // the manifest also says so
   // One helper per desktop session: a second one would fight over the tray and the channel.
   HANDLE single = CreateMutexW(nullptr, TRUE, L"Local\\bothy-computer-helper");
-  if (single == nullptr || GetLastError() == ERROR_ALREADY_EXISTS) return 0;
+  if (single == nullptr || GetLastError() == ERROR_ALREADY_EXISTS) {
+    // The person started the helper again from the Start menu: the running one opens its settings
+    // window. A second start without --settings (installer, login) stays silent.
+    // The running helper may still be starting (mutex taken, window not yet made): wait a little.
+    HWND running = nullptr;
+    for (int i = 0; settings && running == nullptr && i < 50; ++i) {
+      running = FindWindowW(kWindowClass, nullptr);
+      if (running == nullptr) Sleep(100);
+    }
+    if (running != nullptr) {
+      DWORD pid = 0;
+      GetWindowThreadProcessId(running, &pid);
+      if (pid != 0) AllowSetForegroundWindow(pid);
+      PostMessageW(running, kMsgOpenSettings, 0, 0);
+    }
+    if (single != nullptr) CloseHandle(single);
+    return 0;
+  }
   if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) return 1;
 
   WNDCLASSEXW wc{};
@@ -187,9 +214,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
   SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app.get()));
   app->controller.start();
   app->channel.start();
+  // The settings window opens by itself only while the switch was never switched on, so the person
+  // finds it after installing; otherwise the helper shows nothing until a session.
+  if (settings || needs_setup(app->store.load())) app->indicator.open_settings();
 
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (app->indicator.dialog_message(&msg)) continue;
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
   }
