@@ -397,8 +397,8 @@ func (m *Mirror) wait(ctx context.Context, d time.Duration) bool {
 // 429 or a 5xx. Any other status (404, 403, 412, a 400 for an object too large) answers the same
 // again.
 func transient(err error) bool {
-	switch code := status(err); {
-	case code == 0, code == http.StatusRequestTimeout, code == http.StatusTooManyRequests:
+	switch code := status(err); code {
+	case 0, http.StatusRequestTimeout, http.StatusTooManyRequests:
 		return true
 	default:
 		return code >= http.StatusInternalServerError
