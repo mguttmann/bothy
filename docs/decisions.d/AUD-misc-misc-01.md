@@ -39,9 +39,9 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   V1-13/6 a failed test prints its last lines, since V1-13/8 also the helper services and their
   event log lines. In run 46116195975 every test that pairs ends with `pair: the running service
   did not answer: EOF` because the host service refuses its start with `HD10 helper_unreachable`
-  for every session user (cause on the helper side not known yet), and the suite ends at its
-  bound of one hour after seven tests, each of whose cleanups waits for helper services that do
-  not stop.
+  for every session user, and the suite ends at its bound of one hour after seven tests, each of
+  whose cleanups waits for helper services that do not stop. Run 46122005337 showed the helpers
+  running; the cause, the synchronous pipe handles of the local channel, is V1-13/9.
 - Windows, cause not known: from `TestPlatform_TMT29_Parts` on every `install` fails with
   `win.profile <session user>: profile 80070070` (the disk is full). Either the profiles of
   earlier tests stay behind or the system drive of the runner is too small for the suite.
@@ -52,9 +52,10 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   helper?
 - Linux: the folder a session user could write was `/opt` with its default ACL (V1-13/1).
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
-- Windows: the three findings of D-M2-42-29 (no deadline and no cancel of `Accept` and `Read` on
-  the synchronous pipe handles of the local channel) stay open with this row, not with M2-48;
-  they need overlapped handles and a Windows run to prove them.
+- Windows: of the three findings of D-M2-42-29, the overlapped handles of V1-13/9 settle the
+  first two (`Accept` and `Read` on synchronous pipe handles); the third, the impostor of
+  `TestPlatform_TMT26` on Windows created by the administrator of the suite, stays open with
+  this row.
 - A failed scheduled run of `host-platform.yml` reports to nobody. AUD-misc-testing-01 built the
   report (`red-runs.yml`); it writes the issue "Red runs of host-platform.yml" only once the
   owner switched it on (AUD-MISC-TESTING-01/11, AUD-CG1/7).
