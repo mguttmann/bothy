@@ -332,7 +332,7 @@ func withState(sess *session, r callResult) callResult {
 // run sends one step: a type text as its parts in order, stopping at the first part that fails.
 // The result is that of the last part sent. quick marks the step as a batch item before the last
 // one; every part of a type text but the last is quick as well, so only the end of the text
-// waits computer.settle and returns an image (27 6.4, 7).
+// waits for the screen to settle and returns an image (27 6.4, 7).
 func (s *Server) run(ctx context.Context, sess *session, st step, quick bool) (result, error) {
 	if st.action != actType {
 		b, _ := json.Marshal(st.args)
@@ -365,7 +365,7 @@ func (s *Server) sessionFailure(err error) callResult {
 // batch runs the actions in order; the first failure stops it, every later item answers
 // notExecuted, and the last image comes once at the end (27 7). Every item before the last is
 // sent with quick, so the host skips its settle wait and its image; only the last item waits
-// computer.settle and returns the image. Every item is checked before the first runs, so a
+// for the screen to settle and returns the image. Every item is checked before the first runs, so a
 // malformed batch runs nothing.
 func (s *Server) batch(ctx context.Context, raw json.RawMessage) callResult {
 	sess, res, ok := s.live()

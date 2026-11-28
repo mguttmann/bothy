@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/clock"
@@ -73,6 +74,9 @@ type csession struct {
 	stateSent   time.Time
 	stateDirty  bool
 	stateTimer  clock.Timer
+	// captureCost is the duration of the last screenshot in nanoseconds, the expected cost of a
+	// look of the adaptive wait (quiet.go).
+	captureCost atomic.Int64
 }
 
 func newSession(m *Manager, o control.ComputerOpen, n control.ComputerNotifier, expires time.Time, sidb, hostb [noise.IDLen]byte) *csession {
