@@ -23,7 +23,8 @@ Work package of the audit of 2026-11-11 for the workflows and rules outside one 
 
 ## Open
 
-For the next run in each area. None of these is a known wrong result of the product.
+For the next run in each area. None of these is a known wrong result of the product (the one
+found on macOS, HD3, is fixed by V1-13/3).
 
 Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cbd84`:
 
@@ -34,19 +35,18 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   program_location_untrusted`, which would also explain the refused starts. First step: on the
   runner, print the owner and the ACL of the program folder, the state directory and the folders
   above them after `install`, and the groups of the service account and of a session user.
-  Since AUD-host-01 the service keeps `bothy-host.log` in the state directory on Windows; the
-  suite does not print it for a failed test yet (it prints the journal on Linux only).
+  Since AUD-host-01 the service keeps `bothy-host.log` in the state directory on Windows; since
+  V1-13/6 a failed test prints its last lines. In run 46103059338 the first test ended with
+  `pair: the running service did not answer: EOF` and every later `install` with a helper service
+  marked for deletion (cleanup fixed in V1-13/6); `TestPlatform_TMT29k` and `TestPlatform_TMT29l`
+  could not give a folder to `bothy-s-robin` after a successful `install` (`icacls /setowner`:
+  `No mapping between account names and security IDs`).
 - Windows, cause not known: from `TestPlatform_TMT29_Parts` on every `install` fails with
   `win.profile <session user>: profile 80070070` (the disk is full). Either the profiles of
   earlier tests stay behind or the system drive of the runner is too small for the suite.
-- macOS: the tests after `TestPlatform_EntryScanMeasurement` have never run on a hosted runner.
-- Linux, cause not known, read from run 45105747612 of 2026-11-23 (after the reset of `/opt` of
-  ruling 1): `helper_untrusted` is gone, but the eight tests that set `claude_bin` or working
-  directories below the folder of the suite fail with `claude_bin_untrusted`,
-  `program_location_untrusted` and `shared_location` for both session users, which points to a
-  folder on the way to `/opt/bothy-platform` that a session user can write. Since
-  AUD-PKG-P10-repo-ops-host a failed job prints the owner, mode and ACL of every folder on the way
-  to the program folders (and the free disk space on Windows), so the next red run names the place.
+- macOS: run 46103059338 ran the whole suite; its causes are V1-13/2 to V1-13/5. Open: whether a
+  process of a session user can attach to its helper on the hosted runner (V1-13/5).
+- Linux: the folder a session user could write was `/opt` with its default ACL (V1-13/1).
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
 - Windows: the three findings of D-M2-42-29 (no deadline and no cancel of `Accept` and `Read` on
   the synchronous pipe handles of the local channel) stay open with this row, not with M2-48;

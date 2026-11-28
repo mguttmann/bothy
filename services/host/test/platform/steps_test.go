@@ -298,14 +298,7 @@ func mainPID(t *testing.T) int {
 			}
 		}
 	case "windows":
-		out, _ := try("sc.exe", "queryex", "bothy-host")
-		if i := strings.Index(out, "PID"); i >= 0 {
-			f := strings.Fields(out[i:])
-			if len(f) >= 3 {
-				n, _ := strconv.Atoi(f[2])
-				return n
-			}
-		}
+		return windowsServicePID("bothy-host")
 	}
 	return 0
 }
@@ -317,9 +310,10 @@ func startImpostor(t *testing.T, user string) func() {
 	case "linux":
 		pid := strings.TrimSpace(sh(t, "/usr/bin/systemctl", "show", "--property=MainPID", "--value", "bothy-host-helper-"+user+".service"))
 		_, _ = asUser(user, "/bin/kill", pid)
-		return stageLinuxImpostor(t, user)
+		return stageImpostor(t, user)
 	case "darwin":
 		_, _ = try("/bin/launchctl", "kill", "SIGKILL", "system/bothy-host.helper."+user)
+		return stageImpostor(t, user)
 	case "windows":
 		_, _ = try("sc.exe", "stop", "bothy-host-helper-"+user)
 	}
@@ -341,9 +335,24 @@ func attachSucceeds(t *testing.T, user string) bool {
 		out, _ := asUser(user, "/bin/cat", "/proc/"+pid+"/mem")
 		return c == 0 && !strings.Contains(out, "Permission denied")
 	case "darwin":
-		out, _ := try("/bin/launchctl", "print", "system/bothy-host.helper."+user)
-		_, c := asUser(user, "/usr/bin/lldb", "--batch", "-o", "process attach --pid "+pidFrom(out))
-		return c == 0
+		// lldb ends with 0 after an attach and with 1 when the attach failed; anything else (no
+		// helper running, lldb that did not run) is no answer and fails the test, never a pass.
+		pid := pidFrom(sh(t, "/bin/launchctl", "print", "system/bothy-host.helper."+user))
+		if pid == "0" {
+			doctor(t) // starts the helper through its socket
+			pid = pidFrom(sh(t, "/bin/launchctl", "print", "system/bothy-host.helper."+user))
+		}
+		if pid == "0" {
+			t.Fatalf("the helper of %s does not run", user)
+		}
+		out, c := asUser(user, "/usr/bin/lldb", "--batch", "-o", "process attach --pid "+pid)
+		switch {
+		case c != 0 && strings.Contains(out, "attach failed"):
+			return false
+		case c == 0 && strings.Contains(out, "Process "+pid+" stopped"):
+			return true
+		}
+		t.Fatalf("lldb gave no answer on attaching to the helper of %s (exit %d):\n%s", user, c, out)
 	}
 	return false
 }

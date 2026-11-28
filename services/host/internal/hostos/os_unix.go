@@ -54,12 +54,24 @@ type UnixProbe struct {
 	Runner Runner
 }
 
-// SudoWithoutPassword implements Probe: "sudo -n true" by absolute path with an empty environment.
+// trueBins are the places of the program true, the first that exists is used.
+var trueBins = []string{"/usr/bin/true", "/bin/true"}
+
+// SudoWithoutPassword implements Probe: "sudo -n true" with sudo and true by absolute path and an
+// empty environment. Without PATH sudo finds a bare "true" only through secure_path, which macOS
+// does not set, so the bare name made every answer "no" there (docs/decisions.d/V1-13.md).
 func (p UnixProbe) SudoWithoutPassword(ctx context.Context) (bool, error) {
 	if _, err := os.Stat("/usr/bin/sudo"); err != nil {
 		return false, nil
 	}
-	out, err := p.Runner.Run(ctx, Cmd{Path: "/usr/bin/sudo", Args: []string{"-n", "true"}, Timeout: probeTimeout})
+	trueBin := trueBins[0]
+	for _, b := range trueBins {
+		if _, err := os.Stat(b); err == nil {
+			trueBin = b
+			break
+		}
+	}
+	out, err := p.Runner.Run(ctx, Cmd{Path: "/usr/bin/sudo", Args: []string{"-n", "--", trueBin}, Timeout: probeTimeout})
 	if err != nil {
 		return false, err
 	}

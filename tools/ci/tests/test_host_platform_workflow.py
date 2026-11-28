@@ -7,7 +7,10 @@ session user can write a folder on the way to its program folder (HD10 `helper_u
 `program_location_untrusted`, docs/spec/24-terminal.md 2.2). The hosted Ubuntu image opens `/opt`
 to every user while it is built, and both the program folder of the product on Linux and the
 folder of the suite lie below it, so every test that started the service failed there. The
-workflow therefore gives such a folder the owner and mode of a stock system before the suite.
+image also gives `/opt` a default ACL that a new folder inherits in place of the umask, so the
+folders the suite creates below it came out writable by every user (docs/decisions.d/V1-13.md).
+The workflow therefore gives such a folder the owner, mode and ACL of a stock system before the
+suite.
 
 The tests read the places from their sources (the install plan of the product, the suite and the
 workflow), so a place that moves takes the step with it.
@@ -74,10 +77,11 @@ def linux_places() -> dict[str, str]:
 
 
 def resets(run: str, folder: str) -> bool:
-    """Whether the shell text gives `folder` itself to root with mode 0755, as root."""
+    """Whether the shell text gives `folder` itself to root with mode 0755 and no ACL, as root."""
     owner = re.search(rf"\bsudo chown root:root {re.escape(folder)}(?=\s|$)", run)
     mode = re.search(rf"\bsudo chmod 0?755 {re.escape(folder)}(?=\s|$)", run)
-    return bool(owner and mode)
+    acl = re.search(rf"\bsudo setfacl -b {re.escape(folder)}(?=\s|$)", run)
+    return bool(owner and mode and acl)
 
 
 def test_the_places_are_read_from_their_sources() -> None:
@@ -94,25 +98,28 @@ def test_linux_gives_the_folders_above_the_programs_back_to_root_before_the_suit
         folder = top_folder(place)
         assert any(resets(run, folder) for run in linux), (
             f"{source} uses {place}: no Linux step before the platform suite gives {folder} "
-            "to root with mode 0755; the hosted Ubuntu image opens it to every user and "
-            "bothy-host then refuses to start (helper_untrusted, program_location_untrusted)"
+            "to root with mode 0755 and no ACL; the hosted Ubuntu image opens it to every user "
+            "and bothy-host then refuses to start (helper_untrusted, program_location_untrusted)"
         )
 
 
 def test_the_reset_runs_only_on_linux_and_touches_the_folder_alone() -> None:
     for step in steps():
         run = str(step.get("run", ""))
-        if "chown root:root" not in run and "chmod 0755" not in run and "chmod 755" not in run:
+        if not any(s in run for s in ("chown root:root", "chmod 0755", "chmod 755", "setfacl")):
             continue
         assert LINUX_ONLY in str(step.get("if", "")), step.get("name")
-        # Not recursive: the tool cache of the runner below /opt keeps its owner.
-        assert not re.search(r"\bch(?:own|mod)\s+-\S*R", run), step.get("name")
+        # Not recursive: the tool cache of the runner below /opt keeps its owner and ACL.
+        assert not re.search(r"\b(?:ch(?:own|mod)|setfacl)\s+-\S*R", run), step.get("name")
 
 
 def test_resets_matches_only_the_folder_itself() -> None:
-    assert resets("sudo chown root:root /opt && sudo chmod 0755 /opt", "/opt")
-    assert resets("sudo chown root:root /opt\nsudo chmod 755 /opt\n", "/opt")
-    assert not resets("sudo chown root:root /opt/x && sudo chmod 0755 /opt/x", "/opt")
-    assert not resets("sudo chmod 0755 /opt", "/opt")
-    assert not resets("chown root:root /opt && chmod 0755 /opt", "/opt")
-    assert not resets("sudo chown root:root /opt && sudo chmod 0777 /opt", "/opt")
+    full = "sudo chown root:root /opt && sudo chmod 0755 /opt && sudo setfacl -b /opt"
+    assert resets(full, "/opt")
+    assert resets("sudo chown root:root /opt\nsudo chmod 755 /opt\nsudo setfacl -b /opt\n", "/opt")
+    assert not resets(full.replace("/opt", "/opt/x"), "/opt")
+    assert not resets("sudo chmod 0755 /opt && sudo setfacl -b /opt", "/opt")
+    assert not resets("chown root:root /opt && chmod 0755 /opt && setfacl -b /opt", "/opt")
+    assert not resets(full.replace("0755", "0777"), "/opt")
+    # The owner and the mode alone left the default ACL of the image (run 46103059338).
+    assert not resets("sudo chown root:root /opt && sudo chmod 0755 /opt", "/opt")

@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // serviceExit returns the exit code of the stopped host service.
@@ -32,14 +34,7 @@ func serviceExit() (int, bool) {
 		}
 	case "darwin":
 		out, _ := try("/bin/launchctl", "print", "system/bothy-host")
-		if strings.Contains(out, "state = not running") {
-			for _, l := range strings.Split(out, "\n") {
-				if v, ok := strings.CutPrefix(strings.TrimSpace(l), "last exit code = "); ok {
-					n, _ := strconv.Atoi(strings.Fields(v)[0])
-					return n, true
-				}
-			}
-		}
+		return launchdExitCode(out)
 	case "windows":
 		out, _ := try("sc.exe", "query", "bothy-host")
 		if strings.Contains(out, "STOPPED") {
@@ -179,16 +174,86 @@ func uninstall(t *testing.T, users []string) {
 		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Users/"+"bothy-host")
 		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Groups/bothy-host")
 	case "windows":
-		_, _ = try("sc.exe", "stop", "bothy-host")
-		_, _ = try("sc.exe", "delete", "bothy-host")
+		removeWindowsService(t, "bothy-host")
 		for _, u := range users {
-			_, _ = try("sc.exe", "stop", "bothy-host-helper-"+u)
-			_, _ = try("sc.exe", "delete", "bothy-host-helper-"+u)
+			removeWindowsService(t, "bothy-host-helper-"+u)
 			deleteWindowsProfile(u)
 			_, _ = try("net", "user", u, "/delete")
 		}
 	}
+	if t.Failed() && runtime.GOOS != "linux" {
+		// macOS and Windows keep the log of the host service in the state directory, which goes
+		// next; the journal of Linux stays and track prints it.
+		for _, l := range lastLines(filepath.Join(stateDir(), "bothy-host.log"), maxServiceLog) {
+			t.Log(l)
+		}
+	}
 	_ = os.RemoveAll(stateDir())
 	_ = os.Remove(configPath())
-	_ = t
+}
+
+// lastLines returns the last n lines of the file p that are not empty (none when it is missing).
+func lastLines(p string, n int) []string {
+	b, err := os.ReadFile(p) //nolint:gosec // the log of the host service under test
+	if err != nil {
+		return nil
+	}
+	lines := slices.DeleteFunc(strings.Split(string(b), "\n"), func(l string) bool { return strings.TrimSpace(l) == "" })
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return lines
+}
+
+// scMissing is the exit code of sc.exe for a service the service control manager does not know
+// (ERROR_SERVICE_DOES_NOT_EXIST).
+const scMissing = 1060
+
+// removeWindowsService stops the service name, ends its process when it does not stop, deletes it
+// and waits until the service control manager forgot it. "sc.exe delete" of a service whose
+// process still runs only marks it for deletion, and the next install then failed with "The
+// specified service has been marked for deletion" in every later test (run 46103059338,
+// docs/decisions.d/V1-13.md).
+func removeWindowsService(t *testing.T, name string) {
+	t.Helper()
+	if _, c := try("sc.exe", "query", name); c == scMissing {
+		return
+	}
+	_, _ = try("sc.exe", "stop", name)
+	if !waitSC(name, func(out string, c int) bool { return c == scMissing || strings.Contains(out, "STOPPED") }) {
+		if pid := windowsServicePID(name); pid > 0 {
+			_, _ = try("taskkill", "/F", "/PID", strconv.Itoa(pid))
+		}
+	}
+	_, _ = try("sc.exe", "delete", name)
+	if !waitSC(name, func(_ string, c int) bool { return c == scMissing }) {
+		t.Logf("the service %s is still installed after its delete", name)
+	}
+}
+
+// waitSC polls "sc.exe query name" until done holds for its output and exit code or the bound
+// of the suite passes.
+func waitSC(name string, done func(out string, code int) bool) bool {
+	deadline := time.Now().Add(waitShort)
+	for {
+		if out, c := try("sc.exe", "query", name); done(out, c) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(pollEvery)
+	}
+}
+
+// windowsServicePID returns the process ID of the service name (0 when none runs).
+func windowsServicePID(name string) int {
+	out, _ := try("sc.exe", "queryex", name)
+	if i := strings.Index(out, "PID"); i >= 0 {
+		if f := strings.Fields(out[i:]); len(f) >= 3 {
+			n, _ := strconv.Atoi(f[2])
+			return n
+		}
+	}
+	return 0
 }

@@ -24,3 +24,11 @@ func crash(t *testing.T, pid int) {
 	}
 	sh(t, "taskkill", "/F", "/PID", strconv.Itoa(pid))
 }
+
+// stageImpostor exists only on Linux and macOS, where the service manager owns the endpoint of the
+// helper (impostor_unix_test.go); startImpostor calls it only there.
+func stageImpostor(t *testing.T, _ string) func() {
+	t.Helper()
+	t.Fatal("stageImpostor runs only on Linux and macOS")
+	return func() {}
+}
