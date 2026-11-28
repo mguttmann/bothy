@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -71,7 +72,8 @@ func crash(t *testing.T, pid int) {
 // endpoint, so the next connection of the host service reaches a peer with the right user ID and
 // the wrong process ID, which is what the peer check must refuse. dir lies on the file system of
 // the endpoint (a rename keeps the bound socket, a copy would not). The returned cleanup ends the
-// impostor, fails the test when a frame reached it, and gives the endpoint back (startHelper).
+// impostor, fails the test when a frame reached it, and gives the endpoint back (startHelper); it
+// is also registered with t.Cleanup, so a failed step leaves nothing behind.
 func stageUnixImpostor(t *testing.T, user, dir string, stopHelper, startHelper func()) func() {
 	t.Helper()
 	endpoint := localchan.HelperEndpoint(runtime.GOOS, user)
@@ -92,6 +94,27 @@ func stageUnixImpostor(t *testing.T, user, dir string, stopHelper, startHelper f
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
+	// The cleanup exists before any step that can fail: it ends the impostor first, and gives back
+	// only what was taken (the helper job, the endpoint).
+	var stopped, moved bool
+	var once sync.Once
+	cleanup := func() {
+		once.Do(func() {
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			_ = cmd.Wait()
+			if _, err := os.Stat(flag); err == nil {
+				t.Errorf("the fake helper of %s got a frame", user)
+			}
+			if moved {
+				_ = os.Remove(endpoint)
+			}
+			_ = os.RemoveAll(dir)
+			if stopped {
+				startHelper()
+			}
+		})
+	}
+	t.Cleanup(cleanup)
 	for i := 0; i < 100; i++ {
 		if _, err := os.Stat(own); err == nil {
 			break
@@ -99,17 +122,10 @@ func stageUnixImpostor(t *testing.T, user, dir string, stopHelper, startHelper f
 		time.Sleep(pollEvery)
 	}
 	stopHelper()
+	stopped = true
 	if err := os.Rename(own, endpoint); err != nil {
 		t.Fatal(err)
 	}
-	return func() {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		_ = cmd.Wait()
-		if _, err := os.Stat(flag); err == nil {
-			t.Errorf("the fake helper of %s got a frame", user)
-		}
-		_ = os.Remove(endpoint)
-		_ = os.RemoveAll(dir)
-		startHelper()
-	}
+	moved = true
+	return cleanup
 }

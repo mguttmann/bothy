@@ -11,7 +11,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"testing"
-	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 func TestUnixAdapters(t *testing.T) {
@@ -71,7 +72,7 @@ func TestSudoProbeMatchesSudo(t *testing.T) {
 	if _, err := os.Stat("/usr/bin/sudo"); err != nil {
 		t.Skip("no sudo on this host")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
 	defer cancel()
 	want := exec.CommandContext(ctx, "/usr/bin/sudo", "-n", "--", "true").Run() == nil
 	got, err := UnixProbe{Runner: ExecRunner{}}.SudoWithoutPassword(ctx)

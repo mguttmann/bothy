@@ -36,16 +36,20 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   runner, print the owner and the ACL of the program folder, the state directory and the folders
   above them after `install`, and the groups of the service account and of a session user.
   Since AUD-host-01 the service keeps `bothy-host.log` in the state directory on Windows; since
-  V1-13/6 a failed test prints its last lines. In run 46103059338 the first test ended with
-  `pair: the running service did not answer: EOF` and every later `install` with a helper service
-  marked for deletion (cleanup fixed in V1-13/6); `TestPlatform_TMT29k` and `TestPlatform_TMT29l`
-  could not give a folder to `bothy-s-robin` after a successful `install` (`icacls /setowner`:
-  `No mapping between account names and security IDs`).
+  V1-13/6 a failed test prints its last lines, since V1-13/8 also the helper services and their
+  event log lines. In run 46116195975 every test that pairs ends with `pair: the running service
+  did not answer: EOF` because the host service refuses its start with `HD10 helper_unreachable`
+  for every session user (cause on the helper side not known yet), and the suite ends at its
+  bound of one hour after seven tests, each of whose cleanups waits for helper services that do
+  not stop.
 - Windows, cause not known: from `TestPlatform_TMT29_Parts` on every `install` fails with
   `win.profile <session user>: profile 80070070` (the disk is full). Either the profiles of
   earlier tests stay behind or the system drive of the runner is too small for the suite.
-- macOS: run 46103059338 ran the whole suite; its causes are V1-13/2 to V1-13/5. Open: whether a
-  process of a session user can attach to its helper on the hosted runner (V1-13/5).
+- macOS: run 46103059338 ran the whole suite; its causes are V1-13/2 to V1-13/5. The attach part
+  of TM-T26 is not provable on the hosted runner, which runs without System Integrity Protection
+  (V1-13/7). Question for the owner: should `doctor` report a macOS host without System Integrity
+  Protection, on which the hardened runtime no longer holds a debugger of the session user off its
+  helper?
 - Linux: the folder a session user could write was `/opt` with its default ACL (V1-13/1).
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
 - Windows: the three findings of D-M2-42-29 (no deadline and no cancel of `Accept` and `Read` on

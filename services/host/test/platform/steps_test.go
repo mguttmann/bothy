@@ -335,8 +335,9 @@ func attachSucceeds(t *testing.T, user string) bool {
 		out, _ := asUser(user, "/bin/cat", "/proc/"+pid+"/mem")
 		return c == 0 && !strings.Contains(out, "Permission denied")
 	case "darwin":
-		// lldb ends with 0 after an attach and with 1 when the attach failed; anything else (no
-		// helper running, lldb that did not run) is no answer and fails the test, never a pass.
+		// lldb ends with 0 after an attach and with an error "attach failed" when it was refused;
+		// anything else (no helper running, a helper that ended meanwhile, lldb that did not run)
+		// is no answer and fails the test, never a pass.
 		pid := pidFrom(sh(t, "/bin/launchctl", "print", "system/bothy-host.helper."+user))
 		if pid == "0" {
 			doctor(t) // starts the helper through its socket
@@ -347,7 +348,7 @@ func attachSucceeds(t *testing.T, user string) bool {
 		}
 		out, c := asUser(user, "/usr/bin/lldb", "--batch", "-o", "process attach --pid "+pid)
 		switch {
-		case c != 0 && strings.Contains(out, "attach failed"):
+		case c != 0 && strings.Contains(out, "attach failed") && !strings.Contains(out, "no such process"):
 			return false
 		case c == 0 && strings.Contains(out, "Process "+pid+" stopped"):
 			return true

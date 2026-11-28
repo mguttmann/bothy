@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // serviceExit returns the exit code of the stopped host service.
@@ -174,6 +176,9 @@ func uninstall(t *testing.T, users []string) {
 		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Users/"+"bothy-host")
 		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Groups/bothy-host")
 	case "windows":
+		if t.Failed() {
+			windowsFailureState(t, users)
+		}
 		removeWindowsService(t, "bothy-host")
 		for _, u := range users {
 			removeWindowsService(t, "bothy-host-helper-"+u)
@@ -198,7 +203,34 @@ func lastLines(p string, n int) []string {
 	if err != nil {
 		return nil
 	}
-	lines := slices.DeleteFunc(strings.Split(string(b), "\n"), func(l string) bool { return strings.TrimSpace(l) == "" })
+	return tailLines(string(b), n)
+}
+
+// windowsFailureState prints, for a failed test, the state of each helper service and the last
+// lines the services of bothy-host wrote to the Application event log: a PTY helper has no log
+// file and writes the reason it stopped there (serviceStderr), and the host service refused its
+// start with helper_unreachable in run 46116195975 without a trace of the helper side.
+func windowsFailureState(t *testing.T, users []string) {
+	t.Helper()
+	for _, u := range users {
+		out, _ := try("sc.exe", "queryex", "bothy-host-helper-"+u)
+		for _, l := range strings.Split(out, "\n") {
+			if f := strings.TrimSpace(l); strings.HasPrefix(f, "STATE") || strings.HasPrefix(f, "WIN32_EXIT_CODE") || strings.HasPrefix(f, "SERVICE_EXIT_CODE") {
+				t.Logf("bothy-host-helper-%s %s", u, f)
+			}
+		}
+	}
+	out, _ := try("powershell", "-NoProfile", "-Command",
+		"Get-EventLog -LogName Application -Source bothy-host -Newest 10 -ErrorAction SilentlyContinue | "+
+			"ForEach-Object { $_.TimeGenerated.ToString('o') + ' ' + ($_.ReplacementStrings -join ' ').Trim() }")
+	for _, l := range tailLines(out, maxServiceLog) {
+		t.Log("event log: " + l)
+	}
+}
+
+// tailLines returns the last n lines of out that are not empty.
+func tailLines(out string, n int) []string {
+	lines := slices.DeleteFunc(strings.Split(out, "\n"), func(l string) bool { return strings.TrimSpace(l) == "" })
 	if len(lines) > n {
 		lines = lines[len(lines)-n:]
 	}
@@ -234,7 +266,7 @@ func removeWindowsService(t *testing.T, name string) {
 // waitSC polls "sc.exe query name" until done holds for its output and exit code or the bound
 // of the suite passes.
 func waitSC(name string, done func(out string, code int) bool) bool {
-	deadline := time.Now().Add(waitShort)
+	deadline := testkit.Deadline()
 	for {
 		if out, c := try("sc.exe", "query", name); done(out, c) {
 			return true

@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // TestTypedCommandsInInteractiveShells: every command the suite types into a PTY prints what its
@@ -48,7 +50,7 @@ func TestTypedCommandsInInteractiveShells(t *testing.T) {
 			if strings.HasPrefix(c.cmd, "perl ") && perlErr != nil {
 				continue
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
 			cmd := exec.CommandContext(ctx, sh[0], sh[1:]...) //nolint:gosec // fixed shells of the test
 			cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + t.TempDir(), "TERM=dumb"}
 			cmd.Stdin = strings.NewReader(c.cmd + enter + "exit" + enter)
@@ -56,16 +58,19 @@ func TestTypedCommandsInInteractiveShells(t *testing.T) {
 			cmd.WaitDelay = 2 * time.Second
 			out, _ := cmd.CombinedOutput()
 			cancel()
+			// A match is a number; 0 is a valid user ID (the suite runs as root), a process ID of a
+			// background process is never 0.
 			m := c.re.FindSubmatch(out)
-			n := 0
-			if m != nil {
-				n, _ = strconv.Atoi(string(m[1]))
+			if m == nil {
+				t.Errorf("%s: %s printed no match of %s:\n%s", sh[0], c.cmd, c.re, out)
+				continue
 			}
+			n, _ := strconv.Atoi(string(m[1]))
 			if c.bg && n > 0 {
 				_ = syscall.Kill(n, syscall.SIGKILL)
 			}
-			if n <= 0 {
-				t.Errorf("%s: %s printed no match of %s:\n%s", sh[0], c.cmd, c.re, out)
+			if c.bg && n <= 0 {
+				t.Errorf("%s: %s printed the process ID %d", sh[0], c.cmd, n)
 			}
 		}
 	}
