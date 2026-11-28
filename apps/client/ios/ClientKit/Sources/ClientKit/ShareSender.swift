@@ -121,6 +121,9 @@ public final class ShareSender: ShareSending {
             let uploads = UploadClient(api: api, transport: transport, reader: reader, idempotencyKey: { UUIDv7.make(now: clock()) })
             for (index, item) in items.enumerated() {
                 completed[index] = try await uploads.upload(item, channelID: draft.target.channelID)
+                // Recorded at once: iOS may end the process before the message, and the app
+                // then attaches this file instead of uploading it again.
+                try? inbox.recordCompleted(clientMsgID: clientMsgID, fileIDs: completed)
             }
             let messages = MessageClient(api: api)
             let fileIDs = completed.compactMap { $0 }
@@ -138,10 +141,7 @@ public final class ShareSender: ShareSending {
             try? inbox.delete(clientMsgID: clientMsgID)
             return .refused(status: status, code: code)
         } catch {
-            // The uploads completed so far go into the entry, so the app does not send them again.
-            if completed.contains(where: { $0 != nil }) {
-                try? inbox.recordCompleted(clientMsgID: clientMsgID, fileIDs: completed)
-            }
+            // The entry stays with the uploads completed so far, recorded after each one.
             return .queued
         }
         targets.recordUse(draft.target)

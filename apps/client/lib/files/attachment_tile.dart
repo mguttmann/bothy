@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
+import '../app/providers/ports.dart';
 import '../voice/voice_player.dart';
 import 'attachment_mapping.dart';
 import 'download_service.dart';
@@ -62,6 +63,9 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
 
   /// Whether the audio was paused (not stopped or completed), so "Play" continues it.
   bool _paused = false;
+
+  /// The `expires_at` of the ticket the audio player holds; a pause past it needs a new one.
+  DateTime? _ticketExpiresAt;
 
   @override
   void dispose() {
@@ -135,23 +139,26 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
       return;
     }
     final paused = _player;
-    if (_paused && paused != null) {
-      try {
-        await paused.resume();
-        if (mounted) {
-          setState(() {
-            _playing = true;
-            _paused = false;
-          });
-        }
-        return;
-      } on Object {
-        // The ticket expired during the pause: a new one below, from the start.
+    final expires = _ticketExpiresAt;
+    // The server checks the ticket on every range request (12 9.2): a pause within its life
+    // continues; after it the player would stall, so a new ticket plays from the start.
+    if (_paused &&
+        paused != null &&
+        expires != null &&
+        ref.read(appPortsProvider).clock.now().isBefore(expires)) {
+      await paused.resume();
+      if (mounted) {
+        setState(() {
+          _playing = true;
+          _paused = false;
+        });
       }
+      return;
     }
     try {
       // 12 9.2: a new ticket per playback; it stays in memory and goes to the player only.
-      final url = await tickets.url(widget.file.id);
+      final ticket = await tickets.ticket(widget.file.id);
+      final url = ticket.url;
       if (!mounted) return;
       if (isVideo(widget.file)) {
         await showVideoDialog(
@@ -172,6 +179,7 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
           });
         }
       });
+      _ticketExpiresAt = ticket.expiresAt;
       await player.play(url);
       if (mounted) {
         setState(() {

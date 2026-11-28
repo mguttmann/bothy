@@ -20,9 +20,12 @@ import '../support/widgets.dart';
 void main() {
   final song = fileOf(1, name: 'song.mp3', mime: 'audio/mpeg');
 
-  testWidgets('Play after Pause continues the playback without a new ticket', (
-    tester,
-  ) async {
+  /// Opens the history with [song], whose tickets expire at [expiresAt]; plays, pauses and
+  /// plays again, and returns the player and the number of tickets asked for.
+  Future<(FakePlayer, int)> playPausePlay(
+    WidgetTester tester, {
+    required String expiresAt,
+  }) async {
     FakePlayer.created.clear();
     final host = await ColumnHost.open(tester);
     final services = FileTestServices(host.db, host.root, fakeFilePorts());
@@ -43,17 +46,13 @@ void main() {
       '/files/${song.id.value}/tickets',
       ScriptedAnswer.json(201, {
         'url': '/api/v1/files/${song.id.value}/content?ticket=abc',
-        'expires_at': '2026-10-17T09:05:00.000Z',
+        'expires_at': expiresAt,
       }),
     );
     final play = find.byKey(ValueKey('file.${song.id.value}.play'));
     await settleUntil(tester, host, play);
-
     await tester.tap(play);
     await settleUntil(tester, host, find.text(en.fileMediaPause));
-    final player = FakePlayer.created.single;
-    expect(player.played, hasLength(1));
-
     await tester.tap(play);
     await settleUntil(
       tester,
@@ -62,15 +61,36 @@ void main() {
     );
     await tester.tap(play);
     await settleUntil(tester, host, find.text(en.fileMediaPause));
+    final tickets = services.adapter.requested
+        .where((p) => p == '/files/${song.id.value}/tickets')
+        .length;
+    final player = FakePlayer.created.single;
+    await host.dispose(tester);
+    return (player, tickets);
+  }
 
+  testWidgets('Play after Pause continues the playback without a new ticket', (
+    tester,
+  ) async {
+    // The clock of the host stands at t0 (09:00); the ticket lives until 09:05.
+    final (player, tickets) = await playPausePlay(
+      tester,
+      expiresAt: '2026-10-17T09:05:00.000Z',
+    );
     expect(player.played, hasLength(1), reason: 'resumed, not played again');
     expect(player.resumed, 1);
-    expect(
-      services.adapter.requested.where(
-        (p) => p == '/files/${song.id.value}/tickets',
-      ),
-      hasLength(1),
+    expect(tickets, 1);
+  });
+
+  testWidgets('Play after a pause past the ticket fetches a new one', (
+    tester,
+  ) async {
+    final (player, tickets) = await playPausePlay(
+      tester,
+      expiresAt: '2026-10-17T08:59:00.000Z',
     );
-    await host.dispose(tester);
+    expect(player.resumed, 0);
+    expect(player.played, hasLength(2));
+    expect(tickets, 2);
   });
 }

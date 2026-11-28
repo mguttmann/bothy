@@ -337,3 +337,24 @@ private func millis(_ uuid: String) -> Int64? {
     #expect(entry.files.map(\.completedFileID) == ["f1", nil])
     #expect(inbox.entry(clientMsgID: "../x") == nil)
 }
+
+/// AUD-PKG-Q03 (#1156): each completed upload is in the entry before the next request, so a
+/// process end before the message leaves the completed file for the app.
+@Test func testCompletedUploadIsRecordedBeforeTheMessage() async throws {
+    let world = ShareWorld()
+    let inbox = world.inbox
+    let lock = NSLock()
+    var atMessage: ShareInboxEntry?
+    world.chat.override = { request in
+        if request.url?.path.hasSuffix("/messages") == true {
+            lock.withLock { atMessage = inbox.entries().first }
+        }
+        return nil
+    }
+    let staged = try world.stage("a.pdf", bytes: pattern(50), mime: "application/pdf")
+
+    #expect(await world.sender().send(ShareDraft(target: threadTarget, comment: "", title: nil, items: [staged])) == .sent)
+    let entry = try #require(lock.withLock { atMessage })
+    #expect(entry.files.first?.completedFileID != nil)
+    #expect(inbox.entries().isEmpty)
+}

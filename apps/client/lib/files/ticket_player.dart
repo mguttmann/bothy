@@ -129,14 +129,25 @@ final class FileTickets {
   /// A new ticket URL of [variant] (`original` or a thumbnail) of [fileId].
   ///
   /// Throws the `DioException` of the request (`409 file_not_ready`, `file_blocked`, `404`).
-  Future<Uri> url(FileId fileId, {String variant = 'original'}) async {
+  Future<Uri> url(FileId fileId, {String variant = 'original'}) async =>
+      (await ticket(fileId, variant: variant)).url;
+
+  /// A new ticket of [variant] of [fileId]: its absolute URL and its `expires_at`, after which
+  /// the server refuses the player's requests (12 9.2).
+  ///
+  /// Throws like [url].
+  Future<({Uri url, DateTime expiresAt})> ticket(
+    FileId fileId, {
+    String variant = 'original',
+  }) async {
     final response = await _client.getFilesApi().createFileTicket(
       fileId: fileId.value,
       fileTicketCreate: api.FileTicketCreate(
         (b) => b..variant = api.FileTicketCreateVariantEnum.valueOf(variant),
       ),
     );
-    return baseUrl.resolve(response.data!.url);
+    final data = response.data!;
+    return (url: baseUrl.resolve(data.url), expiresAt: data.expiresAt);
   }
 }
 
