@@ -454,6 +454,7 @@ def test_prompt_section_names_the_rules_of_10_3() -> None:
         "Only the last item of a batch waits for the screen and returns an image",
         "the longest time the step may need",
         "It ends as soon as the screen is quiet",
+        "A `wait` before the last item waits its full time",
         "in every program",
         "Tab and shift+Tab between fields",
         "the host ID from `list_desktops`",

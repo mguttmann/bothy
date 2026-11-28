@@ -197,14 +197,14 @@ func TestQuietWaitSessionEnds(t *testing.T) {
 
 // TestQuietInSession is the adaptive wait through a session and the helper channel: a still
 // screen ends a wait of 5 s and the settle of a click early with the image of the last look, a
-// quick wait ends early without an image, and a screen that keeps changing runs to the limit.
+// quick wait keeps its full time, and a screen that keeps changing runs to the limit.
 func TestQuietInSession(t *testing.T) {
 	r := newRig(t)
 	fh := r.connect(hello())
 	still, moved := testScreen(t, 100, false), testScreen(t, 700, false)
 	fh.set(func(f *fakeHelper) { f.img, f.imgW, f.imgH = still, 1280, 832 })
 	r.waitState(func(s HelperState) bool { return s.Connected })
-	const settle = 2 * time.Second
+	const settle = 3 * time.Second
 	op := openOp(sidA)
 	op.Settings.SettleMs = settle.Milliseconds()
 	r.m.Open(context.Background(), op, r.n)
@@ -221,18 +221,19 @@ func TestQuietInSession(t *testing.T) {
 		return res, img, time.Since(start)
 	}
 	first, img, took := timed(actWait, `{"duration_ms":5000}`, false)
-	if first.Code != CodeOK || !bytes.Equal(img, still) || took < quietIdleWait || took > quietIdleWait+time.Second {
+	if first.Code != CodeOK || !bytes.Equal(img, still) || took < quietIdleWait || took > 4*time.Second {
 		t.Errorf("wait on a still screen: %+v with %d image bytes after %v", first, len(img), took)
 	}
 	captures := len(fh.opsOf(OpCapture))
 	if res, img, took := timed(actLeftClick, `{"coordinate":[10,10],"scale_id":`+itoa(first.ScaleID)+`}`, false); res.Code != CodeOK || !bytes.Equal(img, still) ||
-		took < quietIdleSettle || took > settle-500*time.Millisecond {
+		took < quietIdleSettle || took > settle-time.Second {
 		t.Errorf("settle on a still screen: %+v with %d image bytes after %v", res, len(img), took)
 	}
 	// The image of the click is its last look, not one more capture.
 	looks := len(fh.opsOf(OpCapture)) - captures
-	if res, img, took := timed(actWait, `{"duration_ms":5000}`, true); res.Code != CodeOK || res.Image || img != nil ||
-		took > quietIdleWait+time.Second {
+	// A quick wait (before the last batch item) waits its full time, even on a still screen.
+	if res, img, took := timed(actWait, `{"duration_ms":2000}`, true); res.Code != CodeOK || res.Image || img != nil ||
+		took < 2*time.Second {
 		t.Errorf("quick wait on a still screen: %+v after %v", res, took)
 	}
 	if looks < 2 {

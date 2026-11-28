@@ -185,7 +185,7 @@ func (s *csession) act(a frame.Action) {
 }
 
 // run1 executes a and returns its outcome; quick drops the image of an input action and of wait
-// (27 6.4). wait ends early on a quiet screen (quiet.go).
+// (27 6.4). wait without quick ends early on a quiet screen (quiet.go).
 func (s *csession) run1(a frame.Action) outcome {
 	ar, ok := s.parseArgs(a.Action, a.Args)
 	if !ok {
@@ -203,13 +203,20 @@ func (s *csession) run1(a frame.Action) outcome {
 	case actCursorPosition:
 		return s.position()
 	case actWait:
-		o, end := s.quiet(time.Duration(ar.DurationMs)*time.Millisecond, quietIdleWait)
-		switch {
-		case end == quietGone || a.Quick:
-			clear(o.img)
+		d := time.Duration(ar.DurationMs) * time.Millisecond
+		if a.Quick {
+			// A wait before the last batch item waits its full time: the items after it act
+			// without an image, so a screen that is still blank must not end it (D-CU-speed-2-7).
+			s.sleep(d)
 			return outcome{code: CodeOK}
-		case end == quietStable:
+		}
+		o, end := s.quiet(d, quietIdleWait)
+		switch end {
+		case quietGone:
+			return outcome{code: CodeOK}
+		case quietStable:
 			return o
+		case quietCapped:
 		}
 		return s.capture(nil, -1)
 	}

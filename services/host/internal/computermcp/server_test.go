@@ -98,6 +98,7 @@ func TestToolsListEqualsChapter27(t *testing.T) {
 		{actType, "type its full address"},
 		{actKey, "Tab and shift+Tab between fields"},
 		{actWait, "Wait until the screen is quiet, at most duration_ms"},
+		{actWait, "A wait before the last item of a batch waits its full time"},
 	} {
 		if !strings.Contains(desc[c.name], c.phrase) {
 			t.Errorf("description of %s lacks %q", c.name, c.phrase)
