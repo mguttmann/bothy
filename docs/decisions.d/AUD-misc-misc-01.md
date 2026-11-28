@@ -53,9 +53,9 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   earlier tests stay behind or the system drive of the runner is too small for the suite.
 - macOS: run 46103059338 ran the whole suite; its causes are V1-13/2 to V1-13/5. The attach part
   of TM-T26 is not provable on the hosted runner, which runs without System Integrity Protection
-  (V1-13/7). Question for the owner: should `doctor` report a macOS host without System Integrity
-  Protection, on which the hardened runtime no longer holds a debugger of the session user off its
-  helper?
+  (V1-13/7). Decided for the owner on 2026-11-28 (V1-13/10): `doctor` reports such a host as a
+  warning (`ok:true`), and TM-T26 checks that warning there; built with the follow-up ticket of
+  the remaining Windows causes.
 - Linux: the folder a session user could write was `/opt` with its default ACL (V1-13/1).
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
 - Windows: of the three findings of D-M2-42-29, the overlapped handles of V1-13/9 settle the
