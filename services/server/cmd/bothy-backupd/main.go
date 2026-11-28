@@ -60,7 +60,8 @@ const usage = `Usage: bothy-backupd [--pgbackrest PATH] [--stanza NAME] [--retry
 Without a command it runs the repository host of the container backup: it starts
 "pgbackrest server" (the TLS server that postgres pushes WAL to), runs "pgbackrest
 stanza-create" until it succeeds, runs every backup kind on its schedule (backup.*, five-field
-cron in UTC, at most one run per kind; missed times are not caught up) and the restore test on
+cron in UTC, at most one run per kind; missed times are not caught up, but a failed or canceled
+run of the latest due time is retried a few times) and the restore test on
 backup.restore_test.schedule, and stops on SIGTERM or SIGINT. At its start it empties the
 directory of the pg_dump file and closes the backup_runs rows that a run of an earlier process
 left running as failed with the code interrupted. pgBackRest reads

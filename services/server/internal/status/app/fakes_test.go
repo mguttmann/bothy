@@ -423,3 +423,27 @@ func (r *fakeRuns) setManifest(t *testing.T, id ids.ID, mutate func(m *domain.Ma
 	}
 	t.Fatalf("no row %s", id)
 }
+
+// LatestRun returns the newest row of kind, as the adapter does; lastErr fails it.
+func (r *fakeRuns) LatestRun(_ context.Context, kind status.BackupKind) (status.BackupRun, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.lastErr != nil {
+		return status.BackupRun{}, false, r.lastErr
+	}
+	var out status.BackupRun
+	found := false
+	for _, row := range r.rows {
+		if row.kind == kind && (!found || !row.started.Before(out.StartedAt)) {
+			out, found = status.BackupRun{ID: row.id, Kind: row.kind, StartedAt: row.started, State: row.state, Error: row.code}, true
+		}
+	}
+	return out, found, nil
+}
+
+// add stores a finished row of an earlier process.
+func (r *fakeRuns) add(kind status.BackupKind, state, code string, started time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rows = append(r.rows, &fakeRow{id: ids.New(), kind: kind, state: state, code: code, started: started, finished: started.Add(time.Minute), size: -1})
+}

@@ -333,3 +333,42 @@ func TestRunsLatestSucceededAndChecks(t *testing.T) {
 		t.Errorf("restore test row %+v", r)
 	}
 }
+
+// TestRunsLatestRun holds the read of the retry at start (AUD srv-stats-status-8): the newest
+// row of one kind in any state, with its state and code, as the role bothy_backup reads it;
+// false for a kind without a row.
+func TestRunsLatestRun(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	runs, clk, _ := newRuns(t)
+	if _, ok, err := runs.LatestRun(ctx, status.BackupLogical); err != nil || ok {
+		t.Fatalf("LatestRun without rows = %v, %v; want none", ok, err)
+	}
+	ok1, err := runs.Start(ctx, status.BackupLogical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.Finish(ctx, status.FinishedRun{ID: ok1, Succeeded: true, SizeBytes: 7, Manifest: []byte(`{}`)}); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(time.Minute)
+	failed, err := runs.Start(ctx, status.BackupLogical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.Finish(ctx, status.FinishedRun{ID: failed, SizeBytes: -1, Error: "canceled"}); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(time.Minute)
+	if _, err := runs.Start(ctx, status.BackupObjects); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := runs.LatestRun(ctx, status.BackupLogical)
+	if err != nil || !ok || got.ID != failed || got.State != "failed" || got.Error != "canceled" || got.Kind != status.BackupLogical {
+		t.Errorf("LatestRun(logical) = %+v, %v, %v; want the canceled run", got, ok, err)
+	}
+	got, ok, err = runs.LatestRun(ctx, status.BackupObjects)
+	if err != nil || !ok || got.State != "running" || got.Error != "" {
+		t.Errorf("LatestRun(objects) = %+v, %v, %v; want the running row without a code", got, ok, err)
+	}
+}

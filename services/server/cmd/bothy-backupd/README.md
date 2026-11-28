@@ -34,7 +34,11 @@ command loads the configuration with the schema of the server, starts the metric
 variables) and drives the service through `internal/wire` (`wire.NewBackupDaemon`).
 
 - Scheduler: at the start of every minute (UTC) the kinds due since the previous minute start,
-  each in its own goroutine; nothing before the start of the process is caught up. `pg_full` and
+  each in its own goroutine; nothing before the start of the process is caught up, except that a
+  failed run is retried (`app.Scheduler`: `retryDelay` after it ended, at most `retryLimit` times
+  per due time) and, once the start has closed the rows of an earlier process, a run of the latest
+  due time that failed, was canceled by the stop or was interrupted is retried as well
+  (`RetryFailed`, AUD srv-stats-status-8). `pg_full` and
   `pg_diff` share one slot, and a full and a differential due together run only the full. After
   each tick it samples `pg_stat_archiver` and the volumes for the metrics.
 - Start (AUD-srv-status-01): before the first tick the default command empties the directory of

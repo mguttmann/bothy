@@ -982,6 +982,12 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
 1. `bothy-backupd` evaluates the five-field cron expressions of `backup.pg.full_schedule`,
    `backup.pg.diff_schedule`, `backup.logical.schedule` and `backup.objects.schedule` in UTC once
    a minute. Missed times while the process was down are not caught up; the next due time runs.
+   The one exception is the retry of a failed run (AUD srv-stats-status-8): a run that fails,
+   also one that could not write its row, starts again 15 minutes after it ended, at most twice
+   for one due time, and the next due time replaces a pending retry. At its start `bothy-backupd`
+   plans the same retry for the newest run of each kind when it failed, was canceled by the stop
+   of the previous process or was closed as `interrupted`, and no later due time of its kind has
+   passed since it started; an older run stays as it is.
    At most one run per slot runs at a time: `pg_full` and `pg_diff` share one slot (one
    pgBackRest lock per stanza), and a full and a differential due together run only the full.
    `bothy-backupd backup <kind>` runs one kind at once and exits with `0` or `1`.
