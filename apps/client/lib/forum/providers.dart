@@ -7,6 +7,7 @@
 library;
 
 import 'package:domain/domain.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:local_store/local_store.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -151,6 +152,17 @@ final class PendingPost {
 
   /// When it was put into the outbox.
   final DateTime createdAt;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingPost &&
+      other.entryId == entryId &&
+      other.title == title &&
+      other.failed == failed &&
+      other.createdAt == createdAt;
+
+  @override
+  int get hashCode => Object.hash(entryId, title, failed, createdAt);
 }
 
 /// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
@@ -159,32 +171,37 @@ final class PendingPost {
 Stream<List<PendingPost>> pendingPosts(Ref ref, String channelId) {
   final db = ref.watch(localDatabaseProvider);
   if (db == null) return Stream.value(const []);
-  return db.outboxDao.watchEntriesFor(null).map((entries) {
-    final byId = {for (final e in entries) e.id: e};
-    final posts = <PendingPost>[];
-    for (final e in entries) {
-      if (e.kind != ThreadOps.createThread ||
-          e.state == OutboxState.confirmed) {
-        continue;
-      }
-      final body = decodePayload(e.payload);
-      if (body['channel_id'] != channelId ||
-          body['parent_message_id'] != null) {
-        continue;
-      }
-      posts.add(
-        PendingPost(
-          entryId: e.id,
-          title: body['title'] as String? ?? '',
-          failed:
-              e.state == OutboxState.failed ||
-              _failedUploadsOf(e, byId).isNotEmpty,
-          createdAt: e.createdAt,
-        ),
-      );
-    }
-    return posts..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  });
+  return db.outboxDao
+      .watchEntriesFor(null)
+      .map((entries) {
+        final byId = {for (final e in entries) e.id: e};
+        final posts = <PendingPost>[];
+        for (final e in entries) {
+          if (e.kind != ThreadOps.createThread ||
+              e.state == OutboxState.confirmed) {
+            continue;
+          }
+          final body = decodePayload(e.payload);
+          if (body['channel_id'] != channelId ||
+              body['parent_message_id'] != null) {
+            continue;
+          }
+          posts.add(
+            PendingPost(
+              entryId: e.id,
+              title: body['title'] as String? ?? '',
+              failed:
+                  e.state == OutboxState.failed ||
+                  _failedUploadsOf(e, byId).isNotEmpty,
+              createdAt: e.createdAt,
+            ),
+          );
+        }
+        return posts..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        // A draft write changes the entries without a thread on every key press; an equal list
+        // is not given again, so the sidebar does not rebuild for it.
+      })
+      .distinct(listEquals);
 }
 
 /// The text of the newest draft write of the person's draft of a new post in [channelId] that
@@ -211,7 +228,7 @@ Stream<String?> unsentChannelDraft(Ref ref, String channelId) {
       }
     }
     return text;
-  });
+  }).distinct();
 }
 
 /// A title and tags the new chat view of a forum starts with (brief M4-41): "Edit" of a refused
