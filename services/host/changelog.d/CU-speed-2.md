@@ -10,4 +10,4 @@
   last item of a batch keeps its full time. A raised `computer.settle` is now only the longest
   settle, no longer the time every settle takes.
 - The tool descriptions of `bothy-computer-mcp` steer toward one `batch` per decision, keys in
-  every program and a `wait` with the longest time the step may need as the last item.
+  every program and a `wait` with the time the step usually needs as the last item.

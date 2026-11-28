@@ -38,6 +38,27 @@ func testScreen(t *testing.T, blockX int, caret bool) []byte {
 	return b.Bytes()
 }
 
+// testScreenBlock renders a light 1280x832 screen with a square of edge pixels at 600,300, dark
+// when dark is set.
+func testScreenBlock(t *testing.T, edge int, dark bool) []byte {
+	t.Helper()
+	m := image.NewRGBA(image.Rect(0, 0, 1280, 832))
+	for y := 0; y < 832; y++ {
+		for x := 0; x < 1280; x++ {
+			c := color.RGBA{R: 240, G: 240, B: 240, A: 255}
+			if dark && x >= 600 && x < 600+edge && y >= 300 && y < 300+edge {
+				c = color.RGBA{R: 20, G: 20, B: 20, A: 255}
+			}
+			m.Set(x, y, c)
+		}
+	}
+	var b bytes.Buffer
+	if err := jpeg.Encode(&b, m, &jpeg.Options{Quality: 80}); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
 func gridOf(t *testing.T, img []byte) lumaGrid {
 	t.Helper()
 	g, ok := lumaOf(img)
@@ -121,6 +142,14 @@ func TestQuietWait(t *testing.T) {
 		}
 		return moved
 	}
+	// banner is a still page with a block of 120x120 pixels that changes every 80 ms.
+	bannerA, bannerB := testScreenBlock(t, 120, false), testScreenBlock(t, 120, true)
+	banner := func(d time.Duration) []byte {
+		if d/(80*time.Millisecond)%2 == 0 {
+			return bannerA
+		}
+		return bannerB
+	}
 	cases := []struct {
 		name        string
 		limit, idle time.Duration
@@ -148,6 +177,8 @@ func TestQuietWait(t *testing.T) {
 			}, end: quietStable, from: quietIdleWait, to: quietIdleWait + 200*time.Millisecond},
 		{name: "a video runs to the limit and no longer", limit: 3 * time.Second, idle: quietIdleWait, cost: 30 * time.Millisecond,
 			screenAt: frames, end: quietCapped, from: 3 * time.Second, to: 3 * time.Second},
+		{name: "an animated banner runs to the limit and no longer", limit: 1500 * time.Millisecond, idle: quietIdleWait, cost: 30 * time.Millisecond,
+			screenAt: banner, end: quietCapped, from: 1500 * time.Millisecond, to: 1500 * time.Millisecond},
 		{name: "a failed look waits the limit as before", limit: 2 * time.Second, idle: quietIdleWait, cost: 30 * time.Millisecond,
 			screenAt: func(time.Duration) []byte { return still }, fail: true, end: quietCapped, from: 2 * time.Second, to: 2 * time.Second},
 		{name: "settle of a still screen", limit: 500 * time.Millisecond, idle: quietIdleSettle, cost: 30 * time.Millisecond,

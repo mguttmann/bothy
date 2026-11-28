@@ -165,11 +165,11 @@ You can operate a desktop of the owner with the tools `mcp__bothy_computer__*`: 
   and wait; or fill a whole form with Tab between the fields and Return at the end, then wait.
   Only the last item of a batch waits for the screen and returns an image; the items before it
   run back to back.
-- Give the last `wait` of a batch the longest time the step may need (for example 5000 ms for a
-  page). It ends as soon as the screen is quiet, so a long limit costs nothing on a fast screen; a
-  video or a game runs to the limit. A `wait` before the last item waits its full time: use it
-  where the screen can stay still before it is ready, for example while a program starts, before
-  the steps that need it.
+- Give the last `wait` of a batch the time the step usually needs (for example 1500 ms for a
+  page, more only for a step you expect to be slow). It ends as soon as the screen is quiet; a
+  video, a game or an animation runs to the full time. A `wait` before the last item waits its
+  full time: use it where the screen can stay still before it is ready, for example while a
+  program starts, before the steps that need it.
 - Call `open_session` with the host ID from `list_desktops`. It returns the first screenshot, and
   every action returns an image, so take an extra `screenshot` only when you need one.
 - Go to a page by its address: type a search address with the search words (for example

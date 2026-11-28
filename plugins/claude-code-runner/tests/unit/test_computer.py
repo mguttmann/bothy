@@ -452,7 +452,9 @@ def test_prompt_section_names_the_rules_of_10_3() -> None:
         "up to the next decision that needs a look at the screen into one `batch`",
         "with the `wait` that follows it as the last item",
         "Only the last item of a batch waits for the screen and returns an image",
-        "the longest time the step may need",
+        "the time the step usually needs",
+        "1500 ms for a page",
+        "runs to the full time",
         "It ends as soon as the screen is quiet",
         "A `wait` before the last item waits its full time",
         "in every program",
@@ -467,6 +469,8 @@ def test_prompt_section_names_the_rules_of_10_3() -> None:
         "`done`",
     ):
         assert phrase in text, phrase
+    # No hint toward long limits: a screen that never settles waits the whole limit.
+    assert "5000" not in text
 
 
 class _Response:

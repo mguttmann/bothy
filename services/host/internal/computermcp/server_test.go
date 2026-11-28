@@ -99,9 +99,18 @@ func TestToolsListEqualsChapter27(t *testing.T) {
 		{actKey, "Tab and shift+Tab between fields"},
 		{actWait, "Wait until the screen is quiet, at most duration_ms"},
 		{actWait, "A wait before the last item of a batch waits its full time"},
+		{actWait, "a screen that keeps moving (a video, an animation) waits the full duration_ms"},
+		{actWait, "for example 1500 for a page"},
 	} {
 		if !strings.Contains(desc[c.name], c.phrase) {
 			t.Errorf("description of %s lacks %q", c.name, c.phrase)
+		}
+	}
+	// No hint toward long limits: a screen that never settles waits the whole limit, so the
+	// examples keep the magnitude of before (D-CU-speed-2-6).
+	for name, d := range desc {
+		if strings.Contains(d, "wait 5000") || strings.Contains(d, "costs nothing") {
+			t.Errorf("description of %s steers toward a long wait", name)
 		}
 	}
 	r.stop()
