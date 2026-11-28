@@ -78,3 +78,8 @@ Collected minors without a reproduced harm; the next run in this area reads and 
   (`mdfind` lists it), not as a search in the Spotlight window.
 - (28.11., same red team) Spec 27 section 15 has no CU-T row for R-CU-13; the tests exist (Swift,
   C++ core, CI probe window checks).
+- (28.11., delta red team of FIX-CU-HELPER-NO-ICON) That the injection marker reaches the switch's
+  click handler end to end (`eventSourceUserData` in `NSApp.currentEvent`, `GetMessageExtraInfo()`)
+  is proven by reading and the core tests only; no CI check clicks the switch with injected input.
+- (28.11., same delta red team) Windows settings window: Enter and Esc send `IDOK` and `IDCANCEL`,
+  which `settings_proc` does not handle, so they do nothing (the comment in `win32.hpp` names them).
