@@ -219,6 +219,7 @@ nav:
       - Claude Code runner on background sessions: design/runner-background-sessions.md
       - "Team channels: agents of several projects": design/cross-project-handoff.md
       - Computer use: design/computer-use.md
+      - "Computer use: where the time goes": design/cu-speed-2026-11-28.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
