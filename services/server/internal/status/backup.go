@@ -102,7 +102,7 @@ type FinishedRun struct {
 	Succeeded bool
 	// SizeBytes is backup_runs.size_bytes; a negative value records NULL (unknown).
 	SizeBytes int64
-	// Manifest is the JSON of backup_manifest.v1; nil records the default '{}' (a failed run).
+	// Manifest is the JSON of backup_manifest.v2; nil records the default '{}' (a failed run).
 	Manifest []byte
 	// Checks is the JSON of restore_test_checks.v1 of a restore test; nil records the default
 	// '{}' (every backup kind).

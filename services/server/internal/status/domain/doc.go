@@ -2,7 +2,7 @@
 
 // Package domain holds the pure rules of the backup service of the status module (brief M7-02,
 // docs/spec/16-operations.md 8): the backup kinds, the five-field cron schedules of backup.*, which
-// kinds are due in a window of time, the manifest backup_manifest.v1 of
+// kinds are due in a window of time, the manifest backup_manifest.v2 of
 // docs/spec/03-data-model.md 4.12 and docs/operations/backup-restore.md 3, and the form of an
 // error code. It needs no storage and no clock; callers pass the instants.
 //

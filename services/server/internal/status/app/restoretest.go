@@ -329,7 +329,7 @@ func (t *restoreRun) restore() (ScratchDB, domain.Manifest, domain.CheckResult) 
 }
 
 // checkManifest is check 2: the copy against the manifest of its backup. Schema version,
-// instance and sync epoch must be equal and the copy holds exactly the tables of row_counts. The
+// instance and sync epoch must be equal and the copy holds exactly the tables of the manifest. The
 // manifest was read after the backup step (docs/decisions.d/M7-02.md D-M7-02-6), so the copy may lag it
 // but never lead it: its event_log head and audit head are not above those of the manifest, and
 // at the same audit head the hash is the same. When both heads are equal no write reached the

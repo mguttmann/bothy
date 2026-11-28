@@ -11,7 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
-// TestTranscribeJobRegistration: every role registers files.transcribe on the queue files with an
+// TestTranscribeJobRegistration: every role registers files.transcribe on the queue files_text with an
 // argument type of IDs only (M3-09).
 func TestTranscribeJobRegistration(t *testing.T) {
 	t.Parallel()

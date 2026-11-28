@@ -72,9 +72,12 @@ func newInserter(t *testing.T, pool *pg.Pool) jobs.Inserter {
 	if err := jobs.Register[probeArgs](reg, probeWork{}, jobs.HandlerOptions{Queue: jobs.QueueDefault}); err != nil {
 		t.Fatal(err)
 	}
-	rt, err := jobs.New(pool, jobs.Config{Schema: jobsSchema, MaxWorkers: map[string]int{
-		jobs.QueueDefault: 1, jobs.QueueFiles: 1, jobs.QueueDelivery: 1, jobs.QueueMaintenance: 1, jobs.QueuePrivacy: 1,
-	}, SoftStopTimeout: time.Second}, jobs.RoleAPI, reg, nil)
+	// Every queue of jobs.Queues() needs workers (jobs.Config.validate).
+	mw := map[string]int{}
+	for _, q := range jobs.Queues() {
+		mw[q] = 1
+	}
+	rt, err := jobs.New(pool, jobs.Config{Schema: jobsSchema, MaxWorkers: mw, SoftStopTimeout: time.Second}, jobs.RoleAPI, reg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

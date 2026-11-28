@@ -13,8 +13,9 @@ import (
 	"strings"
 )
 
-// ErrInvalidManifest reports a manifest that is not backup_manifest.v1. The message names the
-// field, never its value: a manifest that fails may carry exactly the text it must not hold.
+// ErrInvalidManifest reports a manifest that is neither backup_manifest.v2 nor v1. The message
+// names the field, never its value: a manifest that fails may carry exactly the text it must not
+// hold.
 var ErrInvalidManifest = errors.New("status: invalid backup manifest")
 
 // The closed forms of the manifest strings. Each admits ids, versions, labels, hashes or table

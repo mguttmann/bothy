@@ -39,7 +39,7 @@ type Scratch interface {
 // ScratchDB is the restored copy, read over its Unix socket as migrate.bootstrap_user. Every
 // method only reads.
 type ScratchDB interface {
-	// Facts reads the facts of backup_manifest.v1 from the copy in one snapshot, with the
+	// Facts reads the facts of backup_manifest.v2 (or v1) from the copy in one snapshot, with the
 	// queries of ManifestSource.Snapshot, so the copy and its manifest are counted alike.
 	Facts(ctx context.Context) (ManifestFacts, error)
 	// EventLog reads count, smallest and largest seq of every partition of event_log, the rows

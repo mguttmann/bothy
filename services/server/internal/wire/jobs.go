@@ -220,7 +220,7 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // on the queue default, never periodic (M2-28), files.scan
 // on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
 // the timeout file.image.processing_timeout (M3-06), files.purge_objects and the periodic
-// files.cleanup_pending on the queue maintenance (M3-08), files.extract_text on the queue files
+// files.cleanup_pending on the queue maintenance (M3-08), files.extract_text on the queue files_text
 // without a River job timeout and the periodic files.extract_text_refresh on the queue maintenance
 // (M3-15), runs.queued_expiry on the queue default
 // (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),

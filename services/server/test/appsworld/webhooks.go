@@ -291,9 +291,13 @@ func (w *World) newRuntime(role jobs.Role) *jobs.Runtime {
 	w.t.Helper()
 	reg := jobs.NewRegistry()
 	Must(w.t, appsjobs.Register(reg, w.apps.Webhooks, w.apps.Webhooks.Lease()))
-	rt, err := jobs.New(w.pool, jobs.Config{Schema: JobsSchema, MaxWorkers: map[string]int{
-		jobs.QueueDefault: 1, jobs.QueueFiles: 1, jobs.QueueDelivery: 2, jobs.QueueMaintenance: 1, jobs.QueuePrivacy: 1,
-	}, SoftStopTimeout: time.Second}, role, reg, nil)
+	// Every queue of jobs.Queues() needs workers (jobs.Config.validate); delivery gets two.
+	mw := map[string]int{}
+	for _, q := range jobs.Queues() {
+		mw[q] = 1
+	}
+	mw[jobs.QueueDelivery] = 2
+	rt, err := jobs.New(w.pool, jobs.Config{Schema: JobsSchema, MaxWorkers: mw, SoftStopTimeout: time.Second}, role, reg, nil)
 	Must(w.t, err)
 	return rt
 }
