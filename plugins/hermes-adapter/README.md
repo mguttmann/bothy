@@ -103,8 +103,11 @@ longer matters. Run `install` again after updating the checkout's `attrs` pin or
 checkout. `install` also writes the platform section,
 `display.busy_input_mode`, `tool_progress: off`, the own access policy and the home channel (the
 report channel, or a placeholder that refuses every report), and refuses to change an existing
-platform key: every thread would lose its Hermes session. Restart the gateway of the profile
-afterwards.
+platform key: every thread would lose its Hermes session. It switches the platform on
+(`gateway.platforms.<platform key>.enabled: true`) only in a section without that key, a first
+install: a profile parked with `enabled: false` stays off through every later `install`, and the
+summary says `platform enabled: no (kept off; install --enable switches it on)`. Pass
+`--enable` to switch a parked profile on. Restart the gateway of the profile afterwards.
 
 ## Checking an install
 

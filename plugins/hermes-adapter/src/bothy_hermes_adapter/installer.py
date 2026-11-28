@@ -16,7 +16,9 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   optional fixed ``--report-thread``), the target of ``deliver=<key>`` cron jobs (09 17.9), or
   a placeholder that refuses every report (Hermes would otherwise ask for one in the first
   turn's thread); it refuses to change an existing platform key
-  (D-AG-19), because every thread would lose its Hermes session.
+  (D-AG-19), because every thread would lose its Hermes session. It switches the platform on
+  only in a new section or with ``--enable``: an operator's ``enabled: false`` (a parked
+  profile) stays, and the summary says so.
 * ``switch-mode``: ``organization`` requires the API-key variable of the profile environment to
   be set (judged by its name), empties the OAuth variables and Hermes's allow list of the
   platform, refuses a login file of another tool in the profile's home and sets
@@ -168,6 +170,7 @@ class InstallRequest:
         dpop_key_file: `hermes_adapter.dpop_key_file`, if any.
         report_channel: The report channel (Hermes' home channel, 09 14, 17.9), if any.
         report_thread: A fixed thread of the report channel for every report, if any.
+        enable: Switch the platform on also when the section says ``enabled: false``.
     """
 
     server_url: str = field(repr=False)
@@ -179,6 +182,7 @@ class InstallRequest:
     dpop_key_file: Path | None = field(default=None, repr=False)
     report_channel: UUID | None = None
     report_thread: UUID | None = None
+    enable: bool = False
 
 
 @dataclass(frozen=True)
@@ -429,7 +433,10 @@ def plan_install(config: Mapping[str, Any], request: InstallRequest) -> dict[str
     load_settings(extra)  # the same validation the plugin applies at connect
     new = copy.deepcopy(dict(config))
     section = _nested(new, "gateway", "platforms", request.platform_key)
-    section["enabled"] = True
+    if request.enable or "enabled" not in section:
+        # A section without the switch is a first install; an existing `false` is the
+        # operator's parked profile and stays off unless `--enable` asks otherwise.
+        section["enabled"] = True
     if request.report_channel is not None:
         # Hermes' home channel is the target of `deliver=<key>` cron jobs and `hermes send
         # --to <key>` (09 14, 17.9); a thread makes every report go into that one thread.
@@ -474,6 +481,11 @@ def _summary(bridge: ProfileBridge, config: Mapping[str, Any], key: str | None) 
     platform = _platform_sections(config).get(key or "", {}) if key else {}
     extra = platform.get("extra") if isinstance(platform, Mapping) else None
     lines.append(f"platform: {'installed' if extra else 'not installed'}")
+    if extra:
+        if isinstance(platform, Mapping) and platform.get("enabled") is True:
+            lines.append("platform enabled: yes")
+        else:
+            lines.append("platform enabled: no (kept off; install --enable switches it on)")
     if isinstance(extra, Mapping):
         for name in sorted(k for k in extra if str(k).startswith("hermes_adapter.")):
             lines.append(f"{name}: set")
