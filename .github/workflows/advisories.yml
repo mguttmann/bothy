@@ -79,7 +79,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/tools
-          key: advisories-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json') }}
+          key: advisories-images-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json') }}
       - name: make image and make postgres-image (host platform)
         run: |
           platform="linux/$(dpkg --print-architecture)"

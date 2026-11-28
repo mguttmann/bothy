@@ -774,8 +774,11 @@ def write_atomically(path: Path, data: bytes) -> None:
     Raises:
         OSError: the file cannot be written or renamed; the temporary file is removed.
     """
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
+        # mkstemp creates the file for its owner only; the feed keeps the mode it had.
+        os.fchmod(fd, mode)
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
         Path(name).replace(path)

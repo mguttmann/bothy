@@ -37,6 +37,13 @@
       "allowedVersions": "<6"
     },
     {
+      "description": "Release downloads of tools/distribution: the SHA-256 constant is raised by hand",
+      "matchFileNames": ["tools/distribution/apple.py", "tools/distribution/android.py", "tools/distribution/hostdist.py"],
+      "prBodyNotes": [
+        "Renovate raised only the version. Raise the `*_SHA256` constant next to it to the checksum of the new release file before merging; the download check fails until then."
+      ]
+    },
+    {
       "description": "Node development tools of the repository gates",
       "matchManagers": ["npm"],
       "matchFileNames": ["tools/node/package.json"],
@@ -127,7 +134,7 @@
     },
     {
       "customType": "regex",
-      "description": "Release downloads of the app and host builds in tools/distribution (Sparkle, bundletool, WiX), each marked with a renovate comment; the SHA-256 constant next to the version is raised in the same pull request",
+      "description": "Release downloads of the app and host builds in tools/distribution (Sparkle, bundletool, WiX), each marked with a renovate comment; Renovate raises only the version, so the SHA-256 constant next to it fails the download check until a maintainer raises it in the same pull request",
       "managerFilePatterns": ["/^tools/distribution/[a-z_]+\\.py$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[A-Z_]+_VERSION = \"(?<currentValue>[^\"]+)\""

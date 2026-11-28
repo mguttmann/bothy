@@ -566,8 +566,10 @@ def test_the_appcast_is_replaced_in_one_step(
     """#1601: an abort while writing leaves the old appcast and no stray file."""
     appcast = tmp_path / "appcast.xml"
     appcast.write_bytes(b"old")
+    appcast.chmod(0o644)
     dist.write_atomically(appcast, b"new")
     assert appcast.read_bytes() == b"new"
+    assert appcast.stat().st_mode & 0o777 == 0o644
 
     def broken(self: Path, target: object) -> None:
         raise OSError("disk full")

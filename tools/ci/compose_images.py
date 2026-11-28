@@ -2,11 +2,11 @@
 """The third-party images an instance runs from the Compose files, one reference per line.
 
 The daily image scan of `advisories.yml` (job `images`, docs/quality/gates.md "Advisories",
-#908) runs `make trivy-image` over the images Bothy builds and over these. A Compose file names
-a third-party image as `image: <name>:${BOTHY_<X>_VERSION:-<default>}`, the form the Renovate
-manager of `renovate.json` reads; the scan takes the default, the version an instance gets
-without an override in its `.env`. The images of Bothy itself (`${BOTHY_REGISTRY}/...`) are
-left out: the job builds them from the checkout.
+#908) runs `make trivy-image` over the images the product builds and over these. A Compose
+file names a third-party image as `image: <name>:${BOTHY_<X>_VERSION:-<default>}`, the form
+the Renovate manager of `renovate.json` reads; the scan takes the default, the version an
+instance gets without an override in its `.env`. The images of the product itself
+(`${BOTHY_REGISTRY}/...`) are left out: the job builds them from the checkout.
 
 Usage: compose_images.py [<compose file> ...]   (default: the files of COMPOSE_FILES)
 """
@@ -33,7 +33,7 @@ def images(text: str, source: str) -> list[str]:
     """Return the third-party images of one Compose file as `<name>:<default>`, sorted.
 
     Raises:
-        ComposeError: an image line is neither one of Bothy (`${BOTHY_REGISTRY}`) nor of the
+        ComposeError: an image line is neither one of the product (`${BOTHY_REGISTRY}`) nor of the
             pinned form, so the scan would miss it.
     """
     found: set[str] = set()

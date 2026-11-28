@@ -32,7 +32,7 @@ need an Apple Developer Program account (OQ-08). It writes `<out>/trial-ios.json
 
 Usage:
   ios.py release --version X.Y.Z --out DIR [--distribution FILE] [--branding FILE]
-  ios.py promote --build N [--distribution FILE]
+  ios.py promote --build N [--group beta|stable] [--distribution FILE]
   ios.py trial --out DIR [--branding FILE]
 Exit codes: 0 done, 1 a step failed or this is no macOS host (named on stderr), 2 usage error.
 """

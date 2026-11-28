@@ -2,7 +2,7 @@
 """The daily image scan covers the images of an instance (#908, docs/quality/gates.md "Advisories").
 
 tools/ci/compose_images.py lists the third-party images of the Compose files at their default
-versions; the job `images` of advisories.yml builds the two Bothy images and runs
+versions; the job `images` of advisories.yml builds the two images of the product and runs
 `make trivy-image` over them and over that list.
 """
 
