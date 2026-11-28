@@ -54,6 +54,7 @@ from .test_bg_sessions import (
     launches,
     nothing_left,
     players,
+    retries,
     start,
     status_line,
     texts,
@@ -778,6 +779,76 @@ async def test_a_session_whose_login_is_gone_is_not_taken_for_one_on_another_acc
     assert world.calls("bg_stop") == []
     world.release(job)
     assert await world.ended(run_id) == "completed"
+
+
+async def test_an_answer_without_the_login_during_the_wait_is_withheld_and_the_wait_goes_on(
+    bg_world: World, logs: LogLines
+) -> None:
+    # The log of run 01a20d79 on 2026-11-25 05:07 UTC: a brief loss of the login failed the
+    # notification turn (account_wait_started not_logged_in, background_tasks 1), the runner
+    # wrote its retry line (account_retry 1), and the CLI answered it after a request record
+    # without the login beta. The counter-check then stopped the session with its background
+    # work (counter_check_failed request_without_login, run_finished billing_mode_mismatch).
+    # Now that answer is withheld, the session is kept, and the next retry on the login is
+    # answered (FIX-RUNNER-BG-VISIBILITY).
+    world = bg_world
+    failure = world.gate("background_error_gate")
+    run_id, job = await held_run(
+        world,
+        FAST,
+        background_error_gate=str(failure),
+        background_api_error="not_authenticated",
+        bg_unlisted_after_login_loss=1,
+    )
+    world.release(failure)
+    await world.until(lambda: len(texts(world)) == 2)
+    [started] = events(logs, "account_wait_started")
+    assert (started["error"], started["background_tasks"]) == ("not_logged_in", "1")
+    assert [e["attempt"] for e in events(logs, "account_retry")] == ["1", "2"]
+    [withheld] = events(logs, "counter_check_withheld")
+    assert (withheld["code"], withheld["error"]) == ("request_without_login", "not_logged_in")
+    assert len(events(logs, "counter_check_login_back")) == 1
+    assert events(logs, "counter_check_failed") == []
+    # The withheld answer was not posted; the answer of the second retry was, once.
+    assert texts(world) == ["Done.", "Status: the background job is still running."]
+    assert world.state_of(run_id) == "running"
+    assert world.calls("bg_stop") == []
+    records = transcript(world, players(world)[0])
+    requests = [r for r in records if r["type"] == "api-request"]
+    listed = ["oauth-2025-04-20" in r["params"]["betas"] for r in requests]
+    assert listed[-3:] == [False, False, True]  # the refused request, the unproven one, the retry
+    world.release(job)
+    assert await world.ended(run_id) == "completed"
+    assert texts(world)[2] == "The suite passed."
+    assert world.fake.run_state(run_id).state_reason != "billing_mode_mismatch"
+
+
+async def test_answers_without_the_login_until_the_bound_end_the_run_with_the_account_error(
+    bg_world: World, logs: LogLines
+) -> None:
+    # The login does not come back: every retry is answered after a request without the beta.
+    # The withheld answers are no answer of the run, so the bound of the wait ends it with the
+    # account error, not completed and not billing_mode_mismatch (review of
+    # FIX-RUNNER-BG-VISIBILITY).
+    world = bg_world
+    failure = world.gate("background_error_gate")
+    run_id, _job = await held_run(
+        world,
+        {**FAST, "account_retry_max_wait": "1500ms"},
+        background_error_gate=str(failure),
+        background_api_error="not_authenticated",
+        bg_unlisted_after_login_loss=1000,
+    )
+    world.release(failure)
+    assert await world.ended(run_id) == "failed"
+    # A lost login ends the run as every not_logged_in account error does (18.9).
+    assert world.fake.run_state(run_id).state_reason == "runtime_not_authenticated"
+    assert "Claude Code is not logged in" in str(world.fake.run(run_id).get("summary"))
+    assert texts(world) == ["Done."]  # no withheld answer was posted
+    assert len(retries(world)) >= 1
+    assert events(logs, "counter_check_failed") == []
+    [gave_up] = events(logs, "account_wait_gave_up")
+    assert gave_up["error"] == "not_logged_in"
 
 
 async def test_any_other_outcome_of_a_request_without_the_login_ends_the_run(

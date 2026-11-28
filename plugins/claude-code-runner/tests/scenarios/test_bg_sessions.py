@@ -639,6 +639,45 @@ async def test_a_background_command_a_followup_and_the_notification(bg_world: Wo
     await nothing_left(world)
 
 
+def job_steps(world: World, run_id: UUID) -> list[dict[str, Any]]:
+    steps = world.fake.run(run_id).get("steps") or {}
+    return [s for s in steps.values() if s["kind"] == "background_job"]
+
+
+async def test_a_background_command_is_a_live_step_until_its_notification(
+    bg_world: World,
+) -> None:
+    # FIX-RUNNER-BG-VISIBILITY: a Bash call with run_in_background was only the metric
+    # background_jobs between the turns, so Live showed a card without a step.
+    world = bg_world
+    job = world.gate("background_gate")
+    world.scenario(
+        fixture="plain", background_gate=str(job), bg_job_command="make test \\\n  GOFLAGS=-p=4"
+    )
+    await start(world, followup_grace="200ms")
+    run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
+    await world.until(lambda: texts(world) == ["Done."])
+    await world.until(
+        lambda: world.fake.run(run.run_id).get("metrics", {}).get("background_jobs") == 1
+    )
+    [step] = job_steps(world, run.run_id)
+    assert (step["name"], step["title"], step["status"]) == (
+        "local_bash",
+        "make test \\",
+        "running",
+    )
+    calls = [s for s in world.fake.run(run.run_id)["steps"].values() if s["kind"] == "tool_call"]
+    [call] = [s for s in calls if s["name"] == "Bash"]
+    assert step["parent_step_id"] == call["id"]
+    world.release(job)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world)[1] == "The suite passed."
+    [step] = job_steps(world, run.run_id)
+    assert step["status"] == "completed"
+    assert world.fake.run(run.run_id)["metrics"]["background_jobs"] == 0
+    await nothing_left(world)
+
+
 async def test_a_stop_during_background_work_names_it_without_a_count(bg_world: World) -> None:
     world = bg_world
     job = world.gate("background_gate")

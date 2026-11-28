@@ -27,3 +27,6 @@ again after the fixed text and gets it again starts runs until the brake (`team.
 stops the pair. An edit of Hermes to a different text is passed on as before; an edit of the first answer
 to the silent reply after another text was posted is not checked. A runner that replays an
 unsent first answer after a restart without its run context sends it unchanged.
+
+Since FIX-TEAM-ACK-LOOP (2026-11-25) the notice of D-THN-2 names the member who asked without
+the `@` (D-TAL-2) and the quiet rules keep acknowledgements free of mentions (D-TAL-1).

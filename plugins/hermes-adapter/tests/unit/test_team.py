@@ -33,6 +33,7 @@ from bothy_hermes_adapter.runtime import (
 )
 from bothy_hermes_adapter.stages import StageRegistry
 from bothy_hermes_adapter.team import (
+    NOTICE_MARK,
     SILENT_REPLY,
     Speaker,
     followup_speaker,
@@ -209,7 +210,7 @@ def test_lines_keep_the_team_channel_quiet() -> None:
     assert SILENT_REPLY == "NOTHING_TO_ADD"
     for speaker in (Speaker(owner=True), Speaker(owner=False, handle="dev")):
         text = "\n".join(team_lines(facts, speaker))
-        assert "only when you hand that member work" in text
+        assert "only when that member has to act on your reply or answer it" in text
         assert "without the @" in text
         assert "was not for it" in text
         assert f"exactly {SILENT_REPLY}" in text
@@ -252,7 +253,9 @@ def test_a_silent_reply_to_an_addressed_input_is_replaced() -> None:
     assert addressed is not None
     assert unaddressed is not None
     member = team_reply(SILENT_REPLY, addressed, Speaker(owner=False, handle="dev"))
-    assert member.startswith("@dev: ")
+    # FIX-TEAM-ACK-LOOP: the member who asked is named without the @, so the notice starts no run.
+    assert member.startswith("dev: ")
+    assert "@" not in member
     assert not is_silent_reply(member)
     owner = team_reply(" nothing_to_add. ", addressed, Speaker(owner=True))
     assert not is_silent_reply(owner)
@@ -263,6 +266,63 @@ def test_a_silent_reply_to_an_addressed_input_is_replaced() -> None:
     assert team_reply(SILENT_REPLY, unaddressed, Speaker(owner=True)) == SILENT_REPLY
     assert team_reply(SILENT_REPLY, None, None) == SILENT_REPLY
     assert team_reply("Done. @dev", addressed, Speaker(owner=False, handle="dev")) == "Done. @dev"
+
+
+# The Hermes side of the sequence of 2026-11-25 09:40 UTC in the team channel, translated:
+# the conductor thanked hermesmember with @ and announced a report after the review round; the
+# Hermes run had nothing to add, and the adapter's notice mentioned the conductor, whose run then
+# explained that it had asked for nothing.
+THANKS_2026_11_25 = (
+    "@qa: Thanks for the analysis. I just continued `run-5684-x` with `resume`, review "
+    "round 1 runs again. Whether the review gets through this time I will tell you here after "
+    "the round."
+)
+
+
+def test_the_notice_of_the_2026_11_25_sequence_starts_no_run() -> None:
+    facts = team_facts(_facts_payload(source_handle="dev"))
+    assert facts is not None
+    notice = team_reply(SILENT_REPLY, facts, Speaker(owner=False, handle="dev"))
+    # The server hands a reply on to the members it mentions (09 3.9.4); the notice mentions
+    # nobody, so it ends the chain; the owner still sees the handle of the member who wrote.
+    assert "@" not in notice
+    assert notice.startswith("dev: ")
+    assert notice.endswith(NOTICE_MARK)
+    assert not is_silent_reply(notice)
+
+
+async def test_a_silent_answer_to_a_thanks_with_a_mention_hands_nothing_on(
+    tmp_path: Path,
+) -> None:
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.events.on_answer(turn.thread_id, SILENT_REPLY, None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r, THANKS_2026_11_25)
+        await r.until(lambda: r.finished(triggered.run_id))
+    (answer,) = r.fake.messages[-1:]
+    assert "@" not in answer["content_md"]
+    assert not is_silent_reply(answer["content_md"])
+
+
+def test_acknowledgements_and_start_notices_mention_nobody() -> None:
+    """FIX-TEAM-ACK-LOOP: "I start", "understood", "it runs", "I report when done" are no
+    hand-over; the mention comes with the result, a real hand-over or a question."""
+    facts = team_facts(_facts_payload(source_handle="dev"))
+    assert facts is not None
+    text = "\n".join(team_lines(facts, Speaker(owner=False, handle="dev")))
+    assert "An acknowledgement, a thanks" in text
+    assert "a notice that you start or that work runs" in text
+    assert "mention nobody with @, also when they answer a request" in text
+    assert "the mention comes with what the member has to act on" in text
+    assert "a question that needs its answer" in text
+    # Team follow-up of 2026-11-25: reviewagent answered hermesmember with @, hermesmember had
+    # nothing left to do, and the notice came anyway; an answer the member does not have to
+    # act on goes without @, a result it needs to go on keeps it.
+    assert "An answer or information the member does not have to act on" in text
+    assert "a result it waits for to go on" in text
 
 
 # ---- team runs -----------------------------------------------------------------------------------
@@ -738,7 +798,8 @@ async def test_a_silent_answer_to_a_members_request_hands_back(tmp_path: Path) -
         triggered = await _member_input(r)
         await r.until(lambda: r.finished(triggered.run_id))
     (answer,) = r.fake.messages[-1:]
-    assert answer["content_md"].startswith("@dev: ")
+    assert answer["content_md"].startswith("dev: ")
+    assert "@" not in answer["content_md"]
     assert not is_silent_reply(answer["content_md"])
 
 
@@ -756,8 +817,8 @@ async def test_a_silent_answer_to_an_unaddressed_owner_message_stays(tmp_path: P
 
 
 async def test_a_silent_answer_to_a_notice_stays_silent(tmp_path: Path) -> None:
-    """Red team: the notice mentions the requester; a silent answer to it must not post a notice
-    back, or two members ping-pong notices until the brake stops the channel."""
+    """Red team: a notice of an older version mentions the requester; a silent answer to it must
+    not post a notice back, or two members ping-pong notices until the brake stops them."""
 
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
         await rt.events.on_answer(turn.thread_id, SILENT_REPLY, None)
@@ -766,7 +827,7 @@ async def test_a_silent_answer_to_a_notice_stays_silent(tmp_path: Path) -> None:
     rt = FakeRuntime(script=script)
     facts = team_facts(_facts_payload(source_handle="dev"))
     notice = team_reply(SILENT_REPLY, facts, Speaker(owner=False, handle="qa"))
-    assert notice.startswith("@qa: ")
+    assert notice.startswith("qa: ")
     async with rig(tmp_path, runtime=rt) as r:
         triggered = await _member_input(r, notice)
         await r.until(lambda: r.finished(triggered.run_id))
@@ -793,4 +854,4 @@ async def test_a_later_silent_edit_never_undoes_the_notice(tmp_path: Path) -> No
         assert r.requests("updateMessage") == []
     assert r.fake.run_state(triggered.run_id).state == "completed"
     (answer,) = r.fake.messages[-1:]
-    assert answer["content_md"].startswith("@dev: ")
+    assert answer["content_md"].startswith("dev: ")

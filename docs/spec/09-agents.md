@@ -483,9 +483,11 @@ nothing new to contribute answers with it, so its run posts nothing in the team 
 nothing (FIX-TEAM-CHANNEL-NOISE). The reply stays in the member's work thread. A request that
 mentions a member is never answered with it: the quiet rules (3.9.9) say so, and the Claude Code
 runner and the Hermes adapter replace a silent first answer to a `team` run whose input mentions
-the member by a short visible answer that mentions the member who asked (an owner is not
-mentioned), so the server mirrors it and hands it back (FIX-TEAM-HANDOFF-NOT-NOTHING). A silent
-answer to such a notice stays silent, so two members never send notices back and forth.
+the member by a short visible answer, so the server mirrors it (FIX-TEAM-HANDOFF-NOT-NOTHING).
+The answer names the member who asked without the `@` (an owner is not named), so it hands
+nothing on: the input may have been only an acknowledgement, and a mention would start a run of
+its writer that answers the notice (FIX-TEAM-ACK-LOOP). A silent answer to a notice of an older
+version, which still mentions, stays silent.
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
@@ -630,9 +632,14 @@ This is the contract the runner and the Hermes adapter build against.
   mention is a hand-over with an expectation, that a member it only refers to is named without the
   `@`, that no member is mentioned to say that a message was not for it, that the writer stays out,
   agrees or waits, and that a run with nothing new to contribute answers with exactly
-  `NOTHING_TO_ADD`. An input that mentions the member with `@` and asks it for something is never
-  answered with `NOTHING_TO_ADD`: the member does what it asks, or says briefly what it needs or
-  what blocks it, and mentions the member who asked when it gives something back; the silent
+  `NOTHING_TO_ADD`. An acknowledgement, a thanks, a notice that work starts or runs and a status
+  mention nobody, also when they answer a request: a member is mentioned only when it has to act
+  on the reply or answer it (a hand-over, a result it waits for to go on, a question that needs
+  its answer); an answer or information it does not have to act on goes without `@`, also when
+  it asked for it (FIX-TEAM-ACK-LOOP). An input that mentions the member with `@` and asks it for
+  something is never answered with `NOTHING_TO_ADD`: the member does what it asks, or says
+  briefly what it needs or what blocks it, and mentions the member who asked when that member
+  has to act on the answer; the silent
   reply stays for an owner message without a mention, a context input and an input that names
   the member without the `@` (FIX-TEAM-HANDOFF-NOT-NOTHING). The runner and the adapter enforce
   it for the run's first answer (3.9.4).
@@ -3676,8 +3683,9 @@ serves `team` runs by the contract of 3.9.9:
   owner wrote is the owner's word, and that a member hands work over by mentioning a handle in
   its final reply, outside code, followed by the quiet rules of 3.9.9 (a mention only for a
   hand-over, `NOTHING_TO_ADD` when the run has nothing new to contribute, never towards a request
-  that mentions the member; a silent first answer to an input that mentions the member is replaced
-  by a short visible answer, FIX-TEAM-HANDOFF-NOT-NOTHING). Handles are printed only
+  that mentions the member, no mention for an acknowledgement; a silent first answer to an input
+  that mentions the member is replaced by a short visible answer that names the member who asked
+  without the `@`, FIX-TEAM-HANDOFF-NOT-NOTHING, FIX-TEAM-ACK-LOOP). Handles are printed only
   in the form of 3.9.1; any other text becomes `unknown`.
 - **Status lines** (FIX-TEAM-CHANNEL-NOISE). Hermes routes every status of its status callback
   (a memory plugin's recall line such as "recalled 43 memories", a lifecycle, fallback
@@ -4022,6 +4030,15 @@ The check fails closed:
   (run with the pinned CLI), and the account rules of 18.9 handle it. Any other API error
   after a record without the beta means that some credential was taken and ends the run the
   same way.
+- Addendum of 2026-11-25 (FIX-RUNNER-BG-VISIBILITY): while the run waits for the account
+  (18.9) or the last account error of the process was `not_logged_in`, such an output does not
+  stop the session: it is withheld (not posted, not shown in the live box, no answer and no
+  proof that the account works), the runner logs `counter_check_withheld` once, and the wait
+  goes on with its retries and its bound `runner.account_retry_max_wait`. The next request
+  record with the beta ends the withholding (`counter_check_login_back`). A brief loss of the
+  login on the host made the pinned CLI answer the runner's retry line after a request record
+  without the beta (live run of 2026-11-25), and stopping the session then stopped its
+  background work with it.
 - Whether the check has passed is a member of the turn record (18.9 "Crash of the runner in
   background mode"), written at every request record that changes it. A runner that adopts
   the turn takes it from the record alone and counts the check as not passed when the record
@@ -4130,12 +4147,12 @@ the content is read only afterwards.
 |---|---|---|
 | `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the run's prompt: `agent_session.report` with `started = true` once, in the place of `system/init`; a record before it is skipped when it has no origin or one of the session itself (a resume first writes what closes the interrupted turn of the process before); any other record with an origin before it is an input of another sender (18.5 "Whose input") |
 | `api-request`, every one | `params.betas`, `timestamp` | the counter-check of 18.3; with `timestamp` whether a deferred `dequeue` is given on (`queue-operation` below) |
-| `assistant` | `timestamp` (whether a deferred `dequeue` is given on, `queue-operation` below), `message.id`, `message.model`, `message.content[]` (`text`; `tool_use` with `id`, `name`, `input`), `message.usage` | `/model` from the first one that is not synthetic; `/last_text_excerpt`; one `tool_call` step per `tool_use`; context percent while the window of the model is known; `/cost` as in 18.7, once per `message.id` with its newest usage. Addendum of 2026-11-18 (FIX-RUNNER-BG-AGENT-STEPS): a `tool_use` of the tool `Agent` also opens a step `subagent` with detail `{"type":"local_agent"}` under its `tool_call` step, titled with `input.description`, as `task_started` of the table above, so the live topology shows the agent; the task is known by the id of the tool call |
+| `assistant` | `timestamp` (whether a deferred `dequeue` is given on, `queue-operation` below), `message.id`, `message.model`, `message.content[]` (`text`; `tool_use` with `id`, `name`, `input`), `message.usage` | `/model` from the first one that is not synthetic; `/last_text_excerpt`; one `tool_call` step per `tool_use`; context percent while the window of the model is known; `/cost` as in 18.7, once per `message.id` with its newest usage. Addendum of 2026-11-18 (FIX-RUNNER-BG-AGENT-STEPS): a `tool_use` of the tool `Agent` also opens a step `subagent` with detail `{"type":"local_agent"}` under its `tool_call` step, titled with `input.description`, as `task_started` of the table above, so the live topology shows the agent; the task is known by the id of the tool call. Addendum of 2026-11-25 (FIX-RUNNER-BG-VISIBILITY): a `tool_use` of the tool `Bash` with `input.run_in_background` true opens a step `background_job` named `local_bash` under its `tool_call` step, titled with the first line of `input.command` (the title of the call's own step, no other member is read), known by the id of the tool call |
 | `assistant` with `isApiErrorMessage` | `error`, `apiErrorParams` | no work; the class of an account error and its reset time (18.9); the recognised error texts of 18.9 |
-| `user` without an origin, with `tool_result` items | `tool_use_id`, `is_error`, `toolUseResult.status`, `toolUseResult.agentId`, `toolUseResult.taskId`, `toolUseResult.taskType`, `toolUseResult.summary` | the step ends `completed` or `failed`; a record that carries an origin is never read as a tool result. The result of an `Agent` call ends its `subagent` step the same way, unless `toolUseResult.status` is `async_launched` (a background agent: the step stays open until its notification); a result with `async_launched` and `taskType` `local_workflow` opens a step `workflow` under the call, titled with the first line of `summary` (FIX-RUNNER-BG-AGENT-STEPS) |
+| `user` without an origin, with `tool_result` items | `tool_use_id`, `is_error`, `toolUseResult.status`, `toolUseResult.agentId`, `toolUseResult.taskId`, `toolUseResult.taskType`, `toolUseResult.summary`, `toolUseResult.backgroundTaskId` | the step ends `completed` or `failed`; a record that carries an origin is never read as a tool result. The result of an `Agent` call ends its `subagent` step the same way, unless `toolUseResult.status` is `async_launched` (a background agent: the step stays open until its notification); a result with `async_launched` and `taskType` `local_workflow` opens a step `workflow` under the call, titled with the first line of `summary` (FIX-RUNNER-BG-AGENT-STEPS). The result of a background `Bash` call keeps its `background_job` step open when it names `toolUseResult.backgroundTaskId` (the command went to the background), ends it `failed` when it is an error and `completed` otherwise (FIX-RUNNER-BG-VISIBILITY) |
 | `user` with `origin.kind` `peer` | `uuid` | a line of the inbox socket that started a turn. With a `uuid` the runner wrote, seen for the first time: its echo, the follow-up is `absorbed` (18.5). With any other `uuid`: an input of another sender (18.5 "Whose input") |
 | `user` with `origin.kind` `human` that is not the run's prompt | none | a person typed into the session: an input of another sender, whatever its content (18.5 "Whose input") |
-| `user` with an origin of the session itself: `origin.kind` `task-notification` with `origin.producer` `session-task` and without `origin.subkind`, or `origin.kind` `auto-continuation` | `origin.producer`, `origin.subkind`; of a notification the `<task-id>`, `<tool-use-id>`, `<status>` and `<usage>` of its text | a turn the session starts by itself (18.5 "Whose input"). A notification that names a tool call of this process that opened a `subagent` or `workflow` step, by `<tool-use-id>` or else by the `<task-id>` that the call's `async_launched` result gave as `toolUseResult.agentId` or `toolUseResult.taskId` (a notification of an agent that waits on its own background work names the task id alone), ends that step by its `<status>` like `task_notification` of the table above, and its `<usage>` (`subagent_tokens`, `tool_uses`, `duration_ms`) becomes `detail.usage`; the ids and the status are read before the `<summary>`, the usage after the agent's `<result>`, and neither the summary nor the result is read (FIX-RUNNER-BG-AGENT-STEPS) |
+| `user` with an origin of the session itself: `origin.kind` `task-notification` with `origin.producer` `session-task` and without `origin.subkind`, or `origin.kind` `auto-continuation` | `origin.producer`, `origin.subkind`; of a notification the `<task-id>`, `<tool-use-id>`, `<status>` and `<usage>` of its text | a turn the session starts by itself (18.5 "Whose input"). A notification that names a tool call of this process that opened a `subagent`, `workflow` or `background_job` step, by `<tool-use-id>` or else by the `<task-id>` that the call's result gave as `toolUseResult.agentId`, `toolUseResult.taskId` or `toolUseResult.backgroundTaskId` (a notification of an agent that waits on its own background work names the task id alone), ends that step by its `<status>` like `task_notification` of the table above, and its `<usage>` (`subagent_tokens`, `tool_uses`, `duration_ms`) becomes `detail.usage`; the ids and the status are read before the `<summary>`, the usage after the agent's `<result>`, and neither the summary nor the result is read (FIX-RUNNER-BG-AGENT-STEPS) |
 | `user` with any other origin, also `task-notification` without that producer or with a `subkind` | none | an input of another sender (18.5 "Whose input") |
 | `queue-operation` | `operation`, `reason`, `commandUuid`, `timestamp` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5), matched in their order, and `dequeue` starts a turn; a `dequeue` after a turn's final answer (`end_turn`, no request since) and before its end (the CLI may write it first) starts its turn after that turn's `result`; so does a `dequeue` while a request waits for its output when the output that follows has an earlier `timestamp` (the CLI may write the record of a turn's final answer seconds late, seen with 2.1.326, 2.1.330 and 2.1.331, addendum of 2026-11-24, FIX-RUNNER-CLI-331); an output with a later or no readable `timestamp` gives the start on before it; a `user` record with `queueTranscriptOnly` (an input the CLI only notes) ends a turn that only such inputs opened (the CLI may dequeue several at once), with the last of them, like a `result` with `num_turns` 0 (evidence: structure-only copies of real transcripts in `plugins/claude-code-runner/tests/fixtures/transcript/`, `followup_before_late_answer.jsonl` of 2026-11-24 and `transcript_only_notice_after_late_answer.jsonl` of 2026-11-18); `remove` with `absorbed_mid_turn` and a `commandUuid` the runner wrote is the echo of that line, a second one under the same `commandUuid` an input of another sender. The CLI removes the notification of the session's own background work the same way, under a `uuid` it made itself, so a removal under any other `uuid` leaves the input open until its attachment (next row) says whose it is |
 | `attachment` of the type `queued_command` | `attachment.origin.kind`, of a `task-notification` also `attachment.origin.producer` and `attachment.origin.subkind`, `attachment.source_uuid` | what a running turn took in, written right after the record of the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with any other origin that is not one of the session itself, an input of another sender (18.5 "Whose input"); with an origin of the session itself (the two of the `user` rows above) the input of that `source_uuid` is the session's own. An input that is still open at the first `assistant` record after the request that carries it, at the next request or at turn end is an input of another sender too, unless the same attachment in the file of an agent of the session (`<session id>/subagents/**/*.jsonl`, a record with `isSidechain` true) attributes it by this row: an agent the session launched takes inputs too, and the CLI writes their removal into the session's transcript and their attachment into the agent's file. An attachment of the session's own notification (`attachment.commandMode` `task-notification`, `attachment.prompt`) ends the step of its tool call like the `user` row of such a notification. No other attachment is read |
@@ -4146,10 +4163,12 @@ Not available in background mode: `tool_progress` (while the session list says `
 turn, the runner counts one progress event per reading, so a long tool call is not reported
 stalled); the progress of a task and `workflow_progress` (a subagent or a workflow is a step of
 its own from its call to its end, but the steps inside it, the agents of a workflow and the usage
-before its end are not shown; a background shell command stays the one `tool_call` step of its
-tool, FIX-RUNNER-BG-AGENT-STEPS); `background_tasks_changed`
-(`/metrics/background_jobs` is 1 while the session list says `busy` between two turns, else 0,
-so a summary names lost background work without a count); `system/status` and `system/api_retry`;
+before its end are not shown, FIX-RUNNER-BG-AGENT-STEPS); `background_tasks_changed` (the
+runner reports it itself while the session list says `busy` between two turns: the background
+shell commands of the process that no result or notification ended, by the ids of their tool
+calls, or the one task `background` when there is none, again at every change of that set, and
+the empty set once the list says `idle`, which ends every `background_job` step still open;
+`/metrics/background_jobs` is the size of that set, and between turns only, FIX-RUNNER-BG-VISIBILITY); `system/status` and `system/api_retry`;
 `rate_limit_event`; and `contextWindow`, cost per turn and `num_turns` of a `result` (the window
 of a model is known only from an earlier print turn of the session, and `/cost` is settled once,
 when the session process ended).
@@ -4355,7 +4374,8 @@ channel), who wrote the input, whether it mentions the member (the server's rule
 how to hand work on (`@handle` of a listed member in the final reply, outside code, never its
 own), with the quiet rules of 3.9.9 (FIX-TEAM-CHANNEL-NOISE). The run's first answer, when it
 is only the silent reply and the trigger mentions the member, goes out as a short visible answer
-of the runner instead, which mentions the source member (FIX-TEAM-HANDOFF-NOT-NOTHING). Who wrote the input comes from the triggering message alone, never from the member
+of the runner instead, which names the source member without the `@`
+(FIX-TEAM-HANDOFF-NOT-NOTHING, FIX-TEAM-ACK-LOOP). Who wrote the input comes from the triggering message alone, never from the member
 `team`, `triggered_by` or the token's `sub`: an input of origin `agent` or with an author of
 kind `agent` is a team member's, labelled "team member @handle" (the one source member:
 `team.source_handle` in the team part, the message's `team_handle` in the lead-in of a later
