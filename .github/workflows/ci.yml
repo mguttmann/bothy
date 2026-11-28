@@ -709,7 +709,7 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-apps ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -835,8 +835,9 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-sdk-plugins ')
     runs-on: ubuntu-24.04
-    # The Hermes adapter suite against the pinned Hermes takes most of this limit (D-HAM-6).
-    timeout-minutes: 75
+    # The Hermes adapter suite against the pinned Hermes takes most of the job (D-HAM-6); the
+    # limit is about one and a half times its longest passing run (RED-RUNS-1128/1).
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1254,8 +1255,9 @@ jobs:
     # The desktop integration tests (one app build per file, and one for the files of
     # integration_test/desktop_suite_test.dart) and the native tests of the Mac; the iOS
     # simulator entries run in apps-ios (PL/44). The limit holds the job as measured for
-    # docs/decisions.d/AUD-client-misc-01.md (ruling AUD-CM01/2) with the suite added.
-    timeout-minutes: 75
+    # docs/decisions.d/AUD-client-misc-01.md (ruling AUD-CM01/2) with the suite added, raised
+    # to about one and a half times its longest passing run (RED-RUNS-1128/1).
+    timeout-minutes: 105
     permissions:
       contents: read
     steps:
@@ -1292,8 +1294,9 @@ jobs:
     # the phone tests and the native simulator tests; a command that stalls is stopped by
     # tools/ci/apps_platform.py (SILENCE_SECONDS, APP_START_SILENCE_SECONDS while the app starts)
     # and runs once more. The accessibility audit of Xcode (M5-10) builds the app once more with
-    # its own entry. The limit holds a stalled start and its second run (PL/57).
-    timeout-minutes: 90
+    # its own entry. The limit holds a stalled start and its second run (PL/57) and was raised
+    # to about one and a half times its longest passing run (RED-RUNS-1128/1).
+    timeout-minutes: 120
     permissions:
       contents: read
     steps:

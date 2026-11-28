@@ -552,7 +552,13 @@ async function running<T>(
 
 /** The adapter's private run table, read the way the Python tests read `_runs`. */
 interface Internals {
-  readonly runs: Map<string, { readonly waitingForToken: boolean }>;
+  readonly runs: Map<
+    string,
+    {
+      readonly waitingForToken: boolean;
+      readonly task: { readonly done: boolean } | undefined;
+    }
+  >;
   readonly runTokens: Map<string, Secret>;
   renew(state: unknown, token: Secret): Promise<Secret>;
 }
@@ -1156,6 +1162,9 @@ describe("runs in progress", () => {
         override async execute(inv: Invocation, run: RunHandle): Promise<void> {
           await super.execute(inv, run);
           await run.awaitInput("Which file?");
+          // The server shows waiting_input before the handler returns; a late return must not
+          // let the cancel reach a run whose work still runs (that path resends the end itself).
+          await new Promise((resolve) => setTimeout(resolve, 50));
         }
       }
       const handler = new Waiting();
@@ -1173,6 +1182,12 @@ describe("runs in progress", () => {
         await until(
           fake,
           async () => (await stateOf(runId)) === "waiting_input",
+        );
+        // The cancel of a waiting run ends it from the event, which is only the case once the
+        // handler work returned; before that the cancel aborts the work instead.
+        await until(
+          fake,
+          () => internals(adapter).runs.get(runId)?.task?.done === true,
         );
         await fake.cancel(runId);
         await until(fake, () =>
