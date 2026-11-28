@@ -472,13 +472,17 @@ every member, who wrote the input, whether it mentions the member, and how to ha
   that run (the SDK's outbox binds it), which the server needs before it mirrors the answer
   and hands it to the mentioned members.
 - **Quiet rules** (FIX-TEAM-CHANNEL-NOISE). The team part tells the session to mention a member
-  only to hand it work, to name a member it only refers to without the `@`, and to answer
+  only when that member has to act on the reply or answer it (work, a result it waits for, a
+  question), never for an answer it does not have to act on and never in an acknowledgement
+  or a notice that work starts or runs (FIX-TEAM-ACK-LOOP), to name a member it only refers to
+  without the `@`, and to answer
   exactly `NOTHING_TO_ADD` when it has nothing new to contribute; the server does not mirror
   such an answer. An owner message with member mentions reaches only those members (09 3.9.3).
   A request that mentions the member is never answered with it (FIX-TEAM-HANDOFF-NOT-NOTHING):
   the session does it or says what it needs or what blocks it, and when the first answer of a
   run whose trigger mentions the member is only `NOTHING_TO_ADD`, the runner posts a short
-  visible answer instead that mentions the member who asked.
+  visible answer instead that names the member who asked without the `@`, so it starts no run
+  of that member (FIX-TEAM-ACK-LOOP).
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
 
@@ -689,7 +693,9 @@ Before you switch it on:
   differently therefore ends every background turn that way instead of running unchecked;
   the mode runs only on the pinned version anyway. A login that is gone is no mismatch: the
   CLI then reports `authentication_failed`, and the run waits for the account as in print
-  mode.
+  mode. While it waits, an answer after a request without the beta is withheld
+  (`counter_check_withheld` in the log): it is not posted, the session and its background
+  work are kept, and the wait goes on until a turn on the login answers.
 
 How a background turn runs:
 

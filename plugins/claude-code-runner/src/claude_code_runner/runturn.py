@@ -658,6 +658,9 @@ class RunTurn:
         self.login_waiting = False
         """The run waits for the retry after a request without the login: its stopped session
         took the prompt, so a cancellation finishes the run like one during a launch."""
+        self._bg_withholding = False
+        """The counter-check withholds the session's output while it waits for its account
+        (`_counter_check`); for the log lines at the start and the end of that phase only."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
         self.owner_codes: OwnerCodes | None = None
@@ -1749,7 +1752,7 @@ class RunTurn:
         if not task.cancelled() and task.exception() is not None:
             _warn("followup_offer_failed", error=type(task.exception()).__name__, **self.ids)
 
-    async def _read(  # noqa: PLR0912 - one branch per message kind of 18.4
+    async def _read(  # noqa: PLR0912, PLR0915 - one branch per message kind of 18.4
         self,
         reader: StreamReader | TranscriptReader,
         group: StoppableGroup,
@@ -1779,13 +1782,26 @@ class RunTurn:
                     saved_at = self.monotonic()
                     await self._checkpoint(reader.offset)
                 continue
-            self.ledger.line(message, reader.line_offset, reader.offset)
-            self.ps.apply(message, self.monotonic())
+            verdict = self._counter_check(message) if session is not None else False
+            withheld = verdict is True
+            if not withheld:
+                # A withheld output never reaches the ledger: it is no answer of an input and
+                # no result the end of the process is judged by (FIX-RUNNER-BG-VISIBILITY).
+                self.ledger.line(message, reader.line_offset, reader.offset)
+            if isinstance(verdict, str) and session is not None:
+                return await self._login_unproven(session, verdict, attempt)
+            self.ps.apply(message, self.monotonic(), proven=not withheld)
             kind, subtype = message.get("type"), message.get("subtype")
             if session is not None:
                 handled = await self._read_background(message, session, attempt)
                 if handled is not None:
                     return handled
+                if withheld:
+                    # Nothing of a withheld output is posted, shown or taken for an answer;
+                    # the wait for the account goes on (FIX-RUNNER-BG-VISIBILITY).
+                    if self.ps.has_stdin and kind == "result":
+                        await self._idle(group)
+                    continue
             elif kind == "system" and subtype == "init" and attempt is not None:
                 if message.get("apiKeySource") != _EXPECTED_KEY_SOURCE.get(self.state.mode):
                     _warn("counter_check_failed", **self.ids)
@@ -3648,6 +3664,7 @@ class RunTurn:
         self.bg_login = False
         self._bg_requests = 0
         self._bg_offset = offset
+        self._bg_withholding = False
         self.bg_record = {
             "name": name,
             "socket": str(files.socket),
@@ -4004,14 +4021,11 @@ class RunTurn:
 
         An input the runner did not write (18.5) is logged and nothing else: the session answers it
         like any input and the run goes on (ruling D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input is never
-        discarded and never ends a run). The counter-check of 18.3 ends the run here, before
-        anything of the message is posted; it fails closed: every request record is judged, and
-        nothing a session puts out (`_is_output`) is accepted unless the newest request record of
-        its process listed the login beta, so neither after a record without it nor before any
-        record.
+        discarded and never ends a run). The counter-check of 18.3 ran before (`_counter_check`).
 
         Returns:
-            An outcome when the message ended the run (the counter-check), else ``None``.
+            An outcome when the message ended the run (an owner code of another sender), else
+            ``None``.
         """
         kind, subtype = message.get("type"), message.get("subtype")
         if kind == "system" and subtype == "bg_foreign":
@@ -4019,15 +4033,6 @@ class RunTurn:
             if message.get("owner_code") is True:
                 return await self._owner_code_stolen(session, str(message.get("origin")))
             return None
-        if kind == "system" and subtype == "bg_request":
-            self._bg_requests += 1
-            listed = message.get("login") is True
-            if listed != self.bg_login:
-                self.bg_login = listed
-                self._persist()  # an adopter reads whether the check has passed
-        elif not self.bg_login and _is_output(message):
-            code = "request_without_login" if self._bg_requests else "no_request_record"
-            return await self._login_unproven(session, code, attempt)
         if kind == "system" and subtype == "init" and attempt is not None:
             await self._report_session(message, attempt)
             if message.get("session_id") and self.phase == "starting":
@@ -4048,6 +4053,51 @@ class RunTurn:
                 **self.ids,
             )
         return None
+
+    def _counter_check(self, message: Mapping[str, Any]) -> str | bool:
+        """The counter-check of 18.3 for one mapped message, before anything of it takes effect.
+
+        It fails closed: every request record is judged, and nothing a session puts out
+        (`_is_output`) is accepted unless the newest request record of its process listed the
+        login beta, so neither after a record without it nor before any record. Such an output
+        stops the session and ends the run ``billing_mode_mismatch`` or tries the turn once
+        more (`_login_unproven`, FIX-RUNNER-LOGIN-BLIP-RETRY), unless the session waits
+        for its account (a wait runs) or its last account error was ``not_logged_in``: a brief
+        loss of the login, which the pinned CLI may follow with a request record without the
+        beta and an answer (live run of 2026-11-25). Then the output is withheld instead: it is
+        not posted, not shown and no proof that the account works, the session and its
+        background work are kept, and the wait goes on until a turn on a proven login answers
+        or ``runner.account_retry_max_wait`` ends it (FIX-RUNNER-BG-VISIBILITY). A withheld
+        message never reaches the ledger either, so a wait given up after it ends with the
+        account error, not with the withheld answer.
+
+        Returns:
+            The code of the failed check (``request_without_login`` or ``no_request_record``)
+            when the session must stop (`_login_unproven`); True when the message is withheld;
+            False when it may take effect.
+        """
+        kind, subtype = message.get("type"), message.get("subtype")
+        if kind == "system" and subtype == "bg_request":
+            self._bg_requests += 1
+            listed = message.get("login") is True
+            if listed != self.bg_login:
+                self.bg_login = listed
+                self._persist()  # an adopter reads whether the check has passed
+            if listed and self._bg_withholding:
+                self._bg_withholding = False
+                _log("counter_check_login_back", **self.ids)
+            return False
+        if self.bg_login or not _is_output(message):
+            return False
+        code = "request_without_login" if self._bg_requests else "no_request_record"
+        if self.ps.account is None and not self.ps.login_lost:
+            return code
+        if not self._bg_withholding:
+            self._bg_withholding = True
+            wait = self.ps.account
+            error = wait.error.kind if wait is not None else "not_logged_in"
+            _warn("counter_check_withheld", code=code, error=error, **self.ids)
+        return True
 
     async def _owner_code_stolen(self, session: BgSession, origin: str) -> _Outcome:
         """Another sender gave the session an owner code the runner wrote: stop it (18.5).

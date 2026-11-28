@@ -2105,3 +2105,213 @@ def test_an_input_the_cli_only_notes_after_a_result_does_not_hold_the_session() 
     for message in [*ended, *out]:
         state.apply(message, 1.0)
     assert _decide_pending(state, 2.0, pending=0) == "close"
+
+
+# ---- background commands as background_job steps (FIX-RUNNER-BG-VISIBILITY) ----------------------
+
+
+def _job_call(tool_use_id: str, command: str) -> dict[str, Any]:
+    return _call(tool_use_id, "Bash", command=command, description="d", run_in_background=True)
+
+
+def _job_launched(tool_use_id: str, task_id: str) -> dict[str, Any]:
+    # The result the pinned CLI writes when the command went to the background (recording).
+    return _answer(tool_use_id, stdout="", stderr="", interrupted=False, backgroundTaskId=task_id)
+
+
+def _job_notice(tool_use_id: str, task_id: str, status: str) -> dict[str, Any]:
+    return _own_notice(
+        f"<task-notification>\n<task-id>{task_id}</task-id>\n"
+        f"<tool-use-id>{tool_use_id}</tool-use-id>\n<status>{status}</status>\n"
+        f'<summary>Background command "d" {status}</summary>\n</task-notification>'
+    )
+
+
+def test_the_recorded_background_command_is_a_background_job_step_its_notification_ends() -> None:
+    # The pinned CLI's records of a Bash call with run_in_background: the call, the result that
+    # names the background task, and later the session's own notification with the tool call
+    # and the status. Before this fix the live box got the tool call only, and the work
+    # between the turns showed as the one task "background" without a step.
+    records = transcript("background")
+    mapper = TranscriptMapper("prompt-uuid", lines_of_the_runner(records).__contains__)
+    out = [m for r in records for m in mapper.map(r)]
+    started = [m for m in out if m.get("subtype") == "task_started"]
+    assert started == [
+        {
+            "type": "system",
+            "subtype": "task_started",
+            "task_id": "toolu_01",
+            "tool_use_id": "toolu_01",
+            "task_type": "local_bash",
+            "description": "sleep 8; echo done",
+        }
+    ]
+    ended = [m for m in out if m.get("subtype") == "task_notification"]
+    assert [(m["task_id"], m["status"]) for m in ended] == [("toolu_01", "completed")]
+    _, patch = _agent_box(records)
+    [job] = _steps(patch, "background_job")
+    assert (job["name"], job["title"], job["status"]) == (
+        "local_bash",
+        "sleep 8; echo done",
+        "completed",
+    )
+    assert job["parent_step_id"] == _tool_step_of(patch, "Bash")
+
+
+def test_a_background_command_stays_open_after_its_launch_and_a_refused_one_fails() -> None:
+    records = [
+        *_prompt(),
+        _job_call("toolu_j", "pytest -q \\\n  --maxfail=1"),
+        _job_call("toolu_k", "make image"),
+        _call("toolu_f", "Bash", command="ls"),
+        _job_launched("toolu_j", "bj1"),
+        _answer("toolu_k", error=True),
+        _answer("toolu_f"),
+    ]
+    _, patch = _agent_box(records)
+    jobs = {s["title"]: s for s in _steps(patch, "background_job")}
+    # The title follows the rule of every step: the first line of the command.
+    assert set(jobs) == {"pytest -q \\", "make image"}
+    assert jobs["pytest -q \\"].get("status") is None  # still running
+    assert jobs["make image"]["status"] == "failed"  # the command never went to the background
+
+
+def test_a_notification_that_names_the_task_id_alone_ends_the_command() -> None:
+    records = [
+        *_prompt(),
+        _job_call("toolu_j", "sleep 60"),
+        _job_launched("toolu_j", "bj1"),
+        _own_notice(
+            "<task-notification>\n<task-id>bj1</task-id>\n<status>failed</status>\n"
+            "</task-notification>"
+        ),
+    ]
+    _, patch = _agent_box(records)
+    [job] = _steps(patch, "background_job")
+    assert job["status"] == "failed"
+
+
+def test_another_sender_s_notification_ends_no_background_command() -> None:
+    peer = _job_notice("toolu_j", "bj1", "completed")
+    peer["origin"] = {"kind": "peer"}
+    peer["uuid"] = "line-of-another-program"
+    records = [*_prompt(), _job_call("toolu_j", "sleep 60"), _job_launched("toolu_j", "bj1"), peer]
+    _, patch = _agent_box(records)
+    [job] = _steps(patch, "background_job")
+    assert job.get("status") is None
+
+
+def _tasks_reported(messages: list[dict[str, Any]]) -> list[list[str]]:
+    return [
+        [t["task_id"] for t in m["tasks"]]
+        for m in messages
+        if m.get("subtype") == "background_tasks_changed"
+    ]
+
+
+async def test_busy_between_turns_reports_the_open_background_commands(tmp_path: Path) -> None:
+    # Two commands go to the background; the notification turn of the first one leaves the
+    # second running; the list says idle after the last turn.
+    sessions = Sessions(after_turn=["busy", "busy", "idle"])
+    dequeue = record("queue-operation", operation="dequeue")
+    pieces = [
+        piece(
+            PROMPT,
+            _job_call("toolu_j", "pytest -q"),
+            _job_launched("toolu_j", "bj1"),
+            _job_call("toolu_k", "make image"),
+            _job_launched("toolu_k", "bj2"),
+            ANSWER,
+            TURN_END,
+        ),
+        piece(dequeue, _job_notice("toolu_j", "bj1", "completed"), ANSWER, TURN_END),
+        piece(dequeue, _job_notice("toolu_k", "bj2", "completed"), ANSWER, TURN_END),
+    ]
+    messages, _ = await read_through(tmp_path, pieces, sessions)
+    assert _tasks_reported(messages) == [["toolu_j", "toolu_k"], ["toolu_k"], []]
+    first = next(m for m in messages if m.get("subtype") == "background_tasks_changed")
+    assert first["tasks"][0]["description"] == "pytest -q"
+    # The ids the live box knows the steps by, so the steps end with the list.
+    started = [m["task_id"] for m in messages if m.get("subtype") == "task_started"]
+    assert started == ["toolu_j", "toolu_k"]
+
+
+async def test_busy_without_a_known_background_command_is_the_one_task(tmp_path: Path) -> None:
+    sessions = Sessions(after_turn=["busy", "idle"])
+    notified = record("user", origin=OWN_NOTIFICATION, message={"content": "n"})
+    dequeue = record("queue-operation", operation="dequeue")
+    pieces = [piece(PROMPT, ANSWER, TURN_END), piece(dequeue, notified, ANSWER, TURN_END)]
+    messages, _ = await read_through(tmp_path, pieces, sessions)
+    assert _tasks_reported(messages) == [[BACKGROUND_TASK], []]
+
+
+async def test_a_command_still_open_when_the_list_first_says_idle_gets_the_empty_list(
+    tmp_path: Path,
+) -> None:
+    # The list never said busy between turns, so no list was reported before; the command
+    # the idle session no longer runs still gets the empty list that ends its step.
+    sessions = Sessions(after_turn=["idle"])
+    pieces = [
+        piece(
+            PROMPT,
+            _job_call("toolu_j", "sleep 60"),
+            _job_launched("toolu_j", "bj1"),
+            ANSWER,
+            TURN_END,
+        )
+    ]
+    messages, _ = await read_through(tmp_path, pieces, sessions)
+    assert _tasks_reported(messages) == [[]]
+
+
+async def test_a_command_without_a_notification_ends_once_the_session_is_idle(
+    tmp_path: Path,
+) -> None:
+    # A command the CLI stopped without a notification (a stop leaves no marker in the
+    # transcript): its step ends with the empty list once the session is idle.
+    sessions = Sessions(after_turn=["busy"])
+    pieces = [
+        piece(PROMPT, _job_call("toolu_j", "sleep 60"), _job_launched("toolu_j", "bj1"), ANSWER),
+        piece(TURN_END),
+    ]
+    path = tmp_path / "session.jsonl"
+    path.write_bytes(b"")
+    alive = [True]
+    patch = Patch()
+    live = LiveBox(
+        patch,  # type: ignore[arg-type]
+        own_uuid="prompt-uuid",
+        title_requested=False,
+        context_windows={},
+        now=lambda: AGENT_NOW,
+    )
+    reader = TranscriptReader(
+        lambda: path,
+        0.0,
+        lambda: alive[0],
+        TranscriptMapper("prompt-uuid"),
+        sessions=sessions,  # type: ignore[arg-type]
+        short_id="1a2b3c4d",
+        pid=PID,
+    )
+    left = list(pieces)
+    async for message in reader.items():
+        if message is not None:
+            live.apply(message)
+            continue
+        if left:
+            with path.open("ab") as fh:
+                fh.write(left.pop(0))
+        elif sessions.status == "busy":
+            [job] = _steps(patch, "background_job")
+            assert job.get("status") is None
+            assert patch.values["/metrics/background_jobs"] == 1
+            sessions.status = "idle"
+            sessions.last = sessions._reading()
+        else:
+            alive[0] = False
+    [job] = _steps(patch, "background_job")
+    assert job["status"] == "completed"
+    assert patch.values["/metrics/background_jobs"] == 0
+    # A later busy phase does not list the stopped command again.
+    assert reader.mapper.open_jobs() == []

@@ -304,10 +304,12 @@ mentions a handle (`@dev`) in its final answer; the server reads the mention. Ev
 the run, the answer included, carries the run's own token, which the server needs to hand an
 answer on. A `team` run without its team facts, and any trigger kind the adapter does not know,
 ends `failed` with `adapter_error` before the start. The team lines also carry the quiet rules
-(a mention only to hand work over, `NOTHING_TO_ADD` when the agent has nothing new to contribute,
+(a mention only when the member has to act on the reply or answer it, never for an answer it
+does not have to act on and never in an acknowledgement, FIX-TEAM-ACK-LOOP; `NOTHING_TO_ADD` when the agent has nothing new to contribute,
 which the server does not mirror; FIX-TEAM-CHANNEL-NOISE), never towards a request that mentions
 the agent: a first answer that is only `NOTHING_TO_ADD` to an input that mentions the agent goes
-out as a short visible answer that mentions the member who asked (FIX-TEAM-HANDOFF-NOT-NOTHING). Hermes' status lines (a memory
+out as a short visible answer that names the member who asked without the `@`, so it starts no
+run of that member (FIX-TEAM-HANDOFF-NOT-NOTHING, FIX-TEAM-ACK-LOOP). Hermes' status lines (a memory
 plugin's recall line, lifecycle and fallback notices) reach the adapter through
 `send_or_update_status` and are shown as the run's draft, never as a message, in every channel.
 

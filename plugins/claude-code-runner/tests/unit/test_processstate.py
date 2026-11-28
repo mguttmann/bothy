@@ -744,6 +744,28 @@ def test_a_replay_restarts_the_wait_at_the_adoption(tmp_path: Path) -> None:
     assert _decide(adopter, 5060.0, True) is Decision.RETRY
 
 
+ANSWERED = {"type": "result", "subtype": "success", "is_error": False, "num_turns": 1}
+
+
+def test_a_withheld_answer_is_no_proof_that_the_account_works(tmp_path: Path) -> None:
+    # FIX-RUNNER-BG-VISIBILITY: the counter-check withholds an answer without a proven login
+    # while the session waits; its turn end must not end the wait.
+    state = _held(tmp_path, "not_authenticated")
+    assert state.login_lost is True
+    state.account_retried(160.0)
+    state.apply(ANSWERED, 161.0, proven=False)
+    assert state.account is not None
+    assert state.login_lost is True
+    assert _decide(state, 161.0 + 120.0, True) is Decision.RETRY  # the wait goes on
+    state.apply(ANSWERED, 300.0)
+    assert state.account is None
+    assert state.login_lost is False
+
+
+def test_only_a_lost_login_marks_the_login_as_lost(tmp_path: Path) -> None:
+    assert _held(tmp_path, "usage_limit").login_lost is False
+
+
 def test_the_end_of_the_process_settles_a_wait(tmp_path: Path) -> None:
     # The CLI ended by itself during the wait: the account error is what ended its last turn.
     state = _held(tmp_path)

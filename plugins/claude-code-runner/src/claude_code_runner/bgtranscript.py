@@ -23,7 +23,11 @@ The mapping, record by record (only records of the main conversation, ``isSidech
   ``api_error_params``. The first one that is not synthetic first gives ``system/init`` with
   its model. Each ``tool_use`` of the tool ``Agent`` then gives ``system/task_started`` of a
   ``local_agent`` task known by the id of the call (FIX-RUNNER-BG-AGENT-STEPS), so the live box
-  shows the subagent under its call as in print mode.
+  shows the subagent under its call as in print mode. Each ``tool_use`` of the tool ``Bash``
+  with ``run_in_background`` true gives ``system/task_started`` of a ``local_bash`` task known
+  by the id of the call, titled with the first line of its command by the rule of every step
+  (`claude_code_runner.livebox.step_title`), so the live box shows the command as a
+  ``background_job`` step under its call (FIX-RUNNER-BG-VISIBILITY).
 * ``user`` with ``origin.kind`` ``peer``: the echo of the inbox line with that ``uuid``
   (18.5), when the runner wrote that line. ``user`` without an origin and with ``tool_result``
   items: those items, reduced to ``tool_use_id`` and ``is_error``. The origin of a ``user``
@@ -31,7 +35,11 @@ The mapping, record by record (only records of the main conversation, ``isSidech
   Its ``toolUseResult.status`` decides the task of the call: the result of an ``Agent`` call
   ends that task (``system/task_notification``) unless the status is ``async_launched`` (a
   background agent, which ends with its notification); ``async_launched`` with ``taskType``
-  `WORKFLOW_TASK_TYPE` starts a workflow task titled with the ``summary``.
+  `WORKFLOW_TASK_TYPE` starts a workflow task titled with the ``summary``. The result of a
+  background ``Bash`` call keeps its task open when ``toolUseResult.backgroundTaskId`` names
+  the background task (the command went to the background, recording of the pinned CLI); an
+  error result ends it ``failed``, any other result ``completed`` (the command ran in the
+  foreground).
 * A notification the session gave itself (a ``user`` record or a ``queued_command``
   attachment of the session's own origin, below) ends the task of the tool call its
   ``<tool-use-id>`` names, when this process started it, with its ``<status>`` and the
@@ -120,7 +128,7 @@ from pathlib import Path
 from typing import Any
 
 from claude_code_runner.bgsession import SessionEntry, SessionList
-from claude_code_runner.livebox import WORKFLOW_TASK_TYPE
+from claude_code_runner.livebox import WORKFLOW_TASK_TYPE, step_title
 from claude_code_runner.livecost import PriceTable, base_model, priced_micros
 from claude_code_runner.ownercode import OwnerLines
 from claude_code_runner.usage import ModelUsage
@@ -180,8 +188,9 @@ and of that attachment alike (of every other origin only ``kind`` is read); its 
 read in the CLI's file, not recorded: no recorded session got a delivery of another sender."""
 
 BACKGROUND_TASK = "background"
-"""The task id the runner reports while the session list says ``busy`` between two turns: the
-session works without a turn, and the list names no single task."""
+"""The task id the runner reports while the session list says ``busy`` between two turns and the
+process started no background command that is still open: the session works without a turn, and
+the list names no single task. With open commands their ids stand in its place."""
 
 CAUSE_WAITING = "background_session_waiting"
 """The cause of a run whose session waited for a person and was stopped."""
@@ -209,6 +218,8 @@ _NOTIFICATION = "task-notification"
 _OWN_PRODUCER = "session-task"
 _CONTINUATION = "auto-continuation"
 _AGENT_TOOL = "Agent"
+_BASH_TOOL = "Bash"
+_BASH_TASK_TYPE = "local_bash"
 _LAUNCHED = "async_launched"
 _NOTICE = re.compile(r"<(task-id|tool-use-id|status)>([^<]*)</\1>")
 _NOTICE_USAGE = (
@@ -394,7 +405,10 @@ class TranscriptMapper:
         self._tasks: set[str] = set()
         """The tool calls of this process that opened a task step (an agent, a workflow)."""
         self._task_calls: dict[str, str] = {}
-        """The tool call of each task id the CLI named in an ``async_launched`` result."""
+        """The tool call of each task id the CLI named in an ``async_launched`` result or as the
+        ``backgroundTaskId`` of a background command."""
+        self._jobs: dict[str, str] = {}
+        """The background commands of this process still open, by tool call, with their title."""
 
     # ---- helpers ---------------------------------------------------------------------------
 
@@ -715,6 +729,7 @@ class TranscriptMapper:
             self._requests.add(key)
         out.append(mapped)
         out.extend(self._agents_started(items))
+        out.extend(self._jobs_started(items))
         self._error_ended = error
         if error:
             # 2.1.326 writes no ``turn_duration`` after an API error: the error record is the
@@ -768,6 +783,53 @@ class TranscriptMapper:
             and item["id"] not in self._tasks
         ]
 
+    def _jobs_started(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """A background job step for each Bash call with ``run_in_background``, as in print mode.
+
+        The task is known by its tool call, which the call's result and the session's own
+        notification both name; the title is the first line of the command, the title of the
+        call's own step (no other member of the input is read). A call read again after an
+        adoption opens nothing new.
+        """
+        out: list[dict[str, Any]] = []
+        for item in items:
+            command = item.get("input")
+            if (
+                item.get("type") != "tool_use"
+                or item.get("name") != _BASH_TOOL
+                or not isinstance(item.get("id"), str)
+                or item["id"] in self._tasks
+                or not isinstance(command, Mapping)
+                or command.get("run_in_background") is not True
+            ):
+                continue
+            title = step_title({"command": command.get("command")})
+            self._jobs[item["id"]] = title
+            out.append(self._task_started(item["id"], _BASH_TASK_TYPE, title))
+        return out
+
+    def open_jobs(self) -> list[dict[str, Any]]:
+        """The background commands of this process that no result or notification ended.
+
+        Returns:
+            One task per command in the order of the calls, with ``task_id`` (the tool call)
+            and ``description`` (the step's title), as ``background_tasks_changed`` lists them.
+        """
+        return [{"task_id": ref, "description": title} for ref, title in self._jobs.items()]
+
+    def close_jobs(self) -> bool:
+        """The session is idle between turns: no background command of it runs any more.
+
+        A command the CLI stopped without a notification is not listed again in a later
+        busy phase.
+
+        Returns:
+            Whether a command was still open.
+        """
+        cleared = bool(self._jobs)
+        self._jobs.clear()
+        return cleared
+
     def _task_results(
         self, record: Mapping[str, Any], results: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
@@ -789,12 +851,25 @@ class TranscriptMapper:
             task_id = result.get("agentId") or result.get("taskId")
             if launched and isinstance(task_id, str) and task_id:
                 self._task_calls[task_id] = ref
-            if ref in self._tasks:
+            if ref in self._jobs:
+                out.extend(self._job_result(ref, result, error=item["is_error"]))
+            elif ref in self._tasks:
                 if not launched:
                     out.append(self._task_ended(ref, "failed" if item["is_error"] else "completed"))
             elif launched and result.get("taskType") == WORKFLOW_TASK_TYPE:
                 out.append(self._task_started(ref, WORKFLOW_TASK_TYPE, result.get("summary")))
         return out
+
+    def _job_result(
+        self, ref: str, result: Mapping[str, Any], *, error: bool
+    ) -> list[dict[str, Any]]:
+        """The result of a background command: it went to the background, failed or ran."""
+        job = result.get("backgroundTaskId")
+        if not error and isinstance(job, str) and job:
+            self._task_calls[job] = ref  # a notification may name the task id alone
+            return []
+        self._jobs.pop(ref, None)
+        return [self._task_ended(ref, "failed" if error else "completed")]
 
     def _notified(self, content: object) -> list[dict[str, Any]]:
         """The end of a task in the notification the session gave itself.
@@ -834,6 +909,7 @@ class TranscriptMapper:
                 if (m := re.search(rf"<{tag}>(\d+)</{tag}>", tail))
             }
             more = {"usage": usage} if usage else {}
+            self._jobs.pop(str(ref), None)
             out.append(self._task_ended(str(ref), status, **more))
         return out
 
@@ -1223,9 +1299,14 @@ class TranscriptReader:
 
     * After a turn end the reader waits for a reading of the list taken after it. ``busy``
       then means that the session works without a turn (background work), unless the
-      transcript already shows the start of the next turn: the reader reports one running
-      task (``system/background_tasks_changed``) before the ``result``, and an empty list
-      once a later reading says ``idle``.
+      transcript already shows the start of the next turn: the reader reports the running
+      tasks (``system/background_tasks_changed``) before the ``result``, and an empty list
+      once a later reading says ``idle``. The running tasks are the background commands of
+      the process that are still open (`TranscriptMapper.open_jobs`), or the one task
+      `BACKGROUND_TASK` when there is none; the list is reported again whenever it changes
+      while the session is busy, so the step of a command its notification ended is not
+      listed any more, and the empty list at ``idle`` ends every step still open
+      (FIX-RUNNER-BG-VISIBILITY).
     * While a turn runs and the list says ``busy``, each reading gives one ``tool_progress``,
       so a long tool call is not reported stalled (18.4).
     * A session that waits for a person (``waitingFor``), and a session whose process is not
@@ -1275,7 +1356,7 @@ class TranscriptReader:
         self._read_at = 0.0
         self._partial = b""
         self._pending: deque[bytes] = deque()
-        self._working = False
+        self._reported: list[str] = []
         self._failed = False
         self._status_at = 0.0
         self.status: str | None = None
@@ -1370,10 +1451,14 @@ class TranscriptReader:
         return failure
 
     def _tasks(self, working: bool) -> list[dict[str, Any]]:
-        if working == self._working:
+        # A command still open when the session is idle gets the empty list even when none was
+        # reported before: it ends the command's step (D-FIX-RUNNER-BG-VISIBILITY-2).
+        cleared = not working and self.mapper.close_jobs()
+        tasks = (self.mapper.open_jobs() or [{"task_id": BACKGROUND_TASK}]) if working else []
+        ids = [str(t["task_id"]) for t in tasks]
+        if ids == self._reported and not cleared:
             return []
-        self._working = working
-        tasks = [{"task_id": BACKGROUND_TASK}] if working else []
+        self._reported = ids
         return [{"type": "system", "subtype": "background_tasks_changed", "tasks": tasks}]
 
     def _turn_follows(self) -> bool:

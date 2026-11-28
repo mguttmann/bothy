@@ -26,7 +26,7 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing import Fault
 from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 
-from claude_code_runner.team import NO_OWNER_CHECK, SILENT_REPLY, is_silent_reply
+from claude_code_runner.team import NO_OWNER_CHECK, SILENT_REPLY, is_silent_reply, mentioned_handles
 
 from .conftest import LogLines, World
 from .test_bg_owner_codes import CODE, listed, socket_texts, valid
@@ -187,7 +187,9 @@ async def test_a_silent_reply_to_a_member_s_request_hands_back_a_visible_answer(
     assert await world.ended(run.run_id) == "completed"
     [answer] = [m["content_md"] for m in world.fake.messages]
     assert not is_silent_reply(answer)
-    assert answer.startswith("@docs: ")
+    # FIX-TEAM-ACK-LOOP: the notice names the member who asked without the @ (no new run).
+    assert answer.startswith("docs: ")
+    assert mentioned_handles(answer) == []
 
 
 async def test_a_silent_reply_in_a_started_session_still_hands_back(world: World) -> None:
@@ -211,7 +213,8 @@ async def test_a_silent_reply_in_a_started_session_still_hands_back(world: World
     answers = [m["content_md"] for m in world.fake.messages]
     assert answers[0] == "I wait for the owner's go."
     assert not is_silent_reply(answers[-1])
-    assert answers[-1].startswith("@docs: ")
+    assert answers[-1].startswith("docs: ")
+    assert mentioned_handles(answers[-1]) == []
 
 
 async def test_a_silent_reply_to_an_unaddressed_owner_message_stays_silent(world: World) -> None:

@@ -31,6 +31,7 @@ from bothy_sdk.generated.models import AgentTeamFacts
 __all__ = [
     "ACCEPTED_TRIGGER_KINDS",
     "MEMBER_LEAD_IN",
+    "NOTICE_MARK",
     "NO_OWNER_CHECK",
     "QUIET_RULES",
     "SILENT_REPLY",
@@ -50,33 +51,44 @@ SILENT_REPLY = "NOTHING_TO_ADD"
 team channel nor hands it on (09 3.9.4, FIX-TEAM-CHANNEL-NOISE)."""
 
 QUIET_RULES = (
-    "Write @handle only when you hand that member work or give back what it asked you for, and "
-    "say what you expect back. When you only refer to a member, write its handle without the @. "
-    "Never mention a member to say that a message was not for it, that you stay out, that you "
-    "agree or that you are waiting, unless it asked you for something. When an input mentions "
-    f"you with @ and asks you for something, never answer {SILENT_REPLY}: do what it asks, or say "
-    "briefly what you need for it or what blocks it (for example that you wait for the owner's "
-    "go), and mention the member who asked as @handle when you give something back. Otherwise, "
+    "Write @handle only when that member has to act on your reply or answer it: you hand it "
+    "work, give it a result it waits for to go on, or ask it a question that needs its answer; "
+    "say what you expect back. Every mention starts a run of that member. An answer or "
+    "information the member does not have to act on goes without @, also when it asked for it. "
+    "When you only refer to a member, write its handle without the @. An acknowledgement, a "
+    "thanks, a notice that you start or that work runs ('I am on it', 'understood', 'it runs "
+    "again', 'I report when it is done') and a status mention nobody with @, also when they "
+    "answer a request: the mention comes with what the member has to act on. Never mention a "
+    "member to say that a message was not for it, that you stay out, that you agree or that you "
+    "are waiting. When an input mentions you with @ and asks "
+    f"you for something, never answer {SILENT_REPLY}: do what it asks, or say briefly what you "
+    "need for it or what blocks it (for example that you wait for the owner's go), and mention "
+    "the member who asked as @handle when it has to act on your answer (it waits for the result "
+    "to go on, you cannot do it, or you need its answer); work that ends later you announce "
+    "without the @. Otherwise, "
     "if you have nothing new to contribute (the input is not for your project, it only names you "
     "without the @, or you would only acknowledge it, repeat a status or say that you wait), your "
     f"whole final reply is exactly {SILENT_REPLY}: it is not shown in the team channel and hands "
     "nothing on."
 )
-"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE): a mention is a hand-over,
-and a member with nothing to add answers with `SILENT_REPLY`, but never to a request that
-mentions it (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
+"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE): a mention is for a member
+that has to act or answer, never an acknowledgement (FIX-TEAM-ACK-LOOP), and a member with nothing
+to add answers with `SILENT_REPLY`, but never to a request that mentions it
+(FIX-TEAM-HANDOFF-NOT-NOTHING)."""
 
 NOTICE_MARK = "the session replied only that it had nothing to add.)"
 """The end of the runner's and the Hermes adapter's notice below: an input that carries it is a
-notice, and a silent reply to it stays silent, so two members never ping-pong notices."""
+notice, and a silent reply to it stays silent (a notice of an older version still mentions)."""
 
 UNANSWERED_MEMBER = (
-    "@{handle}: I got your request, but this run ended without an answer to it, so nothing of it "
-    "is done yet. Send it again or ask the owner. (Written by the runner: the session replied "
-    "only that it had nothing to add.)"
+    "{handle}: your message mentioned me, but this run ended without an answer to it, so if it "
+    "asked for something, nothing of it is done yet. Send it again or ask the owner. (Written "
+    "by the runner: the session replied only that it had nothing to add.)"
 )
-"""What replaces a silent reply to a member's request that mentions this member: the request
-is answered visibly and handed back (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
+"""What replaces a silent reply to a member's input that mentions this member: visible to the
+owner in the team channel (FIX-TEAM-HANDOFF-NOT-NOTHING), naming the member without the @, so
+it starts no run of that member and never answers an acknowledgement with a new run
+(FIX-TEAM-ACK-LOOP)."""
 
 UNANSWERED_OWNER = (
     "I got your message, but this run ended without an answer to it, so nothing of it is done "
@@ -263,8 +275,9 @@ def team_reply(reply: str, trigger: Any, facts: AgentTeamFacts | None) -> str:
 
     A silent reply to an input that mentions this member (the run's trigger) would be neither
     mirrored nor handed on, so the request would be lost: it is replaced by a short visible
-    answer, which mentions the member who asked (an owner is no member and is not mentioned).
-    Every other reply goes out as written.
+    answer, which names the member who asked without the @ (FIX-TEAM-ACK-LOOP: the input may
+    have been an acknowledgement, and a mention would start a run of its writer). Every other
+    reply goes out as written.
 
     Args:
         reply: The session's final reply.

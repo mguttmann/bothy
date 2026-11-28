@@ -143,6 +143,8 @@ class ProcessState:
         account_retries: The retry lines written before that failure mark was set; ``None``
             when none was written (the runner did not wait, or the wait ended before its
             first retry).
+        login_lost: The last account error of the process was ``not_logged_in`` and no turn
+            on a proven login answered since (FIX-RUNNER-BG-VISIBILITY).
     """
 
     def __init__(
@@ -172,18 +174,23 @@ class ProcessState:
         self.account: AccountWait | None = None
         self.account_error: AccountError | None = None
         self.account_retries: int | None = None
+        self.login_lost = False
         self._retry = account_retry
         self._turn_error: AccountError | None = None
         # The account error of the turn's last own assistant message, until its result.
 
     # ---- the one writer --------------------------------------------------------------------
 
-    def apply(self, message: Mapping[str, Any], now: float) -> None:
+    def apply(self, message: Mapping[str, Any], now: float, *, proven: bool = True) -> None:
         """Take one stream message read (or replayed) at ``now``.
 
         Args:
             message: A decoded stream message.
             now: The monotonic read time (the adoption time for a replayed line).
+            proven: False for an output of a background session that the counter-check of
+                18.3 withheld while the session waits for its account
+                (FIX-RUNNER-BG-VISIBILITY): its turn end is no proof that the account works,
+                so it neither ends the wait nor clears `login_lost`.
         """
         self.background.apply(message, now)
         kind, subtype = message.get("type"), message.get("subtype")
@@ -198,11 +205,12 @@ class ProcessState:
                 self.last_result_at = now
             if not _success(message):
                 self._error_result(now)
-            elif message.get("num_turns") != 0:
+            elif message.get("num_turns") != 0 and proven:
                 # An answered turn: the account works. A result of a turn without a request
                 # to the model (num_turns 0, a task's notification the CLI only notes) is no
-                # such proof and leaves the wait as it is.
+                # such proof and leaves the wait as it is, nor is a withheld one.
                 self.account = None
+                self.login_lost = False
             self._turn_error = None
         elif kind == "system" and subtype == "background_tasks_changed":
             self._task_list(message.get("tasks"))
@@ -216,6 +224,8 @@ class ProcessState:
                 # Only the turn's last own message counts: an answer after an API error
                 # means the turn went on.
                 self._turn_error = account_error(message)
+                if self._turn_error is not None and self._turn_error.kind == "not_logged_in":
+                    self.login_lost = True
 
     def _error_result(self, now: float) -> None:
         if not self.has_stdin:

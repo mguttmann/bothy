@@ -17,6 +17,7 @@ from bothy_sdk.generated.models import AgentInvocationPayload, AgentTeamFacts
 from claude_code_runner.team import (
     ACCEPTED_TRIGGER_KINDS,
     NO_OWNER_CHECK,
+    NOTICE_MARK,
     SILENT_REPLY,
     UNANSWERED_MEMBER,
     facts_of,
@@ -152,12 +153,12 @@ def test_the_team_part_keeps_the_channel_quiet() -> None:
     text = team_part(message("Everyone: status?", agent=False), facts("owner"))
     assert SILENT_REPLY == "NOTHING_TO_ADD"
     assert f"exactly {SILENT_REPLY}" in text
-    assert "only when you hand that member work" in text
+    assert "only when that member has to act on your reply or answer it" in text
     assert "without the @" in text
     assert "was not for it" in text
     member = team_part(message("@web please review the API", agent=True), facts())
     assert f"exactly {SILENT_REPLY}" in member
-    assert "only when you hand that member work" in member
+    assert "only when that member has to act on your reply or answer it" in member
 
 
 def test_the_note_of_an_unaddressed_input_offers_the_silent_reply() -> None:
@@ -291,12 +292,71 @@ def test_the_silent_reply_follows_the_server_s_rule(text: str, silent: bool) -> 
     assert is_silent_reply(text) is silent
 
 
-def test_a_silent_reply_to_a_member_s_request_is_replaced_and_hands_back() -> None:
+def test_a_silent_reply_to_a_member_s_request_is_replaced_without_a_mention() -> None:
+    # FIX-TEAM-ACK-LOOP: the notice names the member who asked without the @, so the owner sees
+    # it in the team channel and it starts no run of that member.
     reply = team_reply(SILENT_REPLY, message("@web send the paths", agent=True), facts())
     assert not is_silent_reply(reply)
-    assert reply.startswith("@docs: ")
+    assert reply.startswith("docs: ")
+    assert mentioned_handles(reply) == []
     assert "nothing of it is done" in reply
     assert "runner" in reply
+    assert reply.endswith(NOTICE_MARK)
+
+
+# The sequence of 2026-11-25 in the team channel (owner report 11:46 UTC), translated: the
+# conductor handed work to the coding agent; the coding agent only announced that it starts and
+# mentioned the conductor; the conductor's run had nothing to add, and the notice mentioned the
+# coding agent, whose run answered the notice. Each acknowledgement with @ cost two more runs.
+ANNOUNCEMENT_2026_11_25 = (
+    "@agentconductor I am checking the end of fix round 2 with `fix-evidence-failed` / "
+    "`base-version-without-result`. The check runs as a background agent of my session. "
+    "You will then get two things back from me: the cause with evidence and the commit in "
+    "`main` and in the release copy.\n\nPlease do not continue anything until then."
+)
+THANKS_2026_11_25 = (
+    "@codingagent: Thanks. I continued `run-5684-x` with a plain `run TICKET-5684`, "
+    "without `--again`. The chain runs again (process 25418) and goes on with the red team. "
+    "If an unexpected reason for the end comes up, I will send you the round folder."
+)
+
+
+@pytest.mark.parametrize(
+    ("trigger", "own", "source"),
+    [
+        (ANNOUNCEMENT_2026_11_25, "agentconductor", "codingagent"),
+        (THANKS_2026_11_25, "codingagent", "agentconductor"),
+    ],
+)
+def test_the_notice_of_the_2026_11_25_sequence_starts_no_run(
+    trigger: str, own: str, source: str
+) -> None:
+    team = facts(handle=own, source_handle=source)
+    assert mentioned_handles(trigger) == [own]
+    notice = team_reply(SILENT_REPLY, message(trigger, agent=True), team)
+    # The server hands a reply on to the members it mentions (09 3.9.4); the notice mentions
+    # none, so the chain ends here instead of starting a run of the member that wrote the
+    # acknowledgement. The owner still sees the notice with the member's handle.
+    assert mentioned_handles(notice) == []
+    assert notice.startswith(f"{source}: ")
+    assert not is_silent_reply(notice)
+
+
+def test_acknowledgements_and_start_notices_mention_nobody() -> None:
+    # FIX-TEAM-ACK-LOOP: "I start", "understood", "it runs", "I report when done" are no
+    # hand-over; the mention comes with the result, a real hand-over or a question.
+    text = team_part(message("@web please check the run", agent=True), facts())
+    assert "An acknowledgement, a thanks" in text
+    assert "a notice that you start or that work runs" in text
+    assert "mention nobody with @, also when they answer a request" in text
+    assert "the mention comes with what the member has to act on" in text
+    assert "a question that needs its answer" in text
+    assert "unless it asked you for something" not in text
+    # Team follow-up of 2026-11-25: reviewagent answered hermesmember with @, hermesmember had
+    # nothing left to do, and the notice came anyway; an answer the member does not have to
+    # act on goes without @, a result it needs to go on keeps it.
+    assert "An answer or information the member does not have to act on" in text
+    assert "a result it waits for to go on" in text
 
 
 def test_a_silent_reply_to_an_owner_s_request_is_replaced_without_a_mention() -> None:
@@ -324,7 +384,7 @@ def test_other_replies_go_out_as_written(trigger: Any, team: str | None, reply: 
 
 
 def test_a_silent_reply_to_the_runner_s_own_notice_stays_silent() -> None:
-    # Red team: the notice mentions the requester; its silent answer must not send a notice
-    # back, or two members ping-pong notices until the brake stops the channel.
+    # Red team: a notice of an older version mentions the requester; its silent answer must
+    # not send a notice back, or two members ping-pong notices until the brake stops them.
     notice = message(UNANSWERED_MEMBER.format(handle="web"), agent=True)
     assert team_reply(SILENT_REPLY, notice, facts()) == SILENT_REPLY

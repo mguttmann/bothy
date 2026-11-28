@@ -60,29 +60,38 @@ team channel nor hands it on (09 3.9.4, FIX-TEAM-CHANNEL-NOISE). It is no silenc
 Hermes, so Hermes posts it like any answer."""
 
 QUIET_RULES: Final = (
-    "Write @handle only when you hand that member work or give back what it asked you for, and "
-    "say what you expect back. When you only refer to a member, write its handle without the @. "
-    "Never mention a member to say that a message was not for it, that you stay out, that you "
-    "agree or that you are waiting, unless it asked you for something. When a message mentions "
-    f"you with @ and asks you for something, never answer {SILENT_REPLY}: do what it asks, or say "
-    "briefly what you need for it or what blocks it (for example that you wait for the owner's "
-    "go), and mention the member who asked as @handle when you give something back. Otherwise, "
+    "Write @handle only when that member has to act on your reply or answer it: you hand it "
+    "work, give it a result it waits for to go on, or ask it a question that needs its answer; "
+    "say what you expect back. Every mention starts a run of that member. An answer or "
+    "information the member does not have to act on goes without @, also when it asked for it. "
+    "When you only refer to a member, write its handle without the @. An acknowledgement, a "
+    "thanks, a notice that you start or that work runs ('I am on it', 'understood', 'it runs "
+    "again', 'I report when it is done') and a status mention nobody with @, also when they "
+    "answer a request: the mention comes with what the member has to act on. Never mention a "
+    "member to say that a message was not for it, that you stay out, that you agree or that you "
+    "are waiting. When a message mentions you with @ and asks "
+    f"you for something, never answer {SILENT_REPLY}: do what it asks, or say briefly what you "
+    "need for it or what blocks it (for example that you wait for the owner's go), and mention "
+    "the member who asked as @handle when it has to act on your answer (it waits for the result "
+    "to go on, you cannot do it, or you need its answer); work that ends later you announce "
+    "without the @. Otherwise, "
     "if you have nothing new to contribute (the message is not for you, it only names you "
     "without the @, or you would only acknowledge it, repeat a status or say that you wait), your "
     f"whole final reply is exactly {SILENT_REPLY}: it is not shown in the team channel and hands "
     "nothing on."
 )
-"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE), never silent towards a
+"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE): a mention is for a member
+that has to act or answer, never an acknowledgement (FIX-TEAM-ACK-LOOP), never silent towards a
 request that mentions the member (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
 
 NOTICE_MARK: Final = "the session replied only that it had nothing to add.)"
 """The end of the adapter's and the Claude Code runner's notice below: an input that carries it
-is a notice, and a silent reply to it stays silent, so two members never ping-pong notices."""
+is a notice, and a silent reply to it stays silent (a notice of an older version still mentions)."""
 
 _UNANSWERED_MEMBER: Final = (
-    "@{handle}: I got your request, but this run ended without an answer to it, so nothing of it "
-    "is done yet. Send it again or ask the owner. (Written by the adapter: the session replied "
-    "only that it had nothing to add.)"
+    "{handle}: your message mentioned me, but this run ended without an answer to it, so if it "
+    "asked for something, nothing of it is done yet. Send it again or ask the owner. (Written "
+    "by the adapter: the session replied only that it had nothing to add.)"
 )
 _UNANSWERED_OWNER: Final = (
     "I got your message, but this run ended without an answer to it, so nothing of it is done "
@@ -352,8 +361,10 @@ def team_reply(reply: str, facts: TeamFacts | None, speaker: Speaker | None) -> 
     """The first answer of a team run as it goes out (FIX-TEAM-HANDOFF-NOT-NOTHING).
 
     A silent reply to an input that mentions this member would be neither mirrored nor handed
-    on, so the request would be lost: it is replaced by a short visible answer that mentions the
-    member who asked (an owner is no member and is not mentioned, nor is an unknown handle).
+    on, so the request would be lost: it is replaced by a short visible answer that names the
+    member who asked without the @ (FIX-TEAM-ACK-LOOP: the input may have been an
+    acknowledgement, and a mention would start a run of its writer); an owner is no member and
+    is not named, nor is an unknown handle.
 
     Args:
         reply: Hermes' answer.
