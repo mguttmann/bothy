@@ -254,7 +254,7 @@ func TestDeletionInfo_Counts(t *testing.T) {
 	msg := w.message(a.ID)
 	file := ids.New()
 	w.sql(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, scope_channel_id,
-		upload_state, scan_status) VALUES ($1, $2, '\x01', 10, 'text/plain', 'notes.txt', $3, 'attachment', $4, 'complete', 'clean')`,
+		upload_state, scan_status) VALUES ($1, $2, decode(repeat('00', 32), 'hex'), 10, 'text/plain', 'notes.txt', $3, 'attachment', $4, 'complete', 'clean')`,
 		file.String(), "f/"+file.String(), w.ownerID.String(), forum.String())
 	w.sql(`INSERT INTO message_attachments (message_id, file_id, position, thread_id, channel_id) VALUES ($1, $2, 0, $3, $4)`,
 		msg.String(), file.String(), a.ID.String(), forum.String())

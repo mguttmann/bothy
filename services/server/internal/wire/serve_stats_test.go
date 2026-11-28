@@ -673,7 +673,7 @@ func (w *statsWorld) seedInstanceRows() {
 		status string
 	}{{w.allgemein, 1000, "infected"}, {w.server, 500, "error"}} {
 		w.sql(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, scope_channel_id, upload_state,
-			scan_status, scanned_at) VALUES ($1, $2, '\x00', $3, 'text/plain', 'report.txt', $4, $5, 'complete', $6, $7)`,
+			scan_status, scanned_at) VALUES ($1, $2, decode(repeat('00', 32), 'hex'), $3, 'text/plain', 'report.txt', $4, $5, 'complete', $6, $7)`,
 			ids.New().String(), "objects/"+ids.New().String(), f.size, w.owner.user.String(), f.c.id, f.status, statsDay)
 	}
 }

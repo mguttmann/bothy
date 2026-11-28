@@ -73,7 +73,7 @@ func newWorker[A Args](h Handler[A], o HandlerOptions, kind string, d workerDeps
 // that does not run is held with River's snooze for Maintenance.Pause, and a kind that runs gets
 // txn.WithWriteInMaintenance, so its units of work may write (ADR 0065 item 4). A handler that
 // returns Snooze gets River's snooze: the attempt is snoozed, uses up no attempt and logs nothing.
-func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
+func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) error {
 	if m := w.d.maintenance; m != nil {
 		if !m.runs(w.kind) {
 			// Maintenance mode holds the job without running it and without an attempt.
@@ -85,6 +85,8 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 	ctx, span := w.d.tracer.Start(ctx, "job "+w.kind,
 		trace.WithSpanKind(trace.SpanKindConsumer),
 		trace.WithAttributes(attribute.String(attr.JobKind, w.kind)))
+	// err is the result of the handler; the deferred records read it, not River's snooze error.
+	var err error
 	defer func() {
 		outcome := outcomeOf(ctx, err)
 		if w.d.metrics != nil {
@@ -99,15 +101,22 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 		}
 		span.End()
 	}()
-	err = w.run(ctx, j)
+	err = w.attempt(ctx, j)
+	if pause, ok := SnoozePause(err); ok {
+		return river.JobSnooze(pause)
+	}
+	return err
+}
+
+// attempt runs the handler once: a nil result while ctx has ended becomes ctx.Err(), and a failed
+// attempt is logged.
+func (w *worker[A]) attempt(ctx context.Context, j *river.Job[A]) error {
+	err := w.run(ctx, j)
 	if err == nil && ctx.Err() != nil {
 		err = ctx.Err()
 	}
 	if err != nil && outcomeOf(ctx, err) == outcomeFailed && !errors.Is(err, errPanicked) {
 		w.logFailed(ctx, j, err)
-	}
-	if pause, ok := SnoozePause(err); ok {
-		return river.JobSnooze(pause)
 	}
 	return err
 }

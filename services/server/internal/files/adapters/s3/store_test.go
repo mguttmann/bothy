@@ -661,19 +661,6 @@ func TestOversizedErrorDocumentIsNoSentinel(t *testing.T) {
 	}
 }
 
-func containsAll(have []string, want ...string) bool {
-	for _, w := range want {
-		found := false
-		for _, h := range have {
-			found = found || h == w
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
-}
-
 // TestS3SDKOnlyInAdapter holds 12 "15" and ADR 0048 "Confirmation": no package of the module but
 // internal/files/adapters/s3, the checkpoint sink internal/audit/adapters/s3sink (M7-22) and the
 // object mirror of the backup service internal/status/adapters/s3mirror (M7-02) imports a path

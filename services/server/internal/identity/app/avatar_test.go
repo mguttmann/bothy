@@ -97,7 +97,7 @@ func (f *fakeAvatarFiles) Stage(ctx context.Context, uploadedBy ids.ID, img iden
 	}
 	id := ids.New()
 	f.w.sql(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose)
-		VALUES ($1, $3, '\x00', 1, 'image/png', 'avatar', $2, 'avatar')`, id.String(), uploadedBy.String(), "avatars/"+id.String())
+		VALUES ($1, $3, decode(repeat('00', 32), 'hex'), 1, 'image/png', 'avatar', $2, 'avatar')`, id.String(), uploadedBy.String(), "avatars/"+id.String())
 	f.staged = append(f.staged, id)
 	return id, nil
 }
@@ -364,7 +364,7 @@ func TestAvatar_Unbound(t *testing.T) {
 	}
 	f := ids.New()
 	w.sql(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose)
-		VALUES ($1, $3, '\x00', 1, 'image/png', 'avatar', $2, 'avatar')`, f.String(), alex.ID.String(), "avatars/"+f.String())
+		VALUES ($1, $3, decode(repeat('00', 32), 'hex'), 1, 'image/png', 'avatar', $2, 'avatar')`, f.String(), alex.ID.String(), "avatars/"+f.String())
 	w.sql(`UPDATE principals SET avatar_file_id = $1 WHERE id = $2`, f.String(), alex.ID.String())
 	wantCode(t, w.p.DeleteMyAvatar(checked(alex), alex), errs.CodeUnavailable)
 	if w.avatarOf(alex.ID) != f.String() || w.userEvents(alex.ID) != 0 {

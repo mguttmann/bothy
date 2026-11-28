@@ -149,7 +149,7 @@ func (d *direct) attached(name, mime string, content []byte) ids.ID {
 	}
 	d.exec(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, scope_channel_id,
 		upload_state, scan_status, created_at)
-		VALUES ($1, $2, '\x01', $3, $4, $5, $6, 'attachment', $7, 'complete', 'clean', $8)`,
+		VALUES ($1, $2, decode(repeat('00', 32), 'hex'), $3, $4, $5, $6, 'attachment', $7, 'complete', 'clean', $8)`,
 		id, key, len(content), mime, name, d.alex, d.allg, d.clk.Now())
 	d.seq++
 	msg := ids.New()

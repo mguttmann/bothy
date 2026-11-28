@@ -134,7 +134,7 @@ func (p *pdWorld) stored(uploader, channel ids.ID, purpose, upload, scan, name, 
 func (p *pdWorld) openSession(uploader ids.ID) ids.ID {
 	p.t.Helper()
 	id := p.file(uploader, p.allgemein, "attachment", "open", "pending", "pending")
-	p.exec(`INSERT INTO file_upload_parts (file_id, part_number, size_bytes, sha256) VALUES ($1, 1, 4, '\x01')`, id)
+	p.exec(`INSERT INTO file_upload_parts (file_id, part_number, size_bytes, sha256) VALUES ($1, 1, 4, decode(repeat('00', 32), 'hex'))`, id)
 	return id
 }
 

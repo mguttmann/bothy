@@ -199,20 +199,6 @@ func (s *gifScanner) application() error {
 	return s.skipSubBlocks()
 }
 
-// subBlock reads one data sub-block (at most 255 bytes, the size byte bounds it) and returns its
-// data, or nil for the block terminator.
-func (s *gifScanner) subBlock() ([]byte, error) {
-	n, err := s.r.ReadByte()
-	if err != nil || n == 0 {
-		return nil, err
-	}
-	data := make([]byte, n)
-	if _, err := io.ReadFull(s.r, data); err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
 // skipSubBlocks discards data sub-blocks up to and including the block terminator.
 func (s *gifScanner) skipSubBlocks() error {
 	for {

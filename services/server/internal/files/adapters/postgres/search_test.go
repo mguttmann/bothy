@@ -111,7 +111,7 @@ func (s *searchWorld) add(sp spec) placed {
 	p := placed{file: ids.New(), thread: sp.thread, channel: channel}
 	s.exec(`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose, scope_channel_id,
 		upload_state, scan_status, transcript_text, created_at, deleted_at)
-		VALUES ($1, $2, '\x01', 10, 'text/plain', $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		VALUES ($1, $2, decode(repeat('00', 32), 'hex'), 10, 'text/plain', $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		p.file, "f/"+p.file.String(), sp.name, sp.uploader, sp.purpose, scope, sp.upload, sp.scan, transcript, sp.at, deletedAt)
 	if sp.unattached {
 		return p
